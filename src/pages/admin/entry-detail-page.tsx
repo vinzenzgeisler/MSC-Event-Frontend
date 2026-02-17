@@ -1,313 +1,160 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  generateTechCheck,
-  generateWaiver,
-  getAdminEntryDetail,
-  getAdminEventsCurrent,
-  patchCheckinIdVerify,
-  patchEntryStatus,
-  patchTechStatus,
-  recordPayment
-} from "@/api/client";
-import { acceptanceStatuses, lifecycleEventTypes, paymentMethods, techStatuses } from "@/api/types";
-import { ErrorState } from "@/components/state/error-state";
-import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { getErrorMessage } from "@/lib/http/api-error";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { adminEntriesService } from "@/services/admin-entries.service";
 
-function extractEventId(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return "";
-  }
-  const obj = payload as Record<string, unknown>;
-  return (
-    (obj.event && typeof obj.event === "object" && ((obj.event as Record<string, unknown>).id as string)) ||
-    (obj.event && typeof obj.event === "object" && ((obj.event as Record<string, unknown>).eventId as string)) ||
-    (obj.eventId as string) ||
-    (obj.id as string) ||
-    ""
-  );
+const tabs = ["Überblick", "Person", "Startmeldungen/Fahrzeuge", "Zahlung", "Dokumente", "Historie"] as const;
+
+type TabValue = (typeof tabs)[number];
+
+function asEuro(cents: number) {
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 
 export function AdminEntryDetailPage() {
-  const { entryId } = useParams<{ entryId: string }>();
-  const [acceptanceStatus, setAcceptanceStatus] = useState(acceptanceStatuses[0]);
-  const [sendLifecycleMail, setSendLifecycleMail] = useState(false);
-  const [lifecycleEventType, setLifecycleEventType] = useState(lifecycleEventTypes[0]);
-  const [techStatus, setTechStatus] = useState(techStatuses[0]);
-  const [payment, setPayment] = useState({ amountCents: "", paidAt: "", method: paymentMethods[0], note: "" });
+  const { entryId = "" } = useParams();
+  const [activeTab, setActiveTab] = useState<TabValue>("Überblick");
+  const [resolvedDetail, setResolvedDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
+  const [status, setStatus] = useState("accepted");
+  const [paid, setPaid] = useState(false);
+  const [checkinDone, setCheckinDone] = useState(false);
 
-  const detailQuery = useQuery({
-    queryKey: ["admin", "entry", entryId],
-    queryFn: () => getAdminEntryDetail(entryId || ""),
-    enabled: !!entryId
-  });
+  useEffect(() => {
+    adminEntriesService.getEntryDetail(entryId).then((result) => {
+      setResolvedDetail(result);
+      if (result) {
+        setStatus(result.status);
+        setPaid(result.payment.status === "paid");
+        setCheckinDone(result.checkinVerified);
+      }
+    });
+  }, [entryId]);
 
-  const currentEventQuery = useQuery({
-    queryKey: ["admin", "currentEvent"],
-    queryFn: getAdminEventsCurrent
-  });
-
-  const entry = detailQuery.data?.entry as Record<string, unknown> | undefined;
-  const history = detailQuery.data?.history ?? [];
-
-  const eventId = useMemo(() => entry?.eventId || extractEventId(currentEventQuery.data), [entry, currentEventQuery.data]);
-
-  const invoiceId = (entry?.invoiceId as string) || (entry?.invoice as Record<string, unknown>)?.id || "";
-
-  const statusMutation = useMutation({
-    mutationFn: () => patchEntryStatus(entryId || "", { acceptanceStatus, sendLifecycleMail, lifecycleEventType })
-  });
-
-  const techMutation = useMutation({
-    mutationFn: () => patchTechStatus(entryId || "", { techStatus })
-  });
-
-  const checkinMutation = useMutation({
-    mutationFn: () => patchCheckinIdVerify(entryId || "")
-  });
-
-  const paymentMutation = useMutation({
-    mutationFn: () =>
-      recordPayment(invoiceId, {
-        amountCents: Number(payment.amountCents),
-        paidAt: payment.paidAt ? new Date(payment.paidAt).toISOString() : new Date().toISOString(),
-        method: payment.method,
-        note: payment.note || undefined
-      })
-  });
-
-  const waiverMutation = useMutation({
-    mutationFn: () => generateWaiver({ eventId, entryId: entryId || "" })
-  });
-
-  const techCheckMutation = useMutation({
-    mutationFn: () => generateTechCheck({ eventId, entryId: entryId || "" })
-  });
-
-  if (detailQuery.isLoading) {
-    return <LoadingState />;
-  }
-
-  if (detailQuery.error) {
-    return <ErrorState message={getErrorMessage(detailQuery.error)} />;
-  }
-
-  if (!entry) {
-    return <ErrorState message="Eintrag nicht gefunden." />;
+  if (!resolvedDetail) {
+    return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung nicht gefunden.</div>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">{resolvedDetail.headline}</h1>
+          <p className="text-sm text-slate-600">
+            {resolvedDetail.classLabel} · Startnummer {resolvedDetail.startNumber}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">{status}</Badge>
+          <Badge variant={paid ? "secondary" : "outline"}>{paid ? "paid" : "due"}</Badge>
+          <Badge variant={checkinDone ? "secondary" : "outline"}>{checkinDone ? "checkin ok" : "checkin offen"}</Badge>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Nennungsdetail</CardTitle>
-          <CardDescription>ID: {entryId}</CardDescription>
+          <CardTitle className="text-sm text-slate-600">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {entry.acceptanceStatus && <Badge variant="secondary">Status: {String(entry.acceptanceStatus)}</Badge>}
-            {entry.registrationStatus && <Badge variant="outline">Registrierung: {String(entry.registrationStatus)}</Badge>}
-            {entry.paymentStatus && <Badge variant="outline">Zahlung: {String(entry.paymentStatus)}</Badge>}
-            {entry.techStatus && <Badge variant="outline">Technik: {String(entry.techStatus)}</Badge>}
-          </div>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setStatus("accepted")}>
+            Status ändern
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setPaid(true)}>
+            Bezahlt setzen
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setCheckinDone(true)}>
+            Check-in bestätigen
+          </Button>
+        </CardContent>
+      </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((tab) => (
+          <Button key={tab} type="button" size="sm" variant={activeTab === tab ? "default" : "outline"} onClick={() => setActiveTab(tab)}>
+            {tab}
+          </Button>
+        ))}
+      </div>
+
+      {activeTab === "Überblick" && (
+        <Card>
+          <CardContent className="grid gap-3 p-4 md:grid-cols-2">
             <div>
-              <div className="text-xs uppercase text-muted-foreground">Fahrer</div>
-              <div className="text-sm">
-                {(entry.driver as Record<string, unknown>)?.firstName} {(entry.driver as Record<string, unknown>)?.lastName}
-              </div>
-              <div className="text-xs text-muted-foreground">{(entry.driver as Record<string, unknown>)?.email}</div>
+              <div className="text-xs uppercase text-slate-500">Fahrer</div>
+              <div className="font-medium">{resolvedDetail.driver.name}</div>
+              <div className="text-sm text-slate-600">{resolvedDetail.driver.email}</div>
             </div>
             <div>
-              <div className="text-xs uppercase text-muted-foreground">Fahrzeug</div>
-              <div className="text-sm">
-                {(entry.vehicle as Record<string, unknown>)?.make} {(entry.vehicle as Record<string, unknown>)?.model}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Startnummer: {(entry.startNumber as string) || (entry.vehicle as Record<string, unknown>)?.startNumber || "-"}
-              </div>
+              <div className="text-xs uppercase text-slate-500">Status</div>
+              <div className="font-medium">{status}</div>
+              <div className="text-sm text-slate-600">Registrierung: {resolvedDetail.registrationStatus}</div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Status & Check-in</CardTitle>
-          <CardDescription>Statusänderungen und ID-Check.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={acceptanceStatus}
-              onChange={(event) => setAcceptanceStatus(event.target.value)}
-            >
-              {acceptanceStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            <div className="flex items-center gap-2 text-sm">
-              <input
-                id="sendLifecycleMail"
-                type="checkbox"
-                checked={sendLifecycleMail}
-                onChange={(event) => setSendLifecycleMail(event.target.checked)}
-              />
-              <Label htmlFor="sendLifecycleMail">Lifecycle-Mail senden</Label>
-            </div>
-            {sendLifecycleMail && (
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={lifecycleEventType}
-                onChange={(event) => setLifecycleEventType(event.target.value)}
-              >
-                {lifecycleEventTypes.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            )}
-            <Button onClick={() => statusMutation.mutate()} disabled={statusMutation.isPending}>
-              {statusMutation.isPending ? "Speichere..." : "Status speichern"}
-            </Button>
-            {statusMutation.isError && <ErrorState message={getErrorMessage(statusMutation.error)} />}
-          </div>
+      {activeTab === "Person" && (
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm text-slate-700">
+            <div>Name: {resolvedDetail.driver.name}</div>
+            <div>E-Mail: {resolvedDetail.driver.email}</div>
+            <div>Hinweise: {resolvedDetail.notes}</div>
+          </CardContent>
+        </Card>
+      )}
 
-          <div className="space-y-2">
-            <Label>Technikstatus</Label>
-            <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={techStatus}
-              onChange={(event) => setTechStatus(event.target.value)}
-            >
-              {techStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            <Button onClick={() => techMutation.mutate()} disabled={techMutation.isPending}>
-              {techMutation.isPending ? "Speichere..." : "Tech-Status speichern"}
-            </Button>
-            {techMutation.isError && <ErrorState message={getErrorMessage(techMutation.error)} />}
+      {activeTab === "Startmeldungen/Fahrzeuge" && (
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm text-slate-700">
+            <div className="font-medium">{resolvedDetail.vehicle.label}</div>
+            {resolvedDetail.vehicle.facts.map((fact) => (
+              <div key={fact}>{fact}</div>
+            ))}
+            {resolvedDetail.relatedEntryIds.length > 1 && <div>Verknüpfte Nennungen: {resolvedDetail.relatedEntryIds.join(", ")}</div>}
+          </CardContent>
+        </Card>
+      )}
 
-            <Button variant="outline" onClick={() => checkinMutation.mutate()} disabled={checkinMutation.isPending}>
-              ID geprüft markieren
-            </Button>
-            {checkinMutation.isError && <ErrorState message={getErrorMessage(checkinMutation.error)} />}
-          </div>
-        </CardContent>
-      </Card>
+      {activeTab === "Zahlung" && (
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm text-slate-700">
+            <div>Gesamt: {asEuro(resolvedDetail.payment.totalCents)}</div>
+            <div>Bezahlt: {asEuro(resolvedDetail.payment.paidAmountCents)}</div>
+            <div>Offen: {asEuro(resolvedDetail.payment.amountOpenCents)}</div>
+            <div>Status: {resolvedDetail.payment.status}</div>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Zahlung</CardTitle>
-          <CardDescription>Erfassung von Zahlungen (falls Rechnung vorhanden).</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!invoiceId && <div className="text-sm text-muted-foreground">Keine Rechnung verknüpft.</div>}
-          {invoiceId && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Betrag (Cent)</Label>
-                <Input
-                  id="amount"
-                  value={payment.amountCents}
-                  onChange={(event) => setPayment((prev) => ({ ...prev, amountCents: event.target.value }))}
-                />
+      {activeTab === "Dokumente" && (
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm text-slate-700">
+            {resolvedDetail.documents.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between rounded border p-2">
+                <span>{doc.type}</span>
+                <span>{doc.status}</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="paidAt">Zahlungsdatum</Label>
-                <Input
-                  id="paidAt"
-                  type="datetime-local"
-                  value={payment.paidAt}
-                  onChange={(event) => setPayment((prev) => ({ ...prev, paidAt: event.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="method">Methode</Label>
-                <select
-                  id="method"
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={payment.method}
-                  onChange={(event) => setPayment((prev) => ({ ...prev, method: event.target.value }))}
-                >
-                  {paymentMethods.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="note">Notiz</Label>
-                <Input
-                  id="note"
-                  value={payment.note}
-                  onChange={(event) => setPayment((prev) => ({ ...prev, note: event.target.value }))}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Button onClick={() => paymentMutation.mutate()} disabled={paymentMutation.isPending}>
-                  Zahlung speichern
-                </Button>
-                {paymentMutation.isError && <ErrorState message={getErrorMessage(paymentMutation.error)} />}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Dokumente</CardTitle>
-          <CardDescription>Haftverzicht und Tech-Check erstellen.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!eventId && <div className="text-sm text-muted-foreground">Event ID fehlt.</div>}
-          {eventId && (
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => waiverMutation.mutate()} disabled={waiverMutation.isPending}>
-                Haftverzicht erzeugen
-              </Button>
-              <Button variant="outline" onClick={() => techCheckMutation.mutate()} disabled={techCheckMutation.isPending}>
-                Tech-Check erzeugen
-              </Button>
-            </div>
-          )}
-          {waiverMutation.isError && <ErrorState message={getErrorMessage(waiverMutation.error)} />}
-          {techCheckMutation.isError && <ErrorState message={getErrorMessage(techCheckMutation.error)} />}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>History</CardTitle>
-          <CardDescription>Audit/History-Einträge.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {history.length === 0 && <div className="text-sm text-muted-foreground">Keine Einträge vorhanden.</div>}
-          {history.map((item, index) => (
-            <div key={index} className="rounded-md border p-3 text-sm">
-              <pre className="whitespace-pre-wrap text-xs text-muted-foreground">{JSON.stringify(item, null, 2)}</pre>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      {activeTab === "Historie" && (
+        <Card>
+          <CardContent className="space-y-2 p-4 text-sm text-slate-700">
+            {resolvedDetail.history.map((item) => (
+              <div key={item.id} className="rounded border p-2">
+                <div className="font-medium">{item.action}</div>
+                <div>{item.details}</div>
+                <div className="text-xs text-slate-500">
+                  {new Date(item.timestamp).toLocaleString("de-DE")} · {item.actor}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -4,24 +4,27 @@ import { AdminNav } from "@/components/navigation/admin-nav";
 import { Button } from "@/components/ui/button";
 
 export function AdminLayout() {
-  const { logout, roles } = useAuth();
+  const { logout } = useAuth();
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      <header className="mb-8 flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">MSC Event</div>
-          <h1 className="text-3xl font-bold">Admin</h1>
-          <p className="text-sm text-muted-foreground">Rollen: {roles.length ? roles.join(", ") : "unbekannt"}</p>
-        </div>
-        <Button variant="outline" onClick={logout}>
-          Logout
-        </Button>
-      </header>
-      <div className="mb-6">
-        <AdminNav />
+    <div className="min-h-screen bg-slate-100">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[240px_1fr]">
+        <aside className="rounded-lg border bg-white p-4">
+          <div className="mb-4 border-b pb-4">
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Admin-Bereich</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">MSC Event</div>
+          </div>
+          <AdminNav />
+          <div className="mt-6 border-t pt-4">
+            <Button size="sm" variant="outline" onClick={logout}>
+              Logout
+            </Button>
+          </div>
+        </aside>
+        <main className="space-y-4">
+          <Outlet />
+        </main>
       </div>
-      <Outlet />
     </div>
   );
 }

@@ -1,31 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --primary: 199 89% 48%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 46 93% 58%;
-  --accent-foreground: 26 83% 14%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 199 89% 48%;
+  --card-foreground: 222 47% 11%;
+  --primary: 221 63% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 46%;
+  --accent: 48 95% 49%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 56%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 90%;
+  --input: 214 32% 90%;
+  --ring: 221 63% 39%;
   --radius: 0.65rem;
 }
 
+* {
+  @apply border-border;
+}
+
 body {
-  @apply min-h-screen bg-background text-foreground antialiased;
-  background-image:
-    radial-gradient(circle at 20% 10%, rgba(14, 165, 233, 0.08), transparent 40%),
-    radial-gradient(circle at 85% 5%, rgba(250, 204, 21, 0.1), transparent 35%);
+  @apply bg-background text-foreground antialiased;
+  font-family: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Barlow Condensed", "IBM Plex Sans", sans-serif;
+  letter-spacing: 0.01em;
 }

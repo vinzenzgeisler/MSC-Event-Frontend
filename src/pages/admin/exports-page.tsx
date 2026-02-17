@@ -1,154 +1,78 @@
-import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { createExport, downloadExport, getAdminEventsCurrent, getAdminExports } from "@/api/client";
-import { exportFormats, exportTypes } from "@/api/types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ErrorState } from "@/components/state/error-state";
-import { LoadingState } from "@/components/state/loading-state";
-import { getErrorMessage } from "@/lib/http/api-error";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { exportsService } from "@/services/exports.service";
+import type { ExportCreateForm, ExportJob } from "@/types/admin";
 
-function extractEventId(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return "";
-  }
-  const obj = payload as Record<string, unknown>;
-  return (
-    (obj.event && typeof obj.event === "object" && ((obj.event as Record<string, unknown>).id as string)) ||
-    (obj.event && typeof obj.event === "object" && ((obj.event as Record<string, unknown>).eventId as string)) ||
-    (obj.eventId as string) ||
-    (obj.id as string) ||
-    ""
-  );
-}
+const initialForm: ExportCreateForm = {
+  type: "entries_csv",
+  classId: "all",
+  acceptanceStatus: "all",
+  format: "csv"
+};
 
 export function AdminExportsPage() {
-  const [form, setForm] = useState({
-    type: exportTypes[0],
-    classId: "",
-    acceptanceStatus: "",
-    paymentOpenOnly: false,
-    checkinIdVerified: false,
-    format: exportFormats[0]
-  });
+  const [form, setForm] = useState<ExportCreateForm>(initialForm);
+  const [jobs, setJobs] = useState<ExportJob[]>([]);
 
-  const currentEventQuery = useQuery({
-    queryKey: ["admin", "currentEvent"],
-    queryFn: getAdminEventsCurrent
-  });
-
-  const eventId = useMemo(() => extractEventId(currentEventQuery.data), [currentEventQuery.data]);
-
-  const exportsQuery = useQuery({
-    queryKey: ["admin", "exports", eventId],
-    queryFn: () => getAdminExports(eventId),
-    enabled: !!eventId
-  });
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      createExport({
-        eventId,
-        type: form.type,
-        classId: form.classId || undefined,
-        acceptanceStatus: form.acceptanceStatus || undefined,
-        paymentOpenOnly: form.paymentOpenOnly || undefined,
-        checkinIdVerified: form.checkinIdVerified || undefined,
-        format: form.format
-      })
-  });
-
-  const downloadMutation = useMutation({
-    mutationFn: (exportJobId: string) => downloadExport(exportJobId)
-  });
-
-  if (currentEventQuery.isLoading) {
-    return <LoadingState />;
-  }
-
-  if (currentEventQuery.error) {
-    return <ErrorState message={getErrorMessage(currentEventQuery.error)} />;
-  }
+  useEffect(() => {
+    exportsService.listExports().then(setJobs);
+  }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold text-slate-900">Exporte</h1>
+
       <Card>
         <CardHeader>
           <CardTitle>Export erstellen</CardTitle>
-          <CardDescription>CSV-Export für das aktuelle Event.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="type">Export-Typ</Label>
-            <select
-              id="type"
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.type}
-              onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value }))}
-            >
-              {exportTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
+        <CardContent className="grid gap-4 md:grid-cols-4">
+          <div className="space-y-1">
+            <Label>Typ</Label>
+            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.type} onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value as ExportCreateForm["type"] }))}>
+              <option value="entries_csv">entries_csv</option>
+              <option value="startlist_csv">startlist_csv</option>
+              <option value="participants_csv">participants_csv</option>
+              <option value="payments_open_csv">payments_open_csv</option>
+              <option value="checkin_status_csv">checkin_status_csv</option>
             </select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="classId">Klasse (optional)</Label>
-            <Input
-              id="classId"
-              value={form.classId}
-              onChange={(event) => setForm((prev) => ({ ...prev, classId: event.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="acceptanceStatus">Status (optional)</Label>
-            <Input
-              id="acceptanceStatus"
-              value={form.acceptanceStatus}
-              onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="format">Format</Label>
-            <select
-              id="format"
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={form.format}
-              onChange={(event) => setForm((prev) => ({ ...prev, format: event.target.value }))}
-            >
-              {exportFormats.map((format) => (
-                <option key={format} value={format}>
-                  {format}
-                </option>
-              ))}
+          <div className="space-y-1">
+            <Label>Klasse (optional)</Label>
+            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.classId} onChange={(event) => setForm((prev) => ({ ...prev, classId: event.target.value }))}>
+              <option value="all">Alle</option>
+              <option value="Auto Elite">Auto Elite</option>
+              <option value="Auto Pro">Auto Pro</option>
+              <option value="Moto Open">Moto Open</option>
             </select>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <input
-              id="paymentOpenOnly"
-              type="checkbox"
-              checked={form.paymentOpenOnly}
-              onChange={(event) => setForm((prev) => ({ ...prev, paymentOpenOnly: event.target.checked }))}
-            />
-            <Label htmlFor="paymentOpenOnly">Nur offene Zahlungen</Label>
+          <div className="space-y-1">
+            <Label>Status (optional)</Label>
+            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.acceptanceStatus} onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as ExportCreateForm["acceptanceStatus"] }))}>
+              <option value="all">Alle</option>
+              <option value="pending">pending</option>
+              <option value="shortlist">shortlist</option>
+              <option value="accepted">accepted</option>
+            </select>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <input
-              id="checkinIdVerified"
-              type="checkbox"
-              checked={form.checkinIdVerified}
-              onChange={(event) => setForm((prev) => ({ ...prev, checkinIdVerified: event.target.checked }))}
-            />
-            <Label htmlFor="checkinIdVerified">Nur ID geprüft</Label>
+          <div className="space-y-1">
+            <Label>Format</Label>
+            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.format} onChange={(event) => setForm((prev) => ({ ...prev, format: event.target.value as "csv" }))}>
+              <option value="csv">csv</option>
+            </select>
           </div>
-          <div className="md:col-span-2">
-            <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !eventId}>
+          <div>
+            <Button
+              type="button"
+              onClick={async () => {
+                await exportsService.createExport(form);
+              }}
+            >
               Export erstellen
             </Button>
-            {createMutation.isError && <ErrorState message={getErrorMessage(createMutation.error)} />}
           </div>
         </CardContent>
       </Card>
@@ -156,41 +80,36 @@ export function AdminExportsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Exportliste</CardTitle>
-          <CardDescription>Verfügbare Exporte.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {exportsQuery.isLoading && <LoadingState />}
-          {exportsQuery.error && <ErrorState message={getErrorMessage(exportsQuery.error)} />}
-          {exportsQuery.data?.exports?.length ? (
-            <div className="space-y-2">
-              {exportsQuery.data.exports.map((item, index) => (
-                <div key={index} className="rounded-md border p-3 text-sm">
-                  <div className="font-medium">{String(item.type || item.id || "Export")}</div>
-                  <div className="text-xs text-muted-foreground">Status: {String(item.status || "-")}</div>
-                  {item.id && (
-                    <Button
-                      className="mt-2"
-                      variant="outline"
-                      onClick={async () => {
-                        const blob = await downloadMutation.mutateAsync(String(item.id));
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = url;
-                        link.download = `export-${item.id}.csv`;
-                        link.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      disabled={downloadMutation.isPending}
-                    >
-                      Download
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">Keine Exporte vorhanden.</div>
-          )}
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-slate-600">
+                <tr>
+                  <th className="px-3 py-2">ID</th>
+                  <th className="px-3 py-2">Typ</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Erstellt am</th>
+                  <th className="px-3 py-2">Download</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr key={job.id} className="border-t">
+                    <td className="px-3 py-2">{job.id}</td>
+                    <td className="px-3 py-2">{job.type}</td>
+                    <td className="px-3 py-2">
+                      <Badge variant={job.status === "succeeded" ? "secondary" : "outline"}>{job.status}</Badge>
+                    </td>
+                    <td className="px-3 py-2">{job.createdAt}</td>
+                    <td className="px-3 py-2">
+                      {job.status === "succeeded" ? <Button size="sm" variant="outline">Download</Button> : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>
