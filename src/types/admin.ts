@@ -165,6 +165,8 @@ export type AdminEntryDetailViewModel = {
   }>;
   relatedEntryIds: Id[];
   notes: string;
+  internalNote: string;
+  driverNote: string;
   history: AdminEntryHistoryItem[];
 };
 

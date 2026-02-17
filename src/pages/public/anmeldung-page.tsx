@@ -9,6 +9,9 @@ import { registrationService } from "@/services/registration.service";
 import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegistrationForm, VehicleForm } from "@/types/registration";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
+const PHONE_PATTERN = /^[+0-9()\/\-\s]{6,20}$/;
+const ZIP_PATTERN = /^\d{5}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function createEmptyVehicle(): VehicleForm {
   return {
@@ -65,12 +68,14 @@ function validateDriverForm(value: DriverForm): Partial<Record<keyof DriverForm,
   if (!value.firstName.trim()) errors.firstName = "Vorname ist erforderlich.";
   if (!value.lastName.trim()) errors.lastName = "Nachname ist erforderlich.";
   if (!value.birthdate.trim()) errors.birthdate = "Geburtsdatum ist erforderlich.";
-  if (!value.phone.trim()) errors.phone = "Telefon ist erforderlich.";
-  if (!value.email.trim() || !value.email.includes("@")) errors.email = "Bitte gültige E-Mail eingeben.";
+  if (!value.phone.trim() || !PHONE_PATTERN.test(value.phone.trim())) errors.phone = "Bitte gültige Telefonnummer eingeben.";
+  if (!value.email.trim() || !EMAIL_PATTERN.test(value.email.trim())) errors.email = "Bitte gültige E-Mail eingeben.";
+  if (value.zip.trim() && !ZIP_PATTERN.test(value.zip.trim())) errors.zip = "PLZ muss aus 5 Ziffern bestehen.";
   if (!value.emergencyContactName.trim()) errors.emergencyContactName = "Notfallkontakt ist erforderlich.";
-  if (!value.emergencyContactPhone.trim()) errors.emergencyContactPhone = "Telefon des Notfallkontakts ist erforderlich.";
+  if (!value.emergencyContactPhone.trim() || !PHONE_PATTERN.test(value.emergencyContactPhone.trim())) {
+    errors.emergencyContactPhone = "Bitte gültige Telefonnummer für den Notfallkontakt eingeben.";
+  }
   if (!value.motorsportHistory.trim()) errors.motorsportHistory = "Bitte kurze Motorsport-Historie erfassen.";
-  if (!value.specialNotes.trim()) errors.specialNotes = "Bitte Hinweise ausfüllen (mind. 'keine').";
   return errors;
 }
 
@@ -80,9 +85,18 @@ function requiredVehicleFields(vehicle: VehicleForm) {
     vehicle.engineType.trim() &&
     vehicle.cylinders.trim() &&
     vehicle.brakes.trim() &&
-    vehicle.vehicleHistory.trim() &&
-    vehicle.ownerName.trim()
+    vehicle.vehicleHistory.trim()
   );
+}
+
+function codriverIsValid(start: StartRegistrationForm) {
+  if (!start.codriverEnabled) {
+    return true;
+  }
+  if (!start.codriver.firstName.trim() || !start.codriver.lastName.trim()) {
+    return false;
+  }
+  return EMAIL_PATTERN.test(start.codriver.email.trim());
 }
 
 export function AnmeldungPage() {
@@ -131,6 +145,10 @@ export function AnmeldungPage() {
     }
     if (!requiredVehicleFields(draftStart.vehicle)) {
       setStartError("Bitte alle Pflichtfelder zu Fahrzeugdaten ausfüllen.");
+      return;
+    }
+    if (!codriverIsValid(draftStart)) {
+      setStartError("Beifahrer benötigt Vorname, Nachname und gültige E-Mail.");
       return;
     }
 
@@ -278,7 +296,7 @@ export function AnmeldungPage() {
               </Button>
             )}
             {step === 2 && (
-              <Button type="button" onClick={goToStep3}>
+              <Button type="button" disabled={starts.length === 0} onClick={goToStep3}>
                 Weiter zur Zusammenfassung
               </Button>
             )}

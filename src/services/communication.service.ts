@@ -29,7 +29,7 @@ export const communicationService = {
     return { ok: true };
   },
 
-  async queueRegistrationConfirmationForEntry(_entryId: string) {
+  async queueAcceptedMailForEntry(_entryId: string) {
     return { ok: true };
   }
 };

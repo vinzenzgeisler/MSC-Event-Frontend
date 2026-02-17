@@ -106,14 +106,7 @@ export function StartEntriesStep({
 
           <div className="space-y-2">
             <Label>Fahrzeugtyp</Label>
-            <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={draft.vehicleType}
-              onChange={(event) => onDraftChange("vehicleType", event.target.value as StartRegistrationForm["vehicleType"])}
-            >
-              <option value="auto">Auto</option>
-              <option value="moto">Motorrad</option>
-            </select>
+            <Input value={draft.vehicleType === "moto" ? "Motorrad" : "Auto"} readOnly />
           </div>
 
           <div className="space-y-2">
@@ -140,7 +133,7 @@ export function StartEntriesStep({
             <Input value={draft.vehicle.displacementCcm} onChange={(event) => onVehicleFieldChange("displacementCcm", event.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Motor / Takt</Label>
+            <Label>Motor-Hersteller</Label>
             <Input value={draft.vehicle.engineType} onChange={(event) => onVehicleFieldChange("engineType", event.target.value)} />
           </div>
           <div className="space-y-2">
@@ -152,7 +145,7 @@ export function StartEntriesStep({
             <Input value={draft.vehicle.brakes} onChange={(event) => onVehicleFieldChange("brakes", event.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Besitzer</Label>
+            <Label>Besitzer (optional, falls abweichend vom Fahrer)</Label>
             <Input value={draft.vehicle.ownerName} onChange={(event) => onVehicleFieldChange("ownerName", event.target.value)} />
           </div>
           <div className="space-y-2 md:col-span-3">
@@ -230,7 +223,7 @@ export function StartEntriesStep({
                   <Input value={draft.backupVehicle.displacementCcm} onChange={(event) => onBackupFieldChange("displacementCcm", event.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Motor / Takt</Label>
+                  <Label>Motor-Hersteller</Label>
                   <Input value={draft.backupVehicle.engineType} onChange={(event) => onBackupFieldChange("engineType", event.target.value)} />
                 </div>
               </div>
@@ -238,9 +231,12 @@ export function StartEntriesStep({
           </div>
         </details>
 
-        <Button type="button" onClick={onSave}>
-          {editingId ? "Startmeldung aktualisieren" : "Startmeldung speichern"}
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-slate-500">Nach dem Hinzufügen kannst du weitere Fahrzeuge erfassen oder direkt zur Zusammenfassung gehen.</p>
+          <Button type="button" variant="secondary" onClick={onSave}>
+            {editingId ? "Startmeldung aktualisieren" : "Startmeldung hinzufügen"}
+          </Button>
+        </div>
       </div>
     </div>
   );

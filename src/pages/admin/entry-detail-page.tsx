@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bike, Car } from "lucide-react";
+import { Bike, Car, FileDown, Mail, ShieldCheck, Wrench } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { communicationService } from "@/services/communication.service";
 
-const tabs = ["Überblick", "Person", "Startmeldungen/Fahrzeuge", "Zahlung", "Dokumente", "Historie"] as const;
+const tabs = ["Überblick", "Person", "Startmeldungen/Fahrzeuge", "Zahlung", "Dokumente", "Historie", "Notizen"] as const;
 
 type TabValue = (typeof tabs)[number];
 
@@ -23,14 +23,21 @@ function asEuro(cents: number) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 
-function VehicleThumb({ src, label }: { src: string | null; label: string }) {
+function VehicleThumb({ src, label, onOpen }: { src: string | null; label: string; onOpen: () => void }) {
   if (src) {
-    return <img className="h-16 w-16 rounded-md border object-cover" src={src} alt={`Fahrzeug: ${label}`} />;
+    return (
+      <button type="button" className="group relative block" onClick={onOpen}>
+        <img className="h-44 w-full rounded-md border object-cover md:h-64" src={src} alt={`Fahrzeug: ${label}`} />
+        <span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100">
+          Bild öffnen
+        </span>
+      </button>
+    );
   }
   const isMoto = label.toLowerCase().includes("yamaha") || label.toLowerCase().includes("moto");
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-md border bg-slate-100 text-slate-500">
-      {isMoto ? <Bike className="h-6 w-6" /> : <Car className="h-6 w-6" />}
+    <div className="flex h-44 w-full items-center justify-center rounded-md border bg-slate-100 text-slate-500 md:h-64">
+      {isMoto ? <Bike className="h-10 w-10" /> : <Car className="h-10 w-10" />}
     </div>
   );
 }
@@ -43,16 +50,25 @@ export function AdminEntryDetailPage() {
   const [paid, setPaid] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [imageOpen, setImageOpen] = useState(false);
+  const [internalNote, setInternalNote] = useState("");
+  const [driverNote, setDriverNote] = useState("");
 
-  useEffect(() => {
+  const loadDetail = () => {
     adminEntriesService.getEntryDetail(entryId).then((result) => {
       setResolvedDetail(result);
       if (result) {
         setStatus(result.status);
         setPaid(result.payment.status === "paid");
         setCheckinDone(result.checkinVerified);
+        setInternalNote(result.internalNote);
+        setDriverNote(result.driverNote);
       }
     });
+  };
+
+  useEffect(() => {
+    loadDetail();
   }, [entryId]);
 
   if (!resolvedDetail) {
@@ -67,18 +83,66 @@ export function AdminEntryDetailPage() {
       <CardHeader>
         <CardTitle className="text-sm text-slate-600">Quick Actions</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-2 sm:flex sm:flex-wrap">
-        <Button className="w-full sm:w-auto" type="button" variant="outline" onClick={() => setStatus("accepted")}>
-          Status auf Zugelassen
+      <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={async () => {
+            await adminEntriesService.setEntryStatus(resolvedDetail.id, "to_shortlist");
+            setStatus("shortlist");
+            setActionMessage("Status auf Vorauswahl gesetzt.");
+            loadDetail();
+          }}
+        >
+          Auf Vorauswahl setzen
         </Button>
-        <Button className="w-full sm:w-auto" type="button" variant="outline" onClick={() => setPaid(true)}>
+
+        <Button
+          type="button"
+          onClick={async () => {
+            const confirmed = window.confirm(
+              "Wirklich auf 'Zugelassen' setzen? Danach wird automatisch die Zulassungs-Mail versendet."
+            );
+            if (!confirmed) {
+              return;
+            }
+            await adminEntriesService.setEntryStatus(resolvedDetail.id, "to_accepted");
+            await communicationService.queueAcceptedMailForEntry(resolvedDetail.id);
+            setStatus("accepted");
+            setActionMessage("Status auf Zugelassen gesetzt. Zulassungs-Mail wurde angestoßen.");
+            loadDetail();
+          }}
+        >
+          Auf Zugelassen setzen
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={async () => {
+            await adminEntriesService.setEntryPaymentPaid(resolvedDetail.id);
+            setPaid(true);
+            setActionMessage("Zahlung wurde als bezahlt markiert.");
+            loadDetail();
+          }}
+        >
           Als bezahlt markieren
         </Button>
-          <Button className="w-full sm:w-auto" type="button" variant="outline" onClick={() => setCheckinDone(true)}>
-            Einchecken bestätigen
-          </Button>
+
         <Button
-          className="w-full sm:w-auto"
+          type="button"
+          variant="outline"
+          onClick={async () => {
+            await adminEntriesService.setEntryCheckinVerified(resolvedDetail.id);
+            setCheckinDone(true);
+            setActionMessage("Einchecken wurde bestätigt.");
+            loadDetail();
+          }}
+        >
+          Einchecken bestätigen
+        </Button>
+
+        <Button
           type="button"
           variant="outline"
           onClick={async () => {
@@ -86,20 +150,24 @@ export function AdminEntryDetailPage() {
             setActionMessage("Zahlungserinnerung wurde in die Mail-Queue gelegt.");
           }}
         >
+          <Mail className="mr-2 h-4 w-4" />
           Zahlungserinnerung senden
         </Button>
-        <Button
-          className="w-full sm:w-auto"
-          type="button"
-          variant="outline"
-          onClick={async () => {
-            await communicationService.queueRegistrationConfirmationForEntry(resolvedDetail.id);
-            setActionMessage("Anmeldebestätigung wurde in die Mail-Queue gelegt.");
-          }}
-        >
-          Anmeldebestätigung senden
+
+        <Button type="button" variant="outline" onClick={() => setActionMessage("PDF Haftverzicht bereitgestellt (UI-only).")}> 
+          <ShieldCheck className="mr-2 h-4 w-4" />
+          PDF Haftverzicht
         </Button>
-        {actionMessage && <div className="w-full rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{actionMessage}</div>}
+
+        <Button type="button" variant="outline" onClick={() => setActionMessage("PDF Technische Abnahme bereitgestellt (UI-only).")}> 
+          <Wrench className="mr-2 h-4 w-4" />
+          PDF Technische Abnahme
+        </Button>
+
+        <Button type="button" variant="outline" onClick={() => setActionMessage("Dokumentenpaket vorbereitet (UI-only).")}> 
+          <FileDown className="mr-2 h-4 w-4" />
+          Dokumente bündeln
+        </Button>
       </CardContent>
     </Card>
   );
@@ -142,7 +210,7 @@ export function AdminEntryDetailPage() {
       <CardContent className="space-y-2 text-sm text-slate-700">
         <div>Name: {resolvedDetail.driver.name}</div>
         <div>E-Mail: {resolvedDetail.driver.email}</div>
-        <div>Hinweise: {resolvedDetail.notes}</div>
+        <div>Hinweise: {resolvedDetail.notes || "-"}</div>
       </CardContent>
     </Card>
   );
@@ -153,12 +221,10 @@ export function AdminEntryDetailPage() {
         <CardTitle>Startmeldungen / Fahrzeuge</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-slate-700">
-        <div className="flex items-start gap-3">
-          <VehicleThumb src={resolvedDetail.vehicle.thumbUrl} label={resolvedDetail.vehicle.label} />
-          <div>
-            <div className="font-medium">{resolvedDetail.vehicle.label}</div>
-            <div className="text-xs text-slate-500">Startnummer: {resolvedDetail.startNumber}</div>
-          </div>
+        <VehicleThumb src={resolvedDetail.vehicle.thumbUrl} label={resolvedDetail.vehicle.label} onOpen={() => setImageOpen(true)} />
+        <div>
+          <div className="font-medium">{resolvedDetail.vehicle.label}</div>
+          <div className="text-xs text-slate-500">Startnummer: {resolvedDetail.startNumber}</div>
         </div>
         {resolvedDetail.vehicle.facts.map((fact) => (
           <div key={fact}>{fact}</div>
@@ -225,13 +291,50 @@ export function AdminEntryDetailPage() {
     </Card>
   );
 
+  const sectionNotes = (
+    <Card>
+      <CardHeader>
+        <CardTitle>Notizen</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-900">Interne Notiz (nur Team)</label>
+          <textarea
+            className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={internalNote}
+            onChange={(event) => setInternalNote(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-900">Notiz für Fahrer (geht mit Zulassungs-Mail raus)</label>
+          <textarea
+            className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={driverNote}
+            onChange={(event) => setDriverNote(event.target.value)}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={async () => {
+            await adminEntriesService.saveEntryNotes(resolvedDetail.id, { internalNote, driverNote });
+            setActionMessage("Notizen gespeichert.");
+          }}
+        >
+          Notizen speichern
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   const desktopSections: Record<TabValue, JSX.Element> = {
     Überblick: sectionOverview,
     Person: sectionPerson,
     "Startmeldungen/Fahrzeuge": sectionVehicle,
     Zahlung: sectionPayment,
     Dokumente: sectionDocuments,
-    Historie: sectionHistory
+    Historie: sectionHistory,
+    Notizen: sectionNotes
   };
 
   return (
@@ -256,6 +359,8 @@ export function AdminEntryDetailPage() {
         </div>
       </div>
 
+      {actionMessage && <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{actionMessage}</div>}
+
       {quickActions}
 
       <div className="space-y-3 md:hidden">
@@ -265,6 +370,7 @@ export function AdminEntryDetailPage() {
         {sectionPayment}
         {sectionDocuments}
         {sectionHistory}
+        {sectionNotes}
       </div>
 
       <div className="hidden space-y-3 md:block">
@@ -277,6 +383,12 @@ export function AdminEntryDetailPage() {
         </div>
         {desktopSections[activeTab]}
       </div>
+
+      {imageOpen && resolvedDetail.vehicle.thumbUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setImageOpen(false)}>
+          <img className="max-h-[90vh] max-w-[90vw] rounded-md border border-white/20 object-contain" src={resolvedDetail.vehicle.thumbUrl} alt={resolvedDetail.vehicle.label} />
+        </div>
+      )}
     </div>
   );
 }

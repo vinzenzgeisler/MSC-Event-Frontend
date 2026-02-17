@@ -15,6 +15,8 @@ import type { AdminEntryListItem } from "@/types/admin";
 
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
+  onSetShortlist: (entryId: string) => void;
+  onSetAccepted: (entryId: string) => void;
 };
 
 function VehicleThumb({ src, label }: { src: string | null; label: string }) {
@@ -29,7 +31,7 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
   );
 }
 
-export function EntriesTable({ rows }: EntriesTableProps) {
+export function EntriesTable({ rows, onSetShortlist, onSetAccepted }: EntriesTableProps) {
   if (!rows.length) {
     return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Keine Nennungen für die aktuelle Filterung.</div>;
   }
@@ -38,7 +40,7 @@ export function EntriesTable({ rows }: EntriesTableProps) {
     <div className="space-y-3">
       <div className="space-y-2 md:hidden">
         {rows.map((row) => (
-          <div key={row.id} className={`rounded-lg border bg-white p-3 ${acceptanceStatusRowAccentClasses(row.status)}`}>
+          <div key={row.id} className={`border bg-white p-3 ${acceptanceStatusRowAccentClasses(row.status)}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-3">
                 <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
@@ -50,9 +52,20 @@ export function EntriesTable({ rows }: EntriesTableProps) {
                   <div className="text-xs text-slate-500">{row.vehicleLabel}</div>
                 </div>
               </div>
-              <Button asChild size="sm" variant="outline">
-                <Link to={`/admin/entries/${row.id}`}>Details</Link>
-              </Button>
+              <div className="flex flex-col gap-1">
+                <Button asChild size="sm" variant="outline">
+                  <Link to={`/admin/entries/${row.id}`}>Details</Link>
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => onSetShortlist(row.id)}>
+                  Vorauswahl
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => onSetAccepted(row.id)}
+                >
+                  Zulassen
+                </Button>
+              </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge className={acceptanceStatusClasses(row.status)} variant="outline">
@@ -87,7 +100,7 @@ export function EntriesTable({ rows }: EntriesTableProps) {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t align-middle">
+                <tr key={row.id} className={`border-t align-middle ${acceptanceStatusRowAccentClasses(row.status)}`}>
                   <td className="px-4 py-3">
                     <div className={`flex items-center gap-3 rounded-md px-2 py-1 ${acceptanceStatusRowAccentClasses(row.status)}`}>
                       <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
@@ -116,9 +129,17 @@ export function EntriesTable({ rows }: EntriesTableProps) {
                   </td>
                   <td className="px-4 py-3">{row.createdAt}</td>
                   <td className="px-4 py-3">
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={`/admin/entries/${row.id}`}>Details</Link>
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/admin/entries/${row.id}`}>Details</Link>
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => onSetShortlist(row.id)}>
+                        Vorauswahl
+                      </Button>
+                      <Button size="sm" onClick={() => onSetAccepted(row.id)}>
+                        Zulassen
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

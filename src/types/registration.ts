@@ -121,7 +121,7 @@ export type PublicCreateEntryRequestDto = {
   startNumber?: string;
   isBackupVehicle?: boolean;
   backupOfEntryId?: Id;
-  specialNotes: string;
+  specialNotes?: string;
   consent: {
     termsAccepted: true;
     privacyAccepted: true;

@@ -7,6 +7,11 @@ import type {
   AdminEntryListItemDto
 } from "@/types/admin";
 
+const entriesStore: AdminEntryListItemDto[] = mockAdminEntries.map((item) => ({ ...item }));
+const detailStore: Record<string, AdminEntryDetailDto> = Object.fromEntries(
+  Object.entries(mockAdminEntryDetail).map(([key, value]) => [key, JSON.parse(JSON.stringify(value)) as AdminEntryDetailDto])
+);
+
 function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
   return {
     id: dto.id,
@@ -58,6 +63,8 @@ function fromAdminEntryDetailDto(dto: AdminEntryDetailDto): AdminEntryDetailView
     documents: dto.documents.map((doc) => ({ id: doc.id, type: doc.type, status: doc.status })),
     relatedEntryIds: dto.relatedEntryIds,
     notes: dto.specialNotes ?? "Keine Hinweise",
+    internalNote: (dto as AdminEntryDetailDto & { internalNote?: string }).internalNote ?? "",
+    driverNote: (dto as AdminEntryDetailDto & { driverNote?: string }).driverNote ?? "",
     history: mockAdminEntryHistory[dto.ids.entryId] ?? []
   };
 }
@@ -79,19 +86,72 @@ function matchesFilter(item: AdminEntryListItemDto, filter: AdminEntriesFilter):
     return true;
   }
   const query = filter.query.toLowerCase();
-  return item.name.toLowerCase().includes(query) || (item.startNumber ?? "").toLowerCase().includes(query);
+  return (
+    item.name.toLowerCase().includes(query) ||
+    (item.startNumber ?? "").toLowerCase().includes(query) ||
+    item.vehicleLabel.toLowerCase().includes(query)
+  );
 }
 
 export const adminEntriesService = {
   async listEntries(filter: AdminEntriesFilter): Promise<AdminEntryListItem[]> {
-    return mockAdminEntries.filter((item) => matchesFilter(item, filter)).map(fromAdminEntryListDto);
+    return entriesStore.filter((item) => matchesFilter(item, filter)).map(fromAdminEntryListDto);
   },
 
   async getEntryDetail(entryId: string): Promise<AdminEntryDetailViewModel | null> {
-    const detail = mockAdminEntryDetail[entryId];
+    const detail = detailStore[entryId];
     if (!detail) {
       return null;
     }
     return fromAdminEntryDetailDto(detail);
+  },
+
+  async setEntryStatus(entryId: string, transition: "to_shortlist" | "to_accepted") {
+    const nextStatus = transition === "to_shortlist" ? "shortlist" : "accepted";
+    const row = entriesStore.find((item) => item.id === entryId);
+    if (row) {
+      row.acceptanceStatus = nextStatus;
+    }
+    const detail = detailStore[entryId];
+    if (detail) {
+      detail.acceptanceStatus = nextStatus;
+    }
+    return { ok: true };
+  },
+
+  async setEntryPaymentPaid(entryId: string) {
+    const row = entriesStore.find((item) => item.id === entryId);
+    if (row) {
+      row.paymentStatus = "paid";
+    }
+    const detail = detailStore[entryId];
+    if (detail) {
+      detail.payment.paymentStatus = "paid";
+      detail.payment.paidAmountCents = detail.payment.totalCents;
+      detail.payment.amountOpenCents = 0;
+    }
+    return { ok: true };
+  },
+
+  async setEntryCheckinVerified(entryId: string) {
+    const row = entriesStore.find((item) => item.id === entryId);
+    if (row) {
+      row.checkinIdVerified = true;
+    }
+    const detail = detailStore[entryId];
+    if (detail) {
+      detail.checkin.checkinIdVerified = true;
+      detail.checkin.checkinIdVerifiedAt = new Date().toISOString();
+    }
+    return { ok: true };
+  },
+
+  async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string }) {
+    const detail = detailStore[entryId] as (AdminEntryDetailDto & { internalNote?: string; driverNote?: string }) | undefined;
+    if (detail) {
+      detail.internalNote = payload.internalNote;
+      detail.driverNote = payload.driverNote;
+    }
+    return { ok: true };
   }
 };

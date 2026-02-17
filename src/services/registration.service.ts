@@ -43,12 +43,12 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       cylinders: Number(start.vehicle.cylinders),
       brakes: start.vehicle.brakes,
       vehicleHistory: start.vehicle.vehicleHistory,
-      ownerName: start.vehicle.ownerName,
+      ownerName: start.vehicle.ownerName || `${form.driver.firstName} ${form.driver.lastName}`.trim(),
       startNumberRaw: start.startNumber || undefined,
       imageS3Key: undefined
     },
     startNumber: start.startNumber || undefined,
-    specialNotes: form.driver.specialNotes,
+    specialNotes: form.driver.specialNotes || undefined,
     isBackupVehicle: start.backupVehicleEnabled,
     consent: {
       termsAccepted: true,
