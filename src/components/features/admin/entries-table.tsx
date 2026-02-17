@@ -13,8 +13,31 @@ export function EntriesTable({ rows }: EntriesTableProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white">
-      <div className="overflow-x-auto">
+    <div className="space-y-3">
+      <div className="space-y-2 md:hidden">
+        {rows.map((row) => (
+          <div key={row.id} className="rounded-lg border bg-white p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-medium text-slate-900">{row.name}</div>
+                <div className="text-xs text-slate-600">{row.classLabel} · #{row.startNumber}</div>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to={`/admin/entries/${row.id}`}>Details</Link>
+              </Button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant={row.status === "accepted" ? "secondary" : "outline"}>{row.status}</Badge>
+              <Badge variant={row.payment === "paid" ? "secondary" : "outline"}>{row.payment}</Badge>
+              <Badge variant={row.checkin === "bestätigt" ? "secondary" : "outline"}>{row.checkin}</Badge>
+            </div>
+            <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-xl border bg-white md:block">
+        <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
@@ -51,6 +74,7 @@ export function EntriesTable({ rows }: EntriesTableProps) {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   );

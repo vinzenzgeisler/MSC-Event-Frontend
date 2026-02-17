@@ -66,8 +66,9 @@ export function AdminCommunicationPage() {
             <Label>Subject Override</Label>
             <Input value={form.subjectOverride} onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))} />
           </div>
-          <div>
+          <div className="md:col-span-3">
             <Button
+              className="w-full md:w-auto"
               type="button"
               onClick={() => {
                 void communicationService.queueBroadcast(form);
@@ -83,8 +84,35 @@ export function AdminCommunicationPage() {
         <CardHeader>
           <CardTitle>Outbox</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="space-y-3">
+          <div className="space-y-2 md:hidden">
+            {outbox.map((item) => (
+              <div key={item.id} className="rounded-lg border p-3">
+                <div className="font-medium text-slate-900">{item.subject}</div>
+                <div className="text-xs text-slate-600">{item.recipient}</div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <Badge variant={item.status === "failed" ? "outline" : "secondary"}>{item.status}</Badge>
+                  {item.status === "failed" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void communicationService.retryOutbox(item.id);
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-slate-500">{item.createdAt}</span>
+                  )}
+                </div>
+                {item.error && <div className="mt-2 text-xs text-destructive">{item.error}</div>}
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-600">
                 <tr>

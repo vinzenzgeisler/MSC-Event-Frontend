@@ -64,8 +64,9 @@ export function AdminExportsPage() {
               <option value="csv">csv</option>
             </select>
           </div>
-          <div>
+          <div className="md:col-span-4">
             <Button
+              className="w-full md:w-auto"
               type="button"
               onClick={async () => {
                 await exportsService.createExport(form);
@@ -81,8 +82,22 @@ export function AdminExportsPage() {
         <CardHeader>
           <CardTitle>Exportliste</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="space-y-3">
+          <div className="space-y-2 md:hidden">
+            {jobs.map((job) => (
+              <div key={job.id} className="rounded-lg border p-3">
+                <div className="font-medium text-slate-900">{job.type}</div>
+                <div className="text-xs text-slate-600">{job.id}</div>
+                <div className="mt-2 flex items-center justify-between">
+                  <Badge variant={job.status === "succeeded" ? "secondary" : "outline"}>{job.status}</Badge>
+                  {job.status === "succeeded" ? <Button size="sm" variant="outline">Download</Button> : <span className="text-xs text-slate-500">-</span>}
+                </div>
+                <div className="mt-2 text-xs text-slate-500">{job.createdAt}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-600">
                 <tr>

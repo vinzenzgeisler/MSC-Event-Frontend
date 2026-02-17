@@ -207,8 +207,18 @@ export function AnmeldungPage() {
     setSuccessMessage("Eingang bestätigt. Eine Bestätigung per E-Mail folgt.");
   };
 
+  const handleNext = () => {
+    if (step === 1) {
+      goToStep2();
+      return;
+    }
+    if (step === 2) {
+      goToStep3();
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 md:pb-0">
       <div className="rounded-2xl bg-blue-700 px-5 py-7 text-white md:px-8">
         <div className="inline-flex rounded bg-yellow-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
           Anmeldung geöffnet
@@ -258,7 +268,7 @@ export function AnmeldungPage() {
             />
           )}
 
-          <div className="flex flex-wrap justify-between gap-3 border-t pt-5">
+          <div className="hidden flex-wrap justify-between gap-3 border-t pt-5 md:flex">
             <Button type="button" variant="outline" disabled={step === 1} onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
               Zurück
             </Button>
@@ -275,6 +285,19 @@ export function AnmeldungPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-white/95 p-3 backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <Button type="button" variant="outline" className="flex-1" disabled={step === 1} onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+            Zurück
+          </Button>
+          {step < 3 && (
+            <Button type="button" className="flex-1" onClick={handleNext}>
+              Weiter
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
