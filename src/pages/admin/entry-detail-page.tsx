@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { Bike, Car } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Bike, Car, Download, Mail, Trash2, Wallet } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   acceptanceStatusClasses,
   acceptanceStatusLabel,
@@ -19,11 +20,24 @@ function asEuro(cents: number) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 
+function centsFromEuroInput(value: string): number {
+  const normalized = value.replace(",", ".").trim();
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.round(parsed * 100);
+}
+
+function euroInputFromCents(value: number): string {
+  return (value / 100).toFixed(2).replace(".", ",");
+}
+
 function VehiclePreview({ src, label, onOpen }: { src: string | null; label: string; onOpen: () => void }) {
   if (src) {
     return (
       <button type="button" className="group relative block w-full" onClick={onOpen}>
-        <img className="h-52 w-full rounded-md border object-cover md:h-72" src={src} alt={`Fahrzeug: ${label}`} />
+        <img className="h-56 w-full rounded-md border object-cover md:h-[22rem]" src={src} alt={`Fahrzeug: ${label}`} />
         <span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100">
           Vergrößern
         </span>
@@ -32,23 +46,68 @@ function VehiclePreview({ src, label, onOpen }: { src: string | null; label: str
   }
   const isMoto = label.toLowerCase().includes("yamaha") || label.toLowerCase().includes("moto");
   return (
-    <div className="flex h-52 w-full items-center justify-center rounded-md border bg-slate-100 text-slate-500 md:h-72">
+    <div className="flex h-56 w-full items-center justify-center rounded-md border bg-slate-100 text-slate-500 md:h-[22rem]">
       {isMoto ? <Bike className="h-10 w-10" /> : <Car className="h-10 w-10" />}
     </div>
   );
 }
 
+function HintButton(props: {
+  label: string;
+  icon?: ReactNode;
+  onClick?: () => void;
+  variant?: "default" | "outline" | "ghost" | "destructive";
+  className?: string;
+  disabledReason?: string;
+}) {
+  const disabled = Boolean(props.disabledReason);
+  const button = (
+    <Button
+      type="button"
+      variant={props.variant ?? "outline"}
+      className={cn("h-auto w-full justify-start whitespace-normal break-words py-2 text-left leading-tight", props.className)}
+      disabled={disabled}
+      onClick={props.onClick}
+    >
+      {props.icon}
+      {props.label}
+    </Button>
+  );
+  if (!props.disabledReason) {
+    return button;
+  }
+  return (
+    <span className="inline-flex w-full" title={props.disabledReason}>
+      <span className="w-full">{button}</span>
+    </span>
+  );
+}
+
 export function AdminEntryDetailPage() {
   const { entryId = "" } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
   const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected">("accepted");
   const [paid, setPaid] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
+  const [confirmationMailSent, setConfirmationMailSent] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
   const [internalNote, setInternalNote] = useState("");
   const [driverNote, setDriverNote] = useState("");
   const [pendingAcceptConfirm, setPendingAcceptConfirm] = useState(false);
+  const [pendingRejectConfirm, setPendingRejectConfirm] = useState(false);
+  const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
+  const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
+  const [paymentEditorOpen, setPaymentEditorOpen] = useState(false);
+  const [paymentTotalInput, setPaymentTotalInput] = useState("0,00");
+  const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
+
+  const flashMessage = (message: string, timeout = 2200) => {
+    setActionMessage(message);
+    setTimeout(() => setActionMessage(""), timeout);
+  };
 
   const loadDetail = () => {
     adminEntriesService.getEntryDetail(entryId).then((result) => {
@@ -57,6 +116,7 @@ export function AdminEntryDetailPage() {
         setStatus(result.status);
         setPaid(result.payment.status === "paid");
         setCheckinDone(result.checkinVerified);
+        setConfirmationMailSent(result.confirmationMailSent);
         setInternalNote(result.internalNote);
         setDriverNote(result.driverNote);
       }
@@ -72,10 +132,28 @@ export function AdminEntryDetailPage() {
   }
 
   const paymentState = paid ? "paid" : "due";
-  const paidPercent = Math.max(0, Math.min(100, Math.round((detail.payment.paidAmountCents / detail.payment.totalCents) * 100)));
+  const paidPercent = detail.payment.totalCents > 0 ? Math.max(0, Math.min(100, Math.round((detail.payment.paidAmountCents / detail.payment.totalCents) * 100))) : 0;
+  const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
+  const actionActiveClass = "border-primary bg-primary text-primary-foreground hover:bg-primary/90";
 
   return (
-    <div className="space-y-4">
+    <div className="w-full max-w-[1120px] space-y-4">
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+              return;
+            }
+            navigate(`/admin/entries${location.search}`);
+          }}
+        >
+          Zurück zu Nennungen
+        </Button>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{detail.headline}</h1>
@@ -84,26 +162,38 @@ export function AdminEntryDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={acceptanceStatusClasses(status)} variant="outline">
-            {acceptanceStatusLabel(status)}
+          <Badge
+            className={confirmationMailSent ? "h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-900" : "h-6 border-amber-300 bg-amber-50 px-2.5 text-xs text-amber-900"}
+            variant="outline"
+          >
+            Mail: {confirmationMailSent ? "Bestätigt" : "Ausstehend"}
           </Badge>
-          <Badge className={paymentStatusClasses(paymentState)} variant="outline">
+          <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
+            Status: {acceptanceStatusLabel(status)}
+          </Badge>
+          <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
             Zahlung: {paymentStatusLabel(paymentState)}
           </Badge>
-          <Badge className={checkinClasses(checkinDone)} variant="outline">
-            Einchecken: {checkinLabel(checkinDone)}
-          </Badge>
+          {status === "accepted" ? (
+            <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
+              Check-in: {checkinLabel(checkinDone)}
+            </Badge>
+          ) : (
+            <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+              Check-in: Noch nicht relevant
+            </Badge>
+          )}
         </div>
       </div>
 
       {actionMessage && (
-        <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
+        <div className="fixed right-4 top-4 z-40 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 shadow-sm">
           {actionMessage}
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
-        <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
+        <div className="order-2 space-y-4 lg:order-1">
           <Card>
             <CardHeader>
               <CardTitle>Fahrerdaten</CardTitle>
@@ -114,93 +204,180 @@ export function AdminEntryDetailPage() {
                 <div>{detail.driver.name}</div>
               </div>
               <div>
+                <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
+                <div>{detail.driver.birthdate}</div>
+              </div>
+              <div>
                 <div className="text-xs uppercase text-slate-500">E-Mail</div>
-                <div>{detail.driver.email}</div>
+                <div className="break-words">{detail.driver.email}</div>
               </div>
               <div>
                 <div className="text-xs uppercase text-slate-500">Telefon</div>
                 <div>{detail.driver.phone}</div>
               </div>
               <div>
-                <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
-                <div>{detail.driver.birthdate}</div>
-              </div>
-              <div className="sm:col-span-2">
-                <div className="text-xs uppercase text-slate-500">Adresse</div>
-                <div>{detail.driver.address}</div>
-              </div>
-              <div className="sm:col-span-2">
-                <div className="text-xs uppercase text-slate-500">Notfallkontakt</div>
-                <div>{detail.driver.emergencyContact}</div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Fahrzeug</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-slate-700">
-              <VehiclePreview src={detail.vehicle.thumbUrl} label={detail.vehicle.label} onOpen={() => setImageOpen(true)} />
-              <div>
-                <div className="font-medium">{detail.vehicle.label}</div>
-                <div className="text-xs text-slate-500">Startnummer: {detail.startNumber}</div>
-              </div>
-              {detail.vehicle.facts.map((fact) => (
-                <div key={fact}>{fact}</div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Zahlung</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-slate-700">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="rounded-md border bg-slate-50 p-3">Gesamt: {asEuro(detail.payment.totalCents)}</div>
-                <div className="rounded-md border bg-slate-50 p-3">Bezahlt: {asEuro(detail.payment.paidAmountCents)}</div>
-                <div className="rounded-md border bg-slate-50 p-3">Offen: {asEuro(detail.payment.amountOpenCents)}</div>
+                <div className="text-xs uppercase text-slate-500">Straße</div>
+                <div>{detail.driver.street}</div>
               </div>
               <div>
-                <div className="mb-1 text-xs text-slate-500">Zahlungsfortschritt</div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-2 bg-emerald-500" style={{ width: `${paidPercent}%` }} />
+                <div className="text-xs uppercase text-slate-500">PLZ / Ort</div>
+                <div>
+                  {detail.driver.zip} {detail.driver.city}
                 </div>
-                <div className="mt-1 text-xs text-slate-600">{paidPercent}% bezahlt</div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={paid ? "default" : "outline"}
-                  onClick={async () => {
-                    await adminEntriesService.setEntryPaymentStatus(detail.id, "paid");
-                    setPaid(true);
-                    setActionMessage("Zahlungsstatus auf Bezahlt gesetzt.");
-                    setTimeout(() => setActionMessage(""), 2200);
-                    loadDetail();
-                  }}
-                >
-                  Bezahlt
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={!paid ? "default" : "outline"}
-                  onClick={async () => {
-                    await adminEntriesService.setEntryPaymentStatus(detail.id, "due");
-                    setPaid(false);
-                    setActionMessage("Zahlungsstatus auf Offen gesetzt.");
-                    setTimeout(() => setActionMessage(""), 2200);
-                    loadDetail();
-                  }}
-                >
-                  Offen
-                </Button>
+              <div>
+                <div className="text-xs uppercase text-slate-500">Notfallkontakt</div>
+                <div>{detail.driver.emergencyContactName}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase text-slate-500">Notfall-Telefon</div>
+                <div>{detail.driver.emergencyContactPhone}</div>
+              </div>
+              <div className="sm:col-span-2">
+                <div className="text-xs uppercase text-slate-500">Beifahrer</div>
+                {detail.codriver.assigned ? (
+                  <details className="mt-1 rounded-md border bg-slate-50 p-3">
+                    <summary className="cursor-pointer font-medium text-slate-900">{detail.codriver.label}</summary>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">Name</div>
+                        <div>{detail.codriver.firstName} {detail.codriver.lastName}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
+                        <div>{detail.codriver.birthdate}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">E-Mail</div>
+                        <div className="break-words">{detail.codriver.email}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">Telefon</div>
+                        <div>{detail.codriver.phone}</div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <div className="text-xs uppercase text-slate-500">Adresse</div>
+                        <div>{detail.codriver.addressLine}</div>
+                      </div>
+                    </div>
+                  </details>
+                ) : (
+                  <div>Nicht angegeben</div>
+                )}
+              </div>
+              <div className="sm:col-span-2">
+                <div className="text-xs uppercase text-slate-500">Bisherige motorsportliche Laufbahn</div>
+                <div className="rounded-md border bg-slate-50 p-3 leading-relaxed text-slate-800">
+                  {detail.driver.motorsportHistory}
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Fahrzeugdetails</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-slate-700">
+              <VehiclePreview src={detail.vehicle.thumbUrl} label={detail.vehicle.label} onOpen={() => setImageOpen(true)} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Klasse</div>
+                  <div className="font-medium text-slate-900">{detail.classLabel}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Startnummer</div>
+                  <div className="font-medium text-slate-900">{detail.startNumber}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Fahrzeugtyp</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.type === "moto" ? "Motorrad" : "Auto"}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Baujahr</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.year}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Hersteller / Modell</div>
+                  <div className="font-medium text-slate-900">
+                    {detail.vehicle.make} {detail.vehicle.model}
+                  </div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Hubraum</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.displacementCcm}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Motor</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.engineType}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Zylinder</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.cylinders}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Bremsen</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.brakes}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Besitzer</div>
+                  <div className="font-medium text-slate-900">{detail.vehicle.ownerName}</div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs uppercase text-slate-500">Fahrzeughistorie</div>
+                  <div className="rounded-md border bg-slate-50 p-3 leading-relaxed text-slate-800">
+                    {detail.vehicle.vehicleHistory}
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <div className="text-xs uppercase text-slate-500">Hinweise Veranstalter</div>
+                  <div className="rounded-md border bg-slate-50 p-3 leading-relaxed text-slate-800">{detail.notes}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Zahlung</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-slate-700">
+                <div className="grid gap-2">
+                  <div className="rounded-md border bg-slate-50 p-3">Gesamt: {asEuro(detail.payment.totalCents)}</div>
+                  <div className="rounded-md border bg-slate-50 p-3">Bezahlt: {asEuro(detail.payment.paidAmountCents)}</div>
+                  <div className="rounded-md border bg-slate-50 p-3">Offen: {asEuro(detail.payment.amountOpenCents)}</div>
+                </div>
+                <div>
+                  <div className="mb-1 text-xs text-slate-500">Zahlungsfortschritt</div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-2 bg-blue-600" style={{ width: `${paidPercent}%` }} />
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">{paidPercent}% bezahlt</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Dokumente & Einwilligung</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-slate-700">
+                <div className="space-y-2">
+                  {detail.documents.map((doc) => (
+                    <div key={doc.id} className="rounded border p-2 text-xs">
+                      {doc.type} · {doc.status}
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded border bg-slate-50 p-3 text-xs">
+                  <div>Haftung: {detail.consent.termsAccepted ? "Ja" : "Nein"}</div>
+                  <div>Datenschutz: {detail.consent.privacyAccepted ? "Ja" : "Nein"}</div>
+                  <div>Medien: {detail.consent.mediaAccepted ? "Ja" : "Nein"}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
@@ -220,54 +397,131 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+        <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-4 lg:w-[300px] lg:justify-self-end lg:self-start">
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle>Aktionen</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  await adminEntriesService.setEntryStatus(detail.id, "to_shortlist");
-                  setStatus("shortlist");
-                  setActionMessage("Status auf Vorauswahl gesetzt.");
-                  setTimeout(() => setActionMessage(""), 2200);
-                  loadDetail();
-                }}
-              >
-                Auf Vorauswahl setzen
-              </Button>
-              <Button type="button" onClick={() => setPendingAcceptConfirm(true)}>
-                Auf Zugelassen setzen
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  await adminEntriesService.setEntryCheckinVerified(detail.id);
-                  setCheckinDone(true);
-                  setActionMessage("Einchecken wurde bestätigt.");
-                  setTimeout(() => setActionMessage(""), 2200);
-                  loadDetail();
-                }}
-              >
-                Einchecken bestätigen
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  await communicationService.queuePaymentReminderForEntry(detail.id);
-                  setActionMessage("Zahlungserinnerung wurde in die Mail-Queue gelegt.");
-                  setTimeout(() => setActionMessage(""), 2200);
-                }}
-              >
-                Zahlungserinnerung senden
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setActionMessage("PDF Haftverzicht bereitgestellt (UI-only).")}>PDF Haftverzicht</Button>
-              <Button type="button" variant="outline" onClick={() => setActionMessage("PDF Technische Abnahme bereitgestellt (UI-only).")}>PDF Technische Abnahme</Button>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <HintButton
+                  label="Auf Vorauswahl setzen"
+                  variant={status === "shortlist" ? "default" : "outline"}
+                  className={status === "shortlist" ? actionActiveClass : actionOutlineClass}
+                  disabledReason={!confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
+                  onClick={async () => {
+                    await adminEntriesService.setEntryStatus(detail.id, "to_shortlist");
+                    setStatus("shortlist");
+                    flashMessage("Status auf Vorauswahl gesetzt.");
+                    loadDetail();
+                  }}
+                />
+                <HintButton
+                  label="Auf Zugelassen setzen"
+                  variant={status === "accepted" ? "default" : "outline"}
+                  className={status === "accepted" ? actionActiveClass : actionOutlineClass}
+                  disabledReason={!confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
+                  onClick={() => setPendingAcceptConfirm(true)}
+                />
+                <HintButton
+                  label="Auf Abgelehnt setzen"
+                  variant={status === "rejected" ? "default" : "outline"}
+                  className={status === "rejected" ? actionActiveClass : actionOutlineClass}
+                  disabledReason={!confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
+                  onClick={() => setPendingRejectConfirm(true)}
+                />
+                <HintButton
+                  label="Einchecken bestätigen"
+                  variant={checkinDone ? "default" : "outline"}
+                  className={checkinDone ? actionActiveClass : actionOutlineClass}
+                  disabledReason={status !== "accepted" ? "Check-in erst nach Zulassung möglich." : undefined}
+                  onClick={() => setPendingCheckinConfirm(true)}
+                />
+              </div>
+
+              <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <HintButton
+                  label={confirmationMailSent ? "Mail bereits bestätigt" : "Bestätigungs-Mail senden"}
+                  icon={<Mail className="mr-2 h-4 w-4" />}
+                  variant={!confirmationMailSent ? "default" : "outline"}
+                  className={!confirmationMailSent ? actionActiveClass : actionOutlineClass}
+                  disabledReason={confirmationMailSent ? "E-Mail wurde bereits bestätigt." : undefined}
+                  onClick={async () => {
+                    await communicationService.queueAcceptedMailForEntry(detail.id);
+                    flashMessage("Bestätigungs-Mail erneut versendet. Status bleibt bis Bestätigung ausstehend.");
+                  }}
+                />
+                <HintButton
+                  label="Zahlungserinnerung senden"
+                  icon={<Mail className="mr-2 h-4 w-4" />}
+                  variant="outline"
+                  className={actionOutlineClass}
+                  disabledReason={status !== "accepted" ? "Zahlungserinnerung erst bei zugelassener Nennung." : undefined}
+                  onClick={async () => {
+                    await communicationService.queuePaymentReminderForEntry(detail.id);
+                    flashMessage("Zahlungserinnerung wurde in die Mail-Queue gelegt.");
+                  }}
+                />
+              </div>
+
+              <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <HintButton
+                  label="Zahlung als eingegangen markieren"
+                  icon={<Wallet className="mr-2 h-4 w-4" />}
+                  variant={paid ? "default" : "outline"}
+                  className={paid ? actionActiveClass : actionOutlineClass}
+                  disabledReason={status !== "accepted" ? "Zahlung kann erst nach Zulassung bestätigt werden." : undefined}
+                  onClick={async () => {
+                    await adminEntriesService.setEntryPaymentStatus(detail.id, "paid");
+                    setPaid(true);
+                    flashMessage("Zahlung als eingegangen markiert.");
+                    loadDetail();
+                  }}
+                />
+                <HintButton
+                  label="Zahlung manuell anpassen"
+                  icon={<Wallet className="mr-2 h-4 w-4" />}
+                  variant="outline"
+                  className={actionOutlineClass}
+                  disabledReason={status !== "accepted" ? "Betragsanpassung erst nach Zulassung möglich." : undefined}
+                  onClick={() => {
+                    setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
+                    setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
+                    setPaymentEditorOpen(true);
+                  }}
+                />
+              </div>
+
+              <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
+                  onClick={() => flashMessage("PDF Haftverzicht bereitgestellt (UI-only).")}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  PDF Haftverzicht
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
+                  onClick={() => flashMessage("PDF Technische Abnahme bereitgestellt (UI-only).")}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  PDF Technische Abnahme
+                </Button>
+              </div>
+
+              <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <HintButton
+                  label="Nennung löschen (Admin)"
+                  icon={<Trash2 className="mr-2 h-4 w-4" />}
+                  variant="outline"
+                  className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                  onClick={() => setPendingDeleteConfirm(true)}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -285,7 +539,8 @@ export function AdminEntryDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-900">Für Fahrer (bei Zulassung)</label>
+                <label className="text-sm font-medium text-slate-900">Fahrer</label>
+                <p className="text-xs text-slate-500">Wird bei Zulassung per E-Mail an den Fahrer gesendet.</p>
                 <textarea
                   className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={driverNote}
@@ -297,8 +552,7 @@ export function AdminEntryDetailPage() {
                 variant="secondary"
                 onClick={async () => {
                   await adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote });
-                  setActionMessage("Notizen gespeichert.");
-                  setTimeout(() => setActionMessage(""), 2200);
+                  flashMessage("Notizen gespeichert.");
                 }}
               >
                 Notizen speichern
@@ -327,15 +581,146 @@ export function AdminEntryDetailPage() {
                 type="button"
                 onClick={async () => {
                   await adminEntriesService.setEntryStatus(detail.id, "to_accepted");
-                  await communicationService.queueAcceptedMailForEntry(detail.id);
                   setStatus("accepted");
                   setPendingAcceptConfirm(false);
-                  setActionMessage("Status auf Zugelassen gesetzt. Zulassungs-Mail wurde angestoßen.");
-                  setTimeout(() => setActionMessage(""), 2400);
+                  flashMessage("Status auf Zugelassen gesetzt.", 2200);
                   loadDetail();
                 }}
               >
                 Ja, zulassen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingCheckinConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Einchecken wirklich bestätigen?</h2>
+            <p className="mt-2 text-sm text-slate-600">Bitte nur bestätigen, wenn alle Punkte erfüllt sind:</p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              <li>Haftverzicht unterschrieben</li>
+              <li>Führerschein geprüft</li>
+              <li>Bei Ü70 ärztliches Attest geprüft</li>
+              <li>Technische Abnahme durchgeführt und dokumentiert</li>
+            </ul>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingCheckinConfirm(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  await adminEntriesService.setEntryCheckinVerified(detail.id);
+                  setCheckinDone(true);
+                  setPendingCheckinConfirm(false);
+                  flashMessage("Einchecken wurde bestätigt.");
+                  loadDetail();
+                }}
+              >
+                Ja, bestätigen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingRejectConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Auf „Abgelehnt“ setzen?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Diese Nennung wird als abgelehnt markiert. Der Status kann später wieder geändert werden.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingRejectConfirm(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={async () => {
+                  await adminEntriesService.setEntryStatus(detail.id, "to_rejected");
+                  setStatus("rejected");
+                  setPendingRejectConfirm(false);
+                  flashMessage("Status auf Abgelehnt gesetzt.");
+                  loadDetail();
+                }}
+              >
+                Ja, ablehnen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Zahlungsbetrag anpassen</h2>
+            <p className="mt-2 text-sm text-slate-600">Werte in EUR eintragen, z. B. 89,00.</p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-slate-700">Gesamtbetrag (EUR)</label>
+                <input
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={paymentTotalInput}
+                  onChange={(event) => setPaymentTotalInput(event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-slate-700">Bereits bezahlt (EUR)</label>
+                <input
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={paymentPaidInput}
+                  onChange={(event) => setPaymentPaidInput(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPaymentEditorOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  await adminEntriesService.setEntryPaymentAmounts(detail.id, {
+                    totalCents: centsFromEuroInput(paymentTotalInput),
+                    paidAmountCents: centsFromEuroInput(paymentPaidInput)
+                  });
+                  setPaymentEditorOpen(false);
+                  flashMessage("Zahlungsdaten wurden aktualisiert.");
+                  loadDetail();
+                }}
+              >
+                Speichern
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Nennung löschen?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Diese Aktion ist im finalen System nur für Admin-Rollen freigegeben. Im Mockup wird nur eine Bestätigung angezeigt.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingDeleteConfirm(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  setPendingDeleteConfirm(false);
+                  flashMessage("Nennung gelöscht (UI-only).");
+                }}
+              >
+                Ja, löschen
               </Button>
             </div>
           </div>

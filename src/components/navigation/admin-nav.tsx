@@ -22,7 +22,7 @@ export function AdminNav() {
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition",
-                isActive ? "bg-blue-700 text-white" : "text-slate-700 hover:bg-slate-100"
+                isActive ? "bg-primary text-primary-foreground" : "text-slate-700 hover:bg-slate-100"
               )
             }
           >

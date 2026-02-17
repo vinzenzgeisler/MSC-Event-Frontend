@@ -19,6 +19,7 @@ export type AdminEntryListItemDto = {
   acceptanceStatus: AcceptanceStatus;
   paymentStatus: PaymentStatus;
   checkinIdVerified: boolean;
+  confirmationMailSent: boolean;
   createdAt: string;
 };
 
@@ -40,6 +41,7 @@ export type AdminEntryListItem = {
   status: AcceptanceStatus;
   payment: PaymentStatus;
   checkin: "offen" | "bestätigt";
+  confirmationMailSent: boolean;
   createdAt: string;
 };
 
@@ -79,6 +81,16 @@ export type AdminEntryDetailDto = {
       city: string | null;
       emergencyContactName: string | null;
       emergencyContactPhone: string | null;
+    };
+    codriver?: {
+      firstName: string | null;
+      lastName: string | null;
+      email: string | null;
+      birthdate: string | null;
+      phone: string | null;
+      street: string | null;
+      zip: string | null;
+      city: string | null;
     };
   };
   vehicle: {
@@ -148,13 +160,40 @@ export type AdminEntryDetailViewModel = {
     email: string;
     birthdate: string;
     phone: string;
-    address: string;
-    emergencyContact: string;
+    street: string;
+    zip: string;
+    city: string;
+    addressLine: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    motorsportHistory: string;
+  };
+  codriver: {
+    assigned: boolean;
+    label: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    birthdate: string;
+    phone: string;
+    street: string;
+    zip: string;
+    city: string;
+    addressLine: string;
   };
   vehicle: {
     label: string;
     thumbUrl: string | null;
-    facts: string[];
+    type: VehicleType;
+    make: string;
+    model: string;
+    year: string;
+    displacementCcm: string;
+    engineType: string;
+    cylinders: string;
+    brakes: string;
+    ownerName: string;
+    vehicleHistory: string;
   };
   payment: {
     totalCents: number;
@@ -176,6 +215,7 @@ export type AdminEntryDetailViewModel = {
   }>;
   relatedEntryIds: Id[];
   notes: string;
+  confirmationMailSent: boolean;
   internalNote: string;
   driverNote: string;
   history: AdminEntryHistoryItem[];

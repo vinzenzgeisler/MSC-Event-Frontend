@@ -23,11 +23,21 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     status: dto.acceptanceStatus,
     payment: dto.paymentStatus,
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
+    confirmationMailSent: dto.confirmationMailSent,
     createdAt: new Date(dto.createdAt).toLocaleString("de-DE")
   };
 }
 
 function fromAdminEntryDetailDto(dto: AdminEntryDetailDto): AdminEntryDetailViewModel {
+  const enriched = dto as AdminEntryDetailDto & {
+    motorsportHistory?: string;
+    confirmationMailSent?: boolean;
+    codriverName?: string;
+  };
+  const codriver = dto.person.codriver;
+  const codriverName =
+    [codriver?.firstName, codriver?.lastName].filter(Boolean).join(" ") ||
+    (dto.ids.codriverPersonId ? (enriched.codriverName ?? `Person-ID ${dto.ids.codriverPersonId}`) : "Nicht angegeben");
   const driverName = [dto.person.driver.firstName, dto.person.driver.lastName].filter(Boolean).join(" ") || "Unbekannt";
   return {
     id: dto.ids.entryId,
@@ -43,20 +53,40 @@ function fromAdminEntryDetailDto(dto: AdminEntryDetailDto): AdminEntryDetailView
       email: dto.person.driver.email ?? "-",
       birthdate: dto.person.driver.birthdate ?? "-",
       phone: dto.person.driver.phone ?? "-",
-      address: [dto.person.driver.street, dto.person.driver.zip, dto.person.driver.city].filter(Boolean).join(", ") || "-",
-      emergencyContact:
-        [dto.person.driver.emergencyContactName, dto.person.driver.emergencyContactPhone].filter(Boolean).join(" · ") || "-"
+      street: dto.person.driver.street ?? "-",
+      zip: dto.person.driver.zip ?? "-",
+      city: dto.person.driver.city ?? "-",
+      addressLine: [dto.person.driver.street, dto.person.driver.zip, dto.person.driver.city].filter(Boolean).join(", ") || "-",
+      emergencyContactName: dto.person.driver.emergencyContactName ?? "-",
+      emergencyContactPhone: dto.person.driver.emergencyContactPhone ?? "-",
+      motorsportHistory: enriched.motorsportHistory ?? "Keine Angabe"
+    },
+    codriver: {
+      assigned: Boolean(dto.ids.codriverPersonId),
+      label: codriverName,
+      firstName: codriver?.firstName ?? "-",
+      lastName: codriver?.lastName ?? "-",
+      email: codriver?.email ?? "-",
+      birthdate: codriver?.birthdate ?? "-",
+      phone: codriver?.phone ?? "-",
+      street: codriver?.street ?? "-",
+      zip: codriver?.zip ?? "-",
+      city: codriver?.city ?? "-",
+      addressLine: [codriver?.street, codriver?.zip, codriver?.city].filter(Boolean).join(", ") || "-"
     },
     vehicle: {
       label: [dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug",
       thumbUrl: dto.vehicle.imageS3Key,
-      facts: [
-        `Typ: ${dto.vehicle.vehicleType}`,
-        `Hubraum: ${dto.vehicle.displacementCcm ?? "-"} ccm`,
-        `Motor: ${dto.vehicle.engineType ?? "-"}`,
-        `Zylinder: ${dto.vehicle.cylinders ?? "-"}`,
-        `Bremsen: ${dto.vehicle.brakes ?? "-"}`
-      ]
+      type: dto.vehicle.vehicleType,
+      make: dto.vehicle.make ?? "-",
+      model: dto.vehicle.model ?? "-",
+      year: dto.vehicle.year ? String(dto.vehicle.year) : "-",
+      displacementCcm: dto.vehicle.displacementCcm ? `${dto.vehicle.displacementCcm} ccm` : "-",
+      engineType: dto.vehicle.engineType ?? "-",
+      cylinders: dto.vehicle.cylinders ? String(dto.vehicle.cylinders) : "-",
+      brakes: dto.vehicle.brakes ?? "-",
+      ownerName: dto.vehicle.ownerName ?? "-",
+      vehicleHistory: dto.vehicle.vehicleHistory ?? "Keine Angabe"
     },
     payment: {
       totalCents: dto.payment.totalCents,
@@ -68,6 +98,7 @@ function fromAdminEntryDetailDto(dto: AdminEntryDetailDto): AdminEntryDetailView
     documents: dto.documents.map((doc) => ({ id: doc.id, type: doc.type, status: doc.status })),
     relatedEntryIds: dto.relatedEntryIds,
     notes: dto.specialNotes ?? "Keine Hinweise",
+    confirmationMailSent: Boolean(enriched.confirmationMailSent),
     internalNote: (dto as AdminEntryDetailDto & { internalNote?: string }).internalNote ?? "",
     driverNote: (dto as AdminEntryDetailDto & { driverNote?: string }).driverNote ?? "",
     history: mockAdminEntryHistory[dto.ids.entryId] ?? []
@@ -111,8 +142,9 @@ export const adminEntriesService = {
     return fromAdminEntryDetailDto(detail);
   },
 
-  async setEntryStatus(entryId: string, transition: "to_shortlist" | "to_accepted") {
-    const nextStatus = transition === "to_shortlist" ? "shortlist" : "accepted";
+  async setEntryStatus(entryId: string, transition: "to_shortlist" | "to_accepted" | "to_rejected") {
+    const nextStatus =
+      transition === "to_shortlist" ? "shortlist" : transition === "to_accepted" ? "accepted" : "rejected";
     const row = entriesStore.find((item) => item.id === entryId);
     if (row) {
       row.acceptanceStatus = nextStatus;
@@ -143,6 +175,30 @@ export const adminEntriesService = {
     return { ok: true };
   },
 
+  async setEntryPaymentAmounts(entryId: string, payload: { totalCents: number; paidAmountCents: number }) {
+    const row = entriesStore.find((item) => item.id === entryId);
+    const detail = detailStore[entryId];
+    if (!detail) {
+      return { ok: false };
+    }
+
+    const total = Math.max(0, Math.floor(payload.totalCents));
+    const paid = Math.max(0, Math.min(total, Math.floor(payload.paidAmountCents)));
+    const open = Math.max(0, total - paid);
+    const status = open === 0 ? "paid" : "due";
+
+    detail.payment.totalCents = total;
+    detail.payment.paidAmountCents = paid;
+    detail.payment.amountOpenCents = open;
+    detail.payment.paymentStatus = status;
+
+    if (row) {
+      row.paymentStatus = status;
+    }
+
+    return { ok: true };
+  },
+
   async setEntryCheckinVerified(entryId: string) {
     const row = entriesStore.find((item) => item.id === entryId);
     if (row) {
@@ -161,6 +217,18 @@ export const adminEntriesService = {
     if (detail) {
       detail.internalNote = payload.internalNote;
       detail.driverNote = payload.driverNote;
+    }
+    return { ok: true };
+  },
+
+  async markConfirmationMailSent(entryId: string) {
+    const row = entriesStore.find((item) => item.id === entryId);
+    if (row) {
+      row.confirmationMailSent = true;
+    }
+    const detail = detailStore[entryId] as (AdminEntryDetailDto & { confirmationMailSent?: boolean }) | undefined;
+    if (detail) {
+      detail.confirmationMailSent = true;
     }
     return { ok: true };
   }

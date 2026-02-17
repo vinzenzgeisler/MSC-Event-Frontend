@@ -8,6 +8,12 @@ import type {
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
 
+function parseCylinders(value: string): number {
+  const digits = value.replace(/\D/g, "");
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: number): PublicCreateEntryRequestDto {
   const start = form.starts[startIndex];
   return {
@@ -40,7 +46,7 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       year: start.vehicle.year ? Number(start.vehicle.year) : undefined,
       displacementCcm: Number(start.vehicle.displacementCcm),
       engineType: start.vehicle.engineType,
-      cylinders: Number(start.vehicle.cylinders),
+      cylinders: parseCylinders(start.vehicle.cylinders),
       brakes: start.vehicle.brakes,
       vehicleHistory: start.vehicle.vehicleHistory,
       ownerName: start.vehicle.ownerName || `${form.driver.firstName} ${form.driver.lastName}`.trim(),

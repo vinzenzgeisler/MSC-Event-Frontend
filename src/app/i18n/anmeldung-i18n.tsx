@@ -1,0 +1,570 @@
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+
+export type AnmeldungLocale = "de" | "en" | "cz";
+
+const STORAGE_KEY = "msc_anmeldung_locale";
+
+const messages = {
+  de: {
+    languageLabel: "Sprache",
+    languageNames: { de: "Deutsch", en: "English", cz: "Čeština" },
+    layout: {
+      dateBadge: "12./13. September 2026",
+      title: "12. Oberlausitzer Dreieck",
+      subtitle:
+        "Fahreranmeldung für Demo-Läufe und historische Klassen. Bitte alle Angaben vollständig erfassen, damit Zulassung und Kommunikation schnell laufen.",
+      chips: ["Ort: Großschönau / Zittauer Gebirge", "Streckenlänge: 5,9 km", "Anmeldung Schritt-für-Schritt"],
+      websiteButton: "Zur Vereinswebsite",
+      infoDeadlineTitle: "Meldeschluss",
+      infoDeadlineValue: "31. August 2026",
+      infoCheckinTitle: "Check-in vor Ort",
+      infoCheckinValue: "ab 07:00 Uhr",
+      infoContactTitle: "Kontakt Orga-Team",
+      infoContactValue: "event@msc-oberlausitz.de",
+      footerCopyright: "© 2026 MSC Oberlausitzer Dreiländereck e.V. Alle Rechte vorbehalten.",
+      footerImprint: "Impressum",
+      footerPrivacy: "Datenschutz",
+      footerLiability: "Haftungshinweise",
+      footerWebsite: "Website"
+    },
+    page: {
+      openBadge: "Anmeldung geöffnet",
+      title: "Teilnehmer-Anmeldung",
+      subtitle:
+        "Schritt für Schritt zur vollständigen Nennung. Du kannst mehrere Startmeldungen je Fahrer erfassen und am Ende alles prüfen.",
+      nextToStarts: "Weiter zu Startmeldungen",
+      nextToSummary: "Weiter zur Zusammenfassung",
+      back: "Zurück",
+      next: "Weiter",
+      step2BlockedReason: "Bitte zuerst mindestens eine Startmeldung hinzufügen.",
+      submitErrorConsent: "Bitte alle Einwilligungen bestätigen.",
+      submitErrorGeneric: "Anmeldung konnte nicht gespeichert werden.",
+      submitSuccess: "Eingang bestätigt. Eine Bestätigung per E-Mail folgt.",
+      startErrorNeedOne: "Bitte zuerst mindestens eine Startmeldung hinzufügen."
+    },
+    stepper: { driver: "Fahrer", starts: "Startmeldungen", summary: "Zusammenfassung" },
+    driver: {
+      title: "Fahrerdaten",
+      firstName: "Vorname",
+      lastName: "Nachname",
+      birthdate: "Geburtsdatum",
+      phone: "Telefon (mobil oder Festnetz)",
+      phonePlaceholder: "z. B. +49 171 123 4567 oder 03583 123456",
+      email: "E-Mail",
+      addressTitle: "Adresse",
+      street: "Straße / Hausnummer",
+      zip: "PLZ",
+      city: "Ort",
+      emergencyTitle: "Notfallkontakt",
+      emergencyName: "Name",
+      emergencyPhone: "Telefon (mobil oder Festnetz)",
+      emergencyPhonePlaceholder: "z. B. +49 170 123 4567",
+      history: "Sportlicher Werdegang / Besonderheiten",
+      historyPlaceholder: "Kurz zu bisherigen Rennen, Erfolgen oder Besonderheiten",
+      historyHint: "Diese Angaben helfen dem Streckensprecher bei der Vorstellung. Bitte gerne detailliert ausfüllen.",
+      notes: "Spezielle Hinweise für Veranstalter",
+      notesPlaceholder: "z. B. Teamlogistik, besondere Anforderungen"
+    },
+    start: {
+      title: "Startmeldungen",
+      intro: "Ein Fahrer kann mehrere Startmeldungen erfassen. Jede Meldung enthält Klasse, Startnummer und Fahrzeugdaten.",
+      empty: "Noch keine Startmeldung erfasst.",
+      codriverBadge: "Beifahrer",
+      backupBadge: "Ersatzfahrzeug",
+      edit: "Editieren",
+      remove: "Entfernen",
+      codriverDetails: "Beifahrer anzeigen",
+      addTitle: "Startmeldung hinzufügen",
+      editTitle: "Startmeldung bearbeiten",
+      classLabel: "Klasse",
+      classPlaceholder: "Bitte wählen",
+      startNumber: "Startnummer",
+      startNumberPlaceholder: "z. B. 10",
+      startAvailable: "Startnummer frei.",
+      startTaken: "Startnummer bereits vergeben.",
+      startInvalid: "Format ungültig.",
+      vehicleTypeHint: "Fahrzeugtyp wird automatisch anhand der gewählten Klasse gesetzt.",
+      make: "Hersteller / Marke",
+      model: "Modell",
+      year: "Baujahr",
+      displacement: "Hubraum (ccm)",
+      engine: "Motor-Hersteller",
+      cylinders: "Zylinder",
+      cylindersPlaceholder: "z. B. 4 oder V8",
+      brakes: "Bremsen",
+      owner: "Besitzer (optional, falls abweichend vom Fahrer)",
+      history: "Fahrzeughistorie / Besonderheiten",
+      historyHint: "Diese Angaben helfen dem Streckensprecher bei der Vorstellung. Bitte gerne detailliert ausfüllen.",
+      upload: "Fahrzeugbild Upload (UI-only)",
+      uploadPlaceholder: "Dateiname oder Platzhalter",
+      codriverAdd: "Beifahrer hinzufügen",
+      codriverFirstName: "Vorname",
+      codriverLastName: "Nachname",
+      codriverEmail: "E-Mail",
+      codriverPhone: "Telefon (mobil oder Festnetz)",
+      codriverPhonePlaceholder: "z. B. +49 170 123 4567",
+      backupSummary: "Optional: Ersatzfahrzeug in gleicher Klasse",
+      backupToggle: "Ersatzfahrzeug erfassen",
+      backupMake: "Marke",
+      backupModel: "Modell",
+      backupDisplacement: "Hubraum (ccm)",
+      backupEngine: "Motor-Hersteller",
+      footerHint: "Nach dem Hinzufügen kannst du weitere Fahrzeuge erfassen oder direkt zur Zusammenfassung gehen.",
+      saveAdd: "Startmeldung hinzufügen",
+      saveEdit: "Startmeldung aktualisieren",
+      saveBeforeContinue: "Bitte aktuelle Startmeldung zuerst hinzufügen oder Eingaben leeren.",
+      genericError: "Bitte korrigiere die markierten Felder in der Startmeldung.",
+      startNumberError: "Bitte Startnummer prüfen."
+    },
+    summary: {
+      driverTitle: "Fahrer",
+      startsTitle: "Startmeldungen",
+      backupVehicle: "Ersatzfahrzeug erfasst",
+      consentTitle: "Einwilligungen",
+      consentTerms: "Haftungshinweise akzeptieren",
+      consentPrivacy: "Datenschutzhinweise akzeptieren",
+      consentMedia: "Einwilligung zur Mediennutzung akzeptieren (Platzhaltertext, final juristisch zu ergänzen)",
+      viewLink: "ansehen",
+      submit: "Anmeldung absenden"
+    },
+    errors: {
+      requiredFirstName: "Vorname ist erforderlich.",
+      requiredLastName: "Nachname ist erforderlich.",
+      requiredBirthdate: "Geburtsdatum ist erforderlich.",
+      requiredStreet: "Straße / Hausnummer ist erforderlich.",
+      requiredCity: "Ort ist erforderlich.",
+      requiredZip: "PLZ ist erforderlich.",
+      invalidZip: "PLZ muss aus 5 Ziffern bestehen.",
+      invalidPhone: "Bitte gültige Telefonnummer eingeben.",
+      invalidEmergencyPhone: "Bitte gültige Telefonnummer für den Notfallkontakt eingeben.",
+      invalidEmail: "Bitte gültige E-Mail eingeben.",
+      requiredEmergencyName: "Notfallkontakt ist erforderlich.",
+      requiredHistory: "Bitte kurze Motorsport-Historie erfassen.",
+      requiredClass: "Bitte Klasse wählen.",
+      invalidStartNumber: "Startnummer muss 1-6 Zeichen A-Z/0-9 enthalten.",
+      requiredMake: "Hersteller/Marke ist erforderlich.",
+      requiredModel: "Modell ist erforderlich.",
+      invalidDisplacement: "Hubraum darf nur aus Ziffern bestehen (2-5 Stellen).",
+      invalidYear: "Baujahr muss 4-stellig sein.",
+      requiredEngine: "Motor-Hersteller ist erforderlich.",
+      invalidCylinders: "Zylinder muss z. B. 4 oder V8 sein.",
+      requiredBrakes: "Bremsen ist erforderlich.",
+      requiredVehicleHistory: "Bitte Fahrzeughistorie/Besonderheiten eintragen.",
+      requiredCodriverFirstName: "Vorname ist erforderlich.",
+      requiredCodriverLastName: "Nachname ist erforderlich.",
+      invalidCodriverEmail: "Bitte gültige E-Mail eingeben.",
+      invalidApiStartFormat: "Die Startnummer hat ein ungültiges Format.",
+      startTaken: "Die Startnummer ist in dieser Klasse bereits vergeben."
+    },
+    legal: {
+      back: "Zurück zur Anmeldung",
+      note: "Hinweis: Inhalt ist vorläufig und wird vor Livegang final juristisch abgestimmt.",
+      impressum: {
+        title: "Impressum (Platzhalter)",
+        intro: "Hier stehen später die vollständigen Anbieterkennzeichnungen und Kontaktdaten des Vereins.",
+        points: [
+          "Vereinsname und vertretungsberechtigte Personen",
+          "Anschrift und Kontakt",
+          "Vereinsregister / Registergericht",
+          "Verantwortlich für Inhalte"
+        ]
+      },
+      datenschutz: {
+        title: "Datenschutz (Platzhalter)",
+        intro: "Diese Seite wird mit den finalen Datenschutzinformationen für das Anmeldeportal befüllt.",
+        points: [
+          "Verarbeitungszwecke und Rechtsgrundlagen",
+          "Speicherdauer und Empfänger",
+          "Betroffenenrechte",
+          "Kontakt Datenschutz-Ansprechpartner"
+        ]
+      },
+      haftung: {
+        title: "Haftungshinweise (Platzhalter)",
+        intro: "Hier folgen die finalen Haftungs- und Teilnahmebedingungen für Fahrer und Teams.",
+        points: [
+          "Teilnahme auf eigenes Risiko",
+          "Voraussetzungen für Startfreigabe",
+          "Haftungsverzicht und technische Abnahme",
+          "Ausschlussgründe"
+        ]
+      }
+    }
+  },
+  en: {
+    languageLabel: "Language",
+    languageNames: { de: "Deutsch", en: "English", cz: "Čeština" },
+    layout: {
+      dateBadge: "September 12/13, 2026",
+      title: "12th Oberlausitzer Dreieck",
+      subtitle:
+        "Driver registration for demo runs and historic classes. Please provide complete data for a fast approval and communication flow.",
+      chips: ["Location: Großschönau / Zittauer Gebirge", "Track length: 5.9 km", "Step-by-step registration"],
+      websiteButton: "Go to club website",
+      infoDeadlineTitle: "Registration deadline",
+      infoDeadlineValue: "August 31, 2026",
+      infoCheckinTitle: "On-site check-in",
+      infoCheckinValue: "from 07:00",
+      infoContactTitle: "Event contact",
+      infoContactValue: "event@msc-oberlausitz.de",
+      footerCopyright: "© 2026 MSC Oberlausitzer Dreiländereck e.V. All rights reserved.",
+      footerImprint: "Imprint",
+      footerPrivacy: "Privacy",
+      footerLiability: "Liability",
+      footerWebsite: "Website"
+    },
+    page: {
+      openBadge: "Registration open",
+      title: "Participant Registration",
+      subtitle: "Complete your entry step-by-step. You can submit multiple start entries per driver and review everything at the end.",
+      nextToStarts: "Continue to start entries",
+      nextToSummary: "Continue to summary",
+      back: "Back",
+      next: "Next",
+      step2BlockedReason: "Please add at least one start entry first.",
+      submitErrorConsent: "Please confirm all consent checkboxes.",
+      submitErrorGeneric: "Registration could not be saved.",
+      submitSuccess: "Received. A confirmation email will follow.",
+      startErrorNeedOne: "Please add at least one start entry first."
+    },
+    stepper: { driver: "Driver", starts: "Start Entries", summary: "Summary" },
+    driver: {
+      title: "Driver Data",
+      firstName: "First name",
+      lastName: "Last name",
+      birthdate: "Date of birth",
+      phone: "Phone (mobile or landline)",
+      phonePlaceholder: "e.g. +49 171 123 4567 or 03583 123456",
+      email: "Email",
+      addressTitle: "Address",
+      street: "Street / No.",
+      zip: "ZIP",
+      city: "City",
+      emergencyTitle: "Emergency Contact",
+      emergencyName: "Name",
+      emergencyPhone: "Phone (mobile or landline)",
+      emergencyPhonePlaceholder: "e.g. +49 170 123 4567",
+      history: "Motorsport history / notes",
+      historyPlaceholder: "Briefly describe races, achievements or notable info",
+      historyHint: "These details help the track announcer. Please provide as much detail as possible.",
+      notes: "Special notes for organizer",
+      notesPlaceholder: "e.g. team logistics, special requirements"
+    },
+    start: {
+      title: "Start Entries",
+      intro: "A driver can submit multiple start entries. Each entry includes class, start number and vehicle data.",
+      empty: "No start entry added yet.",
+      codriverBadge: "Co-driver",
+      backupBadge: "Backup vehicle",
+      edit: "Edit",
+      remove: "Remove",
+      codriverDetails: "Show co-driver",
+      addTitle: "Add start entry",
+      editTitle: "Edit start entry",
+      classLabel: "Class",
+      classPlaceholder: "Please select",
+      startNumber: "Start number",
+      startNumberPlaceholder: "e.g. 10",
+      startAvailable: "Start number is available.",
+      startTaken: "Start number already taken.",
+      startInvalid: "Invalid format.",
+      vehicleTypeHint: "Vehicle type is derived automatically from selected class.",
+      make: "Manufacturer / Brand",
+      model: "Model",
+      year: "Year",
+      displacement: "Displacement (ccm)",
+      engine: "Engine manufacturer",
+      cylinders: "Cylinders",
+      cylindersPlaceholder: "e.g. 4 or V8",
+      brakes: "Brakes",
+      owner: "Owner (optional if different from driver)",
+      history: "Vehicle history / notes",
+      historyHint: "These details help the track announcer. Please provide as much detail as possible.",
+      upload: "Vehicle image upload (UI-only)",
+      uploadPlaceholder: "Filename or placeholder",
+      codriverAdd: "Add co-driver",
+      codriverFirstName: "First name",
+      codriverLastName: "Last name",
+      codriverEmail: "Email",
+      codriverPhone: "Phone (mobile or landline)",
+      codriverPhonePlaceholder: "e.g. +49 170 123 4567",
+      backupSummary: "Optional: backup vehicle in same class",
+      backupToggle: "Add backup vehicle",
+      backupMake: "Brand",
+      backupModel: "Model",
+      backupDisplacement: "Displacement (ccm)",
+      backupEngine: "Engine manufacturer",
+      footerHint: "After adding this entry you can add more vehicles or continue to summary.",
+      saveAdd: "Add start entry",
+      saveEdit: "Update start entry",
+      saveBeforeContinue: "Please add the current start entry first or clear the fields.",
+      genericError: "Please fix the highlighted fields in this start entry.",
+      startNumberError: "Please validate the start number."
+    },
+    summary: {
+      driverTitle: "Driver",
+      startsTitle: "Start Entries",
+      backupVehicle: "Backup vehicle entered",
+      consentTitle: "Consents",
+      consentTerms: "Accept liability terms",
+      consentPrivacy: "Accept privacy policy",
+      consentMedia: "Accept media consent (placeholder text, final legal text pending)",
+      viewLink: "view",
+      submit: "Submit registration"
+    },
+    errors: {
+      requiredFirstName: "First name is required.",
+      requiredLastName: "Last name is required.",
+      requiredBirthdate: "Date of birth is required.",
+      requiredStreet: "Street / number is required.",
+      requiredCity: "City is required.",
+      requiredZip: "ZIP is required.",
+      invalidZip: "ZIP must contain 5 digits.",
+      invalidPhone: "Please enter a valid phone number.",
+      invalidEmergencyPhone: "Please enter a valid emergency phone number.",
+      invalidEmail: "Please enter a valid email address.",
+      requiredEmergencyName: "Emergency contact is required.",
+      requiredHistory: "Please provide a brief motorsport history.",
+      requiredClass: "Please select a class.",
+      invalidStartNumber: "Start number must be 1-6 chars A-Z/0-9.",
+      requiredMake: "Manufacturer/brand is required.",
+      requiredModel: "Model is required.",
+      invalidDisplacement: "Displacement must contain digits only (2-5).",
+      invalidYear: "Year must contain 4 digits.",
+      requiredEngine: "Engine manufacturer is required.",
+      invalidCylinders: "Cylinders must be e.g. 4 or V8.",
+      requiredBrakes: "Brakes are required.",
+      requiredVehicleHistory: "Please enter vehicle history/notes.",
+      requiredCodriverFirstName: "First name is required.",
+      requiredCodriverLastName: "Last name is required.",
+      invalidCodriverEmail: "Please enter a valid email address.",
+      invalidApiStartFormat: "Start number format is invalid.",
+      startTaken: "Start number is already taken in this class."
+    },
+    legal: {
+      back: "Back to registration",
+      note: "Note: this content is placeholder text and will be legally finalized before launch.",
+      impressum: {
+        title: "Imprint (Placeholder)",
+        intro: "This page will contain the official provider identification and contact details.",
+        points: ["Club name and representatives", "Address and contact", "Register court", "Responsible for content"]
+      },
+      datenschutz: {
+        title: "Privacy (Placeholder)",
+        intro: "This page will contain the final privacy information for the registration portal.",
+        points: ["Purposes and legal basis", "Retention and recipients", "Data subject rights", "Privacy contact"]
+      },
+      haftung: {
+        title: "Liability (Placeholder)",
+        intro: "This page will contain final participation and liability terms for drivers and teams.",
+        points: ["Participation at own risk", "Requirements for start approval", "Waiver and technical check", "Exclusion criteria"]
+      }
+    }
+  },
+  cz: {
+    languageLabel: "Jazyk",
+    languageNames: { de: "Deutsch", en: "English", cz: "Čeština" },
+    layout: {
+      dateBadge: "12./13. září 2026",
+      title: "12. Oberlausitzer Dreieck",
+      subtitle: "Registrace jezdců pro demo jízdy a historické třídy. Vyplňte prosím všechny údaje pro rychlé schválení a komunikaci.",
+      chips: ["Místo: Großschönau / Zittauer Gebirge", "Délka tratě: 5,9 km", "Registrace krok za krokem"],
+      websiteButton: "Na klubový web",
+      infoDeadlineTitle: "Uzávěrka registrace",
+      infoDeadlineValue: "31. srpna 2026",
+      infoCheckinTitle: "Check-in na místě",
+      infoCheckinValue: "od 07:00",
+      infoContactTitle: "Kontakt organizace",
+      infoContactValue: "event@msc-oberlausitz.de",
+      footerCopyright: "© 2026 MSC Oberlausitzer Dreiländereck e.V. Všechna práva vyhrazena.",
+      footerImprint: "Impressum",
+      footerPrivacy: "Ochrana osobních údajů",
+      footerLiability: "Upozornění k odpovědnosti",
+      footerWebsite: "Web"
+    },
+    page: {
+      openBadge: "Registrace otevřena",
+      title: "Registrace účastníka",
+      subtitle: "Vyplňte přihlášku krok za krokem. Na jednoho jezdce můžete zadat více startů a vše na konci zkontrolovat.",
+      nextToStarts: "Pokračovat na starty",
+      nextToSummary: "Pokračovat na souhrn",
+      back: "Zpět",
+      next: "Další",
+      step2BlockedReason: "Nejprve přidejte alespoň jeden start.",
+      submitErrorConsent: "Potvrďte prosím všechny souhlasy.",
+      submitErrorGeneric: "Registraci se nepodařilo uložit.",
+      submitSuccess: "Přijato. Potvrzení e-mailem bude následovat.",
+      startErrorNeedOne: "Nejprve přidejte alespoň jeden start."
+    },
+    stepper: { driver: "Jezdec", starts: "Starty", summary: "Souhrn" },
+    driver: {
+      title: "Údaje jezdce",
+      firstName: "Jméno",
+      lastName: "Příjmení",
+      birthdate: "Datum narození",
+      phone: "Telefon (mobil nebo pevná linka)",
+      phonePlaceholder: "např. +420 777 123 456 nebo 03583 123456",
+      email: "E-mail",
+      addressTitle: "Adresa",
+      street: "Ulice / číslo",
+      zip: "PSČ",
+      city: "Město",
+      emergencyTitle: "Nouzový kontakt",
+      emergencyName: "Jméno",
+      emergencyPhone: "Telefon (mobil nebo pevná linka)",
+      emergencyPhonePlaceholder: "např. +420 777 123 456",
+      history: "Motorsportovní historie / poznámky",
+      historyPlaceholder: "Stručně o závodech, úspěších nebo zvláštnostech",
+      historyHint: "Tyto informace pomáhají komentátorovi tratě. Klidně uveďte více detailů.",
+      notes: "Speciální poznámky pro pořadatele",
+      notesPlaceholder: "např. logistika týmu, zvláštní požadavky"
+    },
+    start: {
+      title: "Starty",
+      intro: "Jeden jezdec může zadat více startů. Každý start obsahuje třídu, startovní číslo a údaje o vozidle.",
+      empty: "Zatím nebyl přidán žádný start.",
+      codriverBadge: "Spolujezdec",
+      backupBadge: "Náhradní vozidlo",
+      edit: "Upravit",
+      remove: "Odstranit",
+      codriverDetails: "Zobrazit spolujezdce",
+      addTitle: "Přidat start",
+      editTitle: "Upravit start",
+      classLabel: "Třída",
+      classPlaceholder: "Vyberte",
+      startNumber: "Startovní číslo",
+      startNumberPlaceholder: "např. 10",
+      startAvailable: "Startovní číslo je volné.",
+      startTaken: "Startovní číslo je obsazené.",
+      startInvalid: "Neplatný formát.",
+      vehicleTypeHint: "Typ vozidla se nastaví automaticky podle třídy.",
+      make: "Výrobce / značka",
+      model: "Model",
+      year: "Rok výroby",
+      displacement: "Objem (ccm)",
+      engine: "Výrobce motoru",
+      cylinders: "Válce",
+      cylindersPlaceholder: "např. 4 nebo V8",
+      brakes: "Brzdy",
+      owner: "Majitel (volitelné, pokud není shodný s jezdcem)",
+      history: "Historie vozidla / poznámky",
+      historyHint: "Tyto informace pomáhají komentátorovi tratě. Klidně uveďte více detailů.",
+      upload: "Nahrání obrázku vozidla (jen UI)",
+      uploadPlaceholder: "Název souboru nebo zástupný text",
+      codriverAdd: "Přidat spolujezdce",
+      codriverFirstName: "Jméno",
+      codriverLastName: "Příjmení",
+      codriverEmail: "E-mail",
+      codriverPhone: "Telefon (mobil nebo pevná linka)",
+      codriverPhonePlaceholder: "např. +420 777 123 456",
+      backupSummary: "Volitelné: náhradní vozidlo ve stejné třídě",
+      backupToggle: "Zadat náhradní vozidlo",
+      backupMake: "Značka",
+      backupModel: "Model",
+      backupDisplacement: "Objem (ccm)",
+      backupEngine: "Výrobce motoru",
+      footerHint: "Po přidání můžete zadat další vozidlo nebo pokračovat na souhrn.",
+      saveAdd: "Přidat start",
+      saveEdit: "Aktualizovat start",
+      saveBeforeContinue: "Nejprve přidejte aktuální start nebo vymažte vyplněná pole.",
+      genericError: "Opravte prosím zvýrazněná pole ve startu.",
+      startNumberError: "Zkontrolujte prosím startovní číslo."
+    },
+    summary: {
+      driverTitle: "Jezdec",
+      startsTitle: "Starty",
+      backupVehicle: "Náhradní vozidlo zadáno",
+      consentTitle: "Souhlasy",
+      consentTerms: "Souhlas s podmínkami odpovědnosti",
+      consentPrivacy: "Souhlas s ochranou osobních údajů",
+      consentMedia: "Souhlas s využitím médií (zástupný text, finální právní text bude doplněn)",
+      viewLink: "zobrazit",
+      submit: "Odeslat registraci"
+    },
+    errors: {
+      requiredFirstName: "Jméno je povinné.",
+      requiredLastName: "Příjmení je povinné.",
+      requiredBirthdate: "Datum narození je povinné.",
+      requiredStreet: "Ulice / číslo je povinné.",
+      requiredCity: "Město je povinné.",
+      requiredZip: "PSČ je povinné.",
+      invalidZip: "PSČ musí mít 5 číslic.",
+      invalidPhone: "Zadejte platné telefonní číslo.",
+      invalidEmergencyPhone: "Zadejte platné telefonní číslo nouzového kontaktu.",
+      invalidEmail: "Zadejte platný e-mail.",
+      requiredEmergencyName: "Nouzový kontakt je povinný.",
+      requiredHistory: "Uveďte stručnou motorsportovní historii.",
+      requiredClass: "Vyberte třídu.",
+      invalidStartNumber: "Startovní číslo musí mít 1-6 znaků A-Z/0-9.",
+      requiredMake: "Výrobce/značka je povinná.",
+      requiredModel: "Model je povinný.",
+      invalidDisplacement: "Objem může obsahovat pouze číslice (2-5).",
+      invalidYear: "Rok výroby musí mít 4 číslice.",
+      requiredEngine: "Výrobce motoru je povinný.",
+      invalidCylinders: "Válce musí být např. 4 nebo V8.",
+      requiredBrakes: "Brzdy jsou povinné.",
+      requiredVehicleHistory: "Uveďte historii/poznámky k vozidlu.",
+      requiredCodriverFirstName: "Jméno je povinné.",
+      requiredCodriverLastName: "Příjmení je povinné.",
+      invalidCodriverEmail: "Zadejte platný e-mail.",
+      invalidApiStartFormat: "Formát startovního čísla je neplatný.",
+      startTaken: "Startovní číslo je v této třídě již obsazené."
+    },
+    legal: {
+      back: "Zpět na registraci",
+      note: "Poznámka: tento obsah je dočasný a bude právně finalizován před spuštěním.",
+      impressum: {
+        title: "Impressum (zástupný text)",
+        intro: "Tato stránka bude obsahovat oficiální identifikační a kontaktní údaje.",
+        points: ["Název klubu a zástupci", "Adresa a kontakt", "Registr soudu", "Odpovědná osoba za obsah"]
+      },
+      datenschutz: {
+        title: "Ochrana osobních údajů (zástupný text)",
+        intro: "Tato stránka bude obsahovat finální informace o ochraně osobních údajů pro registrační portál.",
+        points: ["Účely a právní základ", "Doba uchování a příjemci", "Práva subjektů údajů", "Kontakt pro ochranu údajů"]
+      },
+      haftung: {
+        title: "Upozornění k odpovědnosti (zástupný text)",
+        intro: "Tato stránka bude obsahovat finální podmínky účasti a odpovědnosti pro jezdce a týmy.",
+        points: ["Účast na vlastní riziko", "Požadavky pro schválení startu", "Prohlášení o odpovědnosti a technická kontrola", "Důvody vyloučení"]
+      }
+    }
+  }
+} as const;
+
+type AnmeldungMessages = (typeof messages)[AnmeldungLocale];
+
+type AnmeldungI18nContextValue = {
+  locale: AnmeldungLocale;
+  setLocale: (next: AnmeldungLocale) => void;
+  m: AnmeldungMessages;
+};
+
+const AnmeldungI18nContext = createContext<AnmeldungI18nContextValue | null>(null);
+
+export function AnmeldungI18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<AnmeldungLocale>("de");
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved === "de" || saved === "en" || saved === "cz") {
+      setLocaleState(saved);
+    }
+  }, []);
+
+  const setLocale = (next: AnmeldungLocale) => {
+    setLocaleState(next);
+    window.localStorage.setItem(STORAGE_KEY, next);
+  };
+
+  const value = useMemo<AnmeldungI18nContextValue>(() => ({ locale, setLocale, m: messages[locale] }), [locale]);
+  return <AnmeldungI18nContext.Provider value={value}>{children}</AnmeldungI18nContext.Provider>;
+}
+
+export function useAnmeldungI18n() {
+  const context = useContext(AnmeldungI18nContext);
+  if (!context) {
+    throw new Error("useAnmeldungI18n must be used within AnmeldungI18nProvider");
+  }
+  return context;
+}

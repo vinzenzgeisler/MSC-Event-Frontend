@@ -4,6 +4,7 @@ import { AdminLayout } from "@/app/layouts/admin-layout";
 import { PublicLayout } from "@/app/layouts/public-layout";
 import { HomePage } from "@/pages/home-page";
 import { AnmeldungPage } from "@/pages/public/anmeldung-page";
+import { LegalPlaceholderPage } from "@/pages/public/legal-placeholder-page";
 import { AdminDashboardPage } from "@/pages/admin/dashboard-page";
 import { AdminEntriesPage } from "@/pages/admin/entries-page";
 import { AdminEntryDetailPage } from "@/pages/admin/entry-detail-page";
@@ -24,6 +25,10 @@ export const router = createBrowserRouter([
       {
         path: "/anmeldung",
         element: <AnmeldungPage />
+      },
+      {
+        path: "/anmeldung/rechtliches/:docId",
+        element: <LegalPlaceholderPage />
       }
     ]
   },

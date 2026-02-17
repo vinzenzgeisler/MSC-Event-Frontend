@@ -29,8 +29,14 @@
   @apply border-border;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-background text-foreground antialiased;
+  overflow-x: hidden;
   font-family: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
 }
 

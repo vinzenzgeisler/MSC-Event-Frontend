@@ -119,7 +119,7 @@ export function AdminDashboardPage() {
                   <span className="font-medium">{item.value}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-2 bg-blue-700" style={{ width: `${Math.round((item.value / maxClass) * 100)}%` }} />
+                  <div className="h-2 bg-primary" style={{ width: `${Math.round((item.value / maxClass) * 100)}%` }} />
                 </div>
               </div>
             ))}

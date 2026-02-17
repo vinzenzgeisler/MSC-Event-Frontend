@@ -12,7 +12,7 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-slate-100">
       <div className="border-b bg-white lg:hidden">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="flex w-full items-center justify-between px-4 py-3">
           <div className="text-base font-semibold text-slate-900">MSC Event Verwaltung</div>
           <Button type="button" size="sm" variant="outline" onClick={() => setMenuOpen((prev) => !prev)}>
             {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
@@ -29,11 +29,11 @@ export function AdminLayout() {
         />
       )}
 
-      <div className="mx-auto grid max-w-7xl gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[240px_1fr] lg:gap-6">
+      <div className="mx-auto grid w-full max-w-[1500px] items-start gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[240px_1fr] lg:gap-6 xl:px-5 2xl:px-6">
         <aside
           className={[
             "rounded-lg border bg-white p-4",
-            "fixed inset-y-0 left-0 z-40 w-[86%] max-w-xs overflow-y-auto transition lg:static lg:w-auto lg:max-w-none",
+            "fixed inset-y-0 left-0 z-40 w-[86%] max-w-xs overflow-y-auto transition lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-auto lg:max-w-none",
             menuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           ].join(" ")}
         >
@@ -57,7 +57,7 @@ export function AdminLayout() {
             </Button>
           </div>
         </aside>
-        <main className="space-y-4">
+        <main className="min-w-0 space-y-4">
           <Outlet />
         </main>
       </div>

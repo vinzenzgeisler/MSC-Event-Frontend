@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar";
@@ -15,11 +16,67 @@ const initialFilter: AdminEntriesFilter = {
   checkinIdVerified: "all"
 };
 
+const ACCEPTANCE_VALUES: AdminEntriesFilter["acceptanceStatus"][] = ["all", "pending", "shortlist", "accepted", "rejected"];
+const PAYMENT_VALUES: AdminEntriesFilter["paymentStatus"][] = ["all", "due", "paid"];
+const CHECKIN_VALUES: AdminEntriesFilter["checkinIdVerified"][] = ["all", "true", "false"];
+
+function hasValue<T extends string>(value: string | null, values: readonly T[]): value is T {
+  return value !== null && (values as readonly string[]).includes(value);
+}
+
+function filterFromSearchParams(searchParams: URLSearchParams): AdminEntriesFilter {
+  const classId = searchParams.get("class");
+  const query = searchParams.get("q");
+  const acceptanceStatus = searchParams.get("status");
+  const paymentStatus = searchParams.get("payment");
+  const checkin = searchParams.get("checkin");
+
+  return {
+    query: query ?? "",
+    classId: classId && classId.trim() ? classId : "all",
+    acceptanceStatus: hasValue(acceptanceStatus, ACCEPTANCE_VALUES) ? acceptanceStatus : "all",
+    paymentStatus: hasValue(paymentStatus, PAYMENT_VALUES) ? paymentStatus : "all",
+    checkinIdVerified: hasValue(checkin, CHECKIN_VALUES) ? checkin : "all"
+  };
+}
+
+function searchParamsFromFilter(filter: AdminEntriesFilter): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter.query.trim()) {
+    params.set("q", filter.query);
+  }
+  if (filter.classId !== "all") {
+    params.set("class", filter.classId);
+  }
+  if (filter.acceptanceStatus !== "all") {
+    params.set("status", filter.acceptanceStatus);
+  }
+  if (filter.paymentStatus !== "all") {
+    params.set("payment", filter.paymentStatus);
+  }
+  if (filter.checkinIdVerified !== "all") {
+    params.set("checkin", filter.checkinIdVerified);
+  }
+  return params;
+}
+
+function sameFilter(a: AdminEntriesFilter, b: AdminEntriesFilter) {
+  return (
+    a.query === b.query &&
+    a.classId === b.classId &&
+    a.acceptanceStatus === b.acceptanceStatus &&
+    a.paymentStatus === b.paymentStatus &&
+    a.checkinIdVerified === b.checkinIdVerified
+  );
+}
+
 export function AdminEntriesPage() {
-  const [filter, setFilter] = useState<AdminEntriesFilter>(initialFilter);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filter, setFilter] = useState<AdminEntriesFilter>(() => filterFromSearchParams(searchParams));
   const [rows, setRows] = useState<AdminEntryListItem[]>([]);
   const [toastMessage, setToastMessage] = useState("");
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
+  const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
 
   const refresh = () => {
     adminEntriesService.listEntries(filter).then(setRows);
@@ -28,6 +85,18 @@ export function AdminEntriesPage() {
   useEffect(() => {
     refresh();
   }, [filter]);
+
+  useEffect(() => {
+    const nextFilter = filterFromSearchParams(searchParams);
+    setFilter((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const nextParams = searchParamsFromFilter(filter);
+    if (nextParams.toString() !== searchParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [filter, searchParams, setSearchParams]);
 
   const activeFilterChips = [
     filter.query && { key: "query", label: `Suche: ${filter.query}` },
@@ -76,6 +145,9 @@ export function AdminEntriesPage() {
         onSetAccepted={async (entryId) => {
           setPendingAcceptEntryId(entryId);
         }}
+        onSetRejected={async (entryId) => {
+          setPendingRejectEntryId(entryId);
+        }}
       />
       {toastMessage && (
         <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
@@ -97,13 +169,41 @@ export function AdminEntriesPage() {
                 type="button"
                 onClick={async () => {
                   await adminEntriesService.setEntryStatus(pendingAcceptEntryId, "to_accepted");
-                  setToastMessage(`Nennung ${pendingAcceptEntryId} wurde zugelassen. Zulassungs-Mail wurde angestoßen.`);
+                  setToastMessage(`Nennung ${pendingAcceptEntryId} wurde zugelassen.`);
                   setTimeout(() => setToastMessage(""), 2600);
                   setPendingAcceptEntryId(null);
                   refresh();
                 }}
               >
                 Ja, zulassen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {pendingRejectEntryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Nennung ablehnen?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Die Nennung wird auf den Status „Abgelehnt“ gesetzt. Das kann später wieder geändert werden.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingRejectEntryId(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={async () => {
+                  await adminEntriesService.setEntryStatus(pendingRejectEntryId, "to_rejected");
+                  setToastMessage(`Nennung ${pendingRejectEntryId} wurde abgelehnt.`);
+                  setTimeout(() => setToastMessage(""), 2400);
+                  setPendingRejectEntryId(null);
+                  refresh();
+                }}
+              >
+                Ja, ablehnen
               </Button>
             </div>
           </div>
