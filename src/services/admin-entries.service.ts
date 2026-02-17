@@ -40,7 +40,12 @@ function fromAdminEntryDetailDto(dto: AdminEntryDetailDto): AdminEntryDetailView
     checkinVerified: dto.checkin.checkinIdVerified,
     driver: {
       name: driverName,
-      email: dto.person.driver.email ?? "-"
+      email: dto.person.driver.email ?? "-",
+      birthdate: dto.person.driver.birthdate ?? "-",
+      phone: dto.person.driver.phone ?? "-",
+      address: [dto.person.driver.street, dto.person.driver.zip, dto.person.driver.city].filter(Boolean).join(", ") || "-",
+      emergencyContact:
+        [dto.person.driver.emergencyContactName, dto.person.driver.emergencyContactPhone].filter(Boolean).join(" · ") || "-"
     },
     vehicle: {
       label: [dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug",
@@ -119,16 +124,21 @@ export const adminEntriesService = {
     return { ok: true };
   },
 
-  async setEntryPaymentPaid(entryId: string) {
+  async setEntryPaymentStatus(entryId: string, paymentStatus: "due" | "paid") {
     const row = entriesStore.find((item) => item.id === entryId);
     if (row) {
-      row.paymentStatus = "paid";
+      row.paymentStatus = paymentStatus;
     }
     const detail = detailStore[entryId];
     if (detail) {
-      detail.payment.paymentStatus = "paid";
-      detail.payment.paidAmountCents = detail.payment.totalCents;
-      detail.payment.amountOpenCents = 0;
+      detail.payment.paymentStatus = paymentStatus;
+      if (paymentStatus === "paid") {
+        detail.payment.paidAmountCents = detail.payment.totalCents;
+        detail.payment.amountOpenCents = 0;
+      } else {
+        detail.payment.paidAmountCents = 0;
+        detail.payment.amountOpenCents = detail.payment.totalCents;
+      }
     }
     return { ok: true };
   },

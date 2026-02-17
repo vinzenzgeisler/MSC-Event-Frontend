@@ -68,13 +68,13 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted }: EntriesTab
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge className={acceptanceStatusClasses(row.status)} variant="outline">
+              <Badge className={`${acceptanceStatusClasses(row.status)} px-2 py-0.5 text-[11px]`} variant="outline">
                 {acceptanceStatusLabel(row.status)}
               </Badge>
-              <Badge className={paymentStatusClasses(row.payment)} variant="outline">
+              <Badge className={`${paymentStatusClasses(row.payment)} px-2 py-0.5 text-[11px]`} variant="outline">
                 Zahlung: {paymentStatusLabel(row.payment)}
               </Badge>
-              <Badge className={checkinClasses(row.checkin === "bestätigt")} variant="outline">
+              <Badge className={`${checkinClasses(row.checkin === "bestätigt")} px-2 py-0.5 text-[11px]`} variant="outline">
                 Einchecken: {checkinLabel(row.checkin === "bestätigt")}
               </Badge>
             </div>
@@ -102,7 +102,7 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted }: EntriesTab
               {rows.map((row) => (
                 <tr key={row.id} className={`border-t align-middle ${acceptanceStatusRowAccentClasses(row.status)}`}>
                   <td className="px-4 py-3">
-                    <div className={`flex items-center gap-3 rounded-md px-2 py-1 ${acceptanceStatusRowAccentClasses(row.status)}`}>
+                    <div className="flex items-center gap-3">
                       <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
                       <div>
                         <div className="font-medium text-slate-900">{row.name}</div>
@@ -113,17 +113,17 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted }: EntriesTab
                   <td className="px-4 py-3">{row.classLabel}</td>
                   <td className="px-4 py-3">{row.startNumber}</td>
                   <td className="px-4 py-3">
-                    <Badge className={acceptanceStatusClasses(row.status)} variant="outline">
+                    <Badge className={`${acceptanceStatusClasses(row.status)} px-2 py-0.5 text-[11px]`} variant="outline">
                       {acceptanceStatusLabel(row.status)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge className={paymentStatusClasses(row.payment)} variant="outline">
+                    <Badge className={`${paymentStatusClasses(row.payment)} px-2 py-0.5 text-[11px]`} variant="outline">
                       {paymentStatusLabel(row.payment)}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge className={checkinClasses(row.checkin === "bestätigt")} variant="outline">
+                    <Badge className={`${checkinClasses(row.checkin === "bestätigt")} px-2 py-0.5 text-[11px]`} variant="outline">
                       {checkinLabel(row.checkin === "bestätigt")}
                     </Badge>
                   </td>

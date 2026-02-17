@@ -72,6 +72,13 @@ export type AdminEntryDetailDto = {
       firstName: string | null;
       lastName: string | null;
       email: string | null;
+      birthdate: string | null;
+      phone: string | null;
+      street: string | null;
+      zip: string | null;
+      city: string | null;
+      emergencyContactName: string | null;
+      emergencyContactPhone: string | null;
     };
   };
   vehicle: {
@@ -139,6 +146,10 @@ export type AdminEntryDetailViewModel = {
   driver: {
     name: string;
     email: string;
+    birthdate: string;
+    phone: string;
+    address: string;
+    emergencyContact: string;
   };
   vehicle: {
     label: string;

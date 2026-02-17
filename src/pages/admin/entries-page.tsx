@@ -18,7 +18,8 @@ const initialFilter: AdminEntriesFilter = {
 export function AdminEntriesPage() {
   const [filter, setFilter] = useState<AdminEntriesFilter>(initialFilter);
   const [rows, setRows] = useState<AdminEntryListItem[]>([]);
-  const [actionMessage, setActionMessage] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
+  const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
 
   const refresh = () => {
     adminEntriesService.listEntries(filter).then(setRows);
@@ -64,24 +65,50 @@ export function AdminEntriesPage() {
           </div>
         )}
       </div>
-      {actionMessage && <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">{actionMessage}</div>}
       <EntriesTable
         rows={rows}
         onSetShortlist={async (entryId) => {
           await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
-          setActionMessage(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
+          setToastMessage(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
+          setTimeout(() => setToastMessage(""), 2200);
           refresh();
         }}
         onSetAccepted={async (entryId) => {
-          const confirmed = window.confirm("Status auf 'Zugelassen' setzen? Danach wird automatisch die Zulassungs-Mail versendet.");
-          if (!confirmed) {
-            return;
-          }
-          await adminEntriesService.setEntryStatus(entryId, "to_accepted");
-          setActionMessage(`Nennung ${entryId} wurde zugelassen. Zulassungs-Mail wurde angestoßen.`);
-          refresh();
+          setPendingAcceptEntryId(entryId);
         }}
       />
+      {toastMessage && (
+        <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
+          {toastMessage}
+        </div>
+      )}
+      {pendingAcceptEntryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingAcceptEntryId(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  await adminEntriesService.setEntryStatus(pendingAcceptEntryId, "to_accepted");
+                  setToastMessage(`Nennung ${pendingAcceptEntryId} wurde zugelassen. Zulassungs-Mail wurde angestoßen.`);
+                  setTimeout(() => setToastMessage(""), 2600);
+                  setPendingAcceptEntryId(null);
+                  refresh();
+                }}
+              >
+                Ja, zulassen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

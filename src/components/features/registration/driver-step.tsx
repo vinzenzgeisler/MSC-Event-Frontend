@@ -94,6 +94,9 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
           onChange={(event) => onChange("motorsportHistory", event.target.value)}
           placeholder="Kurz zu bisherigen Rennen, Erfolgen oder Besonderheiten"
         />
+        <p className="text-xs text-slate-500">
+          Diese Angaben helfen dem Streckensprecher bei der Vorstellung. Bitte gerne detailliert ausfüllen.
+        </p>
         <FieldError message={errors.motorsportHistory} />
       </section>
 

@@ -32,7 +32,8 @@ export function SummaryStep({ form, submitError, successMessage, onConsentChange
             </div>
             {start.codriverEnabled && (
               <div className="text-sm text-slate-600">
-                Beifahrer: {start.codriver.firstName} {start.codriver.lastName}
+                Beifahrer: {start.codriver.firstName} {start.codriver.lastName} · {start.codriver.email}
+                {start.codriver.phone ? ` · ${start.codriver.phone}` : ""}
               </div>
             )}
             {start.backupVehicleEnabled && <div className="text-sm text-slate-600">Ersatzfahrzeug erfasst</div>}

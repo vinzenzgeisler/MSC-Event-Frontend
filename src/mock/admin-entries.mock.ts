@@ -62,7 +62,14 @@ export const mockAdminEntryDetail: Record<string, AdminEntryDetailDto> = {
       driver: {
         firstName: "Rashid",
         lastName: "Khan",
-        email: "rashid@example.com"
+        email: "rashid@example.com",
+        birthdate: "1992-05-11",
+        phone: "+49 176 44112233",
+        street: "Hauptstraße 12",
+        zip: "02763",
+        city: "Zittau",
+        emergencyContactName: "Samir Khan",
+        emergencyContactPhone: "+49 176 99887766"
       }
     },
     vehicle: {
