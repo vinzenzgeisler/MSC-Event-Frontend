@@ -11,7 +11,7 @@ export default defineConfig({
       client: "react-query",
       mode: "single",
       clean: true,
-      prettier: true,
+      prettier: false,
       override: {
         mutator: {
           path: "./src/lib/http/client.ts",

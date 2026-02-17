@@ -4,9 +4,13 @@
 - `npm run dev`
 - `npm run rodney:smoke`
 - `npm run rodney:auth`
+- `npx playwright install`
 
 ## Result
 - Failed before app launch because dependencies were not installed (`vite: not found`, `playwright: not found`).
+- Dev server failed to bind `127.0.0.1:5173` (`EPERM`).
+- Playwright install failed to create cache dir; after creating dir, install hung (likely blocked download).
+- Rodney smoke failed because Playwright browsers were not installed.
 
 ## UI Issues Found
 - No runtime screenshots available yet because dev server did not start.
