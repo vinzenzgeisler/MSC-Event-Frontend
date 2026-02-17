@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bike, Car } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -225,17 +225,14 @@ export function AdminEntryDetailPage() {
     </Card>
   );
 
-  const desktopSections = useMemo(
-    () => ({
-      Überblick: sectionOverview,
-      Person: sectionPerson,
-      "Startmeldungen/Fahrzeuge": sectionVehicle,
-      Zahlung: sectionPayment,
-      Dokumente: sectionDocuments,
-      Historie: sectionHistory
-    }),
-    [sectionOverview, sectionPerson, sectionVehicle, sectionPayment, sectionDocuments, sectionHistory]
-  );
+  const desktopSections: Record<TabValue, JSX.Element> = {
+    Überblick: sectionOverview,
+    Person: sectionPerson,
+    "Startmeldungen/Fahrzeuge": sectionVehicle,
+    Zahlung: sectionPayment,
+    Dokumente: sectionDocuments,
+    Historie: sectionHistory
+  };
 
   return (
     <div className="space-y-4">
