@@ -3,6 +3,7 @@
 ## Attempted
 - `npm run dev`
 - `npm run rodney:smoke`
+- `npm run rodney:auth`
 
 ## Result
 - Failed before app launch because dependencies were not installed (`vite: not found`, `playwright: not found`).
