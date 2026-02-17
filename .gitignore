@@ -1,7 +1,5 @@
 node_modules
 dist
 .vite
-playwright-report
+*.tsbuildinfo
 test-results
-artifacts/rodney/screenshots
-artifacts/rodney/reports

@@ -1,25 +1,22 @@
 # MSC Event Frontend
 
-SPA for public registration and admin event management.
+Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admin/*`).
 
 ## Stack
 
 - React + Vite + TypeScript
 - TailwindCSS + shadcn-style UI components
-- TanStack React Query
-- Orval code generation from `api/openapi.json`
+- React Router
+- Lokaler Service-Layer + typed Models (backend-ready, aktuell UI-only)
 
 ## Commands
 
 - `npm install`
-- `npm run api:generate`
 - `npm run dev`
 - `npm run typecheck`
 - `npm run build`
-- `npm run rodney:smoke`
 
 ## Notes
 
-Current OpenAPI lacks success response schemas for many endpoints. Screens in phase 2 are scaffolded and annotated with backend gaps.
-
-Run `npm install` and `npm run api:generate` before starting the dev server or Rodney flows.
+- Keine direkte Backend-Integration in dieser Phase.
+- API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.

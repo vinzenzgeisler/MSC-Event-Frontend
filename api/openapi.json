@@ -72,7 +72,14 @@
         },
         "responses": {
           "200": {
-            "description": "Entry created"
+            "description": "Entry created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCreateEntryResponse"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error400"
@@ -481,26 +488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "entries": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/ListMeta"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "entries",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/AdminEntriesListResponse"
                 }
               }
             }
@@ -522,26 +510,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "entries": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/ListMeta"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "entries",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/AdminEntriesListResponse"
                 }
               }
             }
@@ -1080,7 +1049,14 @@
         },
         "responses": {
           "200": {
-            "description": "Export job created"
+            "description": "Export job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminExportCreateResponse"
+                }
+              }
+            }
           }
         },
         "operationId": "postAdminExportsEntries"
@@ -1101,6 +1077,46 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "completedAt",
+                "status",
+                "type"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortDir",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1109,26 +1125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "exports": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/ListMeta"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "exports",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/AdminExportsListResponse"
                 }
               }
             }
@@ -1200,51 +1197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "event": {
-                      "type": "object"
-                    },
-                    "classes": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "registration": {
-                      "type": "object",
-                      "properties": {
-                        "isOpen": {
-                          "type": "boolean"
-                        },
-                        "reason": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "enum": [
-                            "event_not_open",
-                            "before_window",
-                            "after_window",
-                            null
-                          ]
-                        }
-                      },
-                      "required": [
-                        "isOpen",
-                        "reason"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "event",
-                    "classes",
-                    "registration"
-                  ]
+                  "$ref": "#/components/schemas/PublicCurrentEventResponse"
                 }
               }
             }
@@ -1309,6 +1262,14 @@
                         "null"
                       ],
                       "format": "uuid"
+                    },
+                    "conflictType": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "same_class_taken",
+                        "invalid_format"
+                      ]
                     }
                   },
                   "required": [
@@ -1316,7 +1277,8 @@
                     "normalizedStartNumber",
                     "validFormat",
                     "available",
-                    "conflictEntryId"
+                    "conflictEntryId",
+                    "conflictType"
                   ]
                 }
               }
@@ -1472,26 +1434,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "entry": {
-                      "type": "object"
-                    },
-                    "history": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "entry",
-                    "history"
-                  ]
+                  "$ref": "#/components/schemas/AdminEntryDetailResponse"
                 }
               }
             }
@@ -1499,7 +1442,12 @@
           "404": {
             "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "x-roles": [
+          "admin",
+          "checkin",
+          "viewer"
+        ]
       }
     },
     "/admin/mail/outbox": {
@@ -1519,13 +1467,7 @@
             "in": "query",
             "name": "status",
             "schema": {
-              "type": "string",
-              "enum": [
-                "queued",
-                "sending",
-                "sent",
-                "failed"
-              ]
+              "$ref": "#/components/schemas/OutboxStatus"
             }
           },
           {
@@ -1575,26 +1517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "outbox": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/ListMeta"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "outbox",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/AdminOutboxListResponse"
                 }
               }
             }
@@ -1602,7 +1525,10 @@
           "400": {
             "$ref": "#/components/responses/Error400"
           }
-        }
+        },
+        "x-roles": [
+          "admin"
+        ]
       }
     },
     "/admin/mail/outbox/{outboxId}/retry": {
@@ -1621,7 +1547,26 @@
         ],
         "responses": {
           "200": {
-            "description": "Outbox retried"
+            "description": "Outbox retried",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "outbox": {
+                      "$ref": "#/components/schemas/AdminOutboxItemDto"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "outbox"
+                  ]
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/Error404"
@@ -1629,7 +1574,10 @@
           "409": {
             "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "x-roles": [
+          "admin"
+        ]
       }
     }
   },
@@ -1918,17 +1866,50 @@
             "minimum": 1900,
             "maximum": 2100
           },
+          "displacementCcm": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "engineType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cylinders": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "brakes": {
+            "type": "string",
+            "minLength": 1
+          },
+          "vehicleHistory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ownerName": {
+            "type": "string",
+            "minLength": 1
+          },
           "startNumberRaw": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 6
+            "pattern": "^[A-Z0-9]{1,6}$"
           },
           "imageS3Key": {
             "type": "string"
+          },
+          "imageUploadId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
-          "vehicleType"
+          "vehicleType",
+          "displacementCcm",
+          "engineType",
+          "cylinders",
+          "brakes",
+          "vehicleHistory",
+          "ownerName"
         ]
       },
       "PublicCreateEntryRequest": {
@@ -1939,7 +1920,7 @@
             "format": "uuid"
           },
           "driver": {
-            "$ref": "#/components/schemas/PersonInput"
+            "$ref": "#/components/schemas/DriverInput"
           },
           "codriver": {
             "$ref": "#/components/schemas/PersonInput"
@@ -1951,14 +1932,27 @@
             "type": "string",
             "pattern": "^[A-Z0-9]{1,6}$"
           },
+          "specialNotes": {
+            "type": "string",
+            "minLength": 1
+          },
+          "backupOfEntryId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "isBackupVehicle": {
             "type": "boolean"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/ConsentInput"
           }
         },
         "required": [
           "classId",
           "driver",
-          "vehicle"
+          "vehicle",
+          "specialNotes",
+          "consent"
         ]
       },
       "PatchEntryStatusRequest": {
@@ -2297,6 +2291,7 @@
           "type": {
             "type": "string",
             "enum": [
+              "entries_csv",
               "startlist_csv",
               "participants_csv",
               "payments_open_csv",
@@ -2416,6 +2411,1038 @@
         "required": [
           "classId",
           "startNumber"
+        ]
+      },
+      "DriverInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "birthdate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "nationality": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "emergencyContactName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "emergencyContactPhone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "motorsportHistory": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "emergencyContactName",
+          "emergencyContactPhone",
+          "motorsportHistory"
+        ]
+      },
+      "ConsentInput": {
+        "type": "object",
+        "properties": {
+          "termsAccepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "privacyAccepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "mediaAccepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "consentVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "consentCapturedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "termsAccepted",
+          "privacyAccepted",
+          "mediaAccepted",
+          "consentVersion",
+          "consentCapturedAt"
+        ]
+      },
+      "PublicEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "registrationOpenAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "registrationCloseAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "startsAt",
+          "endsAt",
+          "status",
+          "isCurrent",
+          "registrationOpenAt",
+          "registrationCloseAt"
+        ]
+      },
+      "PublicClassDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vehicleType": {
+            "$ref": "#/components/schemas/VehicleType"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "name",
+          "vehicleType"
+        ]
+      },
+      "PublicRegistrationWindowDto": {
+        "type": "object",
+        "properties": {
+          "isOpen": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "event_not_open",
+              "before_window",
+              "after_window",
+              null
+            ]
+          }
+        },
+        "required": [
+          "isOpen",
+          "reason"
+        ]
+      },
+      "PublicCurrentEventResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "event": {
+            "$ref": "#/components/schemas/PublicEventDto"
+          },
+          "classes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicClassDto"
+            }
+          },
+          "registration": {
+            "$ref": "#/components/schemas/PublicRegistrationWindowDto"
+          }
+        },
+        "required": [
+          "ok",
+          "event",
+          "classes",
+          "registration"
+        ]
+      },
+      "AdminEntryListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "classId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "className": {
+            "type": "string"
+          },
+          "registrationStatus": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "acceptanceStatus": {
+            "$ref": "#/components/schemas/AcceptanceStatus"
+          },
+          "checkinIdVerified": {
+            "type": "boolean"
+          },
+          "checkinIdVerifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "checkinIdVerifiedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "techStatus": {
+            "$ref": "#/components/schemas/TechStatus"
+          },
+          "techCheckedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "techCheckedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startNumberNorm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driverPersonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "driverFirstName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driverLastName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driverEmail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paymentStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completionStatus": {
+            "type": "string",
+            "enum": [
+              "open",
+              "completed"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "classId",
+          "className",
+          "registrationStatus",
+          "acceptanceStatus",
+          "checkinIdVerified",
+          "techStatus",
+          "driverPersonId",
+          "completionStatus",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminEntriesListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminEntryListItemDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ListMeta"
+          }
+        },
+        "required": [
+          "ok",
+          "entries",
+          "meta"
+        ]
+      },
+      "AdminEntryDocumentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "createdAt"
+        ]
+      },
+      "AdminEntryHistoryItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payload": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "actorUserId",
+          "createdAt"
+        ]
+      },
+      "AdminEntryDetailDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "object",
+            "properties": {
+              "entryId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "classId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "driverPersonId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "codriverPersonId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "vehicleId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "backupOfEntryId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "entryId",
+              "eventId",
+              "classId",
+              "driverPersonId",
+              "codriverPersonId",
+              "vehicleId",
+              "backupOfEntryId"
+            ]
+          },
+          "className": {
+            "type": "string"
+          },
+          "registrationStatus": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "acceptanceStatus": {
+            "$ref": "#/components/schemas/AcceptanceStatus"
+          },
+          "startNumberNorm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isBackupVehicle": {
+            "type": "boolean"
+          },
+          "relatedEntryIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "person": {
+            "type": "object",
+            "properties": {
+              "driver": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "lastName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "firstName",
+                  "lastName",
+                  "email"
+                ]
+              }
+            },
+            "required": [
+              "driver"
+            ]
+          },
+          "vehicle": {
+            "type": "object",
+            "properties": {
+              "vehicleType": {
+                "$ref": "#/components/schemas/VehicleType"
+              },
+              "make": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "year": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "displacementCcm": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "engineType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cylinders": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "brakes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ownerName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "vehicleHistory": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "imageS3Key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "vehicleType",
+              "make",
+              "model",
+              "year",
+              "displacementCcm",
+              "engineType",
+              "cylinders",
+              "brakes",
+              "ownerName",
+              "vehicleHistory",
+              "imageS3Key"
+            ]
+          },
+          "payment": {
+            "type": "object",
+            "properties": {
+              "totalCents": {
+                "type": "integer"
+              },
+              "paidAmountCents": {
+                "type": "integer"
+              },
+              "amountOpenCents": {
+                "type": "integer"
+              },
+              "paymentStatus": {
+                "$ref": "#/components/schemas/PaymentStatus"
+              }
+            },
+            "required": [
+              "totalCents",
+              "paidAmountCents",
+              "amountOpenCents",
+              "paymentStatus"
+            ]
+          },
+          "checkin": {
+            "type": "object",
+            "properties": {
+              "checkinIdVerified": {
+                "type": "boolean"
+              },
+              "checkinIdVerifiedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "checkinIdVerifiedBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "techStatus": {
+                "$ref": "#/components/schemas/TechStatus"
+              },
+              "techCheckedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "techCheckedBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "checkinIdVerified",
+              "checkinIdVerifiedAt",
+              "checkinIdVerifiedBy",
+              "techStatus",
+              "techCheckedAt",
+              "techCheckedBy"
+            ]
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminEntryDocumentDto"
+            }
+          },
+          "specialNotes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "consent": {
+            "type": "object",
+            "properties": {
+              "termsAccepted": {
+                "type": "boolean"
+              },
+              "privacyAccepted": {
+                "type": "boolean"
+              },
+              "mediaAccepted": {
+                "type": "boolean"
+              },
+              "consentVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "consentCapturedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "termsAccepted",
+              "privacyAccepted",
+              "mediaAccepted",
+              "consentVersion",
+              "consentCapturedAt"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ids",
+          "className",
+          "registrationStatus",
+          "acceptanceStatus",
+          "startNumberNorm",
+          "isBackupVehicle",
+          "relatedEntryIds",
+          "person",
+          "vehicle",
+          "payment",
+          "checkin",
+          "documents",
+          "specialNotes",
+          "consent",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminEntryDetailResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/AdminEntryDetailDto"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminEntryHistoryItemDto"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "entry",
+          "history"
+        ]
+      },
+      "OutboxStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "sending",
+          "sent",
+          "failed"
+        ]
+      },
+      "AdminOutboxItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "toEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "templateVersion": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OutboxStatus"
+          },
+          "attemptCount": {
+            "type": "integer"
+          },
+          "maxAttempts": {
+            "type": "integer"
+          },
+          "errorLast": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sendAfter": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "toEmail",
+          "subject",
+          "templateId",
+          "templateVersion",
+          "status",
+          "attemptCount",
+          "maxAttempts",
+          "errorLast",
+          "sendAfter",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminOutboxListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "outbox": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminOutboxItemDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ListMeta"
+          }
+        },
+        "required": [
+          "ok",
+          "outbox",
+          "meta"
+        ]
+      },
+      "ExportJobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "processing",
+          "succeeded",
+          "failed"
+        ]
+      },
+      "AdminExportJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "entries_csv",
+              "startlist_csv",
+              "participants_csv",
+              "payments_open_csv",
+              "checkin_status_csv"
+            ]
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExportJobStatus"
+          },
+          "s3Key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errorLast": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "type",
+          "filters",
+          "status",
+          "s3Key",
+          "errorLast",
+          "createdBy",
+          "createdAt",
+          "completedAt"
+        ]
+      },
+      "AdminExportsListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "exports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminExportJobDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ListMeta"
+          }
+        },
+        "required": [
+          "ok",
+          "exports",
+          "meta"
+        ]
+      },
+      "PublicCreateEntryResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "registrationStatus": {
+            "$ref": "#/components/schemas/RegistrationStatus"
+          },
+          "verificationToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "entryId",
+          "registrationStatus",
+          "verificationToken"
+        ]
+      },
+      "AdminExportCreateResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "exportJobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExportJobStatus"
+          }
+        },
+        "required": [
+          "ok",
+          "exportJobId",
+          "status"
         ]
       }
     }
