@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
 import { communicationService } from "@/services/communication.service";
 import type { BroadcastForm, OutboxItem } from "@/types/admin";
 
@@ -45,17 +46,17 @@ export function AdminCommunicationPage() {
             <Label>Status</Label>
             <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.acceptanceStatus} onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as BroadcastForm["acceptanceStatus"] }))}>
               <option value="all">Alle</option>
-              <option value="pending">pending</option>
-              <option value="shortlist">shortlist</option>
-              <option value="accepted">accepted</option>
+              <option value="pending">Offen</option>
+              <option value="shortlist">Vorauswahl</option>
+              <option value="accepted">Zugelassen</option>
             </select>
           </div>
           <div className="space-y-1">
             <Label>Zahlung</Label>
             <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.paymentStatus} onChange={(event) => setForm((prev) => ({ ...prev, paymentStatus: event.target.value as BroadcastForm["paymentStatus"] }))}>
               <option value="all">Alle</option>
-              <option value="due">due</option>
-              <option value="paid">paid</option>
+              <option value="due">{paymentStatusLabel("due")}</option>
+              <option value="paid">{paymentStatusLabel("paid")}</option>
             </select>
           </div>
           <div className="space-y-1">
@@ -63,7 +64,7 @@ export function AdminCommunicationPage() {
             <Input value={form.templateKey} onChange={(event) => setForm((prev) => ({ ...prev, templateKey: event.target.value }))} />
           </div>
           <div className="space-y-1 md:col-span-2">
-            <Label>Subject Override</Label>
+            <Label>Betreff (optional)</Label>
             <Input value={form.subjectOverride} onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))} />
           </div>
           <div className="md:col-span-3">
@@ -74,7 +75,7 @@ export function AdminCommunicationPage() {
                 void communicationService.queueBroadcast(form);
               }}
             >
-              Broadcast in Queue legen
+              Broadcast in Warteschlange legen
             </Button>
           </div>
         </CardContent>
@@ -82,7 +83,7 @@ export function AdminCommunicationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Outbox</CardTitle>
+          <CardTitle>Postausgang</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2 md:hidden">
@@ -91,7 +92,9 @@ export function AdminCommunicationPage() {
                 <div className="font-medium text-slate-900">{item.subject}</div>
                 <div className="text-xs text-slate-600">{item.recipient}</div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <Badge variant={item.status === "failed" ? "outline" : "secondary"}>{item.status}</Badge>
+                  <Badge className={outboxStatusClasses(item.status)} variant="outline">
+                    {outboxStatusLabel(item.status)}
+                  </Badge>
                   {item.status === "failed" ? (
                     <Button
                       type="button"
@@ -101,7 +104,7 @@ export function AdminCommunicationPage() {
                         void communicationService.retryOutbox(item.id);
                       }}
                     >
-                      Retry
+                      Erneut senden
                     </Button>
                   ) : (
                     <span className="text-xs text-slate-500">{item.createdAt}</span>
@@ -129,7 +132,9 @@ export function AdminCommunicationPage() {
                     <td className="px-3 py-2">{item.recipient}</td>
                     <td className="px-3 py-2">{item.subject}</td>
                     <td className="px-3 py-2">
-                      <Badge variant={item.status === "failed" ? "outline" : "secondary"}>{item.status}</Badge>
+                      <Badge className={outboxStatusClasses(item.status)} variant="outline">
+                        {outboxStatusLabel(item.status)}
+                      </Badge>
                     </td>
                     <td className="px-3 py-2">{item.createdAt}</td>
                     <td className="px-3 py-2">
@@ -142,7 +147,7 @@ export function AdminCommunicationPage() {
                             void communicationService.retryOutbox(item.id);
                           }}
                         >
-                          Retry
+                          Erneut senden
                         </Button>
                       ) : (
                         "-"

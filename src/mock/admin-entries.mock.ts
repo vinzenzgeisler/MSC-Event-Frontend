@@ -1,4 +1,6 @@
 import type { AdminEntryDetailDto, AdminEntryHistoryItem, AdminEntryListItemDto } from "@/types/admin";
+import autoThumb from "@/assets/vehicle-auto.svg";
+import motoThumb from "@/assets/vehicle-moto.svg";
 
 export const mockAdminEntries: AdminEntryListItemDto[] = [
   {
@@ -6,6 +8,8 @@ export const mockAdminEntries: AdminEntryListItemDto[] = [
     name: "Lena Berger",
     className: "Auto Elite",
     startNumber: "21A",
+    vehicleLabel: "Porsche 911",
+    vehicleThumbUrl: autoThumb,
     acceptanceStatus: "pending",
     paymentStatus: "due",
     checkinIdVerified: false,
@@ -16,6 +20,8 @@ export const mockAdminEntries: AdminEntryListItemDto[] = [
     name: "Rashid Khan",
     className: "Moto Open",
     startNumber: "77",
+    vehicleLabel: "Yamaha YZF",
+    vehicleThumbUrl: motoThumb,
     acceptanceStatus: "accepted",
     paymentStatus: "paid",
     checkinIdVerified: true,
@@ -26,6 +32,8 @@ export const mockAdminEntries: AdminEntryListItemDto[] = [
     name: "Mila Hoffmann",
     className: "Auto Pro",
     startNumber: "8B",
+    vehicleLabel: "BMW M3 E30",
+    vehicleThumbUrl: autoThumb,
     acceptanceStatus: "shortlist",
     paymentStatus: "due",
     checkinIdVerified: false,
@@ -68,7 +76,7 @@ export const mockAdminEntryDetail: Record<string, AdminEntryDetailDto> = {
       brakes: "Scheibenbremse",
       ownerName: "Rashid Khan",
       vehicleHistory: "2x Klassensieger Regional",
-      imageS3Key: null
+      imageS3Key: motoThumb
     },
     payment: {
       totalCents: 8900,

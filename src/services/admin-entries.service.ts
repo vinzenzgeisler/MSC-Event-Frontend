@@ -13,6 +13,8 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     name: dto.name,
     classLabel: dto.className,
     startNumber: dto.startNumber ?? "-",
+    vehicleLabel: dto.vehicleLabel,
+    vehicleThumbUrl: dto.vehicleThumbUrl,
     status: dto.acceptanceStatus,
     payment: dto.paymentStatus,
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
@@ -37,6 +39,7 @@ function fromAdminEntryDetailDto(dto: AdminEntryDetailDto): AdminEntryDetailView
     },
     vehicle: {
       label: [dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug",
+      thumbUrl: dto.vehicle.imageS3Key,
       facts: [
         `Typ: ${dto.vehicle.vehicleType}`,
         `Hubraum: ${dto.vehicle.displacementCcm ?? "-"} ccm`,

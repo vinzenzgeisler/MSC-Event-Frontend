@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { acceptanceStatusLabel, exportStatusClasses, exportStatusLabel } from "@/lib/admin-status";
 import { exportsService } from "@/services/exports.service";
 import type { ExportCreateForm, ExportJob } from "@/types/admin";
 
@@ -53,9 +54,9 @@ export function AdminExportsPage() {
             <Label>Status (optional)</Label>
             <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.acceptanceStatus} onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as ExportCreateForm["acceptanceStatus"] }))}>
               <option value="all">Alle</option>
-              <option value="pending">pending</option>
-              <option value="shortlist">shortlist</option>
-              <option value="accepted">accepted</option>
+              <option value="pending">{acceptanceStatusLabel("pending")}</option>
+              <option value="shortlist">{acceptanceStatusLabel("shortlist")}</option>
+              <option value="accepted">{acceptanceStatusLabel("accepted")}</option>
             </select>
           </div>
           <div className="space-y-1">
@@ -89,7 +90,9 @@ export function AdminExportsPage() {
                 <div className="font-medium text-slate-900">{job.type}</div>
                 <div className="text-xs text-slate-600">{job.id}</div>
                 <div className="mt-2 flex items-center justify-between">
-                  <Badge variant={job.status === "succeeded" ? "secondary" : "outline"}>{job.status}</Badge>
+                  <Badge className={exportStatusClasses(job.status)} variant="outline">
+                    {exportStatusLabel(job.status)}
+                  </Badge>
                   {job.status === "succeeded" ? <Button size="sm" variant="outline">Download</Button> : <span className="text-xs text-slate-500">-</span>}
                 </div>
                 <div className="mt-2 text-xs text-slate-500">{job.createdAt}</div>
@@ -114,7 +117,9 @@ export function AdminExportsPage() {
                     <td className="px-3 py-2">{job.id}</td>
                     <td className="px-3 py-2">{job.type}</td>
                     <td className="px-3 py-2">
-                      <Badge variant={job.status === "succeeded" ? "secondary" : "outline"}>{job.status}</Badge>
+                      <Badge className={exportStatusClasses(job.status)} variant="outline">
+                        {exportStatusLabel(job.status)}
+                      </Badge>
                     </td>
                     <td className="px-3 py-2">{job.createdAt}</td>
                     <td className="px-3 py-2">

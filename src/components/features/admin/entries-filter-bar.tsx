@@ -42,10 +42,10 @@ export function EntriesFilterBar({ filter, onChange }: EntriesFilterBarProps) {
           onChange={(event) => onChange("acceptanceStatus", event.target.value as AdminEntriesFilter["acceptanceStatus"])}
         >
           <option value="all">Alle</option>
-          <option value="pending">pending</option>
-          <option value="shortlist">shortlist</option>
-          <option value="accepted">accepted</option>
-          <option value="rejected">rejected</option>
+          <option value="pending">Offen</option>
+          <option value="shortlist">Vorauswahl</option>
+          <option value="accepted">Zugelassen</option>
+          <option value="rejected">Abgelehnt</option>
         </select>
       </div>
       <div className="space-y-1">
@@ -57,12 +57,12 @@ export function EntriesFilterBar({ filter, onChange }: EntriesFilterBarProps) {
           onChange={(event) => onChange("paymentStatus", event.target.value as AdminEntriesFilter["paymentStatus"])}
         >
           <option value="all">Alle</option>
-          <option value="due">due</option>
-          <option value="paid">paid</option>
+          <option value="due">Offen</option>
+          <option value="paid">Bezahlt</option>
         </select>
       </div>
       <div className="space-y-1">
-        <Label htmlFor="admin-filter-checkin">Check-in</Label>
+        <Label htmlFor="admin-filter-checkin">Einchecken</Label>
         <select
           id="admin-filter-checkin"
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -70,8 +70,8 @@ export function EntriesFilterBar({ filter, onChange }: EntriesFilterBarProps) {
           onChange={(event) => onChange("checkinIdVerified", event.target.value as AdminEntriesFilter["checkinIdVerified"])}
         >
           <option value="all">Alle</option>
-          <option value="true">bestätigt</option>
-          <option value="false">offen</option>
+          <option value="true">Eingecheckt</option>
+          <option value="false">Nicht eingecheckt</option>
         </select>
       </div>
     </div>

@@ -23,5 +23,13 @@ export const communicationService = {
 
   async retryOutbox(_id: string) {
     return { ok: true };
+  },
+
+  async queuePaymentReminderForEntry(_entryId: string) {
+    return { ok: true };
+  },
+
+  async queueRegistrationConfirmationForEntry(_entryId: string) {
+    return { ok: true };
   }
 };

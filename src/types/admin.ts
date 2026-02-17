@@ -14,6 +14,8 @@ export type AdminEntryListItemDto = {
   name: string;
   className: string;
   startNumber: string | null;
+  vehicleLabel: string;
+  vehicleThumbUrl: string | null;
   acceptanceStatus: AcceptanceStatus;
   paymentStatus: PaymentStatus;
   checkinIdVerified: boolean;
@@ -33,6 +35,8 @@ export type AdminEntryListItem = {
   name: string;
   classLabel: string;
   startNumber: string;
+  vehicleLabel: string;
+  vehicleThumbUrl: string | null;
   status: AcceptanceStatus;
   payment: PaymentStatus;
   checkin: "offen" | "bestätigt";
@@ -138,6 +142,7 @@ export type AdminEntryDetailViewModel = {
   };
   vehicle: {
     label: string;
+    thumbUrl: string | null;
     facts: string[];
   };
   payment: {
@@ -188,6 +193,8 @@ export type OutboxItem = {
   error: string;
   createdAt: string;
 };
+
+export type EntryMailAction = "payment_reminder" | "registration_confirmation";
 
 export type AdminExportType = "entries_csv" | "startlist_csv" | "participants_csv" | "payments_open_csv" | "checkin_status_csv";
 

@@ -1,11 +1,33 @@
+import { Bike, Car } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  acceptanceStatusClasses,
+  acceptanceStatusLabel,
+  acceptanceStatusRowAccentClasses,
+  checkinClasses,
+  checkinLabel,
+  paymentStatusClasses,
+  paymentStatusLabel
+} from "@/lib/admin-status";
 import type { AdminEntryListItem } from "@/types/admin";
 
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
 };
+
+function VehicleThumb({ src, label }: { src: string | null; label: string }) {
+  if (src) {
+    return <img className="h-12 w-12 rounded-md border object-cover" src={src} alt={`Fahrzeug: ${label}`} />;
+  }
+  const isMoto = label.toLowerCase().includes("yamaha") || label.toLowerCase().includes("moto");
+  return (
+    <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-slate-100 text-slate-500">
+      {isMoto ? <Bike className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+    </div>
+  );
+}
 
 export function EntriesTable({ rows }: EntriesTableProps) {
   if (!rows.length) {
@@ -16,20 +38,32 @@ export function EntriesTable({ rows }: EntriesTableProps) {
     <div className="space-y-3">
       <div className="space-y-2 md:hidden">
         {rows.map((row) => (
-          <div key={row.id} className="rounded-lg border bg-white p-3">
+          <div key={row.id} className={`rounded-lg border bg-white p-3 ${acceptanceStatusRowAccentClasses(row.status)}`}>
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-medium text-slate-900">{row.name}</div>
-                <div className="text-xs text-slate-600">{row.classLabel} · #{row.startNumber}</div>
+              <div className="flex items-start gap-3">
+                <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
+                <div>
+                  <div className="font-medium text-slate-900">{row.name}</div>
+                  <div className="text-xs text-slate-600">
+                    {row.classLabel} · #{row.startNumber}
+                  </div>
+                  <div className="text-xs text-slate-500">{row.vehicleLabel}</div>
+                </div>
               </div>
               <Button asChild size="sm" variant="outline">
                 <Link to={`/admin/entries/${row.id}`}>Details</Link>
               </Button>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge variant={row.status === "accepted" ? "secondary" : "outline"}>{row.status}</Badge>
-              <Badge variant={row.payment === "paid" ? "secondary" : "outline"}>{row.payment}</Badge>
-              <Badge variant={row.checkin === "bestätigt" ? "secondary" : "outline"}>{row.checkin}</Badge>
+              <Badge className={acceptanceStatusClasses(row.status)} variant="outline">
+                {acceptanceStatusLabel(row.status)}
+              </Badge>
+              <Badge className={paymentStatusClasses(row.payment)} variant="outline">
+                Zahlung: {paymentStatusLabel(row.payment)}
+              </Badge>
+              <Badge className={checkinClasses(row.checkin === "bestätigt")} variant="outline">
+                Einchecken: {checkinLabel(row.checkin === "bestätigt")}
+              </Badge>
             </div>
             <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div>
           </div>
@@ -38,43 +72,59 @@ export function EntriesTable({ rows }: EntriesTableProps) {
 
       <div className="hidden overflow-hidden rounded-xl border bg-white md:block">
         <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Klasse</th>
-              <th className="px-4 py-3 font-medium">Startnummer</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Zahlung</th>
-              <th className="px-4 py-3 font-medium">Check-in</th>
-              <th className="px-4 py-3 font-medium">Erstellt am</th>
-              <th className="px-4 py-3 font-medium">Aktion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-t align-middle">
-                <td className="px-4 py-3 font-medium text-slate-900">{row.name}</td>
-                <td className="px-4 py-3">{row.classLabel}</td>
-                <td className="px-4 py-3">{row.startNumber}</td>
-                <td className="px-4 py-3">
-                  <Badge variant={row.status === "accepted" ? "secondary" : "outline"}>{row.status}</Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant={row.payment === "paid" ? "secondary" : "outline"}>{row.payment}</Badge>
-                </td>
-                <td className="px-4 py-3">{row.checkin}</td>
-                <td className="px-4 py-3">{row.createdAt}</td>
-                <td className="px-4 py-3">
-                  <Button asChild size="sm" variant="outline">
-                    <Link to={`/admin/entries/${row.id}`}>Details</Link>
-                  </Button>
-                </td>
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-4 py-3 font-medium">Nennung</th>
+                <th className="px-4 py-3 font-medium">Klasse</th>
+                <th className="px-4 py-3 font-medium">Startnummer</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Zahlung</th>
+                <th className="px-4 py-3 font-medium">Einchecken</th>
+                <th className="px-4 py-3 font-medium">Erstellt am</th>
+                <th className="px-4 py-3 font-medium">Aktion</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t align-middle">
+                  <td className="px-4 py-3">
+                    <div className={`flex items-center gap-3 rounded-md px-2 py-1 ${acceptanceStatusRowAccentClasses(row.status)}`}>
+                      <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
+                      <div>
+                        <div className="font-medium text-slate-900">{row.name}</div>
+                        <div className="text-xs text-slate-500">{row.vehicleLabel}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">{row.classLabel}</td>
+                  <td className="px-4 py-3">{row.startNumber}</td>
+                  <td className="px-4 py-3">
+                    <Badge className={acceptanceStatusClasses(row.status)} variant="outline">
+                      {acceptanceStatusLabel(row.status)}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge className={paymentStatusClasses(row.payment)} variant="outline">
+                      {paymentStatusLabel(row.payment)}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge className={checkinClasses(row.checkin === "bestätigt")} variant="outline">
+                      {checkinLabel(row.checkin === "bestätigt")}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3">{row.createdAt}</td>
+                  <td className="px-4 py-3">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/admin/entries/${row.id}`}>Details</Link>
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

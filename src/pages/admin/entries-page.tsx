@@ -25,6 +25,7 @@ export function AdminEntriesPage() {
       <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
       <div className="rounded-xl border bg-white p-4">
         <EntriesFilterBar filter={filter} onChange={(field, value) => setFilter((prev) => ({ ...prev, [field]: value }))} />
+        <div className="mt-3 text-xs text-slate-500">{rows.length} Treffer in aktueller Filterung</div>
       </div>
       <EntriesTable rows={rows} />
     </div>
