@@ -92,7 +92,18 @@
           }
         },
         "operationId": "postPublicEventsEventIdEntries"
-      }
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/public/entries/{entryId}/verify-email": {
       "post": {
@@ -129,7 +140,14 @@
         },
         "responses": {
           "200": {
-            "description": "Verification result"
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicVerifyEmailResponse"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error400"
@@ -142,12 +160,24 @@
           }
         },
         "operationId": "postPublicEntriesEntryIdVerifyEmail"
-      }
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "entryId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/events": {
       "get": {
         "x-roles": [
           "admin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -195,9 +225,20 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminEvents"
+        "operationId": "getAdminEvents",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "post": {
         "x-roles": [
@@ -215,28 +256,64 @@
         },
         "responses": {
           "200": {
-            "description": "Event created"
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminEvents"
+        "operationId": "postAdminEvents",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/events/current": {
       "get": {
         "x-roles": [
           "admin",
-          "checkin",
+          "editor",
           "viewer"
         ],
         "responses": {
           "200": {
-            "description": "Current event"
+            "description": "Current event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCurrentEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
           }
         },
-        "operationId": "getAdminEventsCurrent"
+        "operationId": "getAdminEventsCurrent",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/events/{eventId}": {
@@ -267,7 +344,20 @@
         },
         "responses": {
           "200": {
-            "description": "Event updated"
+            "description": "Event updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "404": {
             "$ref": "#/components/responses/Error404"
@@ -276,8 +366,24 @@
             "$ref": "#/components/responses/Error409"
           }
         },
-        "operationId": "patchAdminEventsEventId"
-      }
+        "operationId": "patchAdminEventsEventId",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/events/{eventId}/activate": {
       "post": {
@@ -286,11 +392,40 @@
         ],
         "responses": {
           "200": {
-            "description": "Activated"
+            "description": "Activated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminEventsEventIdActivate"
-      }
+        "operationId": "postAdminEventsEventIdActivate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/events/{eventId}/close": {
       "post": {
@@ -299,11 +434,40 @@
         ],
         "responses": {
           "200": {
-            "description": "Closed"
+            "description": "Closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminEventsEventIdClose"
-      }
+        "operationId": "postAdminEventsEventIdClose",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/events/{eventId}/archive": {
       "post": {
@@ -312,18 +476,47 @@
         ],
         "responses": {
           "200": {
-            "description": "Archived"
+            "description": "Archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminEventsEventIdArchive"
-      }
+        "operationId": "postAdminEventsEventIdArchive",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/events/{eventId}/classes": {
       "get": {
         "x-roles": [
           "admin",
-          "viewer",
-          "checkin"
+          "editor",
+          "viewer"
         ],
         "responses": {
           "200": {
@@ -354,9 +547,20 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminEventsEventIdClasses"
+        "operationId": "getAdminEventsEventIdClasses",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "post": {
         "x-roles": [
@@ -374,11 +578,40 @@
         },
         "responses": {
           "200": {
-            "description": "Class created"
+            "description": "Class created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminClassResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminEventsEventIdClasses"
-      }
+        "operationId": "postAdminEventsEventIdClasses",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/classes/{classId}": {
       "patch": {
@@ -397,10 +630,28 @@
         },
         "responses": {
           "200": {
-            "description": "Class updated"
+            "description": "Class updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminClassResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "patchAdminClassesClassId"
+        "operationId": "patchAdminClassesClassId",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
         "x-roles": [
@@ -408,17 +659,46 @@
         ],
         "responses": {
           "200": {
-            "description": "Class deleted"
+            "description": "Class deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminClassDeleteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "deleteAdminClassesClassId"
-      }
+        "operationId": "deleteAdminClassesClassId",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "classId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/entries": {
       "get": {
         "x-roles": [
           "admin",
-          "checkin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -480,6 +760,48 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "className",
+                "driverLastName",
+                "driverFirstName",
+                "createdAt",
+                "updatedAt",
+                "startNumberNorm"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortDir",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
           }
         ],
         "responses": {
@@ -492,16 +814,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminEntries"
+        "operationId": "getAdminEntries",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/checkin/entries": {
       "get": {
         "x-roles": [
           "admin",
-          "checkin",
+          "editor",
           "viewer"
         ],
         "responses": {
@@ -514,15 +847,130 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminCheckinEntries"
+        "operationId": "getAdminCheckinEntries",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "classId",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "acceptanceStatus",
+            "schema": {
+              "$ref": "#/components/schemas/AcceptanceStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "registrationStatus",
+            "schema": {
+              "$ref": "#/components/schemas/RegistrationStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paymentStatus",
+            "schema": {
+              "$ref": "#/components/schemas/PaymentStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "checkinIdVerified",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "techStatus",
+            "schema": {
+              "$ref": "#/components/schemas/TechStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "className",
+                "driverLastName",
+                "driverFirstName",
+                "createdAt",
+                "updatedAt",
+                "startNumberNorm"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "sortDir",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/entries/{entryId}/status": {
       "patch": {
         "x-roles": [
-          "admin"
+          "admin",
+          "editor"
         ],
         "requestBody": {
           "required": true,
@@ -536,17 +984,46 @@
         },
         "responses": {
           "200": {
-            "description": "Entry status updated"
+            "description": "Entry status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntryMutationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "patchAdminEntriesEntryIdStatus"
-      }
+        "operationId": "patchAdminEntriesEntryIdStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "entryId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/entries/{entryId}/tech-status": {
       "patch": {
         "x-roles": [
           "admin",
-          "checkin"
+          "editor"
         ],
         "requestBody": {
           "required": true,
@@ -560,17 +1037,46 @@
         },
         "responses": {
           "200": {
-            "description": "Tech status updated"
+            "description": "Tech status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntryMutationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "patchAdminEntriesEntryIdTechStatus"
-      }
+        "operationId": "patchAdminEntriesEntryIdTechStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "entryId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/entries/{entryId}/checkin/id-verify": {
       "patch": {
         "x-roles": [
           "admin",
-          "checkin"
+          "editor"
         ],
         "requestBody": {
           "required": true,
@@ -592,11 +1098,40 @@
         },
         "responses": {
           "200": {
-            "description": "ID verify updated"
+            "description": "ID verify updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCheckinVerifyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "patchAdminEntriesEntryIdCheckinIdVerify"
-      }
+        "operationId": "patchAdminEntriesEntryIdCheckinIdVerify",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "entryId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/events/{eventId}/pricing-rules": {
       "put": {
@@ -615,10 +1150,73 @@
         },
         "responses": {
           "200": {
-            "description": "Pricing rules updated"
+            "description": "Pricing rules updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPricingRulesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "putAdminEventsEventIdPricingRules"
+        "operationId": "putAdminEventsEventIdPricingRules",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getAdminEventsEventIdPricingRules",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pricing rules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPricingRulesReadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "editor",
+          "viewer"
+        ]
       }
     },
     "/admin/events/{eventId}/invoices/recalculate": {
@@ -638,16 +1236,46 @@
         },
         "responses": {
           "200": {
-            "description": "Invoices recalculated"
+            "description": "Invoices recalculated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInvoiceRecalculateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminEventsEventIdInvoicesRecalculate"
-      }
+        "operationId": "postAdminEventsEventIdInvoicesRecalculate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/invoices": {
       "get": {
         "x-roles": [
           "admin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -682,38 +1310,31 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "invoices": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/ListMeta"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "invoices",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/AdminInvoicesListResponse"
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminInvoices"
+        "operationId": "getAdminInvoices",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/invoices/{invoiceId}/payments": {
       "get": {
         "x-roles": [
           "admin",
+          "editor",
           "viewer"
         ],
         "responses": {
@@ -722,32 +1343,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "payments": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/ListMeta"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "payments",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/AdminInvoicePaymentsListResponse"
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminInvoicesInvoiceIdPayments"
+        "operationId": "getAdminInvoicesInvoiceIdPayments",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "post": {
         "x-roles": [
@@ -765,11 +1378,40 @@
         },
         "responses": {
           "200": {
-            "description": "Payment recorded"
+            "description": "Payment recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminInvoicePaymentMutationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminInvoicesInvoiceIdPayments"
-      }
+        "operationId": "postAdminInvoicesInvoiceIdPayments",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "invoiceId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/mail/queue": {
       "post": {
@@ -788,10 +1430,28 @@
         },
         "responses": {
           "200": {
-            "description": "Mail queued"
+            "description": "Mail queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMailQueueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminMailQueue"
+        "operationId": "postAdminMailQueue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/mail/lifecycle/queue": {
@@ -811,10 +1471,28 @@
         },
         "responses": {
           "200": {
-            "description": "Lifecycle mail queued"
+            "description": "Lifecycle mail queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMailQueueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminMailLifecycleQueue"
+        "operationId": "postAdminMailLifecycleQueue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/mail/broadcast/queue": {
@@ -834,10 +1512,28 @@
         },
         "responses": {
           "200": {
-            "description": "Broadcast queued"
+            "description": "Broadcast queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMailQueueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminMailBroadcastQueue"
+        "operationId": "postAdminMailBroadcastQueue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/payment/reminders/queue": {
@@ -857,10 +1553,28 @@
         },
         "responses": {
           "200": {
-            "description": "Payment reminders queued"
+            "description": "Payment reminders queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMailQueueResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminPaymentRemindersQueue"
+        "operationId": "postAdminPaymentRemindersQueue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/documents/waiver": {
@@ -880,17 +1594,34 @@
         },
         "responses": {
           "200": {
-            "description": "Waiver document generated"
+            "description": "Waiver document generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDocumentGenerateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminDocumentsWaiver"
+        "operationId": "postAdminDocumentsWaiver",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/documents/tech-check": {
       "post": {
         "x-roles": [
-          "admin",
-          "checkin"
+          "admin"
         ],
         "requestBody": {
           "required": true,
@@ -904,17 +1635,34 @@
         },
         "responses": {
           "200": {
-            "description": "Tech-check document generated"
+            "description": "Tech-check document generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDocumentGenerateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminDocumentsTechCheck"
+        "operationId": "postAdminDocumentsTechCheck",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/documents/waiver/batch": {
       "post": {
         "x-roles": [
-          "admin",
-          "checkin"
+          "admin"
         ],
         "requestBody": {
           "required": true,
@@ -928,17 +1676,34 @@
         },
         "responses": {
           "200": {
-            "description": "Batch waiver generated"
+            "description": "Batch waiver generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDocumentGenerateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminDocumentsWaiverBatch"
+        "operationId": "postAdminDocumentsWaiverBatch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/documents/tech-check/batch": {
       "post": {
         "x-roles": [
-          "admin",
-          "checkin"
+          "admin"
         ],
         "requestBody": {
           "required": true,
@@ -952,17 +1717,35 @@
         },
         "responses": {
           "200": {
-            "description": "Batch tech-check generated"
+            "description": "Batch tech-check generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDocumentGenerateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminDocumentsTechCheckBatch"
+        "operationId": "postAdminDocumentsTechCheckBatch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/documents/{documentId}/download": {
       "get": {
         "x-roles": [
           "admin",
-          "checkin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -978,17 +1761,46 @@
         ],
         "responses": {
           "200": {
-            "description": "Document download URL"
+            "description": "Document download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDocumentDownloadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminDocumentsDocumentIdDownload"
-      }
+        "operationId": "getAdminDocumentsDocumentIdDownload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "documentId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/documents/entry/{entryId}/download": {
       "get": {
         "x-roles": [
           "admin",
-          "checkin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -1025,17 +1837,45 @@
         ],
         "responses": {
           "200": {
-            "description": "On-demand document download URL"
+            "description": "On-demand document download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDocumentDownloadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminDocumentsEntryEntryIdDownload"
-      }
+        "operationId": "getAdminDocumentsEntryEntryIdDownload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "entryId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/exports/entries": {
       "post": {
         "x-roles": [
-          "admin",
-          "viewer"
+          "admin"
         ],
         "requestBody": {
           "required": true,
@@ -1057,15 +1897,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "postAdminExportsEntries"
+        "operationId": "postAdminExportsEntries",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/exports": {
       "get": {
         "x-roles": [
           "admin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -1129,15 +1981,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminExports"
+        "operationId": "getAdminExports",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/exports/{exportJobId}": {
       "get": {
         "x-roles": [
           "admin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -1153,16 +2017,46 @@
         ],
         "responses": {
           "200": {
-            "description": "Export job"
+            "description": "Export job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminExportDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
-        "operationId": "getAdminExportsExportJobId"
-      }
+        "operationId": "getAdminExportsExportJobId",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "exportJobId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/exports/{exportJobId}/download": {
       "get": {
         "x-roles": [
           "admin",
+          "editor",
           "viewer"
         ],
         "parameters": [
@@ -1178,14 +2072,43 @@
         ],
         "responses": {
           "200": {
-            "description": "Export download URL"
+            "description": "Export download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminExportDownloadResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           },
           "409": {
             "$ref": "#/components/responses/Error409"
           }
         },
-        "operationId": "getAdminExportsExportJobIdDownload"
-      }
+        "operationId": "getAdminExportsExportJobIdDownload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "exportJobId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/public/events/current": {
       "get": {
@@ -1239,47 +2162,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "normalizedStartNumber": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "validFormat": {
-                      "type": "boolean"
-                    },
-                    "available": {
-                      "type": "boolean"
-                    },
-                    "conflictEntryId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "format": "uuid"
-                    },
-                    "conflictType": {
-                      "type": "string",
-                      "enum": [
-                        "none",
-                        "same_class_taken",
-                        "invalid_format"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "normalizedStartNumber",
-                    "validFormat",
-                    "available",
-                    "conflictEntryId",
-                    "conflictType"
-                  ]
+                  "$ref": "#/components/schemas/PublicStartNumberValidateResponse"
                 }
               }
             }
@@ -1291,7 +2174,18 @@
             "$ref": "#/components/responses/Error404"
           }
         }
-      }
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "eventId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/public/uploads/vehicle-image/init": {
       "post": {
@@ -1439,16 +2333,38 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
           "404": {
             "$ref": "#/components/responses/Error404"
           }
         },
         "x-roles": [
           "admin",
-          "checkin",
+          "editor",
           "viewer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ]
-      }
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "entryId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     },
     "/admin/mail/outbox": {
       "get": {
@@ -1524,10 +2440,23 @@
           },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         },
         "x-roles": [
-          "admin"
+          "admin",
+          "editor",
+          "viewer"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ]
       }
     },
@@ -1568,11 +2497,448 @@
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
           "404": {
             "$ref": "#/components/responses/Error404"
           },
           "409": {
             "$ref": "#/components/responses/Error409"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "outboxId",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
+    },
+    "/admin/entries/{entryId}/notes": {
+      "patch": {
+        "operationId": "patchAdminEntriesEntryIdNotes",
+        "x-roles": [
+          "admin",
+          "editor"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminEntryNotesPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Entry notes updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntryNotesPatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/auth/me": {
+      "get": {
+        "operationId": "getAdminAuthMe",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated user details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAuthMeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "editor",
+          "viewer"
+        ]
+      }
+    },
+    "/admin/dashboard/summary": {
+      "get": {
+        "operationId": "getAdminDashboardSummary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDashboardSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "editor",
+          "viewer"
+        ]
+      }
+    },
+    "/admin/iam/roles": {
+      "get": {
+        "operationId": "getAdminIamRoles",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IAM roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIamRolesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/iam/users": {
+      "get": {
+        "operationId": "getAdminIamUsers",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AdminRole"
+            }
+          },
+          {
+            "in": "query",
+            "name": "enabled",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "IAM users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIamUsersListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "postAdminIamUsers",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIamCreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "IAM user created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIamUserMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/iam/users/{userId}/roles": {
+      "patch": {
+        "operationId": "patchAdminIamUsersUserIdRoles",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIamPatchRolesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "IAM user roles updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIamUserMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/iam/users/{userId}/status": {
+      "patch": {
+        "operationId": "patchAdminIamUsersUserIdStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminIamPatchStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "IAM user status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIamUserMutationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
         },
         "x-roles": [
@@ -1612,6 +2978,26 @@
       },
       "Error409": {
         "description": "Conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Forbidden",
         "content": {
           "application/json": {
             "schema": {
@@ -1834,20 +3220,18 @@
             "type": "string"
           },
           "zip": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{5}$"
           },
           "city": {
             "type": "string"
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{6,15}$"
           }
         },
-        "required": [
-          "email",
-          "firstName",
-          "lastName"
-        ]
+        "required": []
       },
       "VehicleInput": {
         "type": "object",
@@ -1868,7 +3252,8 @@
           },
           "displacementCcm": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 10,
+            "maximum": 99999
           },
           "engineType": {
             "type": "string",
@@ -1876,7 +3261,8 @@
           },
           "cylinders": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 99
           },
           "brakes": {
             "type": "string",
@@ -1903,13 +3289,13 @@
           }
         },
         "required": [
-          "vehicleType",
+          "make",
+          "model",
           "displacementCcm",
           "engineType",
           "cylinders",
           "brakes",
-          "vehicleHistory",
-          "ownerName"
+          "vehicleHistory"
         ]
       },
       "PublicCreateEntryRequest": {
@@ -1945,13 +3331,16 @@
           },
           "consent": {
             "$ref": "#/components/schemas/ConsentInput"
+          },
+          "codriverEnabled": {
+            "type": "boolean"
           }
         },
         "required": [
           "classId",
           "driver",
           "vehicle",
-          "specialNotes",
+          "startNumber",
           "consent"
         ]
       },
@@ -2436,16 +3825,20 @@
             "type": "string"
           },
           "street": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "zip": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{5}$"
           },
           "city": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{6,15}$"
           },
           "emergencyContactName": {
             "type": "string",
@@ -2453,9 +3846,13 @@
           },
           "emergencyContactPhone": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^\\d{6,15}$"
           },
           "motorsportHistory": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specialNotes": {
             "type": "string",
             "minLength": 1
           }
@@ -2464,6 +3861,11 @@
           "email",
           "firstName",
           "lastName",
+          "birthdate",
+          "street",
+          "zip",
+          "city",
+          "phone",
           "emergencyContactName",
           "emergencyContactPhone",
           "motorsportHistory"
@@ -2647,6 +4049,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "vehicleId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "className": {
             "type": "string"
           },
@@ -2716,6 +4122,33 @@
               "null"
             ]
           },
+          "vehicleLabel": {
+            "type": "string"
+          },
+          "vehicleThumbUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirmationMailSent": {
+            "type": "boolean"
+          },
+          "confirmationMailVerified": {
+            "type": "boolean"
+          },
+          "internalNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driverNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "paymentStatus": {
             "anyOf": [
               {
@@ -2746,12 +4179,16 @@
           "id",
           "eventId",
           "classId",
+          "vehicleId",
           "className",
           "registrationStatus",
           "acceptanceStatus",
           "checkinIdVerified",
           "techStatus",
           "driverPersonId",
+          "vehicleLabel",
+          "confirmationMailSent",
+          "confirmationMailVerified",
           "completionStatus",
           "createdAt",
           "updatedAt"
@@ -2915,6 +4352,21 @@
               "format": "uuid"
             }
           },
+          "vehicleLabel": {
+            "type": "string"
+          },
+          "vehicleThumbUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirmationMailSent": {
+            "type": "boolean"
+          },
+          "confirmationMailVerified": {
+            "type": "boolean"
+          },
           "person": {
             "type": "object",
             "properties": {
@@ -2939,17 +4391,164 @@
                       "null"
                     ],
                     "format": "email"
+                  },
+                  "birthdate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date"
+                  },
+                  "nationality": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "street": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "zip": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "city": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emergencyContactName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emergencyContactPhone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "motorsportHistory": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   }
                 },
                 "required": [
                   "firstName",
                   "lastName",
-                  "email"
+                  "email",
+                  "birthdate",
+                  "nationality",
+                  "street",
+                  "zip",
+                  "city",
+                  "phone",
+                  "emergencyContactName",
+                  "emergencyContactPhone",
+                  "motorsportHistory"
                 ]
+              },
+              "codriver": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "firstName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "lastName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "email"
+                  },
+                  "birthdate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date"
+                  },
+                  "nationality": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "street": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "zip": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "city": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emergencyContactName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emergencyContactPhone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "motorsportHistory": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
               }
             },
             "required": [
-              "driver"
+              "driver",
+              "codriver"
             ]
           },
           "vehicle": {
@@ -3113,6 +4712,18 @@
               "null"
             ]
           },
+          "internalNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driverNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "consent": {
             "type": "object",
             "properties": {
@@ -3164,12 +4775,18 @@
           "startNumberNorm",
           "isBackupVehicle",
           "relatedEntryIds",
+          "vehicleLabel",
+          "vehicleThumbUrl",
+          "confirmationMailSent",
+          "confirmationMailVerified",
           "person",
           "vehicle",
           "payment",
           "checkin",
           "documents",
           "specialNotes",
+          "internalNote",
+          "driverNote",
           "consent",
           "createdAt",
           "updatedAt"
@@ -3416,6 +5033,9 @@
           },
           "verificationToken": {
             "type": "string"
+          },
+          "confirmationMailSent": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3443,6 +5063,1182 @@
           "ok",
           "exportJobId",
           "status"
+        ]
+      },
+      "PublicVerifyEmailResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "alreadyVerified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "PublicStartNumberValidateResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "normalizedStartNumber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "validFormat": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "conflictEntryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "conflictType": {
+            "type": "string",
+            "enum": [
+              "none",
+              "same_class_taken",
+              "invalid_format"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "normalizedStartNumber",
+          "validFormat",
+          "available",
+          "conflictEntryId",
+          "conflictType"
+        ]
+      },
+      "AdminEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventStatus"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "registrationOpenAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "registrationCloseAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "openedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "startsAt",
+          "endsAt",
+          "status",
+          "isCurrent",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminEventResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "event": {
+            "$ref": "#/components/schemas/AdminEventDto"
+          }
+        },
+        "required": [
+          "ok",
+          "event"
+        ]
+      },
+      "AdminCurrentEventResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "event": {
+            "$ref": "#/components/schemas/AdminEventDto"
+          }
+        },
+        "required": [
+          "ok",
+          "event"
+        ]
+      },
+      "AdminClassDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vehicleType": {
+            "$ref": "#/components/schemas/VehicleType"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "name",
+          "vehicleType",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminClassResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "class": {
+            "$ref": "#/components/schemas/AdminClassDto"
+          }
+        },
+        "required": [
+          "ok",
+          "class"
+        ]
+      },
+      "AdminClassDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "classId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "ok",
+          "classId",
+          "eventId"
+        ]
+      },
+      "AdminEntryMutationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "classId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "acceptanceStatus": {
+            "$ref": "#/components/schemas/AcceptanceStatus"
+          },
+          "techStatus": {
+            "$ref": "#/components/schemas/TechStatus"
+          },
+          "checkinIdVerified": {
+            "type": "boolean"
+          },
+          "checkinIdVerifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "checkinIdVerifiedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "internalNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driverNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "updatedAt"
+        ],
+        "additionalProperties": true
+      },
+      "AdminEntryMutationResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/AdminEntryMutationDto"
+          }
+        },
+        "required": [
+          "ok",
+          "entry"
+        ]
+      },
+      "AdminCheckinVerifyResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkinIdVerified": {
+            "type": "boolean"
+          },
+          "checkinIdVerifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "checkinIdVerifiedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "id",
+          "eventId",
+          "checkinIdVerified",
+          "checkinIdVerifiedAt",
+          "checkinIdVerifiedBy"
+        ]
+      },
+      "AdminEntryNotesPatchRequest": {
+        "type": "object",
+        "properties": {
+          "internalNote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "driverNote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        }
+      },
+      "AdminEntryNotesPatchResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "internalNote": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "driverNote": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "eventId",
+              "internalNote",
+              "driverNote",
+              "updatedAt"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "entry"
+        ]
+      },
+      "AdminPricingRulesResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "AdminInvoiceRecalculateResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "recalculated": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "ok",
+          "recalculated"
+        ]
+      },
+      "AdminInvoiceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "driverPersonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "totalCents": {
+            "type": "integer"
+          },
+          "paymentStatus": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "paidAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "paidAmountCents": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "amountOpenCents": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "pricingSnapshot": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "driverPersonId",
+          "totalCents",
+          "paymentStatus",
+          "updatedAt"
+        ]
+      },
+      "AdminInvoicesListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminInvoiceDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ListMeta"
+          }
+        },
+        "required": [
+          "ok",
+          "invoices",
+          "meta"
+        ]
+      },
+      "AdminInvoicePaymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "bank_transfer",
+              "cash",
+              "card",
+              "other"
+            ]
+          },
+          "recordedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "invoiceId",
+          "amountCents",
+          "paidAt",
+          "method",
+          "createdAt"
+        ]
+      },
+      "AdminInvoicePaymentsListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminInvoicePaymentDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ListMeta"
+          }
+        },
+        "required": [
+          "ok",
+          "payments",
+          "meta"
+        ]
+      },
+      "AdminInvoicePaymentMutationResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "invoice": {
+            "$ref": "#/components/schemas/AdminInvoiceDto"
+          }
+        },
+        "required": [
+          "ok",
+          "invoice"
+        ]
+      },
+      "AdminMailQueueResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "queued": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "ok",
+          "queued"
+        ]
+      },
+      "AdminDocumentGenerateResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "templateVariant": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "templateVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "documentId"
+        ]
+      },
+      "AdminDocumentDownloadResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "templateVariant": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "templateVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "url",
+          "type",
+          "templateVariant",
+          "templateVersion"
+        ]
+      },
+      "AdminExportDetailResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "export": {
+            "$ref": "#/components/schemas/AdminExportJobDto"
+          }
+        },
+        "required": [
+          "ok",
+          "export"
+        ]
+      },
+      "AdminExportDownloadResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExportJobStatus"
+          }
+        },
+        "required": [
+          "ok",
+          "url",
+          "status"
+        ]
+      },
+      "AdminRole": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "editor",
+          "viewer"
+        ]
+      },
+      "AdminAuthMeResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "sub": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "sub",
+          "email",
+          "roles"
+        ]
+      },
+      "AdminDashboardSummaryDto": {
+        "type": "object",
+        "properties": {
+          "entriesTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paymentsDueTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "checkinPendingTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mailFailedTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mailQueuedTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "exportsQueuedTotal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "exportsProcessingTotal": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "entriesTotal",
+          "paymentsDueTotal",
+          "checkinPendingTotal",
+          "mailFailedTotal",
+          "mailQueuedTotal",
+          "exportsQueuedTotal",
+          "exportsProcessingTotal"
+        ]
+      },
+      "AdminDashboardClassDistributionItem": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "className": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "classId",
+          "className",
+          "count"
+        ]
+      },
+      "AdminDashboardRecentEntryItem": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "driverName": {
+            "type": "string"
+          },
+          "className": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "entryId",
+          "driverName",
+          "className",
+          "createdAt"
+        ]
+      },
+      "AdminDashboardSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/AdminDashboardSummaryDto"
+          },
+          "classDistribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardClassDistributionItem"
+            }
+          },
+          "recentEntries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDashboardRecentEntryItem"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "summary",
+          "classDistribution",
+          "recentEntries"
+        ]
+      },
+      "AdminIamRoleDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/AdminRole"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "description"
+        ]
+      },
+      "AdminIamRolesResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminIamRoleDto"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "roles"
+        ]
+      },
+      "AdminIamUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "emailVerified": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            }
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email",
+          "enabled",
+          "status",
+          "emailVerified",
+          "roles",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AdminIamUsersMeta": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "nextCursor",
+          "limit"
+        ]
+      },
+      "AdminIamUsersListResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminIamUserDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/AdminIamUsersMeta"
+          }
+        },
+        "required": [
+          "ok",
+          "users",
+          "meta"
+        ]
+      },
+      "AdminIamCreateUserRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            },
+            "minItems": 1
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256
+          },
+          "sendInvitation": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "roles"
+        ]
+      },
+      "AdminIamPatchRolesRequest": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRole"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "roles"
+        ]
+      },
+      "AdminIamPatchStatusRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "AdminIamUserMutationResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AdminIamUserDto"
+          }
+        },
+        "required": [
+          "ok",
+          "user"
+        ]
+      },
+      "AdminPricingRulesReadClassRuleDto": {
+        "type": "object",
+        "properties": {
+          "classId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "className": {
+            "type": "string"
+          },
+          "baseFeeCents": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "classId",
+          "className",
+          "baseFeeCents"
+        ]
+      },
+      "AdminPricingRulesReadDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "earlyDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lateFeeCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "secondVehicleDiscountCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string"
+          },
+          "classRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPricingRulesReadClassRuleDto"
+            }
+          }
+        },
+        "required": [
+          "eventId",
+          "earlyDeadline",
+          "lateFeeCents",
+          "secondVehicleDiscountCents",
+          "currency",
+          "classRules"
+        ]
+      },
+      "AdminPricingRulesReadResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "pricingRules": {
+            "$ref": "#/components/schemas/AdminPricingRulesReadDto"
+          }
+        },
+        "required": [
+          "ok",
+          "pricingRules"
         ]
       }
     }
