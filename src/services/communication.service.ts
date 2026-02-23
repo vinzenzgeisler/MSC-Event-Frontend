@@ -1,4 +1,6 @@
 import { mockOutbox } from "@/mock/communication.mock";
+import { getAdminEventId } from "@/services/api/event-context";
+import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
 import type { BroadcastForm, OutboxItem, OutboxItemDto } from "@/types/admin";
 
 function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
@@ -12,24 +14,95 @@ function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
   };
 }
 
+type AdminOutboxListResponse = {
+  ok: boolean;
+  outbox: OutboxItemDto[];
+};
+
+type AdminMailQueueResponse = {
+  ok: boolean;
+  queued: number;
+};
+
 export const communicationService = {
   async listOutbox() {
-    return mockOutbox.map(fromOutboxDto);
+    if (isMockApiEnabled()) {
+      return mockOutbox.map(fromOutboxDto);
+    }
+
+    const eventId = await getAdminEventId();
+    const response = await requestJson<AdminOutboxListResponse>("/admin/mail/outbox", {
+      query: {
+        eventId,
+        limit: 100,
+        sortBy: "createdAt",
+        sortDir: "desc"
+      }
+    });
+
+    return response.outbox.map(fromOutboxDto);
   },
 
-  async queueBroadcast(_form: BroadcastForm) {
-    return { ok: true };
+  async queueBroadcast(form: BroadcastForm) {
+    if (isMockApiEnabled()) {
+      return { ok: true, queued: 1 };
+    }
+
+    const eventId = await getAdminEventId();
+    return requestJson<AdminMailQueueResponse>("/admin/mail/broadcast/queue", {
+      method: "POST",
+      body: {
+        eventId,
+        templateKey: form.templateKey,
+        classId: form.classId !== "all" ? form.classId : undefined,
+        acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+        paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined,
+        subjectOverride: form.subjectOverride || undefined
+      }
+    });
   },
 
-  async retryOutbox(_id: string) {
-    return { ok: true };
+  async retryOutbox(id: string) {
+    if (isMockApiEnabled()) {
+      return { ok: true };
+    }
+
+    return requestJson<{ ok: boolean }>(`/admin/mail/outbox/${id}/retry`, {
+      method: "POST"
+    });
   },
 
-  async queuePaymentReminderForEntry(_entryId: string) {
-    return { ok: true };
+  async queuePaymentReminderForEntry(entryId: string) {
+    if (isMockApiEnabled()) {
+      return { ok: true };
+    }
+
+    const eventId = await getAdminEventId();
+    return requestJson<AdminMailQueueResponse>("/admin/payment/reminders/queue", {
+      method: "POST",
+      body: {
+        eventId,
+        templateId: "payment_reminder",
+        templateData: {
+          entryId
+        }
+      }
+    });
   },
 
-  async queueAcceptedMailForEntry(_entryId: string) {
-    return { ok: true };
+  async queueAcceptedMailForEntry(entryId: string) {
+    if (isMockApiEnabled()) {
+      return { ok: true };
+    }
+
+    const eventId = await getAdminEventId();
+    return requestJson<AdminMailQueueResponse>("/admin/mail/lifecycle/queue", {
+      method: "POST",
+      body: {
+        eventId,
+        entryId,
+        eventType: "accepted_open_payment"
+      }
+    });
   }
 };

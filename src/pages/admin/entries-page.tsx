@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useAuth } from "@/app/auth/auth-context";
+import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar";
 import { acceptanceStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
 import { EntriesTable } from "@/components/features/admin/entries-table";
 import { adminEntriesService } from "@/services/admin-entries.service";
+import { getApiErrorMessage } from "@/services/api/http-client";
+import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import type { AdminEntriesFilter, AdminEntryListItem } from "@/types/admin";
 
 const initialFilter: AdminEntriesFilter = {
@@ -71,20 +75,39 @@ function sameFilter(a: AdminEntriesFilter, b: AdminEntriesFilter) {
 }
 
 export function AdminEntriesPage() {
+  const { roles } = useAuth();
+  const canManageStatus = hasPermission(roles, "entries.status.write");
   const [searchParams, setSearchParams] = useSearchParams();
   const [filter, setFilter] = useState<AdminEntriesFilter>(() => filterFromSearchParams(searchParams));
   const [rows, setRows] = useState<AdminEntryListItem[]>([]);
+  const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [toastMessage, setToastMessage] = useState("");
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
 
-  const refresh = () => {
-    adminEntriesService.listEntries(filter).then(setRows);
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(""), 2600);
+  };
+
+  const refresh = async () => {
+    try {
+      setRows(await adminEntriesService.listEntries(filter));
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "Nennungen konnten nicht geladen werden."));
+    }
   };
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [filter]);
+
+  useEffect(() => {
+    adminMetaService
+      .listClassOptions()
+      .then(setClassOptions)
+      .catch((error) => showToast(getApiErrorMessage(error, "Klassen konnten nicht geladen werden.")));
+  }, []);
 
   useEffect(() => {
     const nextFilter = filterFromSearchParams(searchParams);
@@ -100,7 +123,7 @@ export function AdminEntriesPage() {
 
   const activeFilterChips = [
     filter.query && { key: "query", label: `Suche: ${filter.query}` },
-    filter.classId !== "all" && { key: "classId", label: `Klasse: ${filter.classId}` },
+    filter.classId !== "all" && { key: "classId", label: `Klasse: ${classOptions.find((item) => item.id === filter.classId)?.name ?? filter.classId}` },
     filter.acceptanceStatus !== "all" && { key: "acceptanceStatus", label: `Status: ${acceptanceStatusLabel(filter.acceptanceStatus)}` },
     filter.paymentStatus !== "all" && { key: "paymentStatus", label: `Zahlung: ${paymentStatusLabel(filter.paymentStatus)}` },
     filter.checkinIdVerified !== "all" && { key: "checkinIdVerified", label: `Einchecken: ${filter.checkinIdVerified === "true" ? "Ja" : "Nein"}` }
@@ -117,7 +140,11 @@ export function AdminEntriesPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
       <div className="rounded-xl border bg-white p-4">
-        <EntriesFilterBar filter={filter} onChange={(field, value) => setFilter((prev) => ({ ...prev, [field]: value }))} />
+        <EntriesFilterBar
+          filter={filter}
+          classOptions={classOptions}
+          onChange={(field, value) => setFilter((prev) => ({ ...prev, [field]: value }))}
+        />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs text-slate-500">{rows.length} Treffer in aktueller Filterung</div>
           <Button type="button" size="sm" variant="outline" onClick={() => setFilter(initialFilter)}>
@@ -136,16 +163,47 @@ export function AdminEntriesPage() {
       </div>
       <EntriesTable
         rows={rows}
+        canManageStatus={canManageStatus}
         onSetShortlist={async (entryId) => {
-          await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
-          setToastMessage(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
-          setTimeout(() => setToastMessage(""), 2200);
-          refresh();
+          if (!canManageStatus) {
+            showToast("Nur Admin-Rollen dürfen den Status ändern.");
+            return;
+          }
+          const row = rows.find((item) => item.id === entryId);
+          if (row?.status === "shortlist") {
+            showToast("Nennung ist bereits auf Vorauswahl.");
+            return;
+          }
+          try {
+            await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
+            showToast(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
+            await refresh();
+          } catch (error) {
+            showToast(getApiErrorMessage(error, "Status konnte nicht aktualisiert werden."));
+          }
         }}
         onSetAccepted={async (entryId) => {
+          if (!canManageStatus) {
+            showToast("Nur Admin-Rollen dürfen den Status ändern.");
+            return;
+          }
+          const row = rows.find((item) => item.id === entryId);
+          if (row?.status === "accepted") {
+            showToast("Nennung ist bereits zugelassen.");
+            return;
+          }
           setPendingAcceptEntryId(entryId);
         }}
         onSetRejected={async (entryId) => {
+          if (!canManageStatus) {
+            showToast("Nur Admin-Rollen dürfen den Status ändern.");
+            return;
+          }
+          const row = rows.find((item) => item.id === entryId);
+          if (row?.status === "rejected") {
+            showToast("Nennung ist bereits abgelehnt.");
+            return;
+          }
           setPendingRejectEntryId(entryId);
         }}
       />
@@ -154,7 +212,7 @@ export function AdminEntriesPage() {
           {toastMessage}
         </div>
       )}
-      {pendingAcceptEntryId && (
+      {canManageStatus && pendingAcceptEntryId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
@@ -168,11 +226,18 @@ export function AdminEntriesPage() {
               <Button
                 type="button"
                 onClick={async () => {
-                  await adminEntriesService.setEntryStatus(pendingAcceptEntryId, "to_accepted");
-                  setToastMessage(`Nennung ${pendingAcceptEntryId} wurde zugelassen.`);
-                  setTimeout(() => setToastMessage(""), 2600);
-                  setPendingAcceptEntryId(null);
-                  refresh();
+                  const entryId = pendingAcceptEntryId;
+                  if (!entryId) {
+                    return;
+                  }
+                  try {
+                    await adminEntriesService.setEntryStatus(entryId, "to_accepted");
+                    showToast(`Nennung ${entryId} wurde zugelassen.`);
+                    setPendingAcceptEntryId(null);
+                    await refresh();
+                  } catch (error) {
+                    showToast(getApiErrorMessage(error, "Nennung konnte nicht zugelassen werden."));
+                  }
                 }}
               >
                 Ja, zulassen
@@ -181,7 +246,7 @@ export function AdminEntriesPage() {
           </div>
         </div>
       )}
-      {pendingRejectEntryId && (
+      {canManageStatus && pendingRejectEntryId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Nennung ablehnen?</h2>
@@ -196,11 +261,18 @@ export function AdminEntriesPage() {
                 type="button"
                 variant="destructive"
                 onClick={async () => {
-                  await adminEntriesService.setEntryStatus(pendingRejectEntryId, "to_rejected");
-                  setToastMessage(`Nennung ${pendingRejectEntryId} wurde abgelehnt.`);
-                  setTimeout(() => setToastMessage(""), 2400);
-                  setPendingRejectEntryId(null);
-                  refresh();
+                  const entryId = pendingRejectEntryId;
+                  if (!entryId) {
+                    return;
+                  }
+                  try {
+                    await adminEntriesService.setEntryStatus(entryId, "to_rejected");
+                    showToast(`Nennung ${entryId} wurde abgelehnt.`);
+                    setPendingRejectEntryId(null);
+                    await refresh();
+                  } catch (error) {
+                    showToast(getApiErrorMessage(error, "Nennung konnte nicht abgelehnt werden."));
+                  }
                 }}
               >
                 Ja, ablehnen

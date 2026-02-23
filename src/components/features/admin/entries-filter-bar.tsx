@@ -1,13 +1,15 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AdminEntriesFilter } from "@/types/admin";
+import type { AdminClassOption } from "@/services/admin-meta.service";
 
 type EntriesFilterBarProps = {
   filter: AdminEntriesFilter;
+  classOptions: AdminClassOption[];
   onChange: <K extends keyof AdminEntriesFilter>(field: K, value: AdminEntriesFilter[K]) => void;
 };
 
-export function EntriesFilterBar({ filter, onChange }: EntriesFilterBarProps) {
+export function EntriesFilterBar({ filter, classOptions, onChange }: EntriesFilterBarProps) {
   return (
     <div className="grid gap-3 md:grid-cols-5">
       <div className="space-y-1">
@@ -28,9 +30,11 @@ export function EntriesFilterBar({ filter, onChange }: EntriesFilterBarProps) {
           onChange={(event) => onChange("classId", event.target.value)}
         >
           <option value="all">Alle</option>
-          <option value="Auto Elite">Auto Elite</option>
-          <option value="Auto Pro">Auto Pro</option>
-          <option value="Moto Open">Moto Open</option>
+          {classOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
         </select>
       </div>
       <div className="space-y-1">

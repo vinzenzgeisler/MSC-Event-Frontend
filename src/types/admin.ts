@@ -11,16 +11,28 @@ import type {
 
 export type AdminEntryListItemDto = {
   id: Id;
-  name: string;
+  eventId?: Id;
+  classId?: Id;
+  vehicleId?: Id;
+  name?: string;
   className: string;
-  startNumber: string | null;
+  startNumber?: string | null;
+  startNumberNorm?: string | null;
+  driverPersonId?: Id;
+  driverFirstName?: string | null;
+  driverLastName?: string | null;
+  driverEmail?: string | null;
   vehicleLabel: string;
   vehicleThumbUrl: string | null;
   acceptanceStatus: AcceptanceStatus;
-  paymentStatus: PaymentStatus;
+  paymentStatus: PaymentStatus | null;
   checkinIdVerified: boolean;
+  confirmationMailVerified?: boolean;
   confirmationMailSent: boolean;
+  internalNote?: string | null;
+  driverNote?: string | null;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type AdminEntriesListResponseDto = {
@@ -42,6 +54,7 @@ export type AdminEntryListItem = {
   payment: PaymentStatus;
   checkin: "offen" | "bestätigt";
   confirmationMailSent: boolean;
+  confirmationMailVerified: boolean;
   createdAt: string;
 };
 
@@ -69,29 +82,39 @@ export type AdminEntryDetailDto = {
   startNumberNorm: string | null;
   isBackupVehicle: boolean;
   relatedEntryIds: Id[];
+  vehicleLabel?: string;
+  vehicleThumbUrl?: string | null;
+  confirmationMailSent?: boolean;
+  confirmationMailVerified?: boolean;
   person: {
     driver: {
       firstName: string | null;
       lastName: string | null;
       email: string | null;
       birthdate: string | null;
+      nationality?: string | null;
       phone: string | null;
       street: string | null;
       zip: string | null;
       city: string | null;
       emergencyContactName: string | null;
       emergencyContactPhone: string | null;
+      motorsportHistory?: string | null;
     };
     codriver?: {
       firstName: string | null;
       lastName: string | null;
       email: string | null;
       birthdate: string | null;
+      nationality?: string | null;
       phone: string | null;
       street: string | null;
       zip: string | null;
       city: string | null;
-    };
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      motorsportHistory?: string | null;
+    } | null;
   };
   vehicle: {
     vehicleType: VehicleType;
@@ -127,6 +150,8 @@ export type AdminEntryDetailDto = {
     createdAt: string;
   }>;
   specialNotes: string | null;
+  internalNote?: string | null;
+  driverNote?: string | null;
   consent: {
     termsAccepted: boolean;
     privacyAccepted: boolean;
@@ -216,6 +241,7 @@ export type AdminEntryDetailViewModel = {
   relatedEntryIds: Id[];
   notes: string;
   confirmationMailSent: boolean;
+  confirmationMailVerified: boolean;
   internalNote: string;
   driverNote: string;
   history: AdminEntryHistoryItem[];
@@ -231,11 +257,18 @@ export type BroadcastForm = {
 
 export type OutboxItemDto = {
   id: Id;
+  eventId?: Id | null;
   toEmail: string;
   subject: string;
   status: OutboxStatus;
+  templateId?: string;
+  templateVersion?: number;
+  attemptCount?: number;
+  maxAttempts?: number;
+  sendAfter?: string;
   errorLast: string | null;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type OutboxItem = {
@@ -260,9 +293,15 @@ export type ExportCreateForm = {
 
 export type ExportJobDto = {
   id: Id;
+  eventId?: Id;
   type: AdminExportType;
+  filters?: Record<string, unknown>;
   status: ExportJobStatus;
+  s3Key?: string | null;
+  errorLast?: string | null;
+  createdBy?: string | null;
   createdAt: string;
+  completedAt?: string | null;
 };
 
 export type ExportJob = {

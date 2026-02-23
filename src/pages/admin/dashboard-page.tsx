@@ -1,38 +1,125 @@
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, BellRing, ClipboardCheck, FileDown, Filter, Mail, MessageSquareWarning, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/app/auth/auth-context";
+import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getAdminEventId } from "@/services/api/event-context";
+import { getApiErrorMessage, requestJson } from "@/services/api/http-client";
 
-const kpis = [
-  { label: "Nennungen gesamt", value: "240", icon: BarChart3 },
-  { label: "Offene Zahlungen", value: "42", icon: Wallet },
-  { label: "Nicht eingecheckt", value: "78", icon: ClipboardCheck },
-  { label: "Mail-Fehler", value: "3", icon: MessageSquareWarning }
-];
+type DashboardSummary = {
+  entriesTotal: number;
+  paymentsDueTotal: number;
+  checkinPendingTotal: number;
+  mailFailedTotal: number;
+  mailQueuedTotal: number;
+  exportsQueuedTotal: number;
+  exportsProcessingTotal: number;
+};
 
-const queueItems = [
-  { area: "Mail-Outbox", status: "In Warteschlange", count: 18 },
-  { area: "Mail-Outbox", status: "Fehlgeschlagen", count: 3 },
-  { area: "Exporte", status: "In Bearbeitung", count: 2 },
-  { area: "Exporte", status: "In Warteschlange", count: 4 }
-];
+type DashboardClassDistributionItem = {
+  classId: string;
+  className: string;
+  count: number;
+};
 
-const classDistribution = [
-  { className: "Auto Elite", value: 64 },
-  { className: "Auto Pro", value: 72 },
-  { className: "Moto Open", value: 58 },
-  { className: "Moto Legend", value: 46 }
-];
+type DashboardRecentEntryItem = {
+  entryId: string;
+  driverName: string;
+  className: string;
+  createdAt: string;
+};
 
-const recentChanges = [
-  { text: "Lena Berger auf Vorauswahl gesetzt", time: "vor 9 Min" },
-  { text: "Rashid Khan eingecheckt", time: "vor 16 Min" },
-  { text: "Export startlist_csv abgeschlossen", time: "vor 31 Min" }
-];
+type AdminDashboardSummaryResponse = {
+  ok: boolean;
+  summary: DashboardSummary;
+  classDistribution: DashboardClassDistributionItem[];
+  recentEntries: DashboardRecentEntryItem[];
+};
+
+const EMPTY_SUMMARY: DashboardSummary = {
+  entriesTotal: 0,
+  paymentsDueTotal: 0,
+  checkinPendingTotal: 0,
+  mailFailedTotal: 0,
+  mailQueuedTotal: 0,
+  exportsQueuedTotal: 0,
+  exportsProcessingTotal: 0
+};
 
 export function AdminDashboardPage() {
-  const maxClass = Math.max(...classDistribution.map((item) => item.value));
+  const { roles } = useAuth();
+  const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
+  const [classDistribution, setClassDistribution] = useState<DashboardClassDistributionItem[]>([]);
+  const [recentEntries, setRecentEntries] = useState<DashboardRecentEntryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const canReadOutbox = hasPermission(roles, "communication.read");
+  const canReadExports = hasPermission(roles, "exports.read");
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const eventId = await getAdminEventId();
+        const response = await requestJson<AdminDashboardSummaryResponse>("/admin/dashboard/summary", {
+          query: {
+            eventId
+          }
+        });
+
+        setSummary(response.summary ?? EMPTY_SUMMARY);
+        setClassDistribution(response.classDistribution ?? []);
+        setRecentEntries(response.recentEntries ?? []);
+      } catch (err) {
+        setSummary(EMPTY_SUMMARY);
+        setClassDistribution([]);
+        setRecentEntries([]);
+        setError(getApiErrorMessage(err, "Dashboard-Daten konnten nicht geladen werden."));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, []);
+
+  const kpis = useMemo(
+    () => [
+      { label: "Nennungen gesamt", value: String(summary.entriesTotal), icon: BarChart3 },
+      { label: "Offene Zahlungen", value: String(summary.paymentsDueTotal), icon: Wallet },
+      { label: "Nicht eingecheckt", value: String(summary.checkinPendingTotal), icon: ClipboardCheck },
+      {
+        label: "Mail-Fehler",
+        value: canReadOutbox ? String(summary.mailFailedTotal) : "-",
+        icon: MessageSquareWarning
+      }
+    ],
+    [summary, canReadOutbox]
+  );
+
+  const queueItems = useMemo(
+    () => [
+      { area: "Mail-Outbox", status: "In Warteschlange", count: canReadOutbox ? summary.mailQueuedTotal : null },
+      { area: "Mail-Outbox", status: "Fehlgeschlagen", count: canReadOutbox ? summary.mailFailedTotal : null },
+      { area: "Exporte", status: "In Bearbeitung", count: canReadExports ? summary.exportsProcessingTotal : null },
+      { area: "Exporte", status: "In Warteschlange", count: canReadExports ? summary.exportsQueuedTotal : null }
+    ],
+    [summary, canReadOutbox, canReadExports]
+  );
+
+  const recentChanges = useMemo(() => {
+    return recentEntries.map((item) => ({
+      text: `Neue Nennung: ${item.driverName} (${item.className})`,
+      time: new Date(item.createdAt).toLocaleString("de-DE")
+    }));
+  }, [recentEntries]);
+
+  const maxClass = classDistribution.length > 0 ? Math.max(...classDistribution.map((item) => item.count)) : 1;
 
   return (
     <div className="space-y-4">
@@ -45,14 +132,18 @@ export function AdminDashboardPage() {
               Offene Fälle
             </Link>
           </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link to="/admin/communication">
-              <Mail className="mr-1 h-4 w-4" />
-              Broadcast
-            </Link>
-          </Button>
+          {canReadOutbox && (
+            <Button asChild size="sm" variant="outline">
+              <Link to="/admin/communication">
+                <Mail className="mr-1 h-4 w-4" />
+                Broadcast
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
+
+      {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((item) => {
@@ -62,7 +153,7 @@ export function AdminDashboardPage() {
               <CardContent className="flex items-center justify-between p-4">
                 <div>
                   <div className="text-xs uppercase text-slate-500">{item.label}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{item.value}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : item.value}</div>
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2 text-slate-600">
                   <Icon className="h-5 w-5" />
@@ -85,7 +176,7 @@ export function AdminDashboardPage() {
                   <div className="font-medium text-slate-900">{item.area}</div>
                   <div className="text-xs text-slate-600">{item.status}</div>
                 </div>
-                <Badge variant="outline">{item.count}</Badge>
+                <Badge variant="outline">{loading ? "…" : item.count === null ? "-" : item.count}</Badge>
               </div>
             ))}
           </CardContent>
@@ -96,12 +187,13 @@ export function AdminDashboardPage() {
             <CardTitle className="text-base">Letzte Änderungen</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {recentChanges.map((item) => (
+            {(loading ? [] : recentChanges).map((item) => (
               <div key={item.text} className="rounded-md border p-2 text-sm">
                 <div className="font-medium text-slate-900">{item.text}</div>
                 <div className="text-xs text-slate-500">{item.time}</div>
               </div>
             ))}
+            {!loading && recentChanges.length === 0 && <div className="text-sm text-slate-500">Keine Einträge verfügbar.</div>}
           </CardContent>
         </Card>
       </section>
@@ -112,17 +204,18 @@ export function AdminDashboardPage() {
             <CardTitle className="text-base">Reporting: Klassenverteilung</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {classDistribution.map((item) => (
-              <div key={item.className} className="space-y-1">
+            {(loading ? [] : classDistribution).map((item) => (
+              <div key={item.classId} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <span>{item.className}</span>
-                  <span className="font-medium">{item.value}</span>
+                  <span className="font-medium">{item.count}</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-2 bg-primary" style={{ width: `${Math.round((item.value / maxClass) * 100)}%` }} />
+                  <div className="h-2 bg-primary" style={{ width: `${Math.round((item.count / maxClass) * 100)}%` }} />
                 </div>
               </div>
             ))}
+            {!loading && classDistribution.length === 0 && <div className="text-sm text-slate-500">Keine Klassenverteilung verfügbar.</div>}
           </CardContent>
         </Card>
 
@@ -143,18 +236,22 @@ export function AdminDashboardPage() {
                 Eincheck-Liste öffnen
               </Link>
             </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link to="/admin/communication">
-                <BellRing className="mr-2 h-4 w-4" />
-                Broadcast starten
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="justify-start">
-              <Link to="/admin/exports">
-                <FileDown className="mr-2 h-4 w-4" />
-                Startliste exportieren
-              </Link>
-            </Button>
+            {canReadOutbox && (
+              <Button asChild variant="outline" className="justify-start">
+                <Link to="/admin/communication">
+                  <BellRing className="mr-2 h-4 w-4" />
+                  Broadcast starten
+                </Link>
+              </Button>
+            )}
+            {canReadExports && (
+              <Button asChild variant="outline" className="justify-start">
+                <Link to="/admin/exports">
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Startliste exportieren
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </section>

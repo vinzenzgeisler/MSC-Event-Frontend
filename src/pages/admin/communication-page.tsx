@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/app/auth/auth-context";
+import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
+import { getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
+import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import type { BroadcastForm, OutboxItem } from "@/types/admin";
 
 const initialForm: BroadcastForm = {
@@ -17,11 +21,33 @@ const initialForm: BroadcastForm = {
 };
 
 export function AdminCommunicationPage() {
+  const { roles } = useAuth();
+  const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
+  const [toastMessage, setToastMessage] = useState("");
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(""), 2600);
+  };
+
+  const loadOutbox = async () => {
+    try {
+      setOutbox(await communicationService.listOutbox());
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "Postausgang konnte nicht geladen werden."));
+    }
+  };
 
   useEffect(() => {
-    communicationService.listOutbox().then(setOutbox);
+    void loadOutbox();
+
+    adminMetaService
+      .listClassOptions()
+      .then(setClassOptions)
+      .catch((error) => showToast(getApiErrorMessage(error, "Klassen konnten nicht geladen werden.")));
   }, []);
 
   return (
@@ -35,16 +61,26 @@ export function AdminCommunicationPage() {
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="space-y-1">
             <Label>Klasse</Label>
-            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.classId} onChange={(event) => setForm((prev) => ({ ...prev, classId: event.target.value }))}>
+            <select
+              className="h-10 w-full rounded-md border px-3 text-sm"
+              value={form.classId}
+              onChange={(event) => setForm((prev) => ({ ...prev, classId: event.target.value }))}
+            >
               <option value="all">Alle</option>
-              <option value="Auto Elite">Auto Elite</option>
-              <option value="Auto Pro">Auto Pro</option>
-              <option value="Moto Open">Moto Open</option>
+              {classOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-1">
             <Label>Status</Label>
-            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.acceptanceStatus} onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as BroadcastForm["acceptanceStatus"] }))}>
+            <select
+              className="h-10 w-full rounded-md border px-3 text-sm"
+              value={form.acceptanceStatus}
+              onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as BroadcastForm["acceptanceStatus"] }))}
+            >
               <option value="all">Alle</option>
               <option value="pending">Offen</option>
               <option value="shortlist">Vorauswahl</option>
@@ -53,7 +89,11 @@ export function AdminCommunicationPage() {
           </div>
           <div className="space-y-1">
             <Label>Zahlung</Label>
-            <select className="h-10 w-full rounded-md border px-3 text-sm" value={form.paymentStatus} onChange={(event) => setForm((prev) => ({ ...prev, paymentStatus: event.target.value as BroadcastForm["paymentStatus"] }))}>
+            <select
+              className="h-10 w-full rounded-md border px-3 text-sm"
+              value={form.paymentStatus}
+              onChange={(event) => setForm((prev) => ({ ...prev, paymentStatus: event.target.value as BroadcastForm["paymentStatus"] }))}
+            >
               <option value="all">Alle</option>
               <option value="due">{paymentStatusLabel("due")}</option>
               <option value="paid">{paymentStatusLabel("paid")}</option>
@@ -68,15 +108,25 @@ export function AdminCommunicationPage() {
             <Input value={form.subjectOverride} onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))} />
           </div>
           <div className="md:col-span-3">
-            <Button
-              className="w-full md:w-auto"
-              type="button"
-              onClick={() => {
-                void communicationService.queueBroadcast(form);
-              }}
-            >
-              Broadcast in Warteschlange legen
-            </Button>
+            {canManageCommunication ? (
+              <Button
+                className="w-full md:w-auto"
+                type="button"
+                onClick={async () => {
+                  try {
+                    await communicationService.queueBroadcast(form);
+                    showToast("Broadcast wurde in die Warteschlange gelegt.");
+                    await loadOutbox();
+                  } catch (error) {
+                    showToast(getApiErrorMessage(error, "Broadcast konnte nicht gestartet werden."));
+                  }
+                }}
+              >
+                Broadcast in Warteschlange legen
+              </Button>
+            ) : (
+              <div className="text-sm text-slate-500">Nur Admin-Rollen dürfen Broadcasts starten.</div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -95,13 +145,19 @@ export function AdminCommunicationPage() {
                   <Badge className={outboxStatusClasses(item.status)} variant="outline">
                     {outboxStatusLabel(item.status)}
                   </Badge>
-                  {item.status === "failed" ? (
+                  {item.status === "failed" && canManageCommunication ? (
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => {
-                        void communicationService.retryOutbox(item.id);
+                      onClick={async () => {
+                        try {
+                          await communicationService.retryOutbox(item.id);
+                          showToast("Outbox-Eintrag wurde erneut eingeplant.");
+                          await loadOutbox();
+                        } catch (error) {
+                          showToast(getApiErrorMessage(error, "Retry fehlgeschlagen."));
+                        }
                       }}
                     >
                       Erneut senden
@@ -138,13 +194,19 @@ export function AdminCommunicationPage() {
                     </td>
                     <td className="px-3 py-2">{item.createdAt}</td>
                     <td className="px-3 py-2">
-                      {item.status === "failed" ? (
+                      {item.status === "failed" && canManageCommunication ? (
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => {
-                            void communicationService.retryOutbox(item.id);
+                          onClick={async () => {
+                            try {
+                              await communicationService.retryOutbox(item.id);
+                              showToast("Outbox-Eintrag wurde erneut eingeplant.");
+                              await loadOutbox();
+                            } catch (error) {
+                              showToast(getApiErrorMessage(error, "Retry fehlgeschlagen."));
+                            }
                           }}
                         >
                           Erneut senden
@@ -160,6 +222,12 @@ export function AdminCommunicationPage() {
           </div>
         </CardContent>
       </Card>
+
+      {toastMessage && (
+        <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

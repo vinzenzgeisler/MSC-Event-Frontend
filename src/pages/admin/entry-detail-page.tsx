@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Bike, Car, Download, Mail, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/app/auth/auth-context";
+import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +16,7 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
+import { ApiError, getApiErrorMessage, isMockApiEnabled } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 
 function asEuro(cents: number) {
@@ -84,6 +87,15 @@ function HintButton(props: {
 }
 
 export function AdminEntryDetailPage() {
+  const HISTORY_PREVIEW_LIMIT = 5;
+  const { roles } = useAuth();
+  const canSetStatus = hasPermission(roles, "entries.status.write");
+  const canCheckin = hasPermission(roles, "entries.checkin.write");
+  const canPaymentWrite = hasPermission(roles, "entries.payment.write");
+  const canNotesWrite = hasPermission(roles, "entries.notes.write");
+  const canDeleteEntry = hasPermission(roles, "entries.delete");
+  const deleteAvailable = isMockApiEnabled();
+  const canSendMail = hasPermission(roles, "communication.write");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,6 +104,7 @@ export function AdminEntryDetailPage() {
   const [paid, setPaid] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
   const [confirmationMailSent, setConfirmationMailSent] = useState(false);
+  const [confirmationMailVerified, setConfirmationMailVerified] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
   const [internalNote, setInternalNote] = useState("");
@@ -103,24 +116,67 @@ export function AdminEntryDetailPage() {
   const [paymentEditorOpen, setPaymentEditorOpen] = useState(false);
   const [paymentTotalInput, setPaymentTotalInput] = useState("0,00");
   const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
     setTimeout(() => setActionMessage(""), timeout);
   };
 
-  const loadDetail = () => {
-    adminEntriesService.getEntryDetail(entryId).then((result) => {
-      setDetail(result);
-      if (result) {
-        setStatus(result.status);
-        setPaid(result.payment.status === "paid");
-        setCheckinDone(result.checkinVerified);
-        setConfirmationMailSent(result.confirmationMailSent);
-        setInternalNote(result.internalNote);
-        setDriverNote(result.driverNote);
+  const runAction = async (operation: () => Promise<unknown>, successMessage: string, errorMessage: string) => {
+    try {
+      await operation();
+      flashMessage(successMessage);
+      loadDetail();
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, errorMessage), 2800);
+    }
+  };
+
+  const getLocalizedActionError = (error: unknown, fallback: string) => {
+    if (error instanceof ApiError) {
+      const code = (error.code ?? "").toLowerCase();
+      const message = error.message.toLowerCase();
+      if (code.includes("duplicate") || message.includes("duplicate request") || message.includes("duplicate")) {
+        return "Doppelte Anfrage: Eine identische Mail-Aktion wurde bereits ausgelöst. Bitte Outbox prüfen.";
       }
-    });
+    }
+    return getApiErrorMessage(error, fallback);
+  };
+
+  const loadDetail = () => {
+    adminEntriesService
+      .getEntryDetail(entryId)
+      .then((result) => {
+        setDetail(result);
+        if (result) {
+          setStatus(result.status);
+          setPaid(result.payment.status === "paid");
+          setCheckinDone(result.checkinVerified);
+          setConfirmationMailSent(result.confirmationMailSent);
+          setConfirmationMailVerified(result.confirmationMailVerified);
+          setInternalNote(result.internalNote);
+          setDriverNote(result.driverNote);
+          setHistoryExpanded(false);
+        }
+      })
+      .catch((error) => {
+        flashMessage(getApiErrorMessage(error, "Nennung konnte nicht geladen werden."), 3000);
+        setDetail(null);
+      });
+  };
+
+  const handleDocumentDownload = async (type: "waiver" | "tech_check", label: string) => {
+    try {
+      const url = await adminEntriesService.getEntryDocumentDownloadUrl(entryId, type);
+      if (!url) {
+        flashMessage(`${label} nicht verfügbar.`, 2600);
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, `${label} konnte nicht geladen werden.`), 2800);
+    }
   };
 
   useEffect(() => {
@@ -133,8 +189,22 @@ export function AdminEntryDetailPage() {
 
   const paymentState = paid ? "paid" : "due";
   const paidPercent = detail.payment.totalCents > 0 ? Math.max(0, Math.min(100, Math.round((detail.payment.paidAmountCents / detail.payment.totalCents) * 100))) : 0;
+  const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
+  const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
   const actionActiveClass = "border-primary bg-primary text-primary-foreground hover:bg-primary/90";
+  const statusDisabledReason = (target: "pending" | "shortlist" | "accepted" | "rejected") => {
+    if (!canSetStatus) {
+      return "Nur Admin-Rollen dürfen Status ändern.";
+    }
+    if (!confirmationMailVerified) {
+      return "Status erst nach verifizierter E-Mail änderbar.";
+    }
+    if (status === target) {
+      return "Bereits in diesem Status.";
+    }
+    return undefined;
+  };
 
   return (
     <div className="w-full max-w-[1120px] space-y-4">
@@ -166,7 +236,13 @@ export function AdminEntryDetailPage() {
             className={confirmationMailSent ? "h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-900" : "h-6 border-amber-300 bg-amber-50 px-2.5 text-xs text-amber-900"}
             variant="outline"
           >
-            Mail: {confirmationMailSent ? "Bestätigt" : "Ausstehend"}
+            Mail: {confirmationMailSent ? "Gesendet" : "Ausstehend"}
+          </Badge>
+          <Badge
+            className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+            variant="outline"
+          >
+            E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
           </Badge>
           <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
             Status: {acceptanceStatusLabel(status)}
@@ -384,7 +460,7 @@ export function AdminEntryDetailPage() {
               <CardTitle>Historie</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-slate-700">
-              {detail.history.map((item) => (
+              {historyItems.map((item) => (
                 <div key={item.id} className="rounded border p-3">
                   <div className="mb-1 font-medium">{item.action}</div>
                   <div>{item.details}</div>
@@ -393,6 +469,16 @@ export function AdminEntryDetailPage() {
                   </div>
                 </div>
               ))}
+              {hiddenHistoryCount > 0 && !historyExpanded && (
+                <Button type="button" variant="outline" onClick={() => setHistoryExpanded(true)}>
+                  Weitere {hiddenHistoryCount} Einträge anzeigen
+                </Button>
+              )}
+              {historyExpanded && detail.history.length > HISTORY_PREVIEW_LIMIT && (
+                <Button type="button" variant="outline" onClick={() => setHistoryExpanded(false)}>
+                  Auf letzte {HISTORY_PREVIEW_LIMIT} Einträge reduzieren
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -408,47 +494,59 @@ export function AdminEntryDetailPage() {
                   label="Auf Vorauswahl setzen"
                   variant={status === "shortlist" ? "default" : "outline"}
                   className={status === "shortlist" ? actionActiveClass : actionOutlineClass}
-                  disabledReason={!confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                  onClick={async () => {
-                    await adminEntriesService.setEntryStatus(detail.id, "to_shortlist");
-                    setStatus("shortlist");
-                    flashMessage("Status auf Vorauswahl gesetzt.");
-                    loadDetail();
+                  disabledReason={statusDisabledReason("shortlist")}
+                  onClick={() => {
+                    void runAction(
+                      () => adminEntriesService.setEntryStatus(detail.id, "to_shortlist"),
+                      "Status auf Vorauswahl gesetzt.",
+                      "Status konnte nicht geändert werden."
+                    );
                   }}
                 />
                 <HintButton
                   label="Auf Zugelassen setzen"
                   variant={status === "accepted" ? "default" : "outline"}
                   className={status === "accepted" ? actionActiveClass : actionOutlineClass}
-                  disabledReason={!confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
+                  disabledReason={statusDisabledReason("accepted")}
                   onClick={() => setPendingAcceptConfirm(true)}
                 />
                 <HintButton
                   label="Auf Abgelehnt setzen"
                   variant={status === "rejected" ? "default" : "outline"}
                   className={status === "rejected" ? actionActiveClass : actionOutlineClass}
-                  disabledReason={!confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
+                  disabledReason={statusDisabledReason("rejected")}
                   onClick={() => setPendingRejectConfirm(true)}
                 />
                 <HintButton
                   label="Einchecken bestätigen"
                   variant={checkinDone ? "default" : "outline"}
                   className={checkinDone ? actionActiveClass : actionOutlineClass}
-                  disabledReason={status !== "accepted" ? "Check-in erst nach Zulassung möglich." : undefined}
+                  disabledReason={!canCheckin ? "Nur Admin/Editor-Rollen dürfen einchecken." : status !== "accepted" ? "Check-in erst nach Zulassung möglich." : undefined}
                   onClick={() => setPendingCheckinConfirm(true)}
                 />
               </div>
 
               <div className="grid gap-2 border-t border-slate-200 pt-4">
                 <HintButton
-                  label={confirmationMailSent ? "Mail bereits bestätigt" : "Bestätigungs-Mail senden"}
+                  label={
+                    confirmationMailVerified
+                      ? "E-Mail bereits verifiziert"
+                      : confirmationMailSent
+                        ? "Bestätigungs-Mail erneut senden"
+                        : "Bestätigungs-Mail senden"
+                  }
                   icon={<Mail className="mr-2 h-4 w-4" />}
                   variant={!confirmationMailSent ? "default" : "outline"}
                   className={!confirmationMailSent ? actionActiveClass : actionOutlineClass}
-                  disabledReason={confirmationMailSent ? "E-Mail wurde bereits bestätigt." : undefined}
+                  disabledReason={!canSendMail ? "Nur Admin-Rollen dürfen Mails senden." : confirmationMailVerified ? "E-Mail wurde bereits verifiziert." : undefined}
                   onClick={async () => {
-                    await communicationService.queueAcceptedMailForEntry(detail.id);
-                    flashMessage("Bestätigungs-Mail erneut versendet. Status bleibt bis Bestätigung ausstehend.");
+                    try {
+                      await communicationService.queueAcceptedMailForEntry(detail.id);
+                      flashMessage("Bestätigungs-Mail erneut versendet. Status bleibt bis Bestätigung ausstehend.");
+                      loadDetail();
+                    } catch (error) {
+                      flashMessage(getLocalizedActionError(error, "Bestätigungs-Mail konnte nicht versendet werden."), 3200);
+                    }
                   }}
                 />
                 <HintButton
@@ -456,10 +554,15 @@ export function AdminEntryDetailPage() {
                   icon={<Mail className="mr-2 h-4 w-4" />}
                   variant="outline"
                   className={actionOutlineClass}
-                  disabledReason={status !== "accepted" ? "Zahlungserinnerung erst bei zugelassener Nennung." : undefined}
+                  disabledReason={
+                    !canSendMail ? "Nur Admin-Rollen dürfen Mails senden." : status !== "accepted" ? "Zahlungserinnerung erst bei zugelassener Nennung." : undefined
+                  }
                   onClick={async () => {
-                    await communicationService.queuePaymentReminderForEntry(detail.id);
-                    flashMessage("Zahlungserinnerung wurde in die Mail-Queue gelegt.");
+                    await runAction(
+                      () => communicationService.queuePaymentReminderForEntry(detail.id),
+                      "Zahlungserinnerung wurde in die Mail-Queue gelegt.",
+                      "Zahlungserinnerung konnte nicht versendet werden."
+                    );
                   }}
                 />
               </div>
@@ -470,12 +573,19 @@ export function AdminEntryDetailPage() {
                   icon={<Wallet className="mr-2 h-4 w-4" />}
                   variant={paid ? "default" : "outline"}
                   className={paid ? actionActiveClass : actionOutlineClass}
-                  disabledReason={status !== "accepted" ? "Zahlung kann erst nach Zulassung bestätigt werden." : undefined}
+                  disabledReason={
+                    !canPaymentWrite
+                      ? "Nur Admin-Rollen dürfen Zahlungen ändern."
+                      : status !== "accepted"
+                        ? "Zahlung kann erst nach Zulassung bestätigt werden."
+                        : undefined
+                  }
                   onClick={async () => {
-                    await adminEntriesService.setEntryPaymentStatus(detail.id, "paid");
-                    setPaid(true);
-                    flashMessage("Zahlung als eingegangen markiert.");
-                    loadDetail();
+                    await runAction(
+                      () => adminEntriesService.setEntryPaymentStatus(detail.id, "paid"),
+                      "Zahlung als eingegangen markiert.",
+                      "Zahlungsstatus konnte nicht aktualisiert werden."
+                    );
                   }}
                 />
                 <HintButton
@@ -483,7 +593,13 @@ export function AdminEntryDetailPage() {
                   icon={<Wallet className="mr-2 h-4 w-4" />}
                   variant="outline"
                   className={actionOutlineClass}
-                  disabledReason={status !== "accepted" ? "Betragsanpassung erst nach Zulassung möglich." : undefined}
+                  disabledReason={
+                    !canPaymentWrite
+                      ? "Nur Admin-Rollen dürfen Zahlungen ändern."
+                      : status !== "accepted"
+                        ? "Betragsanpassung erst nach Zulassung möglich."
+                        : undefined
+                  }
                   onClick={() => {
                     setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
                     setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
@@ -497,7 +613,9 @@ export function AdminEntryDetailPage() {
                   type="button"
                   variant="outline"
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
-                  onClick={() => flashMessage("PDF Haftverzicht bereitgestellt (UI-only).")}
+                  onClick={() => {
+                    void handleDocumentDownload("waiver", "Haftverzicht");
+                  }}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   PDF Haftverzicht
@@ -506,7 +624,9 @@ export function AdminEntryDetailPage() {
                   type="button"
                   variant="outline"
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
-                  onClick={() => flashMessage("PDF Technische Abnahme bereitgestellt (UI-only).")}
+                  onClick={() => {
+                    void handleDocumentDownload("tech_check", "Technische Abnahme");
+                  }}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   PDF Technische Abnahme
@@ -519,6 +639,7 @@ export function AdminEntryDetailPage() {
                   icon={<Trash2 className="mr-2 h-4 w-4" />}
                   variant="outline"
                   className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                  disabledReason={!canDeleteEntry ? "Nur Admin-Rollen dürfen Nennungen löschen." : !deleteAvailable ? "Im Live-Backend aktuell nicht verfügbar." : undefined}
                   onClick={() => setPendingDeleteConfirm(true)}
                 />
               </div>
@@ -535,6 +656,7 @@ export function AdminEntryDetailPage() {
                 <textarea
                   className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={internalNote}
+                  disabled={!canNotesWrite}
                   onChange={(event) => setInternalNote(event.target.value)}
                 />
               </div>
@@ -544,15 +666,20 @@ export function AdminEntryDetailPage() {
                 <textarea
                   className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={driverNote}
+                  disabled={!canNotesWrite}
                   onChange={(event) => setDriverNote(event.target.value)}
                 />
               </div>
               <Button
                 type="button"
                 variant="secondary"
+                disabled={!canNotesWrite}
                 onClick={async () => {
-                  await adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote });
-                  flashMessage("Notizen gespeichert.");
+                  await runAction(
+                    () => adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote }),
+                    "Notizen gespeichert.",
+                    "Notizen konnten nicht gespeichert werden."
+                  );
                 }}
               >
                 Notizen speichern
@@ -568,7 +695,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {pendingAcceptConfirm && (
+      {canSetStatus && pendingAcceptConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
@@ -580,11 +707,15 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 onClick={async () => {
-                  await adminEntriesService.setEntryStatus(detail.id, "to_accepted");
-                  setStatus("accepted");
                   setPendingAcceptConfirm(false);
-                  flashMessage("Status auf Zugelassen gesetzt.", 2200);
-                  loadDetail();
+                  if (status === "accepted") {
+                    return;
+                  }
+                  await runAction(
+                    () => adminEntriesService.setEntryStatus(detail.id, "to_accepted"),
+                    "Status auf Zugelassen gesetzt.",
+                    "Status konnte nicht geändert werden."
+                  );
                 }}
               >
                 Ja, zulassen
@@ -594,7 +725,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {pendingCheckinConfirm && (
+      {canCheckin && pendingCheckinConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Einchecken wirklich bestätigen?</h2>
@@ -612,11 +743,12 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 onClick={async () => {
-                  await adminEntriesService.setEntryCheckinVerified(detail.id);
-                  setCheckinDone(true);
                   setPendingCheckinConfirm(false);
-                  flashMessage("Einchecken wurde bestätigt.");
-                  loadDetail();
+                  await runAction(
+                    () => adminEntriesService.setEntryCheckinVerified(detail.id),
+                    "Einchecken wurde bestätigt.",
+                    "Check-in konnte nicht bestätigt werden."
+                  );
                 }}
               >
                 Ja, bestätigen
@@ -626,7 +758,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {pendingRejectConfirm && (
+      {canSetStatus && pendingRejectConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Auf „Abgelehnt“ setzen?</h2>
@@ -641,11 +773,15 @@ export function AdminEntryDetailPage() {
                 type="button"
                 variant="destructive"
                 onClick={async () => {
-                  await adminEntriesService.setEntryStatus(detail.id, "to_rejected");
-                  setStatus("rejected");
                   setPendingRejectConfirm(false);
-                  flashMessage("Status auf Abgelehnt gesetzt.");
-                  loadDetail();
+                  if (status === "rejected") {
+                    return;
+                  }
+                  await runAction(
+                    () => adminEntriesService.setEntryStatus(detail.id, "to_rejected"),
+                    "Status auf Abgelehnt gesetzt.",
+                    "Status konnte nicht geändert werden."
+                  );
                 }}
               >
                 Ja, ablehnen
@@ -655,7 +791,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {paymentEditorOpen && (
+      {canPaymentWrite && paymentEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Zahlungsbetrag anpassen</h2>
@@ -685,13 +821,17 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 onClick={async () => {
-                  await adminEntriesService.setEntryPaymentAmounts(detail.id, {
-                    totalCents: centsFromEuroInput(paymentTotalInput),
-                    paidAmountCents: centsFromEuroInput(paymentPaidInput)
-                  });
-                  setPaymentEditorOpen(false);
-                  flashMessage("Zahlungsdaten wurden aktualisiert.");
-                  loadDetail();
+                  try {
+                    await adminEntriesService.setEntryPaymentAmounts(detail.id, {
+                      totalCents: centsFromEuroInput(paymentTotalInput),
+                      paidAmountCents: centsFromEuroInput(paymentPaidInput)
+                    });
+                    setPaymentEditorOpen(false);
+                    flashMessage("Zahlungsdaten wurden aktualisiert.");
+                    loadDetail();
+                  } catch (error) {
+                    flashMessage(getApiErrorMessage(error, "Zahlungsdaten konnten nicht aktualisiert werden."), 2800);
+                  }
                 }}
               >
                 Speichern
@@ -701,13 +841,11 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {pendingDeleteConfirm && (
+      {canDeleteEntry && deleteAvailable && pendingDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Nennung löschen?</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Diese Aktion ist im finalen System nur für Admin-Rollen freigegeben. Im Mockup wird nur eine Bestätigung angezeigt.
-            </p>
+            <p className="mt-2 text-sm text-slate-600">Diese Aktion entfernt die Nennung dauerhaft.</p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setPendingDeleteConfirm(false)}>
                 Abbrechen
@@ -715,9 +853,14 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 variant="destructive"
-                onClick={() => {
+                onClick={async () => {
                   setPendingDeleteConfirm(false);
-                  flashMessage("Nennung gelöscht (UI-only).");
+                  try {
+                    await adminEntriesService.deleteEntry(detail.id);
+                    navigate(`/admin/entries${location.search}`);
+                  } catch (error) {
+                    flashMessage(getLocalizedActionError(error, "Nennung konnte nicht gelöscht werden."), 3200);
+                  }
                 }}
               >
                 Ja, löschen

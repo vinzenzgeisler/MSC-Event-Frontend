@@ -16,6 +16,7 @@ import type { AdminEntryListItem } from "@/types/admin";
 
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
+  canManageStatus: boolean;
   onSetShortlist: (entryId: string) => void;
   onSetAccepted: (entryId: string) => void;
   onSetRejected: (entryId: string) => void;
@@ -58,8 +59,17 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
   );
 }
 
-export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejected }: EntriesTableProps) {
+export function EntriesTable({ rows, canManageStatus, onSetShortlist, onSetAccepted, onSetRejected }: EntriesTableProps) {
   const location = useLocation();
+  const statusDisabledReason = (row: AdminEntryListItem, target: AdminEntryListItem["status"]) => {
+    if (!row.confirmationMailVerified) {
+      return "Status erst nach verifizierter E-Mail änderbar.";
+    }
+    if (row.status === target) {
+      return "Bereits in diesem Status.";
+    }
+    return undefined;
+  };
 
   if (!rows.length) {
     return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Keine Nennungen für die aktuelle Filterung.</div>;
@@ -71,7 +81,7 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejecte
         {rows.map((row) => (
           <div
             key={row.id}
-            className={`rounded-md border p-3 shadow-sm ${row.confirmationMailSent ? `bg-white ${acceptanceStatusRowAccentClasses(row.status)}` : "border-l-4 border-l-slate-300 bg-slate-50"}`}
+            className={`rounded-md border p-3 shadow-sm ${row.confirmationMailVerified ? `bg-white ${acceptanceStatusRowAccentClasses(row.status)}` : "border-l-4 border-l-slate-300 bg-slate-50"}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-3">
@@ -79,7 +89,7 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejecte
                 <div>
                   <div className="flex items-center gap-1.5 font-medium text-slate-900">
                     <span>{row.name}</span>
-                    {row.confirmationMailSent && (
+                    {row.confirmationMailVerified && (
                       <span title="E-Mail verifiziert">
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       </span>
@@ -95,30 +105,34 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejecte
                 <Button asChild size="sm" variant="outline">
                   <Link to={`/admin/entries/${row.id}${location.search}`}>Details</Link>
                 </Button>
-                <ActionButton
-                  label="Vorauswahl"
-                  wrapperClassName="h-8 w-full"
-                  className="px-3.5"
-                  variant="outline"
-                  disabledReason={!row.confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                  onClick={() => onSetShortlist(row.id)}
-                />
-                <ActionButton
-                  label="Zulassen"
-                  wrapperClassName="h-8 w-full"
-                  className="px-3.5"
-                  variant="default"
-                  disabledReason={!row.confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                  onClick={() => onSetAccepted(row.id)}
-                />
-                <ActionButton
-                  label="Ablehnen"
-                  wrapperClassName="h-8 w-full"
-                  className="px-3.5"
-                  variant="outline"
-                  disabledReason={!row.confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                  onClick={() => onSetRejected(row.id)}
-                />
+                {canManageStatus && (
+                  <>
+                    <ActionButton
+                      label="Vorauswahl"
+                      wrapperClassName="h-8 w-full"
+                      className="px-3.5"
+                      variant="outline"
+                      disabledReason={statusDisabledReason(row, "shortlist")}
+                      onClick={() => onSetShortlist(row.id)}
+                    />
+                    <ActionButton
+                      label="Zulassen"
+                      wrapperClassName="h-8 w-full"
+                      className="px-3.5"
+                      variant="default"
+                      disabledReason={statusDisabledReason(row, "accepted")}
+                      onClick={() => onSetAccepted(row.id)}
+                    />
+                    <ActionButton
+                      label="Ablehnen"
+                      wrapperClassName="h-8 w-full"
+                      className="px-3.5"
+                      variant="outline"
+                      disabledReason={statusDisabledReason(row, "rejected")}
+                      onClick={() => onSetRejected(row.id)}
+                    />
+                  </>
+                )}
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -178,7 +192,7 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejecte
               {rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`h-[116px] border-t align-middle hover:bg-slate-50 ${row.confirmationMailSent ? acceptanceStatusRowAccentClasses(row.status) : "border-l-4 border-l-slate-300 bg-slate-50"}`}
+                  className={`h-[116px] border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowAccentClasses(row.status) : "border-l-4 border-l-slate-300 bg-slate-50"}`}
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-start gap-3">
@@ -186,7 +200,7 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejecte
                       <div className="min-w-0 pt-0.5">
                         <div className="flex items-center gap-1.5 truncate font-semibold leading-tight text-slate-900">
                           <span className="truncate">{row.name}</span>
-                          {row.confirmationMailSent && (
+                          {row.confirmationMailVerified && (
                             <span title="E-Mail verifiziert">
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                             </span>
@@ -237,30 +251,34 @@ export function EntriesTable({ rows, onSetShortlist, onSetAccepted, onSetRejecte
                           <Link to={`/admin/entries/${row.id}${location.search}`}>Details</Link>
                         </Button>
                       </div>
-                      <ActionButton
-                        label="Vorauswahl"
-                        wrapperClassName="h-8 w-full"
-                        className="px-3.5"
-                        variant="outline"
-                        disabledReason={!row.confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                        onClick={() => onSetShortlist(row.id)}
-                      />
-                      <ActionButton
-                        label="Ablehnen"
-                        wrapperClassName="h-8 w-full"
-                        className="px-3.5"
-                        variant="outline"
-                        disabledReason={!row.confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                        onClick={() => onSetRejected(row.id)}
-                      />
-                      <ActionButton
-                        label="Zulassen"
-                        wrapperClassName="col-span-2 h-8 w-full"
-                        className="px-3.5"
-                        variant="default"
-                        disabledReason={!row.confirmationMailSent ? "Status erst nach bestätigter E-Mail änderbar." : undefined}
-                        onClick={() => onSetAccepted(row.id)}
-                      />
+                      {canManageStatus && (
+                        <>
+                          <ActionButton
+                            label="Vorauswahl"
+                            wrapperClassName="h-8 w-full"
+                            className="px-3.5"
+                            variant="outline"
+                            disabledReason={statusDisabledReason(row, "shortlist")}
+                            onClick={() => onSetShortlist(row.id)}
+                          />
+                          <ActionButton
+                            label="Ablehnen"
+                            wrapperClassName="h-8 w-full"
+                            className="px-3.5"
+                            variant="outline"
+                            disabledReason={statusDisabledReason(row, "rejected")}
+                            onClick={() => onSetRejected(row.id)}
+                          />
+                          <ActionButton
+                            label="Zulassen"
+                            wrapperClassName="col-span-2 h-8 w-full"
+                            className="px-3.5"
+                            variant="default"
+                            disabledReason={statusDisabledReason(row, "accepted")}
+                            onClick={() => onSetAccepted(row.id)}
+                          />
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
