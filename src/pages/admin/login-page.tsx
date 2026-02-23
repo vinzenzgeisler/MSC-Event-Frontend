@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { consumeCognitoReturnTo, handleCognitoCallbackIfPresent, isCognitoConfigured, startCognitoLogin } from "@/app/auth/cognito";
 import { useAuth } from "@/app/auth/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 type LocationState = {
   from?: {
@@ -13,11 +12,38 @@ type LocationState = {
 };
 
 export function AdminLoginPage() {
-  const { login } = useAuth();
-  const [token, setToken] = useState("");
+  const { loginWithSession } = useAuth();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = (location.state as LocationState | null)?.from?.pathname || "/admin/dashboard";
+  const cognitoReady = isCognitoConfigured();
+
+  useEffect(() => {
+    const runCallback = async () => {
+      try {
+        setBusy(true);
+        const session = await handleCognitoCallbackIfPresent();
+        if (!session) {
+          return;
+        }
+        loginWithSession(session);
+        const target = consumeCognitoReturnTo(redirectTo);
+        navigate(target, { replace: true });
+      } catch (callbackError) {
+        if (callbackError instanceof Error) {
+          setError(callbackError.message);
+        } else {
+          setError("Cognito Login konnte nicht abgeschlossen werden.");
+        }
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    void runCallback();
+  }, [loginWithSession, navigate, redirectTo]);
 
   return (
     <div className="mx-auto mt-16 max-w-md px-4">
@@ -27,22 +53,39 @@ export function AdminLoginPage() {
           <CardTitle className="text-2xl">MSC Event Verwaltung</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="token">Bearer Token</Label>
-            <Input id="token" value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJ..." />
-          </div>
-          <Button
-            className="w-full"
-            onClick={() => {
-              if (!token.trim()) {
-                return;
-              }
-              login(token.trim());
-              navigate(redirectTo, { replace: true });
-            }}
-          >
-            Login
-          </Button>
+          {cognitoReady && (
+            <Button
+              type="button"
+              className="w-full"
+              disabled={busy}
+              onClick={() => {
+                setError("");
+                setBusy(true);
+                void startCognitoLogin(redirectTo).catch((startError) => {
+                  setBusy(false);
+                  if (startError instanceof Error) {
+                    setError(startError.message);
+                  } else {
+                    setError("Cognito Login konnte nicht gestartet werden.");
+                  }
+                });
+              }}
+            >
+              {busy ? "Weiterleitung..." : "Mit Cognito anmelden"}
+            </Button>
+          )}
+
+          {!cognitoReady && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Login ist nicht konfiguriert. Bitte `VITE_COGNITO_ENABLED=true` sowie `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID` und Redirect-URIs setzen.
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

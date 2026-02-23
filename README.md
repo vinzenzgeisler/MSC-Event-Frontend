@@ -21,8 +21,21 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `npm run typecheck`
 - `npm run build`
 
+## Environment
+
+- `VITE_API_BASE_URL` API-Basis-URL
+- `VITE_PUBLIC_EVENT_ID` optional feste Event-ID (überschreibt `/events/current`)
+- `VITE_COGNITO_ENABLED` `true|false`
+- `VITE_COGNITO_DOMAIN` z. B. `https://<domain>.auth.<region>.amazoncognito.com`
+- `VITE_COGNITO_CLIENT_ID` Cognito App Client ID (ohne Secret)
+- `VITE_COGNITO_REDIRECT_URI` OAuth Redirect (typisch `/admin/login`)
+- `VITE_COGNITO_LOGOUT_URI` Logout Redirect
+- `VITE_COGNITO_SCOPES` typischerweise `openid email profile`
+- `VITE_ADMIN_ENABLE_TOKEN_LOGIN` optionaler Dev-Fallback für manuellen JWT-Login
+- `VITE_ADMIN_ENABLE_ROLE_PREVIEW` optionaler Dev-Fallback für Rollen-UI-Test ohne Token
+
 ## Notes
 
-- Keine direkte Backend-Integration in dieser Phase.
 - API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.
 - Mock-/UI-Only Daten liegen zentral unter `src/mock/*`.
+- IAM/Rollen im Frontend: `admin`, `editor`, `viewer` (Legacy-Claim `checkin` wird auf `editor` gemappt).

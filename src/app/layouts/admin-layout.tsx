@@ -5,9 +5,14 @@ import { useAuth } from "@/app/auth/auth-context";
 import { AdminNav } from "@/components/navigation/admin-nav";
 import { Button } from "@/components/ui/button";
 
+function looksLikeOpaqueId(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value) || /^[0-9a-f]{32,}$/i.test(value);
+}
+
 export function AdminLayout() {
-  const { logout } = useAuth();
+  const { logout, roles, displayName, email } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const showDisplayName = Boolean(displayName && !looksLikeOpaqueId(displayName));
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -40,6 +45,11 @@ export function AdminLayout() {
           <div className="mb-4 border-b pb-4">
             <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Admin-Bereich</div>
             <div className="mt-2 text-lg font-semibold text-slate-900">MSC Event</div>
+            <div className="mt-3 space-y-1 rounded-md bg-slate-50 p-2 text-xs text-slate-600">
+              <div className="font-medium text-slate-800">{showDisplayName ? displayName : email || "Angemeldet"}</div>
+              {email && showDisplayName && <div>{email}</div>}
+              <div>Rollen: {roles.length > 0 ? roles.join(", ") : "nicht im Token"}</div>
+            </div>
           </div>
           <div onClick={() => setMenuOpen(false)}>
             <AdminNav />

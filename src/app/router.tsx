@@ -47,9 +47,30 @@ export const router = createBrowserRouter([
           { path: "dashboard", element: <AdminDashboardPage /> },
           { path: "entries", element: <AdminEntriesPage /> },
           { path: "entries/:entryId", element: <AdminEntryDetailPage /> },
-          { path: "communication", element: <AdminCommunicationPage /> },
-          { path: "exports", element: <AdminExportsPage /> },
-          { path: "settings", element: <AdminSettingsPage /> }
+          {
+            path: "communication",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminCommunicationPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "exports",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "editor", "viewer"]}>
+                <AdminExportsPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "settings",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminSettingsPage />
+              </ProtectedRoute>
+            )
+          }
         ]
       }
     ]

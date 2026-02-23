@@ -1,13 +1,14 @@
+import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
-
-const ROLE_PRIORITY = ["admin", "checkin", "viewer"] as const;
+import { getEffectiveRoles } from "@/app/auth/iam";
 
 type GuardProps = {
   allowedRoles?: string[];
+  children?: ReactNode;
 };
 
-export function ProtectedRoute({ allowedRoles }: GuardProps) {
+export function ProtectedRoute({ allowedRoles, children }: GuardProps) {
   const location = useLocation();
   const { isAuthenticated, roles } = useAuth();
 
@@ -19,12 +20,12 @@ export function ProtectedRoute({ allowedRoles }: GuardProps) {
     return <Outlet />;
   }
 
-  const effectiveRoles = roles.filter((role) => ROLE_PRIORITY.includes(role as (typeof ROLE_PRIORITY)[number]));
+  const effectiveRoles = getEffectiveRoles(roles);
   const allowed = effectiveRoles.some((role) => allowedRoles.includes(role));
 
   if (!allowed) {
     return <Navigate to="/admin/forbidden" replace />;
   }
 
-  return <Outlet />;
+  return children ? <>{children}</> : <Outlet />;
 }
