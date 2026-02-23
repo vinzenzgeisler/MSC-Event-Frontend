@@ -1,8 +1,102 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { AnmeldungI18nProvider, type AnmeldungLocale, useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { ApiError } from "@/services/api/http-client";
+import { getPublicCurrentEvent } from "@/services/api/event-context";
+
+type HeaderEvent = {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  registrationCloseAt: string | null;
+};
+
+function toIntlLocale(locale: AnmeldungLocale) {
+  if (locale === "de") return "de-DE";
+  if (locale === "cz") return "cs-CZ";
+  return "en-US";
+}
+
+function formatDate(value: string, locale: AnmeldungLocale) {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  }).format(parsed);
+}
+
+function formatDateRange(startsAt: string, endsAt: string, locale: AnmeldungLocale) {
+  if (!startsAt && !endsAt) {
+    return "";
+  }
+  if (!endsAt || startsAt === endsAt) {
+    return formatDate(startsAt, locale);
+  }
+  return `${formatDate(startsAt, locale)} - ${formatDate(endsAt, locale)}`;
+}
+
+function formatDateTime(value: string, locale: AnmeldungLocale) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(parsed);
+}
 
 function PublicLayoutContent() {
   const { locale, setLocale, m } = useAnmeldungI18n();
+  const [headerEvent, setHeaderEvent] = useState<HeaderEvent | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getPublicCurrentEvent()
+      .then((response) => {
+        if (!active) {
+          return;
+        }
+        setHeaderEvent({
+          name: response.event.name,
+          startsAt: response.event.startsAt,
+          endsAt: response.event.endsAt,
+          registrationCloseAt: response.event.registrationCloseAt
+        });
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        if (error instanceof ApiError && error.status === 404) {
+          setHeaderEvent(null);
+          return;
+        }
+        setHeaderEvent(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const headerDateBadge = useMemo(() => {
+    if (!headerEvent) {
+      return m.layout.dateBadge;
+    }
+    const label = formatDateRange(headerEvent.startsAt, headerEvent.endsAt, locale);
+    return label || m.layout.dateBadge;
+  }, [headerEvent, locale, m.layout.dateBadge]);
+
+  const headerTitle = headerEvent?.name || m.layout.title;
+  const headerDeadline = headerEvent?.registrationCloseAt ? formatDateTime(headerEvent.registrationCloseAt, locale) : m.layout.infoDeadlineValue;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -10,7 +104,7 @@ function PublicLayoutContent() {
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 md:px-6 md:py-12">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded bg-yellow-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
-              {m.layout.dateBadge}
+              {headerDateBadge}
             </div>
             <div className="rounded-full border border-white/35 bg-white/10 p-1">
               <div className="flex items-center gap-1">
@@ -34,7 +128,7 @@ function PublicLayoutContent() {
 
           <div className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
             <div className="space-y-4 sm:space-y-5">
-              <h1 className="text-3xl font-semibold md:text-5xl">{m.layout.title}</h1>
+              <h1 className="text-3xl font-semibold md:text-5xl">{headerTitle}</h1>
               <p className="text-sm text-primary-foreground/90 md:text-base">{m.layout.subtitle}</p>
               <div className="flex flex-wrap gap-2">
                 <a
@@ -51,7 +145,7 @@ function PublicLayoutContent() {
             <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
               <div className="rounded border border-white/25 bg-white/10 p-3">
                 <div className="text-xs uppercase tracking-wide text-primary-foreground/80">{m.layout.infoDeadlineTitle}</div>
-                <div className="mt-1 text-sm font-semibold">{m.layout.infoDeadlineValue}</div>
+                <div className="mt-1 text-sm font-semibold">{headerDeadline}</div>
               </div>
               <div className="rounded border border-white/25 bg-white/10 p-3">
                 <div className="text-xs uppercase tracking-wide text-primary-foreground/80">{m.layout.infoCheckinTitle}</div>

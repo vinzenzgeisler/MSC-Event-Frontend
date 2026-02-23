@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { getCountryOptions } from "@/lib/countries";
 import type { DriverForm } from "@/types/registration";
 
 type DriverStepProps = {
@@ -17,7 +19,8 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export function DriverStep({ value, errors, onChange }: DriverStepProps) {
-  const { m } = useAnmeldungI18n();
+  const { m, locale } = useAnmeldungI18n();
+  const countryOptions = useMemo(() => getCountryOptions(locale), [locale]);
 
   return (
     <div className="space-y-6">
@@ -48,6 +51,23 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
             placeholder={m.driver.phonePlaceholder}
           />
           <FieldError message={errors.phone} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="driver-nationality">{m.driver.nationality}</Label>
+          <Input
+            id="driver-nationality"
+            list="driver-nationality-options"
+            value={value.nationality}
+            onChange={(event) => onChange("nationality", event.target.value)}
+            placeholder={m.driver.nationalityPlaceholder}
+            autoComplete="country-name"
+          />
+          <datalist id="driver-nationality-options">
+            {countryOptions.map((country) => (
+              <option key={country} value={country} />
+            ))}
+          </datalist>
+          <FieldError message={errors.nationality} />
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-email">{m.driver.email}</Label>

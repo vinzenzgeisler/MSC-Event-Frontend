@@ -22,6 +22,9 @@ export function SummaryStep({ form, submitError, successMessage, onConsentChange
           {form.driver.firstName} {form.driver.lastName} · {form.driver.email}
         </p>
         <p className="text-sm text-slate-600">
+          {m.driver.nationality}: {form.driver.nationality}
+        </p>
+        <p className="text-sm text-slate-600">
           {m.driver.emergencyTitle}: {form.driver.emergencyContactName} ({form.driver.emergencyContactPhone})
         </p>
       </div>

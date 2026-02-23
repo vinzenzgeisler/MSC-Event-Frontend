@@ -4,6 +4,7 @@ export type DriverForm = {
   firstName: string;
   lastName: string;
   birthdate: string;
+  nationality: string;
   street: string;
   zip: string;
   city: string;
@@ -33,6 +34,9 @@ export type VehicleForm = {
   vehicleHistory: string;
   ownerName: string;
   imageFileName: string;
+  imageS3Key: string;
+  imageUploadState: "idle" | "uploading" | "uploaded" | "error";
+  imageUploadError: string;
 };
 
 export type StartRegistrationForm = {
@@ -89,14 +93,16 @@ export type PublicCreateEntryRequestDto = {
     email: string;
     firstName: string;
     lastName: string;
-    birthdate?: string;
-    street?: string;
-    zip?: string;
-    city?: string;
-    phone?: string;
+    birthdate: string;
+    nationality?: string;
+    street: string;
+    zip: string;
+    city: string;
+    phone: string;
     emergencyContactName: string;
     emergencyContactPhone: string;
     motorsportHistory: string;
+    specialNotes?: string;
   };
   codriver?: {
     email: string;
@@ -104,10 +110,11 @@ export type PublicCreateEntryRequestDto = {
     lastName: string;
     phone?: string;
   };
+  codriverEnabled?: boolean;
   vehicle: {
     vehicleType: VehicleType;
-    make?: string;
-    model?: string;
+    make: string;
+    model: string;
     year?: number;
     displacementCcm: number;
     engineType: string;
@@ -118,7 +125,7 @@ export type PublicCreateEntryRequestDto = {
     startNumberRaw?: string;
     imageS3Key?: string;
   };
-  startNumber?: string;
+  startNumber: string;
   isBackupVehicle?: boolean;
   backupOfEntryId?: Id;
   specialNotes?: string;

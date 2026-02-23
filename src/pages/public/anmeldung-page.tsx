@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { DriverStep } from "@/components/features/registration/driver-step";
 import { StartEntriesStep } from "@/components/features/registration/start-entries-step";
 import { SummaryStep } from "@/components/features/registration/summary-step";
 import { WizardStepper } from "@/components/features/registration/wizard-stepper";
+import { ApiError } from "@/services/api/http-client";
+import { isCountryOption } from "@/lib/countries";
 import { registrationService } from "@/services/registration.service";
 import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegistrationForm, VehicleForm } from "@/types/registration";
 
@@ -29,7 +31,10 @@ function createEmptyVehicle(): VehicleForm {
     brakes: "",
     vehicleHistory: "",
     ownerName: "",
-    imageFileName: ""
+    imageFileName: "",
+    imageS3Key: "",
+    imageUploadState: "idle",
+    imageUploadError: ""
   };
 }
 
@@ -57,6 +62,7 @@ const initialDriver: DriverForm = {
   firstName: "",
   lastName: "",
   birthdate: "",
+  nationality: "",
   street: "",
   zip: "",
   city: "",
@@ -96,11 +102,16 @@ function isValidPhone(value: string) {
   return digits.length >= 6 && digits.length <= 15;
 }
 
-function validateDriverForm(value: DriverForm, m: ReturnType<typeof useAnmeldungI18n>["m"]): Partial<Record<keyof DriverForm, string>> {
+function validateDriverForm(value: DriverForm, locale: string, m: ReturnType<typeof useAnmeldungI18n>["m"]): Partial<Record<keyof DriverForm, string>> {
   const errors: Partial<Record<keyof DriverForm, string>> = {};
   if (!value.firstName.trim()) errors.firstName = m.errors.requiredFirstName;
   if (!value.lastName.trim()) errors.lastName = m.errors.requiredLastName;
   if (!value.birthdate.trim()) errors.birthdate = m.errors.requiredBirthdate;
+  if (!value.nationality.trim()) {
+    errors.nationality = m.errors.requiredNationality;
+  } else if (!isCountryOption(value.nationality, locale)) {
+    errors.nationality = m.errors.invalidNationality;
+  }
   if (!value.street.trim()) errors.street = m.errors.requiredStreet;
   if (!value.city.trim()) errors.city = m.errors.requiredCity;
   if (!value.zip.trim()) {
@@ -145,6 +156,41 @@ type RegistrationDraftStorage = {
   editingId: string | null;
   consent: RegistrationWizardForm["consent"];
 };
+
+function hydrateVehicleForm(value: Partial<VehicleForm> | undefined): VehicleForm {
+  const base = createEmptyVehicle();
+  const next = {
+    ...base,
+    ...(value ?? {})
+  };
+  if (!next.imageS3Key && next.imageUploadState === "uploaded") {
+    next.imageUploadState = "idle";
+  }
+  if (next.imageS3Key && next.imageUploadState === "idle") {
+    next.imageUploadState = "uploaded";
+  }
+  return next;
+}
+
+function hydrateStartForm(value: Partial<StartRegistrationForm> | undefined): StartRegistrationForm {
+  const base = createEmptyStart();
+  return {
+    ...base,
+    ...(value ?? {}),
+    classId: typeof value?.classId === "string" ? value.classId : "",
+    classLabel: typeof value?.classLabel === "string" ? value.classLabel : "",
+    vehicleType: value?.vehicleType === "moto" ? "moto" : "auto",
+    startNumber: typeof value?.startNumber === "string" ? value.startNumber : "",
+    codriverEnabled: Boolean(value?.codriverEnabled),
+    codriver: {
+      ...base.codriver,
+      ...(value?.codriver ?? {})
+    },
+    backupVehicleEnabled: Boolean(value?.backupVehicleEnabled),
+    vehicle: hydrateVehicleForm(value?.vehicle),
+    backupVehicle: hydrateVehicleForm(value?.backupVehicle)
+  };
+}
 
 function validateStartFields(start: StartRegistrationForm, m: ReturnType<typeof useAnmeldungI18n>["m"]): StartFieldErrors {
   const errors: StartFieldErrors = {};
@@ -206,8 +252,10 @@ function validateStartFields(start: StartRegistrationForm, m: ReturnType<typeof 
 }
 
 export function AnmeldungPage() {
-  const { m } = useAnmeldungI18n();
+  const { m, locale } = useAnmeldungI18n();
+  const vehicleUploadSequence = useRef(0);
   const [step, setStep] = useState(1);
+  const [eventLoadState, setEventLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [eventOverview, setEventOverview] = useState<PublicEventOverview | null>(null);
   const [driver, setDriver] = useState<DriverForm>(initialDriver);
   const [starts, setStarts] = useState<StartRegistrationForm[]>([]);
@@ -227,7 +275,31 @@ export function AnmeldungPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    registrationService.getCurrentEvent().then(setEventOverview);
+    let active = true;
+    registrationService
+      .getCurrentEvent()
+      .then((event) => {
+        if (!active) {
+          return;
+        }
+        setEventOverview(event);
+        setEventLoadState("ready");
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        if (error instanceof ApiError && error.status === 404) {
+          setEventLoadState("missing");
+          return;
+        }
+        setEventLoadState("error");
+        setSubmitError(m.page.submitErrorGeneric);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -241,9 +313,9 @@ export function AnmeldungPage() {
         return;
       }
       setStep(parsed.step && parsed.step >= 1 && parsed.step <= 3 ? parsed.step : 1);
-      setDriver(parsed.driver ?? initialDriver);
-      setStarts(Array.isArray(parsed.starts) ? parsed.starts : []);
-      setDraftStart(parsed.draftStart ?? createEmptyStart());
+      setDriver({ ...initialDriver, ...(parsed.driver ?? {}) });
+      setStarts(Array.isArray(parsed.starts) ? parsed.starts.map((item) => hydrateStartForm(item)) : []);
+      setDraftStart(hydrateStartForm(parsed.draftStart));
       setEditingId(parsed.editingId ?? null);
       setConsent(
         parsed.consent ?? {
@@ -285,6 +357,68 @@ export function AnmeldungPage() {
     }
   };
 
+  const handleVehicleImageSelect = async (file: File | null) => {
+    const uploadId = vehicleUploadSequence.current + 1;
+    vehicleUploadSequence.current = uploadId;
+
+    if (!file) {
+      setDraftStart((prev) => ({
+        ...prev,
+        vehicle: {
+          ...prev.vehicle,
+          imageFileName: "",
+          imageS3Key: "",
+          imageUploadState: "idle",
+          imageUploadError: ""
+        }
+      }));
+      return;
+    }
+
+    setDraftStart((prev) => ({
+      ...prev,
+      vehicle: {
+        ...prev.vehicle,
+        imageFileName: file.name,
+        imageS3Key: "",
+        imageUploadState: "uploading",
+        imageUploadError: ""
+      }
+    }));
+
+    try {
+      const uploaded = await registrationService.uploadVehicleImage(file);
+      if (vehicleUploadSequence.current !== uploadId) {
+        return;
+      }
+      setDraftStart((prev) => ({
+        ...prev,
+        vehicle: {
+          ...prev.vehicle,
+          imageFileName: uploaded.fileName,
+          imageS3Key: uploaded.imageS3Key,
+          imageUploadState: "uploaded",
+          imageUploadError: ""
+        }
+      }));
+    } catch (error) {
+      if (vehicleUploadSequence.current !== uploadId) {
+        return;
+      }
+      const fallback = "Bild-Upload fehlgeschlagen.";
+      const message = error instanceof Error && error.message.trim() ? error.message : fallback;
+      setDraftStart((prev) => ({
+        ...prev,
+        vehicle: {
+          ...prev.vehicle,
+          imageS3Key: "",
+          imageUploadState: "error",
+          imageUploadError: message
+        }
+      }));
+    }
+  };
+
   const validateStartNumber = async (): Promise<boolean> => {
     if (!draftStart.classId || !draftStart.startNumber.trim()) {
       return false;
@@ -299,7 +433,14 @@ export function AnmeldungPage() {
     }
 
     setStartNumberState("checking");
-    const validation = await registrationService.validateStartNumber(draftStart.classId, normalizedStartNumber);
+    let validation: Awaited<ReturnType<typeof registrationService.validateStartNumber>>;
+    try {
+      validation = await registrationService.validateStartNumber(draftStart.classId, normalizedStartNumber);
+    } catch {
+      setStartNumberState("idle");
+      setStartNumberHint("");
+      return false;
+    }
 
     if (!validation.validFormat || validation.conflictType === "invalid_format") {
       setStartNumberState("invalid");
@@ -334,7 +475,7 @@ export function AnmeldungPage() {
 
     const isStartNumberValid = await validateStartNumber();
     if (!isStartNumberValid) {
-      setStartError(m.start.startNumberError);
+      setStartError("");
       return;
     }
 
@@ -377,7 +518,10 @@ export function AnmeldungPage() {
   };
 
   const goToStep2 = () => {
-    const errors = validateDriverForm(driver, m);
+    if (!eventOverview) {
+      return;
+    }
+    const errors = validateDriverForm(driver, locale, m);
     setDriverErrors(errors);
     if (Object.keys(errors).length) {
       return;
@@ -399,6 +543,7 @@ export function AnmeldungPage() {
       Boolean(draftStart.vehicle.vehicleHistory.trim()) ||
       Boolean(draftStart.vehicle.ownerName.trim()) ||
       Boolean(draftStart.vehicle.imageFileName.trim()) ||
+      Boolean(draftStart.vehicle.imageS3Key.trim()) ||
       draftStart.codriverEnabled ||
       draftStart.backupVehicleEnabled;
 
@@ -425,7 +570,13 @@ export function AnmeldungPage() {
       setSubmitError(m.page.submitErrorConsent);
       return;
     }
-    const result = await registrationService.submitWizard(form);
+    let result: Awaited<ReturnType<typeof registrationService.submitWizard>>;
+    try {
+      result = await registrationService.submitWizard(form);
+    } catch {
+      setSubmitError(m.page.submitErrorGeneric);
+      return;
+    }
     if (!result.ok) {
       setSubmitError(m.page.submitErrorGeneric);
       return;
@@ -445,6 +596,56 @@ export function AnmeldungPage() {
     }
   };
   const step2BlockedReason = m.page.step2BlockedReason;
+
+  if (eventLoadState === "loading") {
+    return (
+      <div className="space-y-6 pb-28 md:pb-0">
+        <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
+          <div className="inline-flex rounded bg-yellow-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
+            {m.page.openBadge}
+          </div>
+          <h2 className="mt-4 text-2xl font-semibold md:text-3xl">{m.page.title}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
+        </div>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          <CardContent className="p-5 text-sm text-slate-600 md:p-8">Eventdaten werden geladen…</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (eventLoadState === "missing") {
+    return (
+      <div className="space-y-6 pb-28 md:pb-0">
+        <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
+          <h2 className="mt-1 text-2xl font-semibold md:text-3xl">{m.page.title}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
+        </div>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          <CardContent className="space-y-2 p-5 md:p-8">
+            <h3 className="text-lg font-semibold text-slate-900">{m.page.noCurrentEventTitle}</h3>
+            <p className="text-sm text-slate-600">{m.page.noCurrentEventBody}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (eventLoadState === "error") {
+    return (
+      <div className="space-y-6 pb-28 md:pb-0">
+        <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
+          <h2 className="mt-1 text-2xl font-semibold md:text-3xl">{m.page.title}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
+        </div>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          <CardContent className="space-y-2 p-5 md:p-8">
+            <h3 className="text-lg font-semibold text-slate-900">{m.page.submitErrorGeneric}</h3>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-28 md:pb-0">
@@ -493,6 +694,9 @@ export function AnmeldungPage() {
                 if (errorKey) {
                   setStartFieldErrors((prev) => ({ ...prev, [errorKey]: undefined }));
                 }
+              }}
+              onVehicleImageSelect={(file) => {
+                void handleVehicleImageSelect(file);
               }}
               onCodriverFieldChange={(field, value) => {
                 setStartError("");

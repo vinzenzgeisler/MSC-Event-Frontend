@@ -33,6 +33,7 @@ type StartEntriesStepProps = {
   startNumberHint: string;
   onDraftChange: <K extends keyof StartRegistrationForm>(field: K, value: StartRegistrationForm[K]) => void;
   onVehicleFieldChange: (field: keyof StartRegistrationForm["vehicle"], value: string) => void;
+  onVehicleImageSelect: (file: File | null) => void;
   onCodriverFieldChange: (field: keyof StartRegistrationForm["codriver"], value: string) => void;
   onBackupFieldChange: (field: keyof StartRegistrationForm["backupVehicle"], value: string) => void;
   onStartNumberBlur: () => void;
@@ -63,6 +64,7 @@ export function StartEntriesStep({
   startNumberHint,
   onDraftChange,
   onVehicleFieldChange,
+  onVehicleImageSelect,
   onCodriverFieldChange,
   onBackupFieldChange,
   onStartNumberBlur,
@@ -171,8 +173,6 @@ export function StartEntriesStep({
             </div>
             <FieldError message={fieldErrors.startNumber} />
             {startNumberState === "available" && <p className="text-xs text-emerald-700">{m.start.startAvailable}</p>}
-            {startNumberState === "taken" && <p className="text-xs text-destructive">{m.start.startTaken}</p>}
-            {startNumberState === "invalid" && <p className="text-xs text-destructive">{m.start.startInvalid}</p>}
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
@@ -234,11 +234,21 @@ export function StartEntriesStep({
           </div>
           <div className="space-y-2 md:col-span-3">
             <Label>{m.start.upload}</Label>
-            <Input
-              value={draft.vehicle.imageFileName}
-              onChange={(event) => onVehicleFieldChange("imageFileName", event.target.value)}
-              placeholder={m.start.uploadPlaceholder}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="block h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1"
+              onClick={(event) => {
+                (event.currentTarget as HTMLInputElement).value = "";
+              }}
+              onChange={(event) => onVehicleImageSelect(event.target.files?.[0] ?? null)}
             />
+            {draft.vehicle.imageFileName && <p className="text-xs text-slate-600">Datei: {draft.vehicle.imageFileName}</p>}
+            {draft.vehicle.imageUploadState === "uploading" && <p className="text-xs text-slate-600">Upload läuft…</p>}
+            {draft.vehicle.imageUploadState === "uploaded" && <p className="text-xs text-emerald-700">Upload abgeschlossen.</p>}
+            {draft.vehicle.imageUploadState === "error" && (
+              <p className="text-xs text-destructive">{draft.vehicle.imageUploadError || "Upload fehlgeschlagen."}</p>
+            )}
           </div>
         </div>
 
