@@ -41,6 +41,9 @@ export function AdminLoginPage() {
       return;
     }
     if (reason === "mfa_required") {
+      if (import.meta.env.DEV) {
+        return;
+      }
       setError("Für Admin-Zugriffe ist eine Anmeldung mit MFA erforderlich.");
     }
   }, []);
