@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { consumeCognitoReturnTo, handleCognitoCallbackIfPresent, isCognitoConfigured, startCognitoLogin } from "@/app/auth/cognito";
+import { consumeAuthLogoutReason } from "@/app/auth/auth-store";
 import { useAuth } from "@/app/auth/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,29 @@ export function AdminLoginPage() {
   const location = useLocation();
   const redirectTo = (location.state as LocationState | null)?.from?.pathname || "/admin/dashboard";
   const cognitoReady = isCognitoConfigured();
+
+  useEffect(() => {
+    const reason = consumeAuthLogoutReason();
+    if (!reason) {
+      return;
+    }
+
+    if (reason === "session_expired") {
+      setError("Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
+      return;
+    }
+    if (reason === "idle_timeout") {
+      setError("Du wurdest wegen Inaktivität abgemeldet.");
+      return;
+    }
+    if (reason === "session_max_age") {
+      setError("Die maximale Sitzungsdauer wurde erreicht. Bitte erneut anmelden.");
+      return;
+    }
+    if (reason === "mfa_required") {
+      setError("Für Admin-Zugriffe ist eine Anmeldung mit MFA erforderlich.");
+    }
+  }, []);
 
   useEffect(() => {
     const runCallback = async () => {

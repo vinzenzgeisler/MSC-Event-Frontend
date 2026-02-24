@@ -36,3 +36,31 @@ export function extractRoles(token: string): string[] {
 
   return [];
 }
+
+export function hasMfaAuthentication(token: string): boolean {
+  const payload = parseJwtPayload(token);
+  if (!payload) {
+    return false;
+  }
+
+  const amr = payload.amr;
+  if (Array.isArray(amr)) {
+    const containsMfaMarker = amr.some((item) => {
+      if (typeof item !== "string") {
+        return false;
+      }
+      const normalized = item.trim().toLowerCase();
+      return normalized.includes("mfa") || normalized.includes("software_token") || normalized.includes("sms");
+    });
+    if (containsMfaMarker) {
+      return true;
+    }
+  }
+
+  const acr = payload.acr;
+  if (typeof acr === "string" && acr.toLowerCase().includes("mfa")) {
+    return true;
+  }
+
+  return false;
+}

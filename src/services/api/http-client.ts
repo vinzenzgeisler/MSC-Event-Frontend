@@ -1,4 +1,4 @@
-import { getAuthToken } from "@/app/auth/auth-store";
+import { getAuthToken, refreshAuthSession } from "@/app/auth/auth-store";
 
 export type ApiFieldError = {
   field: string;
@@ -69,18 +69,30 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const token = options.auth === false ? null : getAuthToken();
-  const headers: Record<string, string> = {
-    ...(options.body ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers ?? {})
+  const sendRequest = async (token: string | null) => {
+    const headers: Record<string, string> = {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {})
+    };
+
+    return fetch(buildUrl(path, options.query), {
+      method: options.method || "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined
+    });
   };
 
-  const response = await fetch(buildUrl(path, options.query), {
-    method: options.method || "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
+  const token = options.auth === false ? null : getAuthToken();
+  let response = await sendRequest(token);
+
+  if (options.auth !== false && response.status === 401 && token) {
+    const refreshed = await refreshAuthSession();
+    const refreshedToken = refreshed?.apiToken ?? getAuthToken();
+    if (refreshedToken && refreshedToken !== token) {
+      response = await sendRequest(refreshedToken);
+    }
+  }
 
   const parsed = (await parseResponseBody(response)) as ApiErrorPayload | T | null;
   if (!response.ok) {

@@ -120,6 +120,24 @@ type OAuthTokenResponse = {
   error_description?: string;
 };
 
+async function requestOAuthToken(body: URLSearchParams): Promise<OAuthTokenResponse> {
+  const { domain } = getCognitoConfig();
+  const response = await fetch(`${domain}/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: body.toString()
+  });
+
+  const payload = (await response.json()) as OAuthTokenResponse;
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error_description || payload.error || "Cognito Token-Austausch fehlgeschlagen.");
+  }
+
+  return payload;
+}
+
 export async function handleCognitoCallbackIfPresent(currentHref = window.location.href): Promise<AuthSession | null> {
   if (!isCognitoConfigured()) {
     return null;
@@ -148,7 +166,7 @@ export async function handleCognitoCallbackIfPresent(currentHref = window.locati
     throw new Error("Ungültiger Cognito Callback-Status. Bitte Login erneut starten.");
   }
 
-  const { domain, clientId, redirectUri } = getCognitoConfig();
+  const { clientId, redirectUri } = getCognitoConfig();
 
   const body = new URLSearchParams();
   body.set("grant_type", "authorization_code");
@@ -157,19 +175,11 @@ export async function handleCognitoCallbackIfPresent(currentHref = window.locati
   body.set("redirect_uri", redirectUri);
   body.set("code_verifier", verifier);
 
-  const response = await fetch(`${domain}/oauth2/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: body.toString()
-  });
-
-  const payload = (await response.json()) as OAuthTokenResponse;
-  clearPkceState();
-
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error_description || payload.error || "Cognito Token-Austausch fehlgeschlagen.");
+  let payload: OAuthTokenResponse;
+  try {
+    payload = await requestOAuthToken(body);
+  } finally {
+    clearPkceState();
   }
 
   const apiToken = payload.access_token || payload.id_token;
@@ -186,6 +196,44 @@ export async function handleCognitoCallbackIfPresent(currentHref = window.locati
     refreshToken: payload.refresh_token,
     expiresAt: Date.now() + expiresInSeconds * 1000,
     provider: "cognito"
+  };
+}
+
+export async function refreshCognitoSession(session: AuthSession): Promise<AuthSession> {
+  if (!isCognitoConfigured()) {
+    throw new Error("Cognito ist nicht konfiguriert.");
+  }
+  if (session.provider !== "cognito") {
+    throw new Error("Session ist kein Cognito-Login.");
+  }
+  if (!session.refreshToken) {
+    throw new Error("Kein Refresh Token verfügbar.");
+  }
+
+  const { clientId } = getCognitoConfig();
+
+  const body = new URLSearchParams();
+  body.set("grant_type", "refresh_token");
+  body.set("client_id", clientId);
+  body.set("refresh_token", session.refreshToken);
+
+  const payload = await requestOAuthToken(body);
+  const nextApiToken = payload.access_token || payload.id_token || session.apiToken;
+  if (!nextApiToken) {
+    throw new Error("Cognito Refresh-Antwort enthält kein verwendbares Access Token.");
+  }
+
+  const expiresInSeconds = typeof payload.expires_in === "number" ? payload.expires_in : 3600;
+  const now = Date.now();
+
+  return {
+    ...session,
+    apiToken: nextApiToken,
+    roleToken: payload.id_token || payload.access_token || session.roleToken || nextApiToken,
+    idToken: payload.id_token || session.idToken,
+    refreshToken: payload.refresh_token || session.refreshToken,
+    expiresAt: now + expiresInSeconds * 1000,
+    lastActivityAt: now
   };
 }
 
