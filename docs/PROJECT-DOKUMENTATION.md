@@ -116,6 +116,11 @@ Die Sprachwahl gilt für den kompletten Anmeldebereich (Header, Formulare, Hinwe
 - Status-/Zahlungs-/Check-in-Badges
 - Quick Actions je Eintrag
 - Filterzustand bleibt über URL-Query-Parameter erhalten
+- Cursor-basiertes Laden mit kleiner Page-Size (initial schnell, dann inkrementell)
+- Endlos-Scroll mit Fallback-Button „Weitere Nennungen laden“
+- Debounced Suche (reduzierte Request-Last bei Eingaben)
+- Manueller Refresh + Auto-Refresh im Abstand von 5 Minuten
+- Session-Cache für schnelle Zurück-Navigation aus der Detailansicht
 
 ### 7.3 Nennungs-Detail
 
