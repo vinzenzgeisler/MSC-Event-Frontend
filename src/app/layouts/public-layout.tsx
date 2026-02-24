@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { AnmeldungI18nProvider, type AnmeldungLocale, useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
-import { formatEuro, resolvePublicPricing } from "@/lib/public-pricing";
 import { ApiError } from "@/services/api/http-client";
-import { getPublicCurrentEvent } from "@/services/api/event-context";
+import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
+import { registrationService } from "@/services/registration.service";
+import type { PublicEventOverview } from "@/types/registration";
 
 type HeaderEvent = {
   name: string;
   startsAt: string;
   endsAt: string;
   registrationCloseAt: string | null;
+  pricingRules: PublicEventOverview["pricingRules"];
 };
 
 const PUBLIC_WEBSITE_URL = "https://msc-oberlausitzer-dreilaendereck.eu";
@@ -21,9 +23,26 @@ function toIntlLocale(locale: AnmeldungLocale) {
   return "en-US";
 }
 
+function eventDateTitle(locale: AnmeldungLocale) {
+  if (locale === "en") return "Event date";
+  if (locale === "cz") return "Datum akce";
+  return "Eventdatum";
+}
+
+function parseEventDate(value: string): Date | null {
+  const datePrefix = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (datePrefix) {
+    const [, year, month, day] = datePrefix;
+    const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function formatDate(value: string, locale: AnmeldungLocale) {
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
+  const parsed = parseEventDate(value);
+  if (!parsed) {
     return value;
   }
   return new Intl.DateTimeFormat(toIntlLocale(locale), {
@@ -67,10 +86,26 @@ function phaseLabel(locale: AnmeldungLocale, phase: "early" | "late") {
   return phase === "early" ? "Frühphase" : "Spätphase";
 }
 
+function deadlineLabel(locale: AnmeldungLocale, phase: "early" | "late") {
+  if (locale === "en") {
+    return phase === "early" ? "Early registration until" : "Registration deadline";
+  }
+  if (locale === "cz") {
+    return phase === "early" ? "Raná registrace do" : "Uzávěrka registrace";
+  }
+  return phase === "early" ? "Frühmelder bis" : "Meldeschluss";
+}
+
 function priceTitle(locale: AnmeldungLocale) {
   if (locale === "en") return "Entry fee";
   if (locale === "cz") return "Startovné";
   return "Startgeld";
+}
+
+function priceFallback(locale: AnmeldungLocale) {
+  if (locale === "en") return "Will be published with event data";
+  if (locale === "cz") return "Bude zveřejněno s daty akce";
+  return "Wird mit den Eventdaten veröffentlicht";
 }
 
 function PublicLayoutContent() {
@@ -79,16 +114,18 @@ function PublicLayoutContent() {
 
   useEffect(() => {
     let active = true;
-    getPublicCurrentEvent()
+    registrationService
+      .getCurrentEvent()
       .then((response) => {
         if (!active) {
           return;
         }
         setHeaderEvent({
-          name: response.event.name,
-          startsAt: response.event.startsAt,
-          endsAt: response.event.endsAt,
-          registrationCloseAt: response.event.registrationCloseAt
+          name: response.name,
+          startsAt: response.startsAt,
+          endsAt: response.endsAt,
+          registrationCloseAt: response.registrationCloseAt,
+          pricingRules: response.pricingRules
         });
       })
       .catch((error) => {
@@ -116,34 +153,39 @@ function PublicLayoutContent() {
   }, [headerEvent, locale]);
 
   const headerTitle = headerEvent?.name || "";
-  const pricing = useMemo(() => {
+  const pricingSnapshot = useMemo(() => {
     if (!headerEvent) {
       return null;
     }
-    return resolvePublicPricing(headerEvent.registrationCloseAt);
+    return resolvePublicPricing(headerEvent.pricingRules, headerEvent.registrationCloseAt);
   }, [headerEvent]);
 
   const headerPrice = useMemo(() => {
-    if (!pricing || pricing.basePriceEur === null) {
-      return "";
+    if (!pricingSnapshot?.entryPrice) {
+      return priceFallback(locale);
     }
-    if (pricing.phase === "early" || pricing.phase === "late") {
-      return `${formatEuro(locale, pricing.basePriceEur)} (${phaseLabel(locale, pricing.phase)})`;
+    const formatted = formatPriceRange(locale, pricingSnapshot.entryPrice);
+    if (pricingSnapshot.phase === "early" || pricingSnapshot.phase === "late") {
+      return `${formatted} (${phaseLabel(locale, pricingSnapshot.phase)})`;
     }
-    return formatEuro(locale, pricing.basePriceEur);
-  }, [locale, pricing]);
+    return formatted;
+  }, [locale, pricingSnapshot]);
 
   const headerDeadline = useMemo(() => {
-    if (!pricing || !pricing.deadlineAt) {
+    if (!pricingSnapshot || !pricingSnapshot.deadlineAt) {
       return "";
     }
-    if (pricing.phase === "closed") {
+    if (pricingSnapshot.phase === "closed") {
       if (locale === "en") return "Registration closed";
       if (locale === "cz") return "Registrace uzavřena";
       return "Anmeldung geschlossen";
     }
-    return formatDateTime(pricing.deadlineAt.toISOString(), locale);
-  }, [locale, pricing]);
+    const formattedDate = formatDateTime(pricingSnapshot.deadlineAt.toISOString(), locale);
+    if (pricingSnapshot.phase === "early" || pricingSnapshot.phase === "late") {
+      return `${deadlineLabel(locale, pricingSnapshot.phase)}: ${formattedDate}`;
+    }
+    return formattedDate;
+  }, [locale, pricingSnapshot]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -152,7 +194,7 @@ function PublicLayoutContent() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             {headerDateBadge && (
               <div className="inline-flex rounded bg-yellow-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
-                {headerDateBadge}
+                {eventDateTitle(locale)}: {headerDateBadge}
               </div>
             )}
             <div className="rounded-full border border-white/35 bg-white/10 p-1">

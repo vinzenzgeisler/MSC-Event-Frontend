@@ -4,6 +4,7 @@ import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
 import type {
   PublicCreateEntryRequestDto,
   PublicEventOverview,
+  PublicPricingRules,
   RegistrationSubmitResult,
   RegistrationWizardForm,
   StartNumberValidationResult
@@ -135,6 +136,93 @@ type PublicVerifyEmailResponse = {
   alreadyVerified?: boolean;
 };
 
+function asNonNegativeNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+  return null;
+}
+
+function normalizePricingRules(value: unknown): PublicPricingRules | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+  const earlyDeadline = typeof source.earlyDeadline === "string" ? source.earlyDeadline : null;
+  const lateFeeCents = asNonNegativeNumber(source.lateFeeCents);
+  const secondVehicleDiscountCents = asNonNegativeNumber(source.secondVehicleDiscountCents) ?? 0;
+  const currency = typeof source.currency === "string" && source.currency.trim() ? source.currency : "EUR";
+  const classRulesSource = Array.isArray(source.classRules) ? source.classRules : [];
+
+  if (!earlyDeadline || lateFeeCents === null || classRulesSource.length === 0) {
+    return null;
+  }
+
+  const classRules = classRulesSource
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const row = item as Record<string, unknown>;
+      const classId =
+        typeof row.classId === "string" ? row.classId : typeof row.eventClassId === "string" ? row.eventClassId : null;
+      const baseFeeCents = asNonNegativeNumber(row.baseFeeCents);
+      if (!classId || baseFeeCents === null) {
+        return null;
+      }
+      return {
+        classId,
+        className: typeof row.className === "string" && row.className.trim() ? row.className : classId,
+        baseFeeCents
+      };
+    })
+    .filter(Boolean) as PublicPricingRules["classRules"];
+
+  if (!classRules.length) {
+    return null;
+  }
+
+  return {
+    earlyDeadline,
+    lateFeeCents,
+    secondVehicleDiscountCents,
+    currency,
+    classRules
+  };
+}
+
+function extractPublicPricingRules(response: unknown): PublicPricingRules | null {
+  if (!response || typeof response !== "object") {
+    return null;
+  }
+
+  const root = response as Record<string, unknown>;
+  const rootPricingRules = normalizePricingRules(root.pricingRules);
+  if (rootPricingRules) {
+    return rootPricingRules;
+  }
+  const rootPricing = normalizePricingRules(root.pricing);
+  if (rootPricing) {
+    return rootPricing;
+  }
+
+  const eventNode = root.event;
+  if (!eventNode || typeof eventNode !== "object") {
+    return null;
+  }
+  const eventRecord = eventNode as Record<string, unknown>;
+  const eventPricingRules = normalizePricingRules(eventRecord.pricingRules);
+  if (eventPricingRules) {
+    return eventPricingRules;
+  }
+  return normalizePricingRules(eventRecord.pricing);
+}
+
 export const registrationService = {
   async getCurrentEvent(): Promise<PublicEventOverview> {
     if (isMockApiEnabled()) {
@@ -151,6 +239,7 @@ export const registrationService = {
       registrationOpen: response.registration.isOpen,
       registrationOpenAt: response.event.registrationOpenAt,
       registrationCloseAt: response.event.registrationCloseAt,
+      pricingRules: extractPublicPricingRules(response),
       classes: response.classes.map((item) => ({
         id: item.id,
         name: item.name,

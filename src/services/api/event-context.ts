@@ -23,6 +23,8 @@ type PublicCurrentEventResponse = {
     isOpen: boolean;
     reason: string | null;
   };
+  pricingRules?: unknown;
+  pricing?: unknown;
 };
 
 type AdminCurrentEventResponse = {

@@ -9,6 +9,18 @@ export const mockPublicEvent: PublicEventOverview = {
   registrationOpen: true,
   registrationOpenAt: "2026-05-01T08:00:00.000Z",
   registrationCloseAt: "2026-08-31T22:00:00.000Z",
+  pricingRules: {
+    earlyDeadline: "2026-07-31T22:00:00.000Z",
+    lateFeeCents: 2500,
+    secondVehicleDiscountCents: 2000,
+    currency: "EUR",
+    classRules: [
+      { classId: "cls-auto-elite", className: "Auto Elite", baseFeeCents: 18000 },
+      { classId: "cls-auto-pro", className: "Auto Pro", baseFeeCents: 18000 },
+      { classId: "cls-moto-open", className: "Moto Open", baseFeeCents: 15000 },
+      { classId: "cls-moto-legend", className: "Moto Legend", baseFeeCents: 15000 }
+    ]
+  },
   classes: [
     { id: "cls-auto-elite", name: "Auto Elite", vehicleType: "auto" },
     { id: "cls-auto-pro", name: "Auto Pro", vehicleType: "auto" },

@@ -28,12 +28,12 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
         <h3 className="md:col-span-2 text-lg font-semibold text-slate-900">{m.driver.title}</h3>
         <div className="space-y-2">
           <Label htmlFor="driver-firstName">{m.driver.firstName}</Label>
-          <Input id="driver-firstName" value={value.firstName} onChange={(event) => onChange("firstName", event.target.value)} placeholder="z. B. Max" />
+          <Input id="driver-firstName" value={value.firstName} onChange={(event) => onChange("firstName", event.target.value)} />
           <FieldError message={errors.firstName} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-lastName">{m.driver.lastName}</Label>
-          <Input id="driver-lastName" value={value.lastName} onChange={(event) => onChange("lastName", event.target.value)} placeholder="z. B. Mustermann" />
+          <Input id="driver-lastName" value={value.lastName} onChange={(event) => onChange("lastName", event.target.value)} />
           <FieldError message={errors.lastName} />
         </div>
         <div className="space-y-2">
@@ -76,7 +76,7 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
             type="email"
             value={value.email}
             onChange={(event) => onChange("email", event.target.value)}
-            placeholder="z. B. max.mustermann@example.com"
+            placeholder="team@example.com"
           />
           <FieldError message={errors.email} />
         </div>
@@ -86,17 +86,17 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
         <h3 className="md:col-span-3 text-lg font-semibold text-slate-900">{m.driver.addressTitle}</h3>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-street">{m.driver.street}</Label>
-          <Input id="driver-street" value={value.street} onChange={(event) => onChange("street", event.target.value)} placeholder="z. B. Musterstraße 12" />
+          <Input id="driver-street" value={value.street} onChange={(event) => onChange("street", event.target.value)} placeholder="Musterstraße 12" />
           <FieldError message={errors.street} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-zip">{m.driver.zip}</Label>
-          <Input id="driver-zip" value={value.zip} onChange={(event) => onChange("zip", event.target.value)} placeholder="z. B. 02763" />
+          <Input id="driver-zip" value={value.zip} onChange={(event) => onChange("zip", event.target.value)} placeholder="02763" />
           <FieldError message={errors.zip} />
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-city">{m.driver.city}</Label>
-          <Input id="driver-city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder="z. B. Zittau" />
+          <Input id="driver-city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder="Zittau" />
           <FieldError message={errors.city} />
         </div>
       </section>
@@ -109,7 +109,6 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
             id="driver-emergency-name"
             value={value.emergencyContactName}
             onChange={(event) => onChange("emergencyContactName", event.target.value)}
-            placeholder="z. B. Erika Mustermann"
           />
           <FieldError message={errors.emergencyContactName} />
         </div>

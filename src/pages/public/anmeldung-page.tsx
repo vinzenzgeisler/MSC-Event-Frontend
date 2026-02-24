@@ -7,7 +7,7 @@ import { StartEntriesStep } from "@/components/features/registration/start-entri
 import { SummaryStep } from "@/components/features/registration/summary-step";
 import { WizardStepper } from "@/components/features/registration/wizard-stepper";
 import { ApiError } from "@/services/api/http-client";
-import { formatEuro, resolvePublicPricing } from "@/lib/public-pricing";
+import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
 import { isCountryOption } from "@/lib/countries";
 import { registrationService } from "@/services/registration.service";
 import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegistrationForm, VehicleForm } from "@/types/registration";
@@ -342,12 +342,12 @@ export function AnmeldungPage() {
       return "";
     }
 
-    const pricing = resolvePublicPricing(eventOverview.registrationCloseAt);
-    if (pricing.secondVehiclePriceEur === null) {
+    const pricing = resolvePublicPricing(eventOverview.pricingRules, eventOverview.registrationCloseAt);
+    if (!pricing.secondVehiclePrice) {
       return "";
     }
 
-    const amount = formatEuro(locale, pricing.secondVehiclePriceEur);
+    const amount = formatPriceRange(locale, pricing.secondVehiclePrice);
     if (locale === "en") {
       return `Price for a second vehicle entry: ${amount}.`;
     }

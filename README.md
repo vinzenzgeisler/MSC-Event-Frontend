@@ -25,10 +25,6 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 
 - `VITE_API_BASE_URL` API-Basis-URL
 - `VITE_PUBLIC_EVENT_ID` optional feste Event-ID (überschreibt `/events/current`)
-- `VITE_PUBLIC_PRICE_EARLY_EUR` optionaler Frühphasen-Preis für Header/Anmeldung (z. B. `180`)
-- `VITE_PUBLIC_PRICE_LATE_EUR` optionaler Spätphasen-Preis für Header/Anmeldung (z. B. `220`)
-- `VITE_PUBLIC_PRICE_PHASE_SWITCH_AT` optionales ISO-Datum für Wechsel Früh- auf Spätphase
-- `VITE_PUBLIC_PRICE_SECOND_VEHICLE_EUR` optionaler Preis für zweites Fahrzeug (Anzeige in Anmeldung)
 - `VITE_COGNITO_ENABLED` `true|false`
 - `VITE_COGNITO_DOMAIN` z. B. `https://<domain>.auth.<region>.amazoncognito.com`
 - `VITE_COGNITO_CLIENT_ID` Cognito App Client ID (ohne Secret)

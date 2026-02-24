@@ -180,12 +180,12 @@ export function StartEntriesStep({
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label>{m.start.make}</Label>
-            <Input value={draft.vehicle.make} onChange={(event) => onVehicleFieldChange("make", event.target.value)} placeholder="z. B. BMW" />
+            <Input value={draft.vehicle.make} onChange={(event) => onVehicleFieldChange("make", event.target.value)} placeholder="BMW" />
             <FieldError message={fieldErrors.make} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.model}</Label>
-            <Input value={draft.vehicle.model} onChange={(event) => onVehicleFieldChange("model", event.target.value)} placeholder="z. B. M3 E30" />
+            <Input value={draft.vehicle.model} onChange={(event) => onVehicleFieldChange("model", event.target.value)} placeholder="M3 E30" />
             <FieldError message={fieldErrors.model} />
           </div>
           <div className="space-y-2">
@@ -193,7 +193,7 @@ export function StartEntriesStep({
             <Input
               value={draft.vehicle.year}
               onChange={(event) => onVehicleFieldChange("year", event.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="z. B. 1989"
+              placeholder="1989"
             />
             <FieldError message={fieldErrors.year} />
           </div>
@@ -202,13 +202,13 @@ export function StartEntriesStep({
             <Input
               value={draft.vehicle.displacementCcm}
               onChange={(event) => onVehicleFieldChange("displacementCcm", event.target.value.replace(/\D/g, "").slice(0, 5))}
-              placeholder="z. B. 1998"
+              placeholder="1998"
             />
             <FieldError message={fieldErrors.displacementCcm} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.engine}</Label>
-            <Input value={draft.vehicle.engineType} onChange={(event) => onVehicleFieldChange("engineType", event.target.value)} placeholder="z. B. BMW S14" />
+            <Input value={draft.vehicle.engineType} onChange={(event) => onVehicleFieldChange("engineType", event.target.value)} placeholder="BMW S14" />
             <FieldError message={fieldErrors.engineType} />
           </div>
           <div className="space-y-2">
@@ -222,12 +222,12 @@ export function StartEntriesStep({
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label>{m.start.brakes}</Label>
-            <Input value={draft.vehicle.brakes} onChange={(event) => onVehicleFieldChange("brakes", event.target.value)} placeholder="z. B. Brembo 4-Kolben" />
+            <Input value={draft.vehicle.brakes} onChange={(event) => onVehicleFieldChange("brakes", event.target.value)} placeholder="Brembo 4-Kolben" />
             <FieldError message={fieldErrors.brakes} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.owner}</Label>
-            <Input value={draft.vehicle.ownerName} onChange={(event) => onVehicleFieldChange("ownerName", event.target.value)} placeholder="z. B. Max Mustermann" />
+            <Input value={draft.vehicle.ownerName} onChange={(event) => onVehicleFieldChange("ownerName", event.target.value)} placeholder="Teamname / Haltername" />
           </div>
           <div className="space-y-2 md:col-span-3">
             <Label>{m.start.history}</Label>
@@ -235,7 +235,7 @@ export function StartEntriesStep({
               className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={draft.vehicle.vehicleHistory}
               onChange={(event) => onVehicleFieldChange("vehicleHistory", event.target.value)}
-              placeholder="z. B. Historie, Umbauten, besondere technische Merkmale"
+              placeholder="Historie, Umbauten, besondere technische Merkmale"
             />
             <p className="text-xs text-slate-500">{m.start.historyHint}</p>
             <FieldError message={fieldErrors.vehicleHistory} />
@@ -273,17 +273,17 @@ export function StartEntriesStep({
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>{m.start.codriverFirstName}</Label>
-                <Input value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="z. B. Anna" />
+                <Input value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="Anna" />
                 <FieldError message={fieldErrors.codriverFirstName} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverLastName}</Label>
-                <Input value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="z. B. Beispiel" />
+                <Input value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="Beispiel" />
                 <FieldError message={fieldErrors.codriverLastName} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverEmail}</Label>
-                <Input value={draft.codriver.email} onChange={(event) => onCodriverFieldChange("email", event.target.value)} placeholder="z. B. anna@example.com" />
+                <Input value={draft.codriver.email} onChange={(event) => onCodriverFieldChange("email", event.target.value)} placeholder="anna@example.com" />
                 <FieldError message={fieldErrors.codriverEmail} />
               </div>
               <div className="space-y-2">
@@ -315,23 +315,23 @@ export function StartEntriesStep({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{m.start.backupMake}</Label>
-                  <Input value={draft.backupVehicle.make} onChange={(event) => onBackupFieldChange("make", event.target.value)} placeholder="z. B. BMW" />
+                  <Input value={draft.backupVehicle.make} onChange={(event) => onBackupFieldChange("make", event.target.value)} placeholder="BMW" />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupModel}</Label>
-                  <Input value={draft.backupVehicle.model} onChange={(event) => onBackupFieldChange("model", event.target.value)} placeholder="z. B. 2002 tii" />
+                  <Input value={draft.backupVehicle.model} onChange={(event) => onBackupFieldChange("model", event.target.value)} placeholder="2002 tii" />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupDisplacement}</Label>
                   <Input
                     value={draft.backupVehicle.displacementCcm}
                     onChange={(event) => onBackupFieldChange("displacementCcm", event.target.value.replace(/\D/g, "").slice(0, 5))}
-                    placeholder="z. B. 1990"
+                    placeholder="1990"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupEngine}</Label>
-                  <Input value={draft.backupVehicle.engineType} onChange={(event) => onBackupFieldChange("engineType", event.target.value)} placeholder="z. B. BMW M10" />
+                  <Input value={draft.backupVehicle.engineType} onChange={(event) => onBackupFieldChange("engineType", event.target.value)} placeholder="BMW M10" />
                 </div>
               </div>
             )}

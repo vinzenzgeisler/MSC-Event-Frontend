@@ -70,6 +70,20 @@ export type PublicEventClass = {
   vehicleType: VehicleType;
 };
 
+export type PublicPricingClassRule = {
+  classId: Id;
+  className: string;
+  baseFeeCents: number;
+};
+
+export type PublicPricingRules = {
+  earlyDeadline: string;
+  lateFeeCents: number;
+  secondVehicleDiscountCents: number;
+  currency: string;
+  classRules: PublicPricingClassRule[];
+};
+
 export type PublicEventOverview = {
   id: Id;
   name: string;
@@ -79,6 +93,7 @@ export type PublicEventOverview = {
   registrationOpen: boolean;
   registrationOpenAt: string | null;
   registrationCloseAt: string | null;
+  pricingRules: PublicPricingRules | null;
   classes: PublicEventClass[];
 };
 
