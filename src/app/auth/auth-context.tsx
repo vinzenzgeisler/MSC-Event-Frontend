@@ -55,8 +55,7 @@ function readPositiveNumberEnv(name: string, fallback: number): number {
 
 const IDLE_TIMEOUT_MS = readPositiveNumberEnv("VITE_AUTH_IDLE_TIMEOUT_MINUTES", DEFAULT_IDLE_TIMEOUT_MINUTES) * 60 * 1000;
 const MAX_SESSION_AGE_MS = readPositiveNumberEnv("VITE_AUTH_MAX_SESSION_HOURS", DEFAULT_MAX_SESSION_HOURS) * 60 * 60 * 1000;
-const REQUIRE_ADMIN_MFA =
-  !import.meta.env.DEV && String(import.meta.env.VITE_AUTH_REQUIRE_ADMIN_MFA || "false").toLowerCase() === "true";
+const REQUIRE_ADMIN_MFA = String(import.meta.env.VITE_AUTH_REQUIRE_ADMIN_MFA || "false").toLowerCase() === "true";
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
