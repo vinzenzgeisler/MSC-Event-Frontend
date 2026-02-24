@@ -101,7 +101,7 @@ export const communicationService = {
       body: {
         eventId,
         entryId,
-        eventType: "accepted_open_payment",
+        eventType: "registration_received",
         allowDuplicate: options?.allowDuplicate === true ? true : undefined
       }
     });

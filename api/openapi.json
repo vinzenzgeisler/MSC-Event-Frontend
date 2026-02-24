@@ -993,11 +993,20 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
           "401": {
             "$ref": "#/components/responses/Error401"
           },
           "403": {
             "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
         },
         "operationId": "patchAdminEntriesEntryIdStatus",
@@ -1480,11 +1489,27 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
           "401": {
             "$ref": "#/components/responses/Error401"
           },
           "403": {
             "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "description": "Duplicate lifecycle queue request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleDuplicateRequestErrorResponse"
+                }
+              }
+            }
           }
         },
         "operationId": "postAdminMailLifecycleQueue",
@@ -2364,7 +2389,42 @@
             "format": "uuid"
           }
         }
-      ]
+      ],
+      "delete": {
+        "operationId": "deleteAdminEntry",
+        "responses": {
+          "200": {
+            "description": "Entry deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEntryDeleteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     },
     "/admin/mail/outbox": {
       "get": {
@@ -3583,6 +3643,11 @@
           "sendAfter": {
             "type": "string",
             "format": "date-time"
+          },
+          "allowDuplicate": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, bypasses dedupe and enqueues a new lifecycle mail even if a matching request already exists."
           }
         },
         "required": [
@@ -5042,7 +5107,8 @@
           "ok",
           "entryId",
           "registrationStatus",
-          "verificationToken"
+          "verificationToken",
+          "confirmationMailSent"
         ]
       },
       "AdminExportCreateResponse": {
@@ -6239,6 +6305,89 @@
         "required": [
           "ok",
           "pricingRules"
+        ]
+      },
+      "AdminEntryDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "deletedEntryId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "ok",
+          "deletedEntryId"
+        ]
+      },
+      "LifecycleDuplicateRequestErrorResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "DUPLICATE_REQUEST"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "existingOutboxId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "blockedUntil": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true
+          },
+          "fieldErrors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field",
+                "code",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "code",
+          "message"
         ]
       }
     }

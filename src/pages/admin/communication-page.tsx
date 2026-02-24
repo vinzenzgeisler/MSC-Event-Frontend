@@ -19,6 +19,7 @@ const initialForm: BroadcastForm = {
   templateKey: "",
   subjectOverride: ""
 };
+const OUTBOX_PREVIEW_LIMIT = 5;
 
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
@@ -26,6 +27,8 @@ export function AdminCommunicationPage() {
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
+  const [eventName, setEventName] = useState("");
+  const [outboxExpanded, setOutboxExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const showToast = (message: string) => {
@@ -41,8 +44,23 @@ export function AdminCommunicationPage() {
     }
   };
 
+  const resolveSubject = (subject: string) => {
+    if (!subject.includes("{{")) {
+      return subject;
+    }
+    const fallback = eventName.trim() || "Aktuelles Event";
+    return subject.replace(/\{\{\s*eventName\s*\}\}/gi, fallback);
+  };
+  const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
+  const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
+
   useEffect(() => {
     void loadOutbox();
+
+    adminMetaService
+      .getCurrentEvent()
+      .then((event) => setEventName(event.name ?? ""))
+      .catch(() => setEventName(""));
 
     adminMetaService
       .listClassOptions()
@@ -137,9 +155,9 @@ export function AdminCommunicationPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2 md:hidden">
-            {outbox.map((item) => (
+            {visibleOutbox.map((item) => (
               <div key={item.id} className="rounded-lg border p-3">
-                <div className="font-medium text-slate-900">{item.subject}</div>
+                <div className="font-medium text-slate-900">{resolveSubject(item.subject)}</div>
                 <div className="text-xs text-slate-600">{item.recipient}</div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <Badge className={outboxStatusClasses(item.status)} variant="outline">
@@ -183,10 +201,10 @@ export function AdminCommunicationPage() {
                 </tr>
               </thead>
               <tbody>
-                {outbox.map((item) => (
+                {visibleOutbox.map((item) => (
                   <tr key={item.id} className="border-t">
                     <td className="px-3 py-2">{item.recipient}</td>
-                    <td className="px-3 py-2">{item.subject}</td>
+                    <td className="px-3 py-2">{resolveSubject(item.subject)}</td>
                     <td className="px-3 py-2">
                       <Badge className={outboxStatusClasses(item.status)} variant="outline">
                         {outboxStatusLabel(item.status)}
@@ -220,6 +238,16 @@ export function AdminCommunicationPage() {
               </tbody>
             </table>
           </div>
+          {hiddenOutboxCount > 0 && !outboxExpanded && (
+            <Button type="button" variant="outline" onClick={() => setOutboxExpanded(true)}>
+              Weitere {hiddenOutboxCount} Einträge anzeigen
+            </Button>
+          )}
+          {outboxExpanded && outbox.length > OUTBOX_PREVIEW_LIMIT && (
+            <Button type="button" variant="outline" onClick={() => setOutboxExpanded(false)}>
+              Auf letzte {OUTBOX_PREVIEW_LIMIT} Einträge reduzieren
+            </Button>
+          )}
         </CardContent>
       </Card>
 
