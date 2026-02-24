@@ -69,7 +69,7 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
           </datalist>
           <FieldError message={errors.nationality} />
         </div>
-        <div className="space-y-2 md:col-span-2">
+        <div className="space-y-2">
           <Label htmlFor="driver-email">{m.driver.email}</Label>
           <Input
             id="driver-email"
@@ -101,16 +101,25 @@ export function DriverStep({ value, errors, onChange }: DriverStepProps) {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <h3 className="md:col-span-2 text-lg font-semibold text-slate-900">{m.driver.emergencyTitle}</h3>
+      <section className="grid gap-4 md:grid-cols-3">
+        <h3 className="md:col-span-3 text-lg font-semibold text-slate-900">{m.driver.emergencyTitle}</h3>
         <div className="space-y-2">
-          <Label htmlFor="driver-emergency-name">{m.driver.emergencyName}</Label>
+          <Label htmlFor="driver-emergency-firstName">{m.driver.emergencyFirstName}</Label>
           <Input
-            id="driver-emergency-name"
-            value={value.emergencyContactName}
-            onChange={(event) => onChange("emergencyContactName", event.target.value)}
+            id="driver-emergency-firstName"
+            value={value.emergencyContactFirstName}
+            onChange={(event) => onChange("emergencyContactFirstName", event.target.value)}
           />
-          <FieldError message={errors.emergencyContactName} />
+          <FieldError message={errors.emergencyContactFirstName} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="driver-emergency-lastName">{m.driver.emergencyLastName}</Label>
+          <Input
+            id="driver-emergency-lastName"
+            value={value.emergencyContactLastName}
+            onChange={(event) => onChange("emergencyContactLastName", event.target.value)}
+          />
+          <FieldError message={errors.emergencyContactLastName} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-emergency-phone">{m.driver.emergencyPhone}</Label>

@@ -10,7 +10,8 @@ export type DriverForm = {
   city: string;
   phone: string;
   email: string;
-  emergencyContactName: string;
+  emergencyContactFirstName: string;
+  emergencyContactLastName: string;
   emergencyContactPhone: string;
   motorsportHistory: string;
   specialNotes: string;

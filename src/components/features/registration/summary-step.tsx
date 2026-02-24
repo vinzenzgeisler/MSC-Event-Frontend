@@ -13,6 +13,7 @@ type SummaryStepProps = {
 
 export function SummaryStep({ form, submitError, successMessage, onConsentChange, onSubmit }: SummaryStepProps) {
   const { m } = useAnmeldungI18n();
+  const emergencyName = `${form.driver.emergencyContactFirstName} ${form.driver.emergencyContactLastName}`.replace(/\s+/g, " ").trim();
 
   return (
     <div className="space-y-6">
@@ -25,7 +26,7 @@ export function SummaryStep({ form, submitError, successMessage, onConsentChange
           {m.driver.nationality}: {form.driver.nationality}
         </p>
         <p className="text-sm text-slate-600">
-          {m.driver.emergencyTitle}: {form.driver.emergencyContactName} ({form.driver.emergencyContactPhone})
+          {m.driver.emergencyTitle}: {emergencyName} ({form.driver.emergencyContactPhone})
         </p>
       </div>
 

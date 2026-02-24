@@ -42,6 +42,10 @@ function buildSpecialNotes(nationality: string, notes: string): string | undefin
   return `${nationalityLine}\n${noteValue}`;
 }
 
+function buildEmergencyContactName(firstName: string, lastName: string): string {
+  return `${firstName} ${lastName}`.replace(/\s+/g, " ").trim();
+}
+
 function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: number): PublicCreateEntryRequestDto {
   const start = form.starts[startIndex];
   const specialNotes = buildSpecialNotes(form.driver.nationality, form.driver.specialNotes);
@@ -56,7 +60,7 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       zip: form.driver.zip,
       city: form.driver.city,
       phone: normalizePhone(form.driver.phone),
-      emergencyContactName: form.driver.emergencyContactName,
+      emergencyContactName: buildEmergencyContactName(form.driver.emergencyContactFirstName, form.driver.emergencyContactLastName),
       emergencyContactPhone: normalizePhone(form.driver.emergencyContactPhone),
       motorsportHistory: form.driver.motorsportHistory,
       specialNotes

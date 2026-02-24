@@ -69,7 +69,8 @@ const initialDriver: DriverForm = {
   city: "",
   phone: "",
   email: "",
-  emergencyContactName: "",
+  emergencyContactFirstName: "",
+  emergencyContactLastName: "",
   emergencyContactPhone: "",
   motorsportHistory: "",
   specialNotes: ""
@@ -122,12 +123,44 @@ function validateDriverForm(value: DriverForm, locale: string, m: ReturnType<typ
   }
   if (!value.phone.trim() || !isValidPhone(value.phone.trim())) errors.phone = m.errors.invalidPhone;
   if (!value.email.trim() || !EMAIL_PATTERN.test(value.email.trim())) errors.email = m.errors.invalidEmail;
-  if (!value.emergencyContactName.trim()) errors.emergencyContactName = m.errors.requiredEmergencyName;
+  if (!value.emergencyContactFirstName.trim()) errors.emergencyContactFirstName = m.errors.requiredEmergencyFirstName;
+  if (!value.emergencyContactLastName.trim()) errors.emergencyContactLastName = m.errors.requiredEmergencyLastName;
   if (!value.emergencyContactPhone.trim() || !isValidPhone(value.emergencyContactPhone.trim())) {
     errors.emergencyContactPhone = m.errors.invalidEmergencyPhone;
   }
   if (!value.motorsportHistory.trim()) errors.motorsportHistory = m.errors.requiredHistory;
   return errors;
+}
+
+function splitEmergencyName(fullName: string): { firstName: string; lastName: string } {
+  const normalized = fullName.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return { firstName: "", lastName: "" };
+  }
+  const [firstName, ...rest] = normalized.split(" ");
+  return {
+    firstName: firstName || "",
+    lastName: rest.join(" ")
+  };
+}
+
+function hydrateDriverForm(value: Partial<DriverForm> | null | undefined): DriverForm {
+  const next: DriverForm = {
+    ...initialDriver,
+    ...(value ?? {})
+  };
+
+  const legacyName = typeof (value as { emergencyContactName?: unknown } | null | undefined)?.emergencyContactName === "string"
+    ? ((value as { emergencyContactName?: string }).emergencyContactName ?? "")
+    : "";
+
+  if (!next.emergencyContactFirstName && !next.emergencyContactLastName && legacyName.trim()) {
+    const split = splitEmergencyName(legacyName);
+    next.emergencyContactFirstName = split.firstName;
+    next.emergencyContactLastName = split.lastName;
+  }
+
+  return next;
 }
 
 type StartFieldErrors = Partial<
@@ -314,7 +347,7 @@ export function AnmeldungPage() {
         return;
       }
       setStep(parsed.step && parsed.step >= 1 && parsed.step <= 3 ? parsed.step : 1);
-      setDriver({ ...initialDriver, ...(parsed.driver ?? {}) });
+      setDriver(hydrateDriverForm(parsed.driver));
       setStarts(Array.isArray(parsed.starts) ? parsed.starts.map((item) => hydrateStartForm(item)) : []);
       setDraftStart(hydrateStartForm(parsed.draftStart));
       setEditingId(parsed.editingId ?? null);
