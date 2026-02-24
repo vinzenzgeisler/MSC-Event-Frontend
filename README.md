@@ -31,6 +31,9 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `VITE_COGNITO_REDIRECT_URI` OAuth Redirect (typisch `/admin/login`)
 - `VITE_COGNITO_LOGOUT_URI` Logout Redirect
 - `VITE_COGNITO_SCOPES` typischerweise `openid email profile`
+- `VITE_AUTH_IDLE_TIMEOUT_MINUTES` optional (Default: `45`, nur außerhalb Dev aktiv)
+- `VITE_AUTH_MAX_SESSION_HOURS` optional (Default: `12`, nur außerhalb Dev aktiv)
+- `VITE_AUTH_REQUIRE_ADMIN_MFA` optional `true|false` (Default: `false`, nur außerhalb Dev ausgewertet)
 - `VITE_ADMIN_ENABLE_TOKEN_LOGIN` optionaler Dev-Fallback für manuellen JWT-Login
 - `VITE_ADMIN_ENABLE_ROLE_PREVIEW` optionaler Dev-Fallback für Rollen-UI-Test ohne Token
 

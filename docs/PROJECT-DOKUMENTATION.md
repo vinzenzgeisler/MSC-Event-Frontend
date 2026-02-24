@@ -191,3 +191,13 @@ Aktuelle Qualitätssicherung:
 - TypeScript-Checks via `npm run typecheck`
 - Konsistente Component-Aufteilung nach Public/Admin
 - Responsive Fokus für Anmeldung (mobile-first) und Admin (desktop-first, tablet-safe)
+
+## 13) Auth-Session & Security-Policy (Admin)
+
+- Cognito PKCE Login mit Session-Persistenz im Frontend.
+- Access-Token werden vor Ablauf automatisch via Refresh-Token erneuert (silent refresh).
+- Bei `401` versucht der HTTP-Client einmalig eine Session-Erneuerung und wiederholt den Request.
+- In Nicht-Dev-Umgebungen gilt:
+  - Idle-Timeout (Default 45 Minuten, konfigurierbar)
+  - Maximale Sessiondauer (Default 12 Stunden, konfigurierbar)
+- Optionale MFA-Pflicht für Admin-Rollen über `VITE_AUTH_REQUIRE_ADMIN_MFA=true` (nur außerhalb Dev).
