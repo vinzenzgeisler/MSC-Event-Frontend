@@ -31,6 +31,7 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `VITE_COGNITO_REDIRECT_URI` OAuth Redirect (typisch `/admin/login`)
 - `VITE_COGNITO_LOGOUT_URI` Logout Redirect
 - `VITE_COGNITO_SCOPES` typischerweise `openid email profile`
+- `VITE_PUBLIC_VERIFY_RESEND_URL` optionaler Link für CTA „Neue Verifizierungs-Mail anfordern“ auf `/anmeldung/verify`
 - `VITE_AUTH_IDLE_TIMEOUT_MINUTES` optional (Default: `45`, nur außerhalb Dev aktiv)
 - `VITE_AUTH_MAX_SESSION_HOURS` optional (Default: `12`, nur außerhalb Dev aktiv)
 - `VITE_AUTH_REQUIRE_ADMIN_MFA` optional `true|false` (Default: `false`, nur außerhalb Dev ausgewertet)
