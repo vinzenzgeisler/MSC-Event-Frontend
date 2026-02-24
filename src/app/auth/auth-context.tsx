@@ -12,7 +12,7 @@ import {
   type AuthSession
 } from "@/app/auth/auth-store";
 import { getEffectiveRoles } from "@/app/auth/iam";
-import { extractRoles, hasMfaAuthentication, parseJwtPayload } from "@/app/auth/jwt";
+import { extractRoles, parseJwtPayload } from "@/app/auth/jwt";
 import { ApiError, requestJson } from "@/services/api/http-client";
 
 type AuthContextValue = {
@@ -35,6 +35,7 @@ type AuthMeResponse = {
   sub: string | null;
   email: string | null;
   roles: string[];
+  mfaAuthenticated: boolean;
 };
 
 const AUTO_REFRESH_SKEW_MS = 60_000;
@@ -164,6 +165,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (cancelled) {
           return;
         }
+        if (REQUIRE_ADMIN_MFA && response.roles.includes("admin") && !response.mfaAuthenticated) {
+          clearSession({ reason: "mfa_required" });
+          return;
+        }
         setAuthMe(response);
       } catch (error) {
         if (cancelled) {
@@ -282,27 +287,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       window.clearInterval(intervalId);
     };
   }, [clearSession, session?.apiToken]);
-
-  useEffect(() => {
-    if (!REQUIRE_ADMIN_MFA || !session?.apiToken || session.provider !== "cognito") {
-      return;
-    }
-
-    if (!effectiveRoles.includes("admin")) {
-      return;
-    }
-
-    const mfaToken = session.idToken || session.roleToken || session.apiToken;
-    if (!mfaToken) {
-      return;
-    }
-
-    if (hasMfaAuthentication(mfaToken)) {
-      return;
-    }
-
-    clearSession({ reason: "mfa_required" });
-  }, [clearSession, effectiveRoles, session?.apiToken, session?.idToken, session?.provider, session?.roleToken]);
 
   const value = useMemo<AuthContextValue>(
     () => {
