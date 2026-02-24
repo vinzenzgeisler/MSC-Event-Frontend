@@ -7,6 +7,7 @@ import { StartEntriesStep } from "@/components/features/registration/start-entri
 import { SummaryStep } from "@/components/features/registration/summary-step";
 import { WizardStepper } from "@/components/features/registration/wizard-stepper";
 import { ApiError } from "@/services/api/http-client";
+import { formatEuro, resolvePublicPricing } from "@/lib/public-pricing";
 import { isCountryOption } from "@/lib/countries";
 import { registrationService } from "@/services/registration.service";
 import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegistrationForm, VehicleForm } from "@/types/registration";
@@ -335,6 +336,26 @@ export function AnmeldungPage() {
   }, [step, driver, starts, draftStart, editingId, consent]);
 
   const form = useMemo<RegistrationWizardForm>(() => ({ driver, starts, consent }), [driver, starts, consent]);
+
+  const secondVehiclePriceHint = useMemo(() => {
+    if (!eventOverview) {
+      return "";
+    }
+
+    const pricing = resolvePublicPricing(eventOverview.registrationCloseAt);
+    if (pricing.secondVehiclePriceEur === null) {
+      return "";
+    }
+
+    const amount = formatEuro(locale, pricing.secondVehiclePriceEur);
+    if (locale === "en") {
+      return `Price for a second vehicle entry: ${amount}.`;
+    }
+    if (locale === "cz") {
+      return `Cena za druhé vozidlo: ${amount}.`;
+    }
+    return `Preis für ein zweites Fahrzeug: ${amount}.`;
+  }, [eventOverview, locale]);
 
   const handleDriverChange = <K extends keyof DriverForm>(field: K, value: DriverForm[K]) => {
     const normalizedValue = field === "phone" || field === "emergencyContactPhone" ? (sanitizePhoneInput(String(value)) as DriverForm[K]) : value;
@@ -667,6 +688,7 @@ export function AnmeldungPage() {
             <StartEntriesStep
               classes={eventOverview.classes}
               starts={starts}
+              secondVehiclePriceHint={secondVehiclePriceHint}
               draft={draftStart}
               editingId={editingId}
               error={startError}

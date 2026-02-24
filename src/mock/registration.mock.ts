@@ -4,8 +4,11 @@ export const mockPublicEvent: PublicEventOverview = {
   id: "evt-2026-oberlausitz",
   name: "12. Oberlausitzer Dreieck",
   startsAt: "2026-09-12",
+  endsAt: "2026-09-13",
   location: "Seifhennersdorf",
   registrationOpen: true,
+  registrationOpenAt: "2026-05-01T08:00:00.000Z",
+  registrationCloseAt: "2026-08-31T22:00:00.000Z",
   classes: [
     { id: "cls-auto-elite", name: "Auto Elite", vehicleType: "auto" },
     { id: "cls-auto-pro", name: "Auto Pro", vehicleType: "auto" },

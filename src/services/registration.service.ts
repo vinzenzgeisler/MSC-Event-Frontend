@@ -146,8 +146,11 @@ export const registrationService = {
       id: response.event.id,
       name: response.event.name,
       startsAt: response.event.startsAt,
+      endsAt: response.event.endsAt,
       location: "",
       registrationOpen: response.registration.isOpen,
+      registrationOpenAt: response.event.registrationOpenAt,
+      registrationCloseAt: response.event.registrationCloseAt,
       classes: response.classes.map((item) => ({
         id: item.id,
         name: item.name,

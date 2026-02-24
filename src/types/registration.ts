@@ -74,8 +74,11 @@ export type PublicEventOverview = {
   id: Id;
   name: string;
   startsAt: string;
+  endsAt: string;
   location: string;
   registrationOpen: boolean;
+  registrationOpenAt: string | null;
+  registrationCloseAt: string | null;
   classes: PublicEventClass[];
 };
 
