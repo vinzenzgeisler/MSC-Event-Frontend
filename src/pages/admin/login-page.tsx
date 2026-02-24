@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { consumeCognitoReturnTo, handleCognitoCallbackIfPresent, isCognitoConfigured, startCognitoLogin } from "@/app/auth/cognito";
+import { consumeCognitoReturnTo, getCognitoConfig, handleCognitoCallbackIfPresent, isCognitoConfigured, startCognitoLogin } from "@/app/auth/cognito";
 import { consumeAuthLogoutReason } from "@/app/auth/auth-store";
 import { useAuth } from "@/app/auth/auth-context";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export function AdminLoginPage() {
   const location = useLocation();
   const redirectTo = (location.state as LocationState | null)?.from?.pathname || "/admin/dashboard";
   const cognitoReady = isCognitoConfigured();
+  const cognitoConfig = cognitoReady ? getCognitoConfig() : null;
 
   useEffect(() => {
     const reason = consumeAuthLogoutReason();
@@ -84,6 +85,15 @@ export function AdminLoginPage() {
               disabled={busy}
               onClick={() => {
                 setError("");
+                if (cognitoConfig) {
+                  const currentLoginUri = `${window.location.origin}/admin/login`;
+                  if (cognitoConfig.redirectUri !== currentLoginUri) {
+                    setError(
+                      `Cognito Redirect-URI passt nicht zur App-URL. Konfiguriert: ${cognitoConfig.redirectUri}. Erwartet für diesen Aufruf: ${currentLoginUri}.`
+                    );
+                    return;
+                  }
+                }
                 setBusy(true);
                 void startCognitoLogin(redirectTo).catch((startError) => {
                   setBusy(false);
