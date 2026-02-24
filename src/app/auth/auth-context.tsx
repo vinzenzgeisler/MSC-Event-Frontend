@@ -170,7 +170,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           return;
         }
         setAuthMe(null);
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        if (error instanceof ApiError && error.status === 401) {
           clearSession({ reason: "session_expired" });
         }
       }
