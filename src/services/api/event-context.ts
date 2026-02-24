@@ -1,4 +1,4 @@
-import { requestJson } from "@/services/api/http-client";
+import { ApiError, requestJson } from "@/services/api/http-client";
 import type { VehicleType } from "@/types/common";
 
 type PublicCurrentEventResponse = {
@@ -84,9 +84,24 @@ export async function getAdminCurrentEvent() {
     };
     return adminEventCache;
   }
-  const response = await requestJson<AdminCurrentEventResponse>("/admin/events/current");
-  adminEventCache = response;
-  return response;
+  try {
+    const response = await requestJson<AdminCurrentEventResponse>("/admin/events/current");
+    adminEventCache = response;
+    return response;
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      const publicEvent = await getPublicCurrentEvent();
+      adminEventCache = {
+        ok: true,
+        event: {
+          id: publicEvent.event.id,
+          name: publicEvent.event.name
+        }
+      };
+      return adminEventCache;
+    }
+    throw error;
+  }
 }
 
 export async function getAdminEventId() {
