@@ -91,6 +91,8 @@ export type PublicEventOverview = {
   startsAt: string;
   endsAt: string;
   location: string;
+  contactEmail: string | null;
+  websiteUrl: string | null;
   registrationOpen: boolean;
   registrationOpenAt: string | null;
   registrationCloseAt: string | null;
@@ -119,6 +121,8 @@ export type PublicCreateEntryRequestDto = {
     city: string;
     phone: string;
     emergencyContactName: string;
+    emergencyContactFirstName?: string;
+    emergencyContactLastName?: string;
     emergencyContactPhone: string;
     motorsportHistory: string;
     specialNotes?: string;

@@ -1,22 +1,15 @@
-import { mockAdminEntries, mockAdminEntryDetail, mockAdminEntryHistory } from "@/mock/admin-entries.mock";
 import { getAdminEventId } from "@/services/api/event-context";
-import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
+import { requestJson } from "@/services/api/http-client";
 import type {
   AdminEntriesPageResult,
   AdminEntriesFilter,
   AdminEntryDetailDto,
   AdminEntryDetailViewModel,
-  AdminEntryHistoryItem,
   AdminEntryListItem,
   AdminEntryListItemDto,
   ListMeta
 } from "@/types/admin";
 import type { AcceptanceStatus, PaymentStatus } from "@/types/common";
-
-const entriesStore: AdminEntryListItemDto[] = mockAdminEntries.map((item) => ({ ...item }));
-const detailStore: Record<string, AdminEntryDetailDto> = Object.fromEntries(
-  Object.entries(mockAdminEntryDetail).map(([key, value]) => [key, JSON.parse(JSON.stringify(value)) as AdminEntryDetailDto])
-);
 
 type EntryContext = {
   eventId: string;
@@ -231,30 +224,6 @@ function fromAdminEntryDetailDto(
   };
 }
 
-function matchesFilter(item: AdminEntryListItemDto, filter: AdminEntriesFilter): boolean {
-  if (filter.classId !== "all" && filter.classId !== item.classId && filter.classId !== item.className) {
-    return false;
-  }
-  if (filter.acceptanceStatus !== "all" && filter.acceptanceStatus !== item.acceptanceStatus) {
-    return false;
-  }
-  if (filter.paymentStatus !== "all" && filter.paymentStatus !== item.paymentStatus) {
-    return false;
-  }
-  if (filter.checkinIdVerified !== "all" && String(item.checkinIdVerified) !== filter.checkinIdVerified) {
-    return false;
-  }
-  if (!filter.query.trim()) {
-    return true;
-  }
-  const query = filter.query.toLowerCase();
-  return (
-    (item.name ?? "").toLowerCase().includes(query) ||
-    (item.startNumber ?? item.startNumberNorm ?? "").toLowerCase().includes(query) ||
-    (item.vehicleLabel ?? "").toLowerCase().includes(query)
-  );
-}
-
 type AdminEntriesListResponse = {
   ok: boolean;
   entries: AdminEntryListItemDto[];
@@ -391,25 +360,6 @@ export const adminEntriesService = {
   ): Promise<AdminEntriesPageResult> {
     const pageSize = clampPageSize(options?.limit);
 
-    if (isMockApiEnabled()) {
-      const filtered = entriesStore.filter((item) => matchesFilter(item, filter));
-      const cursor = Number.parseInt(options?.cursor ?? "0", 10);
-      const offset = Number.isFinite(cursor) && cursor > 0 ? cursor : 0;
-      const entries = filtered.slice(offset, offset + pageSize).map(fromAdminEntryListDto);
-      const nextOffset = offset + entries.length;
-
-      return {
-        entries,
-        meta: {
-          page: Math.floor(offset / pageSize) + 1,
-          pageSize,
-          total: filtered.length,
-          hasMore: nextOffset < filtered.length,
-          nextCursor: nextOffset < filtered.length ? String(nextOffset) : null
-        }
-      };
-    }
-
     const eventId = await getAdminEventId();
     const response = await requestJson<AdminEntriesListResponse>("/admin/entries", {
       query: {
@@ -449,23 +399,6 @@ export const adminEntriesService = {
   },
 
   async getEntryDetail(entryId: string): Promise<AdminEntryDetailViewModel | null> {
-    if (isMockApiEnabled()) {
-      const detail = detailStore[entryId];
-      if (!detail) {
-        return null;
-      }
-      return fromAdminEntryDetailDto(
-        detail,
-        (mockAdminEntryHistory[entryId] ?? []).map((item) => ({
-          id: item.id,
-          action: item.action,
-          actorUserId: item.actor,
-          createdAt: item.timestamp,
-          payload: { details: item.details }
-        }))
-      );
-    }
-
     const response = await requestJson<AdminEntryDetailResponse>(`/admin/entries/${entryId}`);
     if (!response.ok) {
       return null;
@@ -480,19 +413,6 @@ export const adminEntriesService = {
   },
 
   async setEntryStatus(entryId: string, transition: "to_shortlist" | "to_accepted" | "to_rejected") {
-    if (isMockApiEnabled()) {
-      const nextStatus = transition === "to_shortlist" ? "shortlist" : transition === "to_accepted" ? "accepted" : "rejected";
-      const row = entriesStore.find((item) => item.id === entryId);
-      if (row) {
-        row.acceptanceStatus = nextStatus;
-      }
-      const detail = detailStore[entryId];
-      if (detail) {
-        detail.acceptanceStatus = nextStatus;
-      }
-      return { ok: true };
-    }
-
     const statusMap: Record<typeof transition, { status: AcceptanceStatus; lifecycleEventType: string }> = {
       to_shortlist: { status: "shortlist", lifecycleEventType: "preselection" },
       to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment" },
@@ -514,25 +434,6 @@ export const adminEntriesService = {
   },
 
   async setEntryPaymentStatus(entryId: string, paymentStatus: "due" | "paid") {
-    if (isMockApiEnabled()) {
-      const row = entriesStore.find((item) => item.id === entryId);
-      if (row) {
-        row.paymentStatus = paymentStatus;
-      }
-      const detail = detailStore[entryId];
-      if (detail) {
-        detail.payment.paymentStatus = paymentStatus;
-        if (paymentStatus === "paid") {
-          detail.payment.paidAmountCents = detail.payment.totalCents;
-          detail.payment.amountOpenCents = 0;
-        } else {
-          detail.payment.paidAmountCents = 0;
-          detail.payment.amountOpenCents = detail.payment.totalCents;
-        }
-      }
-      return { ok: true };
-    }
-
     if (paymentStatus !== "paid") {
       throw new Error("Manuelles Zurücksetzen auf offen ist im Ledger-Flow nicht möglich.");
     }
@@ -545,30 +446,6 @@ export const adminEntriesService = {
   },
 
   async setEntryPaymentAmounts(entryId: string, payload: { totalCents: number; paidAmountCents: number }) {
-    if (isMockApiEnabled()) {
-      const row = entriesStore.find((item) => item.id === entryId);
-      const detail = detailStore[entryId];
-      if (!detail) {
-        return { ok: false };
-      }
-
-      const total = Math.max(0, Math.floor(payload.totalCents));
-      const paid = Math.max(0, Math.min(total, Math.floor(payload.paidAmountCents)));
-      const open = Math.max(0, total - paid);
-      const status = open === 0 ? "paid" : "due";
-
-      detail.payment.totalCents = total;
-      detail.payment.paidAmountCents = paid;
-      detail.payment.amountOpenCents = open;
-      detail.payment.paymentStatus = status;
-
-      if (row) {
-        row.paymentStatus = status;
-      }
-
-      return { ok: true };
-    }
-
     const invoice = await findInvoiceForEntry(entryId);
     const currentPaid = invoice.paidAmountCents ?? 0;
     const targetPaid = Math.max(0, Math.floor(payload.paidAmountCents));
@@ -583,19 +460,6 @@ export const adminEntriesService = {
   },
 
   async setEntryCheckinVerified(entryId: string) {
-    if (isMockApiEnabled()) {
-      const row = entriesStore.find((item) => item.id === entryId);
-      if (row) {
-        row.checkinIdVerified = true;
-      }
-      const detail = detailStore[entryId];
-      if (detail) {
-        detail.checkin.checkinIdVerified = true;
-        detail.checkin.checkinIdVerifiedAt = new Date().toISOString();
-      }
-      return { ok: true };
-    }
-
     await requestJson(`/admin/entries/${entryId}/checkin/id-verify`, {
       method: "PATCH",
       body: {
@@ -607,15 +471,6 @@ export const adminEntriesService = {
   },
 
   async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string }) {
-    if (isMockApiEnabled()) {
-      const detail = detailStore[entryId] as (AdminEntryDetailDto & { internalNote?: string; driverNote?: string }) | undefined;
-      if (detail) {
-        detail.internalNote = payload.internalNote;
-        detail.driverNote = payload.driverNote;
-      }
-      return { ok: true };
-    }
-
     return requestJson(`/admin/entries/${entryId}/notes`, {
       method: "PATCH",
       body: {
@@ -626,18 +481,6 @@ export const adminEntriesService = {
   },
 
   async markConfirmationMailSent(entryId: string) {
-    if (isMockApiEnabled()) {
-      const row = entriesStore.find((item) => item.id === entryId);
-      if (row) {
-        row.confirmationMailSent = true;
-      }
-      const detail = detailStore[entryId] as (AdminEntryDetailDto & { confirmationMailSent?: boolean }) | undefined;
-      if (detail) {
-        detail.confirmationMailSent = true;
-      }
-      return { ok: true };
-    }
-
     const context = await resolveEntryContext(entryId);
     await requestJson("/admin/mail/lifecycle/queue", {
       method: "POST",
@@ -652,10 +495,6 @@ export const adminEntriesService = {
   },
 
   async getEntryDocumentDownloadUrl(entryId: string, type: "waiver" | "tech_check") {
-    if (isMockApiEnabled()) {
-      return null;
-    }
-
     const context = await resolveEntryContext(entryId);
     const response = await requestJson<{ ok: boolean; url: string }>(`/admin/documents/entry/${entryId}/download`, {
       query: {
@@ -668,16 +507,6 @@ export const adminEntriesService = {
   },
 
   async deleteEntry(entryId: string) {
-    if (isMockApiEnabled()) {
-      const rowIndex = entriesStore.findIndex((item) => item.id === entryId);
-      if (rowIndex >= 0) {
-        entriesStore.splice(rowIndex, 1);
-      }
-      delete detailStore[entryId];
-      entryContextStore.delete(entryId);
-      return { ok: true };
-    }
-
     return requestJson<AdminEntryDeleteResponse>(`/admin/entries/${entryId}`, {
       method: "DELETE"
     });

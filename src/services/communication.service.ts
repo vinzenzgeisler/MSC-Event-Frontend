@@ -1,6 +1,5 @@
-import { mockOutbox } from "@/mock/communication.mock";
 import { getAdminEventId } from "@/services/api/event-context";
-import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
+import { requestJson } from "@/services/api/http-client";
 import type { BroadcastForm, OutboxItem, OutboxItemDto } from "@/types/admin";
 
 function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
@@ -26,10 +25,6 @@ type AdminMailQueueResponse = {
 
 export const communicationService = {
   async listOutbox() {
-    if (isMockApiEnabled()) {
-      return mockOutbox.map(fromOutboxDto);
-    }
-
     const eventId = await getAdminEventId();
     const response = await requestJson<AdminOutboxListResponse>("/admin/mail/outbox", {
       query: {
@@ -44,10 +39,6 @@ export const communicationService = {
   },
 
   async queueBroadcast(form: BroadcastForm) {
-    if (isMockApiEnabled()) {
-      return { ok: true, queued: 1 };
-    }
-
     const eventId = await getAdminEventId();
     return requestJson<AdminMailQueueResponse>("/admin/mail/broadcast/queue", {
       method: "POST",
@@ -63,20 +54,12 @@ export const communicationService = {
   },
 
   async retryOutbox(id: string) {
-    if (isMockApiEnabled()) {
-      return { ok: true };
-    }
-
     return requestJson<{ ok: boolean }>(`/admin/mail/outbox/${id}/retry`, {
       method: "POST"
     });
   },
 
   async queuePaymentReminderForEntry(entryId: string) {
-    if (isMockApiEnabled()) {
-      return { ok: true };
-    }
-
     const eventId = await getAdminEventId();
     return requestJson<AdminMailQueueResponse>("/admin/payment/reminders/queue", {
       method: "POST",
@@ -91,10 +74,6 @@ export const communicationService = {
   },
 
   async queueAcceptedMailForEntry(entryId: string, options?: { allowDuplicate?: boolean }) {
-    if (isMockApiEnabled()) {
-      return { ok: true };
-    }
-
     const eventId = await getAdminEventId();
     return requestJson<AdminMailQueueResponse>("/admin/mail/lifecycle/queue", {
       method: "POST",

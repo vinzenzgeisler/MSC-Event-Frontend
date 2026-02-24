@@ -12,6 +12,8 @@ type PublicCurrentEventResponse = {
     isCurrent: boolean;
     registrationOpenAt: string | null;
     registrationCloseAt: string | null;
+    contactEmail: string | null;
+    websiteUrl: string | null;
   };
   classes: Array<{
     id: string;

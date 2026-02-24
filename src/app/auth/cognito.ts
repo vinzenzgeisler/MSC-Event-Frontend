@@ -217,7 +217,7 @@ export async function handleCognitoCallbackIfPresent(currentHref = window.locati
     clearPkceState();
   }
 
-  const apiToken = payload.access_token || payload.id_token;
+  const apiToken = payload.id_token || payload.access_token;
   if (!apiToken) {
     throw new Error("Cognito Antwort enthält kein verwendbares Access Token.");
   }
@@ -253,7 +253,7 @@ export async function refreshCognitoSession(session: AuthSession): Promise<AuthS
   body.set("refresh_token", session.refreshToken);
 
   const payload = await requestOAuthToken(body);
-  const nextApiToken = payload.access_token || payload.id_token || session.apiToken;
+  const nextApiToken = payload.id_token || payload.access_token || session.apiToken;
   if (!nextApiToken) {
     throw new Error("Cognito Refresh-Antwort enthält kein verwendbares Access Token.");
   }

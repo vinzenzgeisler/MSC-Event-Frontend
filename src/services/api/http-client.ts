@@ -102,10 +102,6 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
   return (parsed ?? ({} as T)) as T;
 }
 
-export function isMockApiEnabled() {
-  return String(import.meta.env.VITE_USE_MOCK_API || "false").toLowerCase() === "true";
-}
-
 export function getApiErrorMessage(error: unknown, fallback = "Ein unerwarteter Fehler ist aufgetreten.") {
   if (error instanceof ApiError) {
     return error.message;

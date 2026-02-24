@@ -41,5 +41,4 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 ## Notes
 
 - API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.
-- Mock-/UI-Only Daten liegen zentral unter `src/mock/*`.
 - IAM/Rollen im Frontend: `admin`, `editor`, `viewer` (Legacy-Claim `checkin` wird auf `editor` gemappt).

@@ -11,11 +11,13 @@ type HeaderEvent = {
   startsAt: string;
   endsAt: string;
   registrationCloseAt: string | null;
+  contactEmail: string | null;
+  websiteUrl: string | null;
   pricingRules: PublicEventOverview["pricingRules"];
 };
 
-const PUBLIC_WEBSITE_URL = "https://msc-oberlausitzer-dreilaendereck.eu";
-const PUBLIC_CONTACT_EMAIL = "nennung@msc-oberlausitzer-dreilaendereck.eu";
+const DEFAULT_PUBLIC_WEBSITE_URL = "https://msc-oberlausitzer-dreilaendereck.eu";
+const DEFAULT_PUBLIC_CONTACT_EMAIL = "nennung@msc-oberlausitzer-dreilaendereck.eu";
 
 function toIntlLocale(locale: AnmeldungLocale) {
   if (locale === "de") return "de-DE";
@@ -125,6 +127,8 @@ function PublicLayoutContent() {
           startsAt: response.startsAt,
           endsAt: response.endsAt,
           registrationCloseAt: response.registrationCloseAt,
+          contactEmail: response.contactEmail,
+          websiteUrl: response.websiteUrl,
           pricingRules: response.pricingRules
         });
       })
@@ -153,6 +157,8 @@ function PublicLayoutContent() {
   }, [headerEvent, locale]);
 
   const headerTitle = headerEvent?.name || "";
+  const headerWebsiteUrl = headerEvent?.websiteUrl || DEFAULT_PUBLIC_WEBSITE_URL;
+  const headerContactEmail = headerEvent?.contactEmail || DEFAULT_PUBLIC_CONTACT_EMAIL;
   const pricingSnapshot = useMemo(() => {
     if (!headerEvent) {
       return null;
@@ -223,7 +229,7 @@ function PublicLayoutContent() {
               <p className="text-sm text-primary-foreground/90 md:text-base">{m.layout.subtitle}</p>
               <div className="flex flex-wrap gap-2">
                 <a
-                  href={PUBLIC_WEBSITE_URL}
+                  href={headerWebsiteUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-yellow-300"
@@ -245,8 +251,8 @@ function PublicLayoutContent() {
               <div className="rounded border border-white/25 bg-white/10 p-3">
                 <div className="text-xs uppercase tracking-wide text-primary-foreground/80">{m.layout.infoContactTitle}</div>
                 <div className="mt-1 text-sm font-semibold">
-                  <a href={`mailto:${PUBLIC_CONTACT_EMAIL}`} className="hover:underline">
-                    {PUBLIC_CONTACT_EMAIL}
+                  <a href={`mailto:${headerContactEmail}`} className="hover:underline">
+                    {headerContactEmail}
                   </a>
                 </div>
               </div>
@@ -270,7 +276,7 @@ function PublicLayoutContent() {
             <Link to="/anmeldung/rechtliches/haftung" className="hover:text-primary">
               {m.layout.footerLiability}
             </Link>
-            <a href={PUBLIC_WEBSITE_URL} target="_blank" rel="noreferrer" className="hover:text-primary">
+            <a href={headerWebsiteUrl} target="_blank" rel="noreferrer" className="hover:text-primary">
               {m.layout.footerWebsite}
             </a>
           </div>

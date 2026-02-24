@@ -1,6 +1,5 @@
-import { mockExportJobs } from "@/mock/exports.mock";
 import { getAdminEventId } from "@/services/api/event-context";
-import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
+import { requestJson } from "@/services/api/http-client";
 import type { ExportCreateForm, ExportJob, ExportJobDto } from "@/types/admin";
 
 function fromExportDto(dto: ExportJobDto): ExportJob {
@@ -29,10 +28,6 @@ type AdminExportDownloadResponse = {
 
 export const exportsService = {
   async createExport(form: ExportCreateForm) {
-    if (isMockApiEnabled()) {
-      return { ok: true, exportJobId: `exp-${Date.now()}` };
-    }
-
     const eventId = await getAdminEventId();
     return requestJson<AdminExportCreateResponse>("/admin/exports/entries", {
       method: "POST",
@@ -47,10 +42,6 @@ export const exportsService = {
   },
 
   async listExports() {
-    if (isMockApiEnabled()) {
-      return mockExportJobs.map(fromExportDto);
-    }
-
     const eventId = await getAdminEventId();
     const response = await requestJson<AdminExportsListResponse>("/admin/exports", {
       query: {
@@ -65,10 +56,6 @@ export const exportsService = {
   },
 
   async getExportDownloadUrl(exportJobId: string) {
-    if (isMockApiEnabled()) {
-      return null;
-    }
-
     const response = await requestJson<AdminExportDownloadResponse>(`/admin/exports/${exportJobId}/download`);
     return response.url;
   }

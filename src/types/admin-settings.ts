@@ -7,6 +7,8 @@ export type AdminSettingsEvent = {
   name: string;
   startsAt: string;
   endsAt: string;
+  contactEmail: string | null;
+  websiteUrl: string | null;
   status: AdminEventStatus;
   isCurrent: boolean;
   registrationOpenAt: string | null;
@@ -22,6 +24,8 @@ export type AdminSettingsEventForm = {
   name: string;
   startsAt: string;
   endsAt: string;
+  contactEmail: string;
+  websiteUrl: string;
   registrationOpenAt: string;
   registrationCloseAt: string;
 };

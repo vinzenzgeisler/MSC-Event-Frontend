@@ -1,6 +1,5 @@
-import { mockPublicEvent, mockReservedStartNumbers } from "@/mock/registration.mock";
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
-import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
+import { requestJson } from "@/services/api/http-client";
 import type {
   PublicCreateEntryRequestDto,
   PublicEventOverview,
@@ -61,6 +60,8 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       city: form.driver.city,
       phone: normalizePhone(form.driver.phone),
       emergencyContactName: buildEmergencyContactName(form.driver.emergencyContactFirstName, form.driver.emergencyContactLastName),
+      emergencyContactFirstName: form.driver.emergencyContactFirstName.trim() || undefined,
+      emergencyContactLastName: form.driver.emergencyContactLastName.trim() || undefined,
       emergencyContactPhone: normalizePhone(form.driver.emergencyContactPhone),
       motorsportHistory: form.driver.motorsportHistory,
       specialNotes
@@ -229,10 +230,6 @@ function extractPublicPricingRules(response: unknown): PublicPricingRules | null
 
 export const registrationService = {
   async getCurrentEvent(): Promise<PublicEventOverview> {
-    if (isMockApiEnabled()) {
-      return mockPublicEvent;
-    }
-
     const response = await getPublicCurrentEvent();
     return {
       id: response.event.id,
@@ -240,6 +237,8 @@ export const registrationService = {
       startsAt: response.event.startsAt,
       endsAt: response.event.endsAt,
       location: "",
+      contactEmail: response.event.contactEmail ?? null,
+      websiteUrl: response.event.websiteUrl ?? null,
       registrationOpen: response.registration.isOpen,
       registrationOpenAt: response.event.registrationOpenAt,
       registrationCloseAt: response.event.registrationCloseAt,
@@ -254,27 +253,6 @@ export const registrationService = {
 
   async validateStartNumber(classId: string, value: string): Promise<StartNumberValidationResult> {
     const normalized = value.trim().toUpperCase();
-
-    if (isMockApiEnabled()) {
-      if (!normalized || !START_NUMBER_PATTERN.test(normalized)) {
-        return {
-          normalizedStartNumber: normalized || null,
-          validFormat: false,
-          available: false,
-          conflictEntryId: null,
-          conflictType: "invalid_format"
-        };
-      }
-
-      const existing = mockReservedStartNumbers.find((item) => item.classId === classId && item.startNumber === normalized);
-      return {
-        normalizedStartNumber: normalized,
-        validFormat: true,
-        available: !existing,
-        conflictEntryId: existing?.entryId ?? null,
-        conflictType: existing ? "same_class_taken" : "none"
-      };
-    }
 
     if (!normalized || !START_NUMBER_PATTERN.test(normalized)) {
       return {
@@ -306,14 +284,6 @@ export const registrationService = {
   },
 
   async submitWizard(form: RegistrationWizardForm): Promise<RegistrationSubmitResult> {
-    if (isMockApiEnabled()) {
-      return {
-        ok: true,
-        createdEntries: form.starts.length,
-        status: "submitted_unverified"
-      };
-    }
-
     if (!form.starts.length) {
       return {
         ok: false,
