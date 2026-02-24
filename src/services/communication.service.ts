@@ -90,7 +90,7 @@ export const communicationService = {
     });
   },
 
-  async queueAcceptedMailForEntry(entryId: string) {
+  async queueAcceptedMailForEntry(entryId: string, options?: { allowDuplicate?: boolean }) {
     if (isMockApiEnabled()) {
       return { ok: true };
     }
@@ -101,7 +101,8 @@ export const communicationService = {
       body: {
         eventId,
         entryId,
-        eventType: "accepted_open_payment"
+        eventType: "accepted_open_payment",
+        allowDuplicate: options?.allowDuplicate === true ? true : undefined
       }
     });
   }

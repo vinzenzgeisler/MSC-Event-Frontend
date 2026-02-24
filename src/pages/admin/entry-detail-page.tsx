@@ -16,7 +16,7 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
-import { ApiError, getApiErrorMessage, isMockApiEnabled } from "@/services/api/http-client";
+import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 
 function asEuro(cents: number) {
@@ -94,7 +94,6 @@ export function AdminEntryDetailPage() {
   const canPaymentWrite = hasPermission(roles, "entries.payment.write");
   const canNotesWrite = hasPermission(roles, "entries.notes.write");
   const canDeleteEntry = hasPermission(roles, "entries.delete");
-  const deleteAvailable = isMockApiEnabled();
   const canSendMail = hasPermission(roles, "communication.write");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
@@ -541,7 +540,7 @@ export function AdminEntryDetailPage() {
                   disabledReason={!canSendMail ? "Nur Admin-Rollen dürfen Mails senden." : confirmationMailVerified ? "E-Mail wurde bereits verifiziert." : undefined}
                   onClick={async () => {
                     try {
-                      await communicationService.queueAcceptedMailForEntry(detail.id);
+                      await communicationService.queueAcceptedMailForEntry(detail.id, { allowDuplicate: confirmationMailSent });
                       flashMessage("Bestätigungs-Mail erneut versendet. Status bleibt bis Bestätigung ausstehend.");
                       loadDetail();
                     } catch (error) {
@@ -639,7 +638,7 @@ export function AdminEntryDetailPage() {
                   icon={<Trash2 className="mr-2 h-4 w-4" />}
                   variant="outline"
                   className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                  disabledReason={!canDeleteEntry ? "Nur Admin-Rollen dürfen Nennungen löschen." : !deleteAvailable ? "Im Live-Backend aktuell nicht verfügbar." : undefined}
+                  disabledReason={!canDeleteEntry ? "Nur Admin-Rollen dürfen Nennungen löschen." : undefined}
                   onClick={() => setPendingDeleteConfirm(true)}
                 />
               </div>
@@ -841,7 +840,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {canDeleteEntry && deleteAvailable && pendingDeleteConfirm && (
+      {canDeleteEntry && pendingDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Nennung löschen?</h2>

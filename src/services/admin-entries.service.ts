@@ -233,6 +233,11 @@ type AdminInvoicePaymentMutationResponse = {
   };
 };
 
+type AdminEntryDeleteResponse = {
+  ok: boolean;
+  deletedEntryId: string;
+};
+
 async function resolveEntryContext(entryId: string): Promise<EntryContext> {
   const existing = entryContextStore.get(entryId);
   if (existing) {
@@ -559,6 +564,8 @@ export const adminEntriesService = {
       return { ok: true };
     }
 
-    throw new Error("Löschen ist im Live-Backend derzeit noch nicht freigeschaltet.");
+    return requestJson<AdminEntryDeleteResponse>(`/admin/entries/${entryId}`, {
+      method: "DELETE"
+    });
   }
 };
