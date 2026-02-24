@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bike, Car, Download, Mail, Trash2, Wallet } from "lucide-react";
+import { Bike, Car, Download, Loader2, Mail, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -99,6 +99,7 @@ export function AdminEntryDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected">("accepted");
   const [paid, setPaid] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
@@ -112,6 +113,7 @@ export function AdminEntryDetailPage() {
   const [pendingRejectConfirm, setPendingRejectConfirm] = useState(false);
   const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
+  const [sendingVerificationMail, setSendingVerificationMail] = useState(false);
   const [paymentEditorOpen, setPaymentEditorOpen] = useState(false);
   const [paymentTotalInput, setPaymentTotalInput] = useState("0,00");
   const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
@@ -148,6 +150,7 @@ export function AdminEntryDetailPage() {
       .getEntryDetail(entryId)
       .then((result) => {
         setDetail(result);
+        setHasLoadedOnce(true);
         if (result) {
           setStatus(result.status);
           setPaid(result.payment.status === "paid");
@@ -162,6 +165,7 @@ export function AdminEntryDetailPage() {
       .catch((error) => {
         flashMessage(getApiErrorMessage(error, "Nennung konnte nicht geladen werden."), 3000);
         setDetail(null);
+        setHasLoadedOnce(true);
       });
   };
 
@@ -179,8 +183,13 @@ export function AdminEntryDetailPage() {
   };
 
   useEffect(() => {
+    setHasLoadedOnce(false);
     loadDetail();
   }, [entryId]);
+
+  if (!hasLoadedOnce) {
+    return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
+  }
 
   if (!detail) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung nicht gefunden.</div>;
@@ -283,6 +292,10 @@ export function AdminEntryDetailPage() {
                 <div>{detail.driver.birthdate}</div>
               </div>
               <div>
+                <div className="text-xs uppercase text-slate-500">Nationalität</div>
+                <div>{detail.driver.nationality}</div>
+              </div>
+              <div>
                 <div className="text-xs uppercase text-slate-500">E-Mail</div>
                 <div className="break-words">{detail.driver.email}</div>
               </div>
@@ -346,6 +359,10 @@ export function AdminEntryDetailPage() {
                   {detail.driver.motorsportHistory}
                 </div>
               </div>
+              <div className="sm:col-span-2">
+                <div className="text-xs uppercase text-slate-500">Zusätzliche Hinweise</div>
+                <div className="rounded-md border bg-slate-50 p-3 leading-relaxed text-slate-800">{detail.notes}</div>
+              </div>
             </CardContent>
           </Card>
 
@@ -403,10 +420,6 @@ export function AdminEntryDetailPage() {
                   <div className="rounded-md border bg-slate-50 p-3 leading-relaxed text-slate-800">
                     {detail.vehicle.vehicleHistory}
                   </div>
-                </div>
-                <div className="sm:col-span-2">
-                  <div className="text-xs uppercase text-slate-500">Hinweise Veranstalter</div>
-                  <div className="rounded-md border bg-slate-50 p-3 leading-relaxed text-slate-800">{detail.notes}</div>
                 </div>
               </div>
             </CardContent>
@@ -528,23 +541,39 @@ export function AdminEntryDetailPage() {
               <div className="grid gap-2 border-t border-slate-200 pt-4">
                 <HintButton
                   label={
-                    confirmationMailVerified
+                    sendingVerificationMail
+                      ? "Verifizierungs-Mail wird gesendet…"
+                      : confirmationMailVerified
                       ? "E-Mail bereits verifiziert"
                       : confirmationMailSent
-                        ? "Bestätigungs-Mail erneut senden"
-                        : "Bestätigungs-Mail senden"
+                        ? "Verifizierungs-Mail erneut senden"
+                        : "Verifizierungs-Mail senden"
                   }
-                  icon={<Mail className="mr-2 h-4 w-4" />}
+                  icon={sendingVerificationMail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                   variant={!confirmationMailSent ? "default" : "outline"}
                   className={!confirmationMailSent ? actionActiveClass : actionOutlineClass}
-                  disabledReason={!canSendMail ? "Nur Admin-Rollen dürfen Mails senden." : confirmationMailVerified ? "E-Mail wurde bereits verifiziert." : undefined}
+                  disabledReason={
+                    !canSendMail
+                      ? "Nur Admin-Rollen dürfen Mails senden."
+                      : confirmationMailVerified
+                        ? "E-Mail wurde bereits verifiziert."
+                        : sendingVerificationMail
+                          ? "Verifizierungs-Mail wird gerade versendet."
+                          : undefined
+                  }
                   onClick={async () => {
+                    if (sendingVerificationMail) {
+                      return;
+                    }
+                    setSendingVerificationMail(true);
                     try {
-                      await communicationService.queueAcceptedMailForEntry(detail.id, { allowDuplicate: confirmationMailSent });
-                      flashMessage("Bestätigungs-Mail erneut versendet. Status bleibt bis Bestätigung ausstehend.");
+                      await communicationService.queueAcceptedMailForEntry(detail.id, { allowDuplicate: true });
+                      flashMessage("Verifizierungs-Mail wurde in die Queue gelegt.");
                       loadDetail();
                     } catch (error) {
-                      flashMessage(getLocalizedActionError(error, "Bestätigungs-Mail konnte nicht versendet werden."), 3200);
+                      flashMessage(getLocalizedActionError(error, "Verifizierungs-Mail konnte nicht versendet werden."), 3200);
+                    } finally {
+                      setSendingVerificationMail(false);
                     }
                   }}
                 />

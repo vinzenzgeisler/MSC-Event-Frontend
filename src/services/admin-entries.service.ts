@@ -2,12 +2,14 @@ import { mockAdminEntries, mockAdminEntryDetail, mockAdminEntryHistory } from "@
 import { getAdminEventId } from "@/services/api/event-context";
 import { isMockApiEnabled, requestJson } from "@/services/api/http-client";
 import type {
+  AdminEntriesPageResult,
   AdminEntriesFilter,
   AdminEntryDetailDto,
   AdminEntryDetailViewModel,
   AdminEntryHistoryItem,
   AdminEntryListItem,
-  AdminEntryListItemDto
+  AdminEntryListItemDto,
+  ListMeta
 } from "@/types/admin";
 import type { AcceptanceStatus, PaymentStatus } from "@/types/common";
 
@@ -22,6 +24,8 @@ type EntryContext = {
 };
 
 const entryContextStore = new Map<string, EntryContext>();
+const DEFAULT_ENTRIES_PAGE_SIZE = 25;
+const MAX_ENTRIES_PAGE_SIZE = 100;
 
 function asDateTime(value: string | null | undefined): string {
   if (!value) {
@@ -36,6 +40,32 @@ function asDate(value: string | null | undefined): string {
     return "-";
   }
   return value;
+}
+
+function formatPhoneForDisplay(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) {
+    return "-";
+  }
+
+  if (raw.startsWith("+")) {
+    return raw;
+  }
+
+  if (raw.startsWith("00")) {
+    return `+${raw.slice(2)}`;
+  }
+
+  const digitsOnly = raw.replace(/\D/g, "");
+  if (!digitsOnly) {
+    return raw;
+  }
+
+  if (raw.startsWith("0")) {
+    return raw;
+  }
+
+  return `+${digitsOnly}`;
 }
 
 function parseName(first: string | null | undefined, last: string | null | undefined, fallback = "Unbekannt") {
@@ -54,9 +84,39 @@ function payloadToText(payload: Record<string, unknown> | null | undefined) {
   return JSON.stringify(payload);
 }
 
+function splitNationalityFromNotes(value: string | null | undefined) {
+  const source = (value ?? "").trim();
+  if (!source) {
+    return { nationality: null as string | null, notes: "" };
+  }
+
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let nationality: string | null = null;
+  const remaining: string[] = [];
+
+  for (const line of lines) {
+    const match = line.match(/^(?:nationalit[aä]t|nationality)\s*:\s*(.+)$/i);
+    if (match && !nationality) {
+      nationality = match[1].trim() || null;
+      continue;
+    }
+    remaining.push(line);
+  }
+
+  return {
+    nationality,
+    notes: remaining.join("\n").trim()
+  };
+}
+
 function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
   return {
     id: dto.id,
+    classId: dto.classId,
     name: dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
     classLabel: dto.className,
     startNumber: dto.startNumber ?? dto.startNumberNorm ?? "-",
@@ -84,6 +144,8 @@ function fromAdminEntryDetailDto(
   const codriver = dto.person.codriver ?? null;
   const driverName = parseName(dto.person.driver.firstName, dto.person.driver.lastName, `Fahrer ${dto.ids.entryId.slice(0, 8)}`);
   const vehicleLabel = dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug");
+  const notesSplit = splitNationalityFromNotes(dto.specialNotes);
+  const driverNationality = (dto.person.driver.nationality ?? "").trim() || notesSplit.nationality || "-";
 
   return {
     id: dto.ids.entryId,
@@ -98,13 +160,14 @@ function fromAdminEntryDetailDto(
       name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
       email: dto.person.driver.email ?? "-",
       birthdate: asDate(dto.person.driver.birthdate),
-      phone: dto.person.driver.phone ?? "-",
+      nationality: driverNationality,
+      phone: formatPhoneForDisplay(dto.person.driver.phone),
       street: dto.person.driver.street ?? "-",
       zip: dto.person.driver.zip ?? "-",
       city: dto.person.driver.city ?? "-",
       addressLine: [dto.person.driver.street, dto.person.driver.zip, dto.person.driver.city].filter(Boolean).join(", ") || "-",
       emergencyContactName: dto.person.driver.emergencyContactName ?? "-",
-      emergencyContactPhone: dto.person.driver.emergencyContactPhone ?? "-",
+      emergencyContactPhone: formatPhoneForDisplay(dto.person.driver.emergencyContactPhone),
       motorsportHistory: dto.person.driver.motorsportHistory ?? "Keine Angabe"
     },
     codriver: {
@@ -114,7 +177,7 @@ function fromAdminEntryDetailDto(
       lastName: codriver?.lastName ?? "-",
       email: codriver?.email ?? "-",
       birthdate: asDate(codriver?.birthdate),
-      phone: codriver?.phone ?? "-",
+      phone: formatPhoneForDisplay(codriver?.phone),
       street: codriver?.street ?? "-",
       zip: codriver?.zip ?? "-",
       city: codriver?.city ?? "-",
@@ -153,7 +216,7 @@ function fromAdminEntryDetailDto(
       status: doc.status
     })),
     relatedEntryIds: dto.relatedEntryIds,
-    notes: dto.specialNotes ?? "Keine Hinweise",
+    notes: notesSplit.notes || "Keine Hinweise",
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     internalNote: dto.internalNote ?? "",
@@ -195,6 +258,7 @@ function matchesFilter(item: AdminEntryListItemDto, filter: AdminEntriesFilter):
 type AdminEntriesListResponse = {
   ok: boolean;
   entries: AdminEntryListItemDto[];
+  meta?: ListMeta;
 };
 
 type AdminEntryDetailResponse = {
@@ -288,10 +352,62 @@ async function recordPayment(invoiceId: string, amountCents: number, note: strin
   });
 }
 
+function clampPageSize(limit?: number) {
+  const normalized = typeof limit === "number" && Number.isFinite(limit) ? Math.floor(limit) : DEFAULT_ENTRIES_PAGE_SIZE;
+  return Math.min(MAX_ENTRIES_PAGE_SIZE, Math.max(1, normalized));
+}
+
+function fallbackListMeta(rowCount: number, pageSize: number): ListMeta {
+  return {
+    page: 1,
+    pageSize,
+    total: rowCount,
+    hasMore: false,
+    nextCursor: null
+  };
+}
+
+function normalizeListMeta(meta: ListMeta | undefined, rowCount: number, pageSize: number): ListMeta {
+  if (!meta) {
+    return fallbackListMeta(rowCount, pageSize);
+  }
+
+  return {
+    page: typeof meta.page === "number" ? meta.page : 1,
+    pageSize: typeof meta.pageSize === "number" ? meta.pageSize : pageSize,
+    total: typeof meta.total === "number" ? meta.total : rowCount,
+    hasMore: Boolean(meta.hasMore),
+    nextCursor: typeof meta.nextCursor === "string" && meta.nextCursor.trim() ? meta.nextCursor : null
+  };
+}
+
 export const adminEntriesService = {
-  async listEntries(filter: AdminEntriesFilter): Promise<AdminEntryListItem[]> {
+  async listEntriesPage(
+    filter: AdminEntriesFilter,
+    options?: {
+      cursor?: string;
+      limit?: number;
+    }
+  ): Promise<AdminEntriesPageResult> {
+    const pageSize = clampPageSize(options?.limit);
+
     if (isMockApiEnabled()) {
-      return entriesStore.filter((item) => matchesFilter(item, filter)).map(fromAdminEntryListDto);
+      const filtered = entriesStore.filter((item) => matchesFilter(item, filter));
+      const cursor = Number.parseInt(options?.cursor ?? "0", 10);
+      const offset = Number.isFinite(cursor) && cursor > 0 ? cursor : 0;
+      const entries = filtered.slice(offset, offset + pageSize).map(fromAdminEntryListDto);
+      const nextOffset = offset + entries.length;
+
+      return {
+        entries,
+        meta: {
+          page: Math.floor(offset / pageSize) + 1,
+          pageSize,
+          total: filtered.length,
+          hasMore: nextOffset < filtered.length,
+          nextCursor: nextOffset < filtered.length ? String(nextOffset) : null
+        }
+      };
     }
 
     const eventId = await getAdminEventId();
@@ -303,7 +419,8 @@ export const adminEntriesService = {
         acceptanceStatus: filter.acceptanceStatus !== "all" ? filter.acceptanceStatus : undefined,
         paymentStatus: filter.paymentStatus !== "all" ? filter.paymentStatus : undefined,
         checkinIdVerified: filter.checkinIdVerified !== "all" ? filter.checkinIdVerified === "true" : undefined,
-        limit: 100,
+        cursor: options?.cursor || undefined,
+        limit: pageSize,
         sortBy: "createdAt",
         sortDir: "desc"
       }
@@ -318,20 +435,17 @@ export const adminEntriesService = {
       }
     });
 
-    return response.entries.map((item) => ({
-      id: item.id,
-      name: parseName(item.driverFirstName, item.driverLastName, item.driverEmail ?? `Eintrag ${item.id}`),
-      classLabel: item.className,
-      startNumber: item.startNumberNorm ?? "-",
-      vehicleLabel: item.vehicleLabel,
-      vehicleThumbUrl: item.vehicleThumbUrl,
-      status: item.acceptanceStatus,
-      payment: item.paymentStatus ?? "due",
-      checkin: item.checkinIdVerified ? "bestätigt" : "offen",
-      confirmationMailSent: Boolean(item.confirmationMailSent),
-      confirmationMailVerified: Boolean(item.confirmationMailVerified),
-      createdAt: asDateTime(item.createdAt)
-    }));
+    return {
+      entries: response.entries.map(fromAdminEntryListDto),
+      meta: normalizeListMeta(response.meta, response.entries.length, pageSize)
+    };
+  },
+
+  async listEntries(filter: AdminEntriesFilter): Promise<AdminEntryListItem[]> {
+    const response = await adminEntriesService.listEntriesPage(filter, {
+      limit: DEFAULT_ENTRIES_PAGE_SIZE
+    });
+    return response.entries;
   },
 
   async getEntryDetail(entryId: string): Promise<AdminEntryDetailViewModel | null> {

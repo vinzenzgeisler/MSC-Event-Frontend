@@ -38,13 +38,20 @@ export type AdminEntryListItemDto = {
 export type AdminEntriesListResponseDto = {
   ok: boolean;
   entries: AdminEntryListItemDto[];
-  meta: {
-    total: number;
-  };
+  meta: ListMeta;
+};
+
+export type ListMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
 };
 
 export type AdminEntryListItem = {
   id: Id;
+  classId?: Id;
   name: string;
   classLabel: string;
   startNumber: string;
@@ -56,6 +63,11 @@ export type AdminEntryListItem = {
   confirmationMailSent: boolean;
   confirmationMailVerified: boolean;
   createdAt: string;
+};
+
+export type AdminEntriesPageResult = {
+  entries: AdminEntryListItem[];
+  meta: ListMeta;
 };
 
 export type AdminEntriesFilter = {
@@ -184,6 +196,7 @@ export type AdminEntryDetailViewModel = {
     name: string;
     email: string;
     birthdate: string;
+    nationality: string;
     phone: string;
     street: string;
     zip: string;

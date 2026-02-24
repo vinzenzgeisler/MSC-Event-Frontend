@@ -17,6 +17,11 @@ import type { AdminEntryListItem } from "@/types/admin";
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
   canManageStatus: boolean;
+  isLoadingInitial?: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  loadMoreRef: (node: HTMLDivElement | null) => void;
   onSetShortlist: (entryId: string) => void;
   onSetAccepted: (entryId: string) => void;
   onSetRejected: (entryId: string) => void;
@@ -59,7 +64,18 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
   );
 }
 
-export function EntriesTable({ rows, canManageStatus, onSetShortlist, onSetAccepted, onSetRejected }: EntriesTableProps) {
+export function EntriesTable({
+  rows,
+  canManageStatus,
+  isLoadingInitial = false,
+  isLoadingMore,
+  hasMore,
+  onLoadMore,
+  loadMoreRef,
+  onSetShortlist,
+  onSetAccepted,
+  onSetRejected
+}: EntriesTableProps) {
   const location = useLocation();
   const statusDisabledReason = (row: AdminEntryListItem, target: AdminEntryListItem["status"]) => {
     if (!row.confirmationMailVerified) {
@@ -72,6 +88,9 @@ export function EntriesTable({ rows, canManageStatus, onSetShortlist, onSetAccep
   };
 
   if (!rows.length) {
+    if (isLoadingInitial) {
+      return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Nennungen werden geladen…</div>;
+    }
     return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Keine Nennungen für die aktuelle Filterung.</div>;
   }
 
@@ -287,6 +306,15 @@ export function EntriesTable({ rows, canManageStatus, onSetShortlist, onSetAccep
           </table>
         </div>
       </div>
+
+      {(hasMore || isLoadingMore) && (
+        <div className="flex flex-col items-center gap-2 py-1">
+          <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+          <Button type="button" size="sm" variant="outline" disabled={isLoadingMore} onClick={onLoadMore}>
+            {isLoadingMore ? "Lade weitere Nennungen…" : "Weitere Nennungen laden"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
