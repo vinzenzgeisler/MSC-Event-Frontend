@@ -41,11 +41,28 @@ function normalizeScopes(raw: string): string {
   return Array.from(seen).join(" ");
 }
 
+function resolveAuthUriFromRuntime(rawEnvValue: string, fallbackPath: string): string {
+  const fallback = `${window.location.origin}${fallbackPath}`;
+  const trimmed = rawEnvValue.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.origin !== window.location.origin) {
+      return fallback;
+    }
+    return parsed.toString();
+  } catch {
+    return fallback;
+  }
+}
+
 export function getCognitoConfig() {
   const domain = String(import.meta.env.VITE_COGNITO_DOMAIN || "").trim().replace(/\/$/, "");
   const clientId = String(import.meta.env.VITE_COGNITO_CLIENT_ID || "").trim();
-  const redirectUri = String(import.meta.env.VITE_COGNITO_REDIRECT_URI || "").trim() || `${window.location.origin}/admin/login`;
-  const logoutUri = String(import.meta.env.VITE_COGNITO_LOGOUT_URI || "").trim() || `${window.location.origin}/admin/login`;
+  const redirectUri = resolveAuthUriFromRuntime(String(import.meta.env.VITE_COGNITO_REDIRECT_URI || ""), "/admin/login");
+  const logoutUri = resolveAuthUriFromRuntime(String(import.meta.env.VITE_COGNITO_LOGOUT_URI || ""), "/admin/login");
   const scope = normalizeScopes(String(import.meta.env.VITE_COGNITO_SCOPES || "").trim() || "openid email profile");
 
   return {
