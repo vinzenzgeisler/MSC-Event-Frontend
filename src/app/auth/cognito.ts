@@ -3,6 +3,7 @@ import type { AuthSession } from "@/app/auth/auth-store";
 const COGNITO_STATE_KEY = "msc_cognito_oauth_state";
 const COGNITO_VERIFIER_KEY = "msc_cognito_pkce_verifier";
 const COGNITO_RETURN_TO_KEY = "msc_cognito_return_to";
+const REQUIRED_SCOPES = ["openid", "email", "profile"] as const;
 
 function base64UrlEncode(bytes: Uint8Array): string {
   const raw = String.fromCharCode(...bytes);
@@ -28,12 +29,24 @@ export function isCognitoEnabled() {
   return String(import.meta.env.VITE_COGNITO_ENABLED || "false").toLowerCase() === "true";
 }
 
+function normalizeScopes(raw: string): string {
+  const seen = new Set<string>();
+  raw
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => seen.add(item));
+
+  REQUIRED_SCOPES.forEach((scope) => seen.add(scope));
+  return Array.from(seen).join(" ");
+}
+
 export function getCognitoConfig() {
   const domain = String(import.meta.env.VITE_COGNITO_DOMAIN || "").trim().replace(/\/$/, "");
   const clientId = String(import.meta.env.VITE_COGNITO_CLIENT_ID || "").trim();
   const redirectUri = String(import.meta.env.VITE_COGNITO_REDIRECT_URI || "").trim() || `${window.location.origin}/admin/login`;
   const logoutUri = String(import.meta.env.VITE_COGNITO_LOGOUT_URI || "").trim() || `${window.location.origin}/admin/login`;
-  const scope = String(import.meta.env.VITE_COGNITO_SCOPES || "").trim() || "openid email profile";
+  const scope = normalizeScopes(String(import.meta.env.VITE_COGNITO_SCOPES || "").trim() || "openid email profile");
 
   return {
     domain,
@@ -48,8 +61,8 @@ export function isCognitoConfigured() {
   if (!isCognitoEnabled()) {
     return false;
   }
-  const { domain, clientId } = getCognitoConfig();
-  return Boolean(domain && clientId);
+  const { domain, clientId, redirectUri } = getCognitoConfig();
+  return Boolean(domain && clientId && redirectUri);
 }
 
 export function shouldShowManualTokenLogin() {
@@ -79,6 +92,11 @@ export async function startCognitoLogin(returnTo?: string) {
   }
 
   const { domain, clientId, redirectUri, scope } = getCognitoConfig();
+  try {
+    new URL(redirectUri);
+  } catch {
+    throw new Error("VITE_COGNITO_REDIRECT_URI ist ungültig. Bitte exakt die erlaubte Callback-URL setzen.");
+  }
   const state = randomString(36);
   const verifier = randomString(96);
   const challenge = await createCodeChallenge(verifier);
