@@ -237,8 +237,6 @@ export const registrationService = {
       startsAt: response.event.startsAt,
       endsAt: response.event.endsAt,
       location: "",
-      contactEmail: response.event.contactEmail ?? null,
-      websiteUrl: response.event.websiteUrl ?? null,
       registrationOpen: response.registration.isOpen,
       registrationOpenAt: response.event.registrationOpenAt,
       registrationCloseAt: response.event.registrationCloseAt,

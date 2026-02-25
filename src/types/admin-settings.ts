@@ -24,8 +24,6 @@ export type AdminSettingsEventForm = {
   name: string;
   startsAt: string;
   endsAt: string;
-  contactEmail: string;
-  websiteUrl: string;
   registrationOpenAt: string;
   registrationCloseAt: string;
 };

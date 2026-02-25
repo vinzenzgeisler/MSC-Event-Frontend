@@ -91,8 +91,6 @@ export type PublicEventOverview = {
   startsAt: string;
   endsAt: string;
   location: string;
-  contactEmail: string | null;
-  websiteUrl: string | null;
   registrationOpen: boolean;
   registrationOpenAt: string | null;
   registrationCloseAt: string | null;

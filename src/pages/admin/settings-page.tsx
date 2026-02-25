@@ -39,8 +39,6 @@ function eventToForm(event: AdminSettingsEvent): AdminSettingsEventForm {
     name: event.name,
     startsAt: event.startsAt,
     endsAt: event.endsAt,
-    contactEmail: event.contactEmail ?? "",
-    websiteUrl: event.websiteUrl ?? "",
     registrationOpenAt: toDatetimeLocal(event.registrationOpenAt),
     registrationCloseAt: toDatetimeLocal(event.registrationCloseAt)
   };
@@ -119,19 +117,6 @@ function parseDateTime(value: string) {
   return parsed;
 }
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isValidWebsiteUrl(value: string) {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 function asRoleList(value: string[]) {
   const unique = new Set<IamRole>();
   value.forEach((item) => {
@@ -163,8 +148,6 @@ export function AdminSettingsPage() {
     name: "",
     startsAt: "",
     endsAt: "",
-    contactEmail: "",
-    websiteUrl: "",
     registrationOpenAt: "",
     registrationCloseAt: ""
   });
@@ -286,8 +269,6 @@ export function AdminSettingsPage() {
           name: "",
           startsAt: "",
           endsAt: "",
-          contactEmail: "",
-          websiteUrl: "",
           registrationOpenAt: "",
           registrationCloseAt: ""
         });
@@ -355,16 +336,6 @@ export function AdminSettingsPage() {
       return;
     }
 
-    if (eventForm.contactEmail.trim() && !isValidEmail(eventForm.contactEmail.trim())) {
-      setEventError("Kontakt-E-Mail ist ungültig.");
-      return;
-    }
-
-    if (eventForm.websiteUrl.trim() && !isValidWebsiteUrl(eventForm.websiteUrl.trim())) {
-      setEventError("Website-URL ist ungültig.");
-      return;
-    }
-
     const hasRegistrationOpen = Boolean(eventForm.registrationOpenAt);
     const hasRegistrationClose = Boolean(eventForm.registrationCloseAt);
     if (hasRegistrationOpen !== hasRegistrationClose) {
@@ -388,8 +359,6 @@ export function AdminSettingsPage() {
         name: eventForm.name.trim(),
         startsAt: eventForm.startsAt,
         endsAt: eventForm.endsAt,
-        contactEmail: eventForm.contactEmail,
-        websiteUrl: eventForm.websiteUrl,
         registrationOpenAt: eventForm.registrationOpenAt,
         registrationCloseAt: eventForm.registrationCloseAt
       });
@@ -428,16 +397,6 @@ export function AdminSettingsPage() {
 
     if (eventForm.startsAt > eventForm.endsAt) {
       setEventError("Event-Beginn darf nicht nach Event-Ende liegen.");
-      return;
-    }
-
-    if (eventForm.contactEmail.trim() && !isValidEmail(eventForm.contactEmail.trim())) {
-      setEventError("Kontakt-E-Mail ist ungültig.");
-      return;
-    }
-
-    if (eventForm.websiteUrl.trim() && !isValidWebsiteUrl(eventForm.websiteUrl.trim())) {
-      setEventError("Website-URL ist ungültig.");
       return;
     }
 
@@ -769,24 +728,6 @@ export function AdminSettingsPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>Kontakt-E-Mail (optional)</Label>
-                    <Input
-                      type="email"
-                      value={eventForm.contactEmail}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, contactEmail: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <Label>Website-URL (optional)</Label>
-                    <Input
-                      type="url"
-                      value={eventForm.websiteUrl}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, websiteUrl: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
                     <Label>Event beginnt</Label>
                     <Input
                       type="date"
@@ -846,24 +787,6 @@ export function AdminSettingsPage() {
                         value={eventForm.name}
                         disabled={!canManage || !eventState}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, name: event.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Kontakt-E-Mail</Label>
-                      <Input
-                        type="email"
-                        value={eventForm.contactEmail}
-                        disabled={!canManage || !eventState}
-                        onChange={(event) => setEventForm((prev) => ({ ...prev, contactEmail: event.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-1 md:col-span-2">
-                      <Label>Website-URL</Label>
-                      <Input
-                        type="url"
-                        value={eventForm.websiteUrl}
-                        disabled={!canManage || !eventState}
-                        onChange={(event) => setEventForm((prev) => ({ ...prev, websiteUrl: event.target.value }))}
                       />
                     </div>
                     <div className="space-y-1">
@@ -944,18 +867,22 @@ export function AdminSettingsPage() {
                       {pricingForm.classRules.map((rule, index) => (
                         <div key={rule.classId} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_220px]">
                           <div className="text-sm font-medium text-slate-900">{rule.className}</div>
-                          <Input
-                            value={rule.baseFeeCents}
-                            disabled={!canManage || !eventState}
-                            onChange={(event) => {
-                              const value = event.target.value.replace(/\D/g, "");
-                              setPricingForm((prev) => {
-                                const next = [...prev.classRules];
-                                next[index] = { ...next[index], baseFeeCents: value };
-                                return { ...prev, classRules: next };
-                              });
-                            }}
-                          />
+                          <div className="space-y-1">
+                            <Label>Basispreis (Cent)</Label>
+                            <Input
+                              value={rule.baseFeeCents}
+                              inputMode="numeric"
+                              disabled={!canManage || !eventState}
+                              onChange={(event) => {
+                                const value = event.target.value.replace(/\D/g, "");
+                                setPricingForm((prev) => {
+                                  const next = [...prev.classRules];
+                                  next[index] = { ...next[index], baseFeeCents: value };
+                                  return { ...prev, classRules: next };
+                                });
+                              }}
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>

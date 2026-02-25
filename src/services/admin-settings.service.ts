@@ -71,11 +71,6 @@ function asVehicleType(value: unknown): VehicleType {
   return value === "moto" ? "moto" : "auto";
 }
 
-function normalizeOptionalString(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
 function mapClass(item: AdminClassesListResponse["classes"][number], eventId: string): AdminSettingsClass | null {
   if (!item?.id || !item?.name) {
     return null;
@@ -100,9 +95,7 @@ export const adminSettingsService = {
     const body: Record<string, unknown> = {
       name: payload.name,
       startsAt: payload.startsAt,
-      endsAt: payload.endsAt,
-      contactEmail: normalizeOptionalString(payload.contactEmail),
-      websiteUrl: normalizeOptionalString(payload.websiteUrl)
+      endsAt: payload.endsAt
     };
 
     if (payload.registrationOpenAt) {
@@ -129,8 +122,6 @@ export const adminSettingsService = {
         name: payload.name,
         startsAt: payload.startsAt,
         endsAt: payload.endsAt,
-        contactEmail: normalizeOptionalString(payload.contactEmail),
-        websiteUrl: normalizeOptionalString(payload.websiteUrl),
         registrationOpenAt: payload.registrationOpenAt ? new Date(payload.registrationOpenAt).toISOString() : null,
         registrationCloseAt: payload.registrationCloseAt ? new Date(payload.registrationCloseAt).toISOString() : null
       }

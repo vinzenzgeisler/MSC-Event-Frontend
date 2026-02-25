@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { AnmeldungI18nProvider, type AnmeldungLocale, useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { publicContactEmail, publicWebsiteUrl } from "@/config/public-info";
 import { ApiError } from "@/services/api/http-client";
 import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
 import { registrationService } from "@/services/registration.service";
@@ -11,8 +12,6 @@ type HeaderEvent = {
   startsAt: string;
   endsAt: string;
   registrationCloseAt: string | null;
-  contactEmail: string | null;
-  websiteUrl: string | null;
   pricingRules: PublicEventOverview["pricingRules"];
 };
 
@@ -124,8 +123,6 @@ function PublicLayoutContent() {
           startsAt: response.startsAt,
           endsAt: response.endsAt,
           registrationCloseAt: response.registrationCloseAt,
-          contactEmail: response.contactEmail,
-          websiteUrl: response.websiteUrl,
           pricingRules: response.pricingRules
         });
       })
@@ -154,8 +151,8 @@ function PublicLayoutContent() {
   }, [headerEvent, locale]);
 
   const headerTitle = headerEvent?.name || "";
-  const headerWebsiteUrl = headerEvent?.websiteUrl?.trim() || "";
-  const headerContactEmail = headerEvent?.contactEmail?.trim() || "";
+  const headerWebsiteUrl = publicWebsiteUrl;
+  const headerContactEmail = publicContactEmail;
   const pricingSnapshot = useMemo(() => {
     if (!headerEvent) {
       return null;
