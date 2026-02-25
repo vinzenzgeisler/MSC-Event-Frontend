@@ -38,10 +38,6 @@ export function AdminLoginPage() {
     }
     if (reason === "session_max_age") {
       setError("Die maximale Sitzungsdauer wurde erreicht. Bitte erneut anmelden.");
-      return;
-    }
-    if (reason === "mfa_required") {
-      setError("Für Admin-Zugriffe ist eine Anmeldung mit MFA erforderlich.");
     }
   }, []);
 

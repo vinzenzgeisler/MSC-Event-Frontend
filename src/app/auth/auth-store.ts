@@ -3,7 +3,7 @@ const SESSION_KEY = "msc_admin_auth_session";
 const LOGOUT_REASON_KEY = "msc_admin_logout_reason";
 
 export type AuthProvider = "manual" | "cognito";
-export type AuthLogoutReason = "session_expired" | "idle_timeout" | "session_max_age" | "mfa_required";
+export type AuthLogoutReason = "session_expired" | "idle_timeout" | "session_max_age";
 
 export type AuthSession = {
   apiToken?: string;
@@ -122,7 +122,7 @@ export function setAuthLogoutReason(reason: AuthLogoutReason) {
 export function consumeAuthLogoutReason(): AuthLogoutReason | null {
   const value = localStorage.getItem(LOGOUT_REASON_KEY);
   localStorage.removeItem(LOGOUT_REASON_KEY);
-  if (value === "session_expired" || value === "idle_timeout" || value === "session_max_age" || value === "mfa_required") {
+  if (value === "session_expired" || value === "idle_timeout" || value === "session_max_age") {
     return value;
   }
   return null;
