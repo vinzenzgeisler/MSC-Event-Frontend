@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bike, Car, Download, Loader2, Mail, Trash2, Wallet } from "lucide-react";
+import { Bike, Car, CheckCircle2, Clock3, Download, Loader2, Mail, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -449,13 +449,37 @@ export function AdminEntryDetailPage() {
                 <CardTitle>Zahlung</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-slate-700">
-                <div className="rounded-md border bg-slate-50 p-3">
-                  <div className="text-xs uppercase text-slate-500">Zahlungsstatus</div>
-                  <div className="mt-1 font-medium text-slate-900">
-                    {paymentState === "paid" ? "Bezahlt" : "Noch nicht bezahlt"}
+                <div
+                  className={cn(
+                    "flex items-center gap-4 rounded-xl border p-4",
+                    paymentState === "paid"
+                      ? "border-emerald-200 bg-emerald-50/70"
+                      : "border-amber-200 bg-amber-50/70"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex h-12 w-12 items-center justify-center rounded-full",
+                      paymentState === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                    )}
+                  >
+                    {paymentState === "paid" ? <CheckCircle2 className="h-6 w-6" /> : <Clock3 className="h-6 w-6" />}
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">Zahlungsstatus</div>
+                    <div className="mt-0.5 text-lg font-semibold text-slate-900">
+                      {paymentState === "paid" ? "Bezahlt" : "Offen"}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {paymentState === "paid"
+                        ? "Zahlungseingang wurde bestätigt."
+                        : "Zahlungseingang wurde noch nicht bestätigt."}
+                    </div>
+                  </div>
+                  <Badge className={`${paymentStatusClasses(paymentState)} h-7 px-2.5 text-xs`} variant="outline">
+                    {paymentStatusLabel(paymentState)}
+                  </Badge>
                 </div>
-                <p className="text-xs text-slate-500">Zahlungsbetrag wird intern verwaltet; hier wird nur bezahlt / nicht bezahlt geführt.</p>
               </CardContent>
             </Card>
 
