@@ -504,6 +504,23 @@ export const adminEntriesService = {
     };
 
     const mapped = statusMap[transition];
+    const waitForTargetStatus = async () => {
+      const attempts = 8;
+      const delayMs = 350;
+
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        const current = await adminEntriesService.getEntryDetail(entryId).catch(() => null);
+        if (current?.status === mapped.status) {
+          return true;
+        }
+        if (attempt < attempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+
+      return false;
+    };
+
     const statusPayload = {
       acceptanceStatus: mapped.status,
       sendLifecycleMail: mapped.sendLifecycleMail,
@@ -522,12 +539,14 @@ export const adminEntriesService = {
       return { ok: true };
     } catch (error) {
       if (!isTransitionNotAllowedError(error)) {
+        if (await waitForTargetStatus()) {
+          return { ok: true, eventuallyConsistent: true };
+        }
         throw error;
       }
     }
 
-    const current = await adminEntriesService.getEntryDetail(entryId).catch(() => null);
-    if (current?.status === mapped.status) {
+    if (await waitForTargetStatus()) {
       return { ok: true, alreadyInTargetStatus: true };
     }
 
@@ -552,8 +571,7 @@ export const adminEntriesService = {
 
       return { ok: true, viaShortlist: true };
     } catch (error) {
-      const latest = await adminEntriesService.getEntryDetail(entryId).catch(() => null);
-      if (latest?.status === mapped.status) {
+      if (await waitForTargetStatus()) {
         return { ok: true, alreadyInTargetStatus: true };
       }
       throw error;
