@@ -104,6 +104,16 @@ function normalizePaymentStatus(value: unknown): PaymentStatus {
   return value === "paid" ? "paid" : "due";
 }
 
+function lifecycleEventTypeForStatus(status: AcceptanceStatus): "preselection" | "accepted_open_payment" | "rejected" {
+  if (status === "accepted") {
+    return "accepted_open_payment";
+  }
+  if (status === "rejected") {
+    return "rejected";
+  }
+  return "preselection";
+}
+
 function payloadToText(payload: Record<string, unknown> | null | undefined) {
   if (!payload) {
     return "-";
@@ -535,7 +545,7 @@ export const adminEntriesService = {
     return { ok: true };
   },
 
-  async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string }) {
+  async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string; status?: AcceptanceStatus }) {
     const body = {
       internalNote: payload.internalNote,
       driverNote: payload.driverNote
@@ -550,12 +560,33 @@ export const adminEntriesService = {
       if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 405)) {
         throw error;
       }
+    }
 
-      return requestJson(`/admin/entries/${entryId}`, {
+    try {
+      return await requestJson(`/admin/entries/${entryId}`, {
         method: "PATCH",
         body
       });
+    } catch (error) {
+      if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 405)) {
+        throw error;
+      }
     }
+
+    if (!payload.status) {
+      throw new Error("Notizen konnten nicht gespeichert werden: Notiz-Endpoint im Backend nicht verfügbar.");
+    }
+
+    return requestJson(`/admin/entries/${entryId}/status`, {
+      method: "PATCH",
+      body: {
+        acceptanceStatus: payload.status,
+        sendLifecycleMail: false,
+        lifecycleEventType: lifecycleEventTypeForStatus(payload.status),
+        internalNote: payload.internalNote,
+        driverNote: payload.driverNote
+      }
+    });
   },
 
   async markConfirmationMailSent(entryId: string) {

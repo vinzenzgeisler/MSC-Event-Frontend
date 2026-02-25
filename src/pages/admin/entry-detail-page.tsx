@@ -857,7 +857,7 @@ export function AdminEntryDetailPage() {
                 onClick={async () => {
                   await runAction(
                     "notes-save",
-                    () => adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote }),
+                    () => adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote, status: detail.status }),
                     "Notizen gespeichert.",
                     "Notizen konnten nicht gespeichert werden."
                   );
