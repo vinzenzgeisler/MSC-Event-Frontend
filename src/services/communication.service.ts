@@ -74,7 +74,7 @@ export const communicationService = {
     });
   },
 
-  async queueAcceptedMailForEntry(entryId: string, options?: { allowDuplicate?: boolean }) {
+  async queueAcceptedMailForEntry(entryId: string, options?: { allowDuplicate?: boolean; includeDriverNote?: boolean }) {
     const eventId = await getAdminEventId();
     return requestJson<AdminMailQueueResponse>("/admin/mail/lifecycle/queue", {
       method: "POST",
@@ -82,6 +82,7 @@ export const communicationService = {
         eventId,
         entryId,
         eventType: "registration_received",
+        includeDriverNote: options?.includeDriverNote === true ? true : undefined,
         allowDuplicate: options?.allowDuplicate === true ? true : undefined
       }
     });

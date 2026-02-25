@@ -82,6 +82,44 @@ function HintButton(props: {
   );
 }
 
+function MailNoteSwitch(props: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-md border bg-slate-50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium text-slate-900">{props.title}</div>
+          <div className="text-xs text-slate-500">{props.description}</div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={props.checked}
+          disabled={props.disabled}
+          onClick={() => props.onChange(!props.checked)}
+          className={cn(
+            "relative inline-flex h-6 w-11 items-center rounded-full border transition",
+            props.checked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-slate-200",
+            props.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-5 w-5 transform rounded-full bg-white shadow transition",
+              props.checked ? "translate-x-5" : "translate-x-0.5"
+            )}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminEntryDetailPage() {
   const HISTORY_PREVIEW_LIMIT = 5;
   const { roles } = useAuth();
@@ -105,6 +143,8 @@ export function AdminEntryDetailPage() {
   const [imageOpen, setImageOpen] = useState(false);
   const [internalNote, setInternalNote] = useState("");
   const [driverNote, setDriverNote] = useState("");
+  const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
+  const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
   const [pendingAcceptConfirm, setPendingAcceptConfirm] = useState(false);
   const [pendingRejectConfirm, setPendingRejectConfirm] = useState(false);
   const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
@@ -217,6 +257,7 @@ export function AdminEntryDetailPage() {
   }
 
   const paymentState = paid ? "paid" : "due";
+  const hasDriverNote = driverNote.trim().length > 0;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const anyActionInFlight = actionInFlight !== null;
@@ -794,7 +835,7 @@ export function AdminEntryDetailPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-900">Fahrer</label>
-                <p className="text-xs text-slate-500">Wird bei Zulassung per E-Mail an den Fahrer gesendet.</p>
+                <p className="text-xs text-slate-500">Kann bei Zulassung oder Ablehnung optional per E-Mail mitgesendet werden.</p>
                 <textarea
                   className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={driverNote}
@@ -840,6 +881,19 @@ export function AdminEntryDetailPage() {
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
             <p className="mt-2 text-sm text-slate-600">Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen.</p>
+            <div className="mt-3">
+              <MailNoteSwitch
+                checked={includeDriverNoteOnAccept}
+                disabled={!hasDriverNote || actionInFlight === "status-accepted"}
+                onChange={setIncludeDriverNoteOnAccept}
+                title="Fahrer-Notiz in Mail mitsenden"
+                description={
+                  hasDriverNote
+                    ? "Die aktuelle Fahrer-Notiz wird in der Zulassungs-Mail ergänzt."
+                    : "Keine Fahrer-Notiz vorhanden."
+                }
+              />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
@@ -859,7 +913,10 @@ export function AdminEntryDetailPage() {
                   }
                   const success = await runAction(
                     "status-accepted",
-                    () => adminEntriesService.setEntryStatus(detail.id, "to_accepted"),
+                    () =>
+                      adminEntriesService.setEntryStatus(detail.id, "to_accepted", {
+                        includeDriverNoteInLifecycleMail: includeDriverNoteOnAccept
+                      }),
                     "Status auf Zugelassen gesetzt.",
                     "Status konnte nicht geändert werden."
                   );
@@ -938,6 +995,19 @@ export function AdminEntryDetailPage() {
             <p className="mt-2 text-sm text-slate-600">
               Diese Nennung wird als abgelehnt markiert. Der Status kann später wieder geändert werden.
             </p>
+            <div className="mt-3">
+              <MailNoteSwitch
+                checked={includeDriverNoteOnReject}
+                disabled={!hasDriverNote || actionInFlight === "status-rejected"}
+                onChange={setIncludeDriverNoteOnReject}
+                title="Fahrer-Notiz in Mail mitsenden"
+                description={
+                  hasDriverNote
+                    ? "Die aktuelle Fahrer-Notiz wird in der Ablehnungs-Mail ergänzt."
+                    : "Keine Fahrer-Notiz vorhanden."
+                }
+              />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
@@ -958,7 +1028,10 @@ export function AdminEntryDetailPage() {
                   }
                   const success = await runAction(
                     "status-rejected",
-                    () => adminEntriesService.setEntryStatus(detail.id, "to_rejected"),
+                    () =>
+                      adminEntriesService.setEntryStatus(detail.id, "to_rejected", {
+                        includeDriverNoteInLifecycleMail: includeDriverNoteOnReject
+                      }),
                     "Status auf Abgelehnt gesetzt.",
                     "Status konnte nicht geändert werden."
                   );

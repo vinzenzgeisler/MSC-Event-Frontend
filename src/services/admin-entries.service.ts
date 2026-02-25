@@ -483,7 +483,11 @@ export const adminEntriesService = {
     return fromAdminEntryDetailDto(response.entry, response.history);
   },
 
-  async setEntryStatus(entryId: string, transition: "to_shortlist" | "to_accepted" | "to_rejected") {
+  async setEntryStatus(
+    entryId: string,
+    transition: "to_shortlist" | "to_accepted" | "to_rejected",
+    options?: { includeDriverNoteInLifecycleMail?: boolean }
+  ) {
     const statusMap: Record<typeof transition, { status: AcceptanceStatus; lifecycleEventType: string; sendLifecycleMail: boolean }> = {
       to_shortlist: { status: "shortlist", lifecycleEventType: "preselection", sendLifecycleMail: false },
       to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment", sendLifecycleMail: true },
@@ -497,7 +501,11 @@ export const adminEntriesService = {
       body: {
         acceptanceStatus: mapped.status,
         sendLifecycleMail: mapped.sendLifecycleMail,
-        lifecycleEventType: mapped.lifecycleEventType
+        lifecycleEventType: mapped.lifecycleEventType,
+        includeDriverNoteInLifecycleMail:
+          mapped.sendLifecycleMail && typeof options?.includeDriverNoteInLifecycleMail === "boolean"
+            ? options.includeDriverNoteInLifecycleMail
+            : undefined
       }
     });
 
