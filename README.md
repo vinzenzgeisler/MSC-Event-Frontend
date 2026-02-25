@@ -40,4 +40,4 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 
 - API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.
 - IAM/Rollen im Frontend: `admin`, `editor`, `viewer` (Legacy-Claim `checkin` wird auf `editor` gemappt).
-- Gelöschte Nennungen: Admin-Ansicht unter `/admin/entries/deleted` mit Wiederherstellen-Action.
+- Gelöschte Nennungen: im Nennungen-Filter über „Ansicht“ (nur für Admin) mit Wiederherstellen-Action.

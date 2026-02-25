@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar";
@@ -7,16 +7,18 @@ import { EntriesTable } from "@/components/features/admin/entries-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import { acceptanceStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
+import { acceptanceStatusClasses, acceptanceStatusLabel, paymentStatusClasses, paymentStatusLabel } from "@/lib/admin-status";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
-import type { AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
+import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
 
 const PAGE_SIZE = 25;
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_KEY = "admin.entries.page.cache.v1";
+
+type EntriesScope = "active" | "deleted";
 
 const initialFilter: AdminEntriesFilter = {
   query: "",
@@ -65,7 +67,15 @@ function filterFromSearchParams(searchParams: URLSearchParams): AdminEntriesFilt
   };
 }
 
-function searchParamsFromFilter(filter: AdminEntriesFilter): URLSearchParams {
+function scopeFromSearchParams(searchParams: URLSearchParams, canDeleteEntries: boolean): EntriesScope {
+  if (!canDeleteEntries) {
+    return "active";
+  }
+  const scope = searchParams.get("scope");
+  return scope === "deleted" ? "deleted" : "active";
+}
+
+function searchParamsFromState(filter: AdminEntriesFilter, scope: EntriesScope, canDeleteEntries: boolean): URLSearchParams {
   const params = new URLSearchParams();
   if (filter.query.trim()) {
     params.set("q", filter.query);
@@ -82,6 +92,9 @@ function searchParamsFromFilter(filter: AdminEntriesFilter): URLSearchParams {
   if (filter.checkinIdVerified !== "all") {
     params.set("checkin", filter.checkinIdVerified);
   }
+  if (canDeleteEntries && scope === "deleted") {
+    params.set("scope", "deleted");
+  }
   return params;
 }
 
@@ -96,6 +109,23 @@ function sameFilter(a: AdminEntriesFilter, b: AdminEntriesFilter) {
 }
 
 function mergeRowsById(existing: AdminEntryListItem[], incoming: AdminEntryListItem[]) {
+  if (!incoming.length) {
+    return existing;
+  }
+
+  const seen = new Set(existing.map((item) => item.id));
+  const merged = [...existing];
+  incoming.forEach((item) => {
+    if (seen.has(item.id)) {
+      return;
+    }
+    seen.add(item.id);
+    merged.push(item);
+  });
+  return merged;
+}
+
+function mergeDeletedRowsById(existing: AdminDeletedEntryListItem[], incoming: AdminDeletedEntryListItem[]) {
   if (!incoming.length) {
     return existing;
   }
@@ -194,6 +224,7 @@ export function AdminEntriesPage() {
 
   const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
   const [filterDraft, setFilterDraft] = useState<AdminEntriesFilter>(initialFilterRef.current);
+  const [viewScope, setViewScope] = useState<EntriesScope>(() => scopeFromSearchParams(searchParams, canDeleteEntries));
 
   const debouncedQuery = useDebouncedValue(filterDraft.query, 450);
   const appliedFilter = useMemo<AdminEntriesFilter>(
@@ -209,6 +240,8 @@ export function AdminEntriesPage() {
 
   const [rows, setRows] = useState<AdminEntryListItem[]>([]);
   const [meta, setMeta] = useState<ListMeta>(EMPTY_META);
+  const [deletedRows, setDeletedRows] = useState<AdminDeletedEntryListItem[]>([]);
+  const [deletedMeta, setDeletedMeta] = useState<ListMeta>(EMPTY_META);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [toastMessage, setToastMessage] = useState("");
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -216,9 +249,11 @@ export function AdminEntriesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
+  const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
 
   const rowsRef = useRef<AdminEntryListItem[]>([]);
+  const deletedRowsRef = useRef<AdminDeletedEntryListItem[]>([]);
   const activeRequestRef = useRef(0);
   const hydratedFromCacheRef = useRef(false);
   const firstFilterLoadRef = useRef(true);
@@ -239,7 +274,7 @@ export function AdminEntriesPage() {
 
   const isRequestActive = (requestId: number) => requestId === activeRequestRef.current;
 
-  const fetchSnapshot = useCallback(
+  const fetchActiveSnapshot = useCallback(
     async (filter: AdminEntriesFilter, minimumRows: number, requestId: number): Promise<{ rows: AdminEntryListItem[]; meta: ListMeta } | null> => {
       const targetSize = Math.max(minimumRows, PAGE_SIZE);
       let nextCursor: string | undefined;
@@ -278,7 +313,50 @@ export function AdminEntriesPage() {
     []
   );
 
-  const replaceRows = useCallback(
+  const fetchDeletedSnapshot = useCallback(
+    async (
+      filter: AdminEntriesFilter,
+      minimumRows: number,
+      requestId: number
+    ): Promise<{ rows: AdminDeletedEntryListItem[]; meta: ListMeta } | null> => {
+      const targetSize = Math.max(minimumRows, PAGE_SIZE);
+      let nextCursor: string | undefined;
+      let mergedRows: AdminDeletedEntryListItem[] = [];
+      let latestMeta = EMPTY_META;
+
+      while (true) {
+        const page = await adminEntriesService.listDeletedEntriesPage(filter, {
+          cursor: nextCursor,
+          limit: PAGE_SIZE
+        });
+
+        if (!isRequestActive(requestId)) {
+          return null;
+        }
+
+        mergedRows = mergeDeletedRowsById(mergedRows, page.entries);
+        latestMeta = page.meta;
+
+        if (!page.meta.hasMore || !page.meta.nextCursor) {
+          break;
+        }
+
+        if (mergedRows.length >= targetSize) {
+          break;
+        }
+
+        nextCursor = page.meta.nextCursor;
+      }
+
+      return {
+        rows: mergedRows,
+        meta: latestMeta
+      };
+    },
+    []
+  );
+
+  const replaceActiveRows = useCallback(
     async (filter: AdminEntriesFilter, options?: { minimumRows?: number; showLoader?: boolean; showRefreshing?: boolean; silentError?: boolean }) => {
       const requestId = beginRequest();
       const minimumRows = options?.minimumRows ?? 0;
@@ -292,7 +370,7 @@ export function AdminEntriesPage() {
       setLoadingMore(false);
 
       try {
-        const snapshot = await fetchSnapshot(filter, minimumRows, requestId);
+        const snapshot = await fetchActiveSnapshot(filter, minimumRows, requestId);
         if (!snapshot || !isRequestActive(requestId)) {
           return;
         }
@@ -316,10 +394,50 @@ export function AdminEntriesPage() {
         setLoadingMore(false);
       }
     },
-    [fetchSnapshot]
+    [fetchActiveSnapshot]
   );
 
-  const loadMore = useCallback(async () => {
+  const replaceDeletedRows = useCallback(
+    async (filter: AdminEntriesFilter, options?: { minimumRows?: number; showLoader?: boolean; showRefreshing?: boolean; silentError?: boolean }) => {
+      const requestId = beginRequest();
+      const minimumRows = options?.minimumRows ?? 0;
+
+      if (options?.showLoader) {
+        setLoadingInitial(true);
+      }
+      if (options?.showRefreshing) {
+        setRefreshing(true);
+      }
+      setLoadingMore(false);
+
+      try {
+        const snapshot = await fetchDeletedSnapshot(filter, minimumRows, requestId);
+        if (!snapshot || !isRequestActive(requestId)) {
+          return;
+        }
+
+        setDeletedRows(snapshot.rows);
+        setDeletedMeta(snapshot.meta);
+      } catch (error) {
+        if (!isRequestActive(requestId)) {
+          return;
+        }
+        if (!options?.silentError) {
+          showToast(getApiErrorMessage(error, "Gelöschte Nennungen konnten nicht geladen werden."));
+        }
+      } finally {
+        if (!isRequestActive(requestId)) {
+          return;
+        }
+        setLoadingInitial(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [fetchDeletedSnapshot]
+  );
+
+  const loadMoreActive = useCallback(async () => {
     if (loadingInitial || loadingMore || refreshing || !meta.hasMore || !meta.nextCursor) {
       return;
     }
@@ -356,21 +474,76 @@ export function AdminEntriesPage() {
     }
   }, [appliedFilter, loadingInitial, loadingMore, meta.hasMore, meta.nextCursor, refreshing]);
 
+  const loadMoreDeleted = useCallback(async () => {
+    if (loadingInitial || loadingMore || refreshing || !deletedMeta.hasMore || !deletedMeta.nextCursor) {
+      return;
+    }
+
+    const requestId = beginRequest();
+    setLoadingMore(true);
+
+    try {
+      const page = await adminEntriesService.listDeletedEntriesPage(appliedFilter, {
+        cursor: deletedMeta.nextCursor,
+        limit: PAGE_SIZE
+      });
+
+      if (!isRequestActive(requestId)) {
+        return;
+      }
+
+      setDeletedRows((prev) => mergeDeletedRowsById(prev, page.entries));
+      setDeletedMeta(page.meta);
+    } catch (error) {
+      if (!isRequestActive(requestId)) {
+        return;
+      }
+      showToast(getApiErrorMessage(error, "Weitere gelöschte Nennungen konnten nicht geladen werden."));
+    } finally {
+      if (!isRequestActive(requestId)) {
+        return;
+      }
+      setLoadingMore(false);
+    }
+  }, [appliedFilter, deletedMeta.hasMore, deletedMeta.nextCursor, loadingInitial, loadingMore, refreshing]);
+
+  const loadMore = useCallback(async () => {
+    if (viewScope === "deleted") {
+      await loadMoreDeleted();
+      return;
+    }
+    await loadMoreActive();
+  }, [loadMoreActive, loadMoreDeleted, viewScope]);
+
   const refreshSnapshot = useCallback(
     async (manual: boolean) => {
-      await replaceRows(appliedFilter, {
+      if (viewScope === "deleted") {
+        await replaceDeletedRows(appliedFilter, {
+          minimumRows: deletedRowsRef.current.length,
+          showLoader: manual && deletedRowsRef.current.length === 0,
+          showRefreshing: manual,
+          silentError: !manual
+        });
+        return;
+      }
+
+      await replaceActiveRows(appliedFilter, {
         minimumRows: rowsRef.current.length,
         showLoader: manual && rowsRef.current.length === 0,
         showRefreshing: manual,
         silentError: !manual
       });
     },
-    [appliedFilter, replaceRows]
+    [appliedFilter, replaceActiveRows, replaceDeletedRows, viewScope]
   );
 
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
+
+  useEffect(() => {
+    deletedRowsRef.current = deletedRows;
+  }, [deletedRows]);
 
   useEffect(() => {
     const cached = readEntriesCache(initialFilterRef.current);
@@ -381,8 +554,10 @@ export function AdminEntriesPage() {
     hydratedFromCacheRef.current = true;
     setRows(cached.rows);
     setMeta(cached.meta);
-    setLoadingInitial(false);
-  }, []);
+    if (viewScope === "active") {
+      setLoadingInitial(false);
+    }
+  }, [viewScope]);
 
   useEffect(() => {
     adminMetaService
@@ -394,16 +569,32 @@ export function AdminEntriesPage() {
   useEffect(() => {
     const nextFilter = filterFromSearchParams(searchParams);
     setFilterDraft((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
-  }, [searchParams]);
+
+    const nextScope = scopeFromSearchParams(searchParams, canDeleteEntries);
+    setViewScope((prev) => (prev === nextScope ? prev : nextScope));
+  }, [canDeleteEntries, searchParams]);
 
   useEffect(() => {
-    const nextParams = searchParamsFromFilter(appliedFilter);
+    const nextParams = searchParamsFromState(appliedFilter, viewScope, canDeleteEntries);
     if (nextParams.toString() !== searchParams.toString()) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [appliedFilter, searchParams, setSearchParams]);
+  }, [appliedFilter, canDeleteEntries, searchParams, setSearchParams, viewScope]);
 
   useEffect(() => {
+    if (viewScope === "deleted") {
+      setDeletedRows([]);
+      setDeletedMeta((prev) => ({ ...prev, hasMore: false, nextCursor: null }));
+
+      void replaceDeletedRows(appliedFilter, {
+        minimumRows: 0,
+        showLoader: true,
+        showRefreshing: false,
+        silentError: false
+      });
+      return;
+    }
+
     const keepCachedRows = firstFilterLoadRef.current && hydratedFromCacheRef.current;
     firstFilterLoadRef.current = false;
 
@@ -412,16 +603,16 @@ export function AdminEntriesPage() {
       setMeta((prev) => ({ ...prev, hasMore: false, nextCursor: null }));
     }
 
-    void replaceRows(appliedFilter, {
+    void replaceActiveRows(appliedFilter, {
       minimumRows: keepCachedRows ? rowsRef.current.length : 0,
       showLoader: !keepCachedRows,
       showRefreshing: keepCachedRows,
       silentError: false
     });
-  }, [appliedFilter, replaceRows]);
+  }, [appliedFilter, replaceActiveRows, replaceDeletedRows, viewScope]);
 
   useEffect(() => {
-    if (!loadMoreNode || !meta.hasMore || loadingMore || loadingInitial) {
+    if (viewScope !== "active" || !loadMoreNode || !meta.hasMore || loadingMore || loadingInitial) {
       return;
     }
 
@@ -439,7 +630,7 @@ export function AdminEntriesPage() {
     return () => {
       observer.disconnect();
     };
-  }, [loadMore, loadMoreNode, loadingInitial, loadingMore, meta.hasMore]);
+  }, [loadMore, loadMoreNode, loadingInitial, loadingMore, meta.hasMore, viewScope]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -499,27 +690,26 @@ export function AdminEntriesPage() {
     });
   };
 
+  const shownCount = viewScope === "deleted" ? deletedRows.length : rows.length;
+  const shownTotal = viewScope === "deleted" ? deletedMeta.total : meta.total;
   const loadedCountText =
-    meta.total > 0
-      ? `${meta.total} Treffer in aktueller Filterung${rows.length < meta.total ? ` · ${rows.length} geladen` : ""}${refreshing ? " · aktualisiere…" : ""}`
-      : `${rows.length} Treffer in aktueller Filterung${loadingInitial ? " · lädt…" : ""}`;
+    shownTotal > 0
+      ? `${shownTotal} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${shownCount < shownTotal ? ` · ${shownCount} geladen` : ""}${refreshing ? " · aktualisiere…" : ""}`
+      : `${shownCount} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${loadingInitial ? " · lädt…" : ""}`;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
-        {canDeleteEntries && (
-          <Button asChild type="button" size="sm" variant="outline">
-            <Link to="/admin/entries/deleted">Gelöschte Nennungen</Link>
-          </Button>
-        )}
-      </div>
+      <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
       <div className="rounded-xl border bg-white p-4">
         <EntriesFilterBar
           filter={filterDraft}
           classOptions={classOptions}
+          statusScope={viewScope}
+          allowDeletedStatusOption={canDeleteEntries}
+          onStatusScopeChange={(scope) => setViewScope(scope)}
           onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
         />
+
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs text-slate-500">{loadedCountText}</div>
           <div className="flex flex-wrap gap-2">
@@ -542,57 +732,125 @@ export function AdminEntriesPage() {
         )}
       </div>
 
-      <EntriesTable
-        rows={rows}
-        canManageStatus={canManageStatus}
-        isLoadingInitial={loadingInitial}
-        isLoadingMore={loadingMore}
-        hasMore={meta.hasMore}
-        onLoadMore={() => void loadMore()}
-        loadMoreRef={setLoadMoreNode}
-        onSetShortlist={async (entryId) => {
-          if (!canManageStatus) {
-            showToast("Nur Admin-Rollen dürfen den Status ändern.");
-            return;
-          }
-          const row = rows.find((item) => item.id === entryId);
-          if (row?.status === "shortlist") {
-            showToast("Nennung ist bereits auf Vorauswahl.");
-            return;
-          }
-          try {
-            await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
-            applyLocalStatusUpdate(entryId, "shortlist");
-            showToast(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
-          } catch (error) {
-            showToast(getApiErrorMessage(error, "Status konnte nicht aktualisiert werden."));
-          }
-        }}
-        onSetAccepted={async (entryId) => {
-          if (!canManageStatus) {
-            showToast("Nur Admin-Rollen dürfen den Status ändern.");
-            return;
-          }
-          const row = rows.find((item) => item.id === entryId);
-          if (row?.status === "accepted") {
-            showToast("Nennung ist bereits zugelassen.");
-            return;
-          }
-          setPendingAcceptEntryId(entryId);
-        }}
-        onSetRejected={async (entryId) => {
-          if (!canManageStatus) {
-            showToast("Nur Admin-Rollen dürfen den Status ändern.");
-            return;
-          }
-          const row = rows.find((item) => item.id === entryId);
-          if (row?.status === "rejected") {
-            showToast("Nennung ist bereits abgelehnt.");
-            return;
-          }
-          setPendingRejectEntryId(entryId);
-        }}
-      />
+      {viewScope === "deleted" ? (
+        <>
+          {!deletedRows.length ? (
+            <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">
+              {loadingInitial ? "Gelöschte Nennungen werden geladen…" : "Keine gelöschten Nennungen für die aktuelle Filterung."}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-left text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">Nennung</th>
+                      <th className="px-3 py-2 font-semibold">Klasse</th>
+                      <th className="px-3 py-2 font-semibold">Status</th>
+                      <th className="px-3 py-2 font-semibold">Zahlung</th>
+                      <th className="px-3 py-2 font-semibold">Gelöscht am</th>
+                      <th className="px-3 py-2 font-semibold">Gelöscht von</th>
+                      <th className="px-3 py-2 font-semibold">Grund</th>
+                      <th className="px-3 py-2 font-semibold">Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletedRows.map((row) => (
+                      <tr key={row.id} className="border-t align-top">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-slate-900">{row.name}</div>
+                          <div className="text-xs text-slate-500">
+                            #{row.startNumber} · {row.vehicleLabel}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">{row.classLabel}</td>
+                        <td className="px-3 py-2">
+                          <Badge className={acceptanceStatusClasses(row.status)} variant="outline">
+                            {acceptanceStatusLabel(row.status)}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge className={paymentStatusClasses(row.payment)} variant="outline">
+                            {paymentStatusLabel(row.payment)}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-slate-700">{row.deletedAt}</td>
+                        <td className="px-3 py-2 text-slate-700">{row.deletedBy}</td>
+                        <td className="px-3 py-2 text-slate-700">{row.deleteReason}</td>
+                        <td className="px-3 py-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setPendingRestoreEntryId(row.id)}>
+                            Wiederherstellen
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {(deletedMeta.hasMore || loadingMore) && (
+            <div className="flex flex-col items-center gap-2 py-1">
+              <Button type="button" size="sm" variant="outline" disabled={loadingMore} onClick={() => void loadMore()}>
+                {loadingMore ? "Lade weitere gelöschte Nennungen…" : "Weitere gelöschte Nennungen laden"}
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <EntriesTable
+          rows={rows}
+          canManageStatus={canManageStatus}
+          isLoadingInitial={loadingInitial}
+          isLoadingMore={loadingMore}
+          hasMore={meta.hasMore}
+          onLoadMore={() => void loadMore()}
+          loadMoreRef={setLoadMoreNode}
+          onSetShortlist={async (entryId) => {
+            if (!canManageStatus) {
+              showToast("Nur Admin-Rollen dürfen den Status ändern.");
+              return;
+            }
+            const row = rows.find((item) => item.id === entryId);
+            if (row?.status === "shortlist") {
+              showToast("Nennung ist bereits auf Vorauswahl.");
+              return;
+            }
+            try {
+              await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
+              applyLocalStatusUpdate(entryId, "shortlist");
+              showToast(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
+            } catch (error) {
+              showToast(getApiErrorMessage(error, "Status konnte nicht aktualisiert werden."));
+            }
+          }}
+          onSetAccepted={async (entryId) => {
+            if (!canManageStatus) {
+              showToast("Nur Admin-Rollen dürfen den Status ändern.");
+              return;
+            }
+            const row = rows.find((item) => item.id === entryId);
+            if (row?.status === "accepted") {
+              showToast("Nennung ist bereits zugelassen.");
+              return;
+            }
+            setPendingAcceptEntryId(entryId);
+          }}
+          onSetRejected={async (entryId) => {
+            if (!canManageStatus) {
+              showToast("Nur Admin-Rollen dürfen den Status ändern.");
+              return;
+            }
+            const row = rows.find((item) => item.id === entryId);
+            if (row?.status === "rejected") {
+              showToast("Nennung ist bereits abgelehnt.");
+              return;
+            }
+            setPendingRejectEntryId(entryId);
+          }}
+        />
+      )}
 
       {toastMessage && (
         <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
@@ -661,6 +919,43 @@ export function AdminEntriesPage() {
                 }}
               >
                 Ja, ablehnen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingRestoreEntryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Nennung wiederherstellen?</h2>
+            <p className="mt-2 text-sm text-slate-600">Die Nennung wird wieder in die normale Nennungs-Liste aufgenommen.</p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingRestoreEntryId(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  const entryId = pendingRestoreEntryId;
+                  if (!entryId) {
+                    return;
+                  }
+                  setPendingRestoreEntryId(null);
+                  try {
+                    await adminEntriesService.restoreEntry(entryId);
+                    setDeletedRows((prev) => prev.filter((item) => item.id !== entryId));
+                    setDeletedMeta((prev) => ({
+                      ...prev,
+                      total: Math.max(0, prev.total - 1)
+                    }));
+                    showToast(`Nennung ${entryId} wurde wiederhergestellt.`);
+                  } catch (error) {
+                    showToast(getApiErrorMessage(error, "Nennung konnte nicht wiederhergestellt werden."));
+                  }
+                }}
+              >
+                Ja, wiederherstellen
               </Button>
             </div>
           </div>

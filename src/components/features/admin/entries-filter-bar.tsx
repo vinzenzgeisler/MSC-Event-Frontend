@@ -6,10 +6,17 @@ import type { AdminClassOption } from "@/services/admin-meta.service";
 type EntriesFilterBarProps = {
   filter: AdminEntriesFilter;
   classOptions: AdminClassOption[];
+  statusScope?: "active" | "deleted";
+  allowDeletedStatusOption?: boolean;
+  onStatusScopeChange?: (scope: "active" | "deleted") => void;
   onChange: <K extends keyof AdminEntriesFilter>(field: K, value: AdminEntriesFilter[K]) => void;
 };
 
-export function EntriesFilterBar({ filter, classOptions, onChange }: EntriesFilterBarProps) {
+const DELETED_SCOPE_VALUE = "__deleted_scope__";
+
+export function EntriesFilterBar({ filter, classOptions, statusScope = "active", allowDeletedStatusOption = false, onStatusScopeChange, onChange }: EntriesFilterBarProps) {
+  const statusSelectValue = statusScope === "deleted" ? DELETED_SCOPE_VALUE : filter.acceptanceStatus;
+
   return (
     <div className="grid gap-3 md:grid-cols-5">
       <div className="space-y-1">
@@ -42,14 +49,24 @@ export function EntriesFilterBar({ filter, classOptions, onChange }: EntriesFilt
         <select
           id="admin-filter-status"
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={filter.acceptanceStatus}
-          onChange={(event) => onChange("acceptanceStatus", event.target.value as AdminEntriesFilter["acceptanceStatus"])}
+          value={statusSelectValue}
+          onChange={(event) => {
+            const next = event.target.value;
+            if (next === DELETED_SCOPE_VALUE) {
+              onStatusScopeChange?.("deleted");
+              onChange("acceptanceStatus", "all");
+              return;
+            }
+            onStatusScopeChange?.("active");
+            onChange("acceptanceStatus", next as AdminEntriesFilter["acceptanceStatus"]);
+          }}
         >
           <option value="all">Alle</option>
           <option value="pending">Offen</option>
           <option value="shortlist">Vorauswahl</option>
           <option value="accepted">Zugelassen</option>
           <option value="rejected">Abgelehnt</option>
+          {allowDeletedStatusOption && <option value={DELETED_SCOPE_VALUE}>Gelöschte (Admin)</option>}
         </select>
       </div>
       <div className="space-y-1">
