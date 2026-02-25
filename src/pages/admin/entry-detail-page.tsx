@@ -16,13 +16,8 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
-import { adminSettingsService } from "@/services/admin-settings.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
-
-function asEuro(cents: number) {
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
-}
 
 function centsFromEuroInput(value: string): number {
   const normalized = value.replace(",", ".").trim();
@@ -122,7 +117,6 @@ export function AdminEntryDetailPage() {
   const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
-  const [fallbackPaymentTotalCents, setFallbackPaymentTotalCents] = useState<number | null>(null);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -214,52 +208,6 @@ export function AdminEntryDetailPage() {
     loadDetail();
   }, [entryId]);
 
-  useEffect(() => {
-    let active = true;
-
-    if (!detail || detail.payment.totalCents > 0) {
-      setFallbackPaymentTotalCents(null);
-      return () => {
-        active = false;
-      };
-    }
-
-    adminSettingsService
-      .getPricingRules(detail.eventId)
-      .then((rules) => {
-        if (!active || !rules) {
-          return;
-        }
-
-        const classRule = rules.classRules.find((rule) => rule.classId === detail.classId);
-        if (!classRule) {
-          setFallbackPaymentTotalCents(null);
-          return;
-        }
-
-        const createdAt = new Date(detail.createdAt);
-        const earlyDeadline = new Date(rules.earlyDeadline);
-        const isLate =
-          Number.isFinite(createdAt.getTime()) &&
-          Number.isFinite(earlyDeadline.getTime()) &&
-          createdAt.getTime() > earlyDeadline.getTime();
-
-        const lateFeeCents = isLate ? Math.max(0, rules.lateFeeCents) : 0;
-        const secondVehicleDiscountCents = detail.isBackupVehicle ? Math.max(0, rules.secondVehicleDiscountCents) : 0;
-        const calculatedTotal = Math.max(0, classRule.baseFeeCents + lateFeeCents - secondVehicleDiscountCents);
-        setFallbackPaymentTotalCents(calculatedTotal);
-      })
-      .catch(() => {
-        if (active) {
-          setFallbackPaymentTotalCents(null);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [detail]);
-
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
   }
@@ -268,17 +216,7 @@ export function AdminEntryDetailPage() {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung nicht gefunden.</div>;
   }
 
-  const hasFallbackPayment =
-    detail.payment.totalCents === 0 && detail.payment.paidAmountCents === 0 && detail.payment.amountOpenCents === 0 && fallbackPaymentTotalCents !== null;
-  const displayedPaymentTotalCents = hasFallbackPayment ? fallbackPaymentTotalCents : detail.payment.totalCents;
-  const displayedPaymentPaidCents = detail.payment.paidAmountCents;
-  const displayedPaymentOpenCents = hasFallbackPayment
-    ? Math.max(0, displayedPaymentTotalCents - displayedPaymentPaidCents)
-    : detail.payment.amountOpenCents;
   const paymentState = paid ? "paid" : "due";
-  const paidPercent = displayedPaymentTotalCents > 0
-    ? Math.max(0, Math.min(100, Math.round((displayedPaymentPaidCents / displayedPaymentTotalCents) * 100)))
-    : 0;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const anyActionInFlight = actionInFlight !== null;
@@ -511,23 +449,13 @@ export function AdminEntryDetailPage() {
                 <CardTitle>Zahlung</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-slate-700">
-                <div className="grid gap-2">
-                  <div className="rounded-md border bg-slate-50 p-3">Gesamt: {asEuro(displayedPaymentTotalCents)}</div>
-                  <div className="rounded-md border bg-slate-50 p-3">Bezahlt: {asEuro(displayedPaymentPaidCents)}</div>
-                  <div className="rounded-md border bg-slate-50 p-3">Offen: {asEuro(displayedPaymentOpenCents)}</div>
-                </div>
-                {hasFallbackPayment && (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    Betrag wird aus aktueller Preisregel angezeigt, da vom Backend noch kein Rechnungsbetrag geliefert wurde.
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <div className="text-xs uppercase text-slate-500">Zahlungsstatus</div>
+                  <div className="mt-1 font-medium text-slate-900">
+                    {paymentState === "paid" ? "Bezahlt" : "Noch nicht bezahlt"}
                   </div>
-                )}
-                <div>
-                  <div className="mb-1 text-xs text-slate-500">Zahlungsfortschritt</div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-2 bg-blue-600" style={{ width: `${paidPercent}%` }} />
-                  </div>
-                  <div className="mt-1 text-xs text-slate-600">{paidPercent}% bezahlt</div>
                 </div>
+                <p className="text-xs text-slate-500">Zahlungsbetrag wird intern verwaltet; hier wird nur bezahlt / nicht bezahlt geführt.</p>
               </CardContent>
             </Card>
 
@@ -759,8 +687,8 @@ export function AdminEntryDetailPage() {
                           : undefined
                   }
                   onClick={() => {
-                    setPaymentTotalInput(euroInputFromCents(displayedPaymentTotalCents));
-                    setPaymentPaidInput(euroInputFromCents(displayedPaymentPaidCents));
+                    setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
+                    setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
                     setPaymentEditorOpen(true);
                   }}
                 />
