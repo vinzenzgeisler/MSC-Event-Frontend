@@ -270,6 +270,8 @@ export function AdminEntryDetailPage() {
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const anyActionInFlight = actionInFlight !== null;
+  const statusActionInFlight =
+    actionInFlight === "status-shortlist" || actionInFlight === "status-accepted" || actionInFlight === "status-rejected";
   const isAcceptedAlready = status === "accepted";
   const isRejectedAlready = status === "rejected";
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
@@ -341,6 +343,12 @@ export function AdminEntryDetailPage() {
           ) : (
             <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
               Check-in: Noch nicht relevant
+            </Badge>
+          )}
+          {statusActionInFlight && (
+            <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              Status wird aktualisiert…
             </Badge>
           )}
         </div>

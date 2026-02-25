@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -250,6 +251,7 @@ export function AdminEntriesPage() {
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
+  const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
 
   const rowsRef = useRef<AdminEntryListItem[]>([]);
@@ -802,12 +804,16 @@ export function AdminEntriesPage() {
         <EntriesTable
           rows={rows}
           canManageStatus={canManageStatus}
+          statusActionBusy={statusActionBusy !== null}
           isLoadingInitial={loadingInitial}
           isLoadingMore={loadingMore}
           hasMore={meta.hasMore}
           onLoadMore={() => void loadMore()}
           loadMoreRef={setLoadMoreNode}
           onSetShortlist={async (entryId) => {
+            if (statusActionBusy) {
+              return;
+            }
             if (!canManageStatus) {
               showToast("Nur Admin-Rollen dürfen den Status ändern.");
               return;
@@ -817,15 +823,21 @@ export function AdminEntriesPage() {
               showToast("Nennung ist bereits auf Vorauswahl.");
               return;
             }
+            setStatusActionBusy({ entryId, action: "shortlist" });
             try {
               await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
               applyLocalStatusUpdate(entryId, "shortlist");
               showToast(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
             } catch (error) {
               showToast(getApiErrorMessage(error, "Status konnte nicht aktualisiert werden."));
+            } finally {
+              setStatusActionBusy(null);
             }
           }}
           onSetAccepted={async (entryId) => {
+            if (statusActionBusy) {
+              return;
+            }
             if (!canManageStatus) {
               showToast("Nur Admin-Rollen dürfen den Status ändern.");
               return;
@@ -838,6 +850,9 @@ export function AdminEntriesPage() {
             setPendingAcceptEntryId(entryId);
           }}
           onSetRejected={async (entryId) => {
+            if (statusActionBusy) {
+              return;
+            }
             if (!canManageStatus) {
               showToast("Nur Admin-Rollen dürfen den Status ändern.");
               return;
@@ -869,11 +884,13 @@ export function AdminEntriesPage() {
               </Button>
               <Button
                 type="button"
+                disabled={statusActionBusy !== null}
                 onClick={async () => {
                   const entryId = pendingAcceptEntryId;
-                  if (!entryId) {
+                  if (!entryId || statusActionBusy) {
                     return;
                   }
+                  setStatusActionBusy({ entryId, action: "accepted" });
                   try {
                     await adminEntriesService.setEntryStatus(entryId, "to_accepted");
                     applyLocalStatusUpdate(entryId, "accepted");
@@ -881,10 +898,19 @@ export function AdminEntriesPage() {
                     setPendingAcceptEntryId(null);
                   } catch (error) {
                     showToast(getApiErrorMessage(error, "Nennung konnte nicht zugelassen werden."));
+                  } finally {
+                    setStatusActionBusy(null);
                   }
                 }}
               >
-                Ja, zulassen
+                {statusActionBusy?.entryId === pendingAcceptEntryId && statusActionBusy.action === "accepted" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird gesetzt…
+                  </>
+                ) : (
+                  "Ja, zulassen"
+                )}
               </Button>
             </div>
           </div>
@@ -903,11 +929,13 @@ export function AdminEntriesPage() {
               <Button
                 type="button"
                 variant="destructive"
+                disabled={statusActionBusy !== null}
                 onClick={async () => {
                   const entryId = pendingRejectEntryId;
-                  if (!entryId) {
+                  if (!entryId || statusActionBusy) {
                     return;
                   }
+                  setStatusActionBusy({ entryId, action: "rejected" });
                   try {
                     await adminEntriesService.setEntryStatus(entryId, "to_rejected");
                     applyLocalStatusUpdate(entryId, "rejected");
@@ -915,10 +943,19 @@ export function AdminEntriesPage() {
                     setPendingRejectEntryId(null);
                   } catch (error) {
                     showToast(getApiErrorMessage(error, "Nennung konnte nicht abgelehnt werden."));
+                  } finally {
+                    setStatusActionBusy(null);
                   }
                 }}
               >
-                Ja, ablehnen
+                {statusActionBusy?.entryId === pendingRejectEntryId && statusActionBusy.action === "rejected" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird gesetzt…
+                  </>
+                ) : (
+                  "Ja, ablehnen"
+                )}
               </Button>
             </div>
           </div>

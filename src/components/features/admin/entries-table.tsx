@@ -17,6 +17,7 @@ import type { AdminEntryListItem } from "@/types/admin";
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
   canManageStatus: boolean;
+  statusActionBusy?: boolean;
   isLoadingInitial?: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
@@ -67,6 +68,7 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
 export function EntriesTable({
   rows,
   canManageStatus,
+  statusActionBusy = false,
   isLoadingInitial = false,
   isLoadingMore,
   hasMore,
@@ -78,6 +80,9 @@ export function EntriesTable({
 }: EntriesTableProps) {
   const location = useLocation();
   const statusDisabledReason = (row: AdminEntryListItem, target: AdminEntryListItem["status"]) => {
+    if (statusActionBusy) {
+      return "Status wird aktualisiert…";
+    }
     if (!row.confirmationMailVerified) {
       return "Status erst nach verifizierter E-Mail änderbar.";
     }
