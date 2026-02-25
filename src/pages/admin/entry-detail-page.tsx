@@ -592,19 +592,18 @@ export function AdminEntryDetailPage() {
                       return;
                     }
                     setSendingPaymentReminder(true);
-                    flashMessage("Zahlungserinnerung wird eingeplant…", 1400);
                     try {
                       const result = await communicationService.queuePaymentReminderForEntry(detail.id, { allowDuplicate: true });
                       if (result.queued < 1) {
                         flashMessage(
                           result.reason?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",
-                          3200
+                          4200
                         );
                         return;
                       }
-                      flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`);
+                      flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
                     } catch (error) {
-                      flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 3200);
+                      flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 4200);
                     } finally {
                       setSendingPaymentReminder(false);
                     }
