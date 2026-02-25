@@ -308,6 +308,14 @@ type AdminEntryRestoreResponse = {
   restoredEntryId: string;
 };
 
+type AdminEntryPaymentStatusResponse = {
+  ok: boolean;
+  entryId: string;
+  paymentStatus: PaymentStatus;
+  paidAmountCents: number;
+  amountOpenCents: number;
+};
+
 async function resolveEntryContext(entryId: string): Promise<EntryContext> {
   const existing = entryContextStore.get(entryId);
   if (existing) {
@@ -506,9 +514,14 @@ export const adminEntriesService = {
       throw new Error("Manuelles Zurücksetzen auf offen ist im Ledger-Flow nicht möglich.");
     }
 
-    const invoice = await findInvoiceForEntry(entryId);
-    const openAmount = invoice.amountOpenCents ?? Math.max(0, invoice.totalCents - (invoice.paidAmountCents ?? 0));
-    await recordPayment(invoice.id, openAmount, "Als vollständig bezahlt markiert (Admin UI)");
+    await requestJson<AdminEntryPaymentStatusResponse>(`/admin/entries/${entryId}/payment-status`, {
+      method: "PATCH",
+      body: {
+        paymentStatus: "paid",
+        paidAt: new Date().toISOString(),
+        note: "Als vollständig bezahlt markiert (Admin UI)"
+      }
+    });
 
     return { ok: true };
   },
