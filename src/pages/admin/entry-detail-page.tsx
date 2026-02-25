@@ -115,6 +115,7 @@ export function AdminEntryDetailPage() {
   const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState(false);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
   const [sendingVerificationMail, setSendingVerificationMail] = useState(false);
+  const [sendingPaymentReminder, setSendingPaymentReminder] = useState(false);
   const [paymentEditorOpen, setPaymentEditorOpen] = useState(false);
   const [paymentTotalInput, setPaymentTotalInput] = useState("0,00");
   const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
@@ -573,14 +574,25 @@ export function AdminEntryDetailPage() {
                   }}
                 />
                 <HintButton
-                  label="Zahlungserinnerung senden"
-                  icon={<Mail className="mr-2 h-4 w-4" />}
+                  label={sendingPaymentReminder ? "Zahlungserinnerung wird gesendet…" : "Zahlungserinnerung senden"}
+                  icon={sendingPaymentReminder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                   variant="outline"
                   className={actionOutlineClass}
                   disabledReason={
-                    !canSendMail ? "Nur Admin-Rollen dürfen Mails senden." : status !== "accepted" ? "Zahlungserinnerung erst bei zugelassener Nennung." : undefined
+                    !canSendMail
+                      ? "Nur Admin-Rollen dürfen Mails senden."
+                      : status !== "accepted"
+                        ? "Zahlungserinnerung erst bei zugelassener Nennung."
+                        : sendingPaymentReminder
+                          ? "Zahlungserinnerung wird gerade eingeplant."
+                          : undefined
                   }
                   onClick={async () => {
+                    if (sendingPaymentReminder) {
+                      return;
+                    }
+                    setSendingPaymentReminder(true);
+                    flashMessage("Zahlungserinnerung wird eingeplant…", 1400);
                     try {
                       const result = await communicationService.queuePaymentReminderForEntry(detail.id);
                       if (result.queued < 1) {
@@ -593,6 +605,8 @@ export function AdminEntryDetailPage() {
                       flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`);
                     } catch (error) {
                       flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 3200);
+                    } finally {
+                      setSendingPaymentReminder(false);
                     }
                   }}
                 />
