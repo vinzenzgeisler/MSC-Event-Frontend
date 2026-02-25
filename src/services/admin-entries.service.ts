@@ -611,6 +611,26 @@ export const adminEntriesService = {
     return { ok: true };
   },
 
+  async queueLifecycleMail(
+    entryId: string,
+    eventType: "accepted_open_payment" | "rejected",
+    options?: { includeDriverNote?: boolean; allowDuplicate?: boolean }
+  ) {
+    const context = await resolveEntryContext(entryId);
+    await requestJson("/admin/mail/lifecycle/queue", {
+      method: "POST",
+      body: {
+        eventId: context.eventId,
+        entryId,
+        eventType,
+        includeDriverNote: options?.includeDriverNote === true ? true : undefined,
+        allowDuplicate: options?.allowDuplicate === true ? true : undefined
+      }
+    });
+
+    return { ok: true };
+  },
+
   async getEntryDocumentDownloadUrl(entryId: string, type: "waiver" | "tech_check") {
     const context = await resolveEntryContext(entryId);
     const response = await requestJson<{ ok: boolean; url: string }>(`/admin/documents/entry/${entryId}/download`, {

@@ -261,6 +261,8 @@ export function AdminEntryDetailPage() {
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const anyActionInFlight = actionInFlight !== null;
+  const isAcceptedAlready = status === "accepted";
+  const isRejectedAlready = status === "rejected";
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
   const actionActiveClass = "border-primary bg-primary text-primary-foreground hover:bg-primary/90";
   const statusDisabledReason = (target: "pending" | "shortlist" | "accepted" | "rejected") => {
@@ -274,6 +276,12 @@ export function AdminEntryDetailPage() {
       return "Status erst nach verifizierter E-Mail änderbar.";
     }
     if (status === target) {
+      if (target === "accepted" || target === "rejected") {
+        if (!canSendMail) {
+          return "Bereits in diesem Status.";
+        }
+        return undefined;
+      }
       return "Bereits in diesem Status.";
     }
     return undefined;
@@ -596,7 +604,15 @@ export function AdminEntryDetailPage() {
                   }}
                 />
                 <HintButton
-                  label={actionInFlight === "status-accepted" ? "Status wird gesetzt…" : "Auf Zugelassen setzen"}
+                  label={
+                    actionInFlight === "status-accepted"
+                      ? isAcceptedAlready
+                        ? "Mail wird gesendet…"
+                        : "Status wird gesetzt…"
+                      : isAcceptedAlready
+                        ? "Zulassungs-Mail erneut senden"
+                        : "Auf Zugelassen setzen"
+                  }
                   icon={actionInFlight === "status-accepted" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
                   variant={status === "accepted" ? "default" : "outline"}
                   className={status === "accepted" ? actionActiveClass : actionOutlineClass}
@@ -604,7 +620,15 @@ export function AdminEntryDetailPage() {
                   onClick={() => setPendingAcceptConfirm(true)}
                 />
                 <HintButton
-                  label={actionInFlight === "status-rejected" ? "Status wird gesetzt…" : "Auf Abgelehnt setzen"}
+                  label={
+                    actionInFlight === "status-rejected"
+                      ? isRejectedAlready
+                        ? "Mail wird gesendet…"
+                        : "Status wird gesetzt…"
+                      : isRejectedAlready
+                        ? "Ablehnungs-Mail erneut senden"
+                        : "Auf Abgelehnt setzen"
+                  }
                   icon={actionInFlight === "status-rejected" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
                   variant={status === "rejected" ? "default" : "outline"}
                   className={status === "rejected" ? actionActiveClass : actionOutlineClass}
@@ -879,8 +903,14 @@ export function AdminEntryDetailPage() {
       {canSetStatus && pendingAcceptConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
-            <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
-            <p className="mt-2 text-sm text-slate-600">Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen.</p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isAcceptedAlready ? "Zulassungs-Mail erneut senden?" : "Auf „Zugelassen“ setzen?"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {isAcceptedAlready
+                ? "Die Zulassungs-Mail wird erneut für diese Nennung eingeplant."
+                : "Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen."}
+            </p>
             <div className="mt-3">
               <MailNoteSwitch
                 checked={includeDriverNoteOnAccept}
@@ -907,11 +937,25 @@ export function AdminEntryDetailPage() {
                 type="button"
                 disabled={actionInFlight === "status-accepted"}
                 onClick={async () => {
-                  if (status === "accepted") {
-                    setPendingAcceptConfirm(false);
+                  setPendingAcceptConfirm(false);
+                  if (isAcceptedAlready) {
+                    if (!canSendMail) {
+                      flashMessage("Bereits zugelassen. Keine Berechtigung zum erneuten Mailversand.");
+                      return;
+                    }
+                    await runAction(
+                      "status-accepted",
+                      () =>
+                        adminEntriesService.queueLifecycleMail(detail.id, "accepted_open_payment", {
+                          includeDriverNote: includeDriverNoteOnAccept,
+                          allowDuplicate: true
+                        }),
+                      "Zulassungs-Mail wurde erneut eingeplant.",
+                      "Zulassungs-Mail konnte nicht eingeplant werden."
+                    );
                     return;
                   }
-                  const success = await runAction(
+                  await runAction(
                     "status-accepted",
                     () =>
                       adminEntriesService.setEntryStatus(detail.id, "to_accepted", {
@@ -920,9 +964,6 @@ export function AdminEntryDetailPage() {
                     "Status auf Zugelassen gesetzt.",
                     "Status konnte nicht geändert werden."
                   );
-                  if (success) {
-                    setPendingAcceptConfirm(false);
-                  }
                 }}
               >
                 {actionInFlight === "status-accepted" ? (
@@ -991,9 +1032,13 @@ export function AdminEntryDetailPage() {
       {canSetStatus && pendingRejectConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
-            <h2 className="text-lg font-semibold text-slate-900">Auf „Abgelehnt“ setzen?</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isRejectedAlready ? "Ablehnungs-Mail erneut senden?" : "Auf „Abgelehnt“ setzen?"}
+            </h2>
             <p className="mt-2 text-sm text-slate-600">
-              Diese Nennung wird als abgelehnt markiert. Der Status kann später wieder geändert werden.
+              {isRejectedAlready
+                ? "Die Ablehnungs-Mail wird erneut für diese Nennung eingeplant."
+                : "Diese Nennung wird als abgelehnt markiert. Der Status kann später wieder geändert werden."}
             </p>
             <div className="mt-3">
               <MailNoteSwitch
@@ -1022,11 +1067,25 @@ export function AdminEntryDetailPage() {
                 variant="destructive"
                 disabled={actionInFlight === "status-rejected"}
                 onClick={async () => {
-                  if (status === "rejected") {
-                    setPendingRejectConfirm(false);
+                  setPendingRejectConfirm(false);
+                  if (isRejectedAlready) {
+                    if (!canSendMail) {
+                      flashMessage("Bereits abgelehnt. Keine Berechtigung zum erneuten Mailversand.");
+                      return;
+                    }
+                    await runAction(
+                      "status-rejected",
+                      () =>
+                        adminEntriesService.queueLifecycleMail(detail.id, "rejected", {
+                          includeDriverNote: includeDriverNoteOnReject,
+                          allowDuplicate: true
+                        }),
+                      "Ablehnungs-Mail wurde erneut eingeplant.",
+                      "Ablehnungs-Mail konnte nicht eingeplant werden."
+                    );
                     return;
                   }
-                  const success = await runAction(
+                  await runAction(
                     "status-rejected",
                     () =>
                       adminEntriesService.setEntryStatus(detail.id, "to_rejected", {
@@ -1035,9 +1094,6 @@ export function AdminEntryDetailPage() {
                     "Status auf Abgelehnt gesetzt.",
                     "Status konnte nicht geändert werden."
                   );
-                  if (success) {
-                    setPendingRejectConfirm(false);
-                  }
                 }}
               >
                 {actionInFlight === "status-rejected" ? (
