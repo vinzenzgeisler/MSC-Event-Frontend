@@ -594,7 +594,7 @@ export function AdminEntryDetailPage() {
                     setSendingPaymentReminder(true);
                     flashMessage("Zahlungserinnerung wird eingeplant…", 1400);
                     try {
-                      const result = await communicationService.queuePaymentReminderForEntry(detail.id);
+                      const result = await communicationService.queuePaymentReminderForEntry(detail.id, { allowDuplicate: true });
                       if (result.queued < 1) {
                         flashMessage(
                           result.reason?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",

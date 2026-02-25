@@ -62,13 +62,14 @@ export const communicationService = {
     });
   },
 
-  async queuePaymentReminderForEntry(entryId: string) {
+  async queuePaymentReminderForEntry(entryId: string, options?: { allowDuplicate?: boolean }) {
     const eventId = await getAdminEventId();
     return requestJson<AdminMailQueueResponse>("/admin/payment/reminders/queue", {
       method: "POST",
       body: {
         eventId,
-        entryId
+        entryId,
+        allowDuplicate: options?.allowDuplicate === true ? true : undefined
       }
     });
   },
