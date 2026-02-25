@@ -587,11 +587,19 @@ export function AdminEntryDetailPage() {
                     !canSendMail ? "Nur Admin-Rollen dürfen Mails senden." : status !== "accepted" ? "Zahlungserinnerung erst bei zugelassener Nennung." : undefined
                   }
                   onClick={async () => {
-                    await runAction(
-                      () => communicationService.queuePaymentReminderForEntry(detail.id),
-                      "Zahlungserinnerung wurde in die Mail-Queue gelegt.",
-                      "Zahlungserinnerung konnte nicht versendet werden."
-                    );
+                    try {
+                      const result = await communicationService.queuePaymentReminderForEntry(detail.id);
+                      if (typeof result.queued === "number" && result.queued < 1) {
+                        flashMessage(
+                          result.message?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",
+                          3200
+                        );
+                        return;
+                      }
+                      flashMessage("Zahlungserinnerung wurde in die Mail-Queue gelegt.");
+                    } catch (error) {
+                      flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 3200);
+                    }
                   }}
                 />
               </div>

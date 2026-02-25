@@ -19,8 +19,9 @@ type AdminOutboxListResponse = {
 };
 
 type AdminMailQueueResponse = {
-  ok: boolean;
-  queued: number;
+  ok?: boolean;
+  queued?: number;
+  message?: string;
 };
 
 export const communicationService = {
