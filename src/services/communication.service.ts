@@ -19,9 +19,11 @@ type AdminOutboxListResponse = {
 };
 
 type AdminMailQueueResponse = {
-  ok?: boolean;
-  queued?: number;
-  message?: string;
+  ok: boolean;
+  queued: number;
+  skipped: number;
+  reason?: string;
+  outboxIds: string[];
 };
 
 export const communicationService = {
@@ -66,10 +68,7 @@ export const communicationService = {
       method: "POST",
       body: {
         eventId,
-        templateId: "payment_reminder",
-        templateData: {
-          entryId
-        }
+        entryId
       }
     });
   },

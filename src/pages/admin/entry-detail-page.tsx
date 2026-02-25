@@ -242,12 +242,6 @@ export function AdminEntryDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge
-            className={confirmationMailSent ? "h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-900" : "h-6 border-amber-300 bg-amber-50 px-2.5 text-xs text-amber-900"}
-            variant="outline"
-          >
-            Mail: {confirmationMailSent ? "Gesendet" : "Ausstehend"}
-          </Badge>
-          <Badge
             className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
             variant="outline"
           >
@@ -589,14 +583,14 @@ export function AdminEntryDetailPage() {
                   onClick={async () => {
                     try {
                       const result = await communicationService.queuePaymentReminderForEntry(detail.id);
-                      if (typeof result.queued === "number" && result.queued < 1) {
+                      if (result.queued < 1) {
                         flashMessage(
-                          result.message?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",
+                          result.reason?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",
                           3200
                         );
                         return;
                       }
-                      flashMessage("Zahlungserinnerung wurde in die Mail-Queue gelegt.");
+                      flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`);
                     } catch (error) {
                       flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 3200);
                     }

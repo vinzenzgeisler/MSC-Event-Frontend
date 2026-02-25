@@ -274,30 +274,6 @@ type AdminEntryDetailResponse = {
   }>;
 };
 
-type AdminInvoicesListResponse = {
-  ok: boolean;
-  invoices: Array<{
-    id: string;
-    eventId: string;
-    driverPersonId: string;
-    totalCents: number;
-    paymentStatus: PaymentStatus;
-    paidAmountCents: number | null;
-    amountOpenCents: number | null;
-  }>;
-};
-
-type AdminInvoicePaymentMutationResponse = {
-  ok: boolean;
-  invoice: {
-    id: string;
-    totalCents: number;
-    paidAmountCents: number | null;
-    amountOpenCents: number | null;
-    paymentStatus: PaymentStatus;
-  };
-};
-
 type AdminEntryDeleteResponse = {
   ok: boolean;
   deletedEntryId: string;
@@ -312,6 +288,15 @@ type AdminEntryPaymentStatusResponse = {
   ok: boolean;
   entryId: string;
   paymentStatus: PaymentStatus;
+  paidAmountCents: number;
+  amountOpenCents: number;
+};
+
+type AdminEntryPaymentAmountsResponse = {
+  ok: boolean;
+  entryId: string;
+  paymentStatus: PaymentStatus;
+  totalCents: number;
   paidAmountCents: number;
   amountOpenCents: number;
 };
@@ -332,38 +317,6 @@ async function resolveEntryContext(entryId: string): Promise<EntryContext> {
     throw new Error("Kontext für Nennung konnte nicht aufgelöst werden.");
   }
   return resolved;
-}
-
-async function findInvoiceForEntry(entryId: string) {
-  const context = await resolveEntryContext(entryId);
-  const response = await requestJson<AdminInvoicesListResponse>("/admin/invoices", {
-    query: {
-      eventId: context.eventId,
-      driverPersonId: context.driverPersonId
-    }
-  });
-
-  const invoice = response.invoices?.[0];
-  if (!invoice) {
-    throw new Error("Keine Rechnung für diese Nennung gefunden.");
-  }
-  return invoice;
-}
-
-async function recordPayment(invoiceId: string, amountCents: number, note: string) {
-  if (amountCents <= 0) {
-    return;
-  }
-
-  await requestJson<AdminInvoicePaymentMutationResponse>(`/admin/invoices/${invoiceId}/payments`, {
-    method: "POST",
-    body: {
-      amountCents,
-      paidAt: new Date().toISOString(),
-      method: "other",
-      note
-    }
-  });
 }
 
 function clampPageSize(limit?: number) {
@@ -527,16 +480,15 @@ export const adminEntriesService = {
   },
 
   async setEntryPaymentAmounts(entryId: string, payload: { totalCents: number; paidAmountCents: number }) {
-    const invoice = await findInvoiceForEntry(entryId);
-    const currentPaid = invoice.paidAmountCents ?? 0;
-    const targetPaid = Math.max(0, Math.floor(payload.paidAmountCents));
-    const delta = targetPaid - currentPaid;
+    await requestJson<AdminEntryPaymentAmountsResponse>(`/admin/entries/${entryId}/payment-amounts`, {
+      method: "PATCH",
+      body: {
+        totalCents: Math.max(0, Math.floor(payload.totalCents)),
+        paidAmountCents: Math.max(0, Math.floor(payload.paidAmountCents)),
+        note: "Zahlungsdaten manuell angepasst (Admin UI)"
+      }
+    });
 
-    if (delta <= 0) {
-      return { ok: true };
-    }
-
-    await recordPayment(invoice.id, delta, "Zusätzliche Zahlung verbucht (Admin UI)");
     return { ok: true };
   },
 
