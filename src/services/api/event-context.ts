@@ -47,8 +47,6 @@ type AdminClassesResponse = {
   }>;
 };
 
-const configuredEventId = (import.meta.env.VITE_PUBLIC_EVENT_ID || "").trim() || null;
-
 let publicEventCache: PublicCurrentEventResponse | null = null;
 let adminEventCache: AdminCurrentEventResponse | null = null;
 let adminClassesCache: Array<{ id: string; name: string; vehicleType: VehicleType }> | null = null;
@@ -63,25 +61,12 @@ export async function getPublicCurrentEvent() {
 }
 
 export async function getPublicEventId() {
-  if (configuredEventId) {
-    return configuredEventId;
-  }
   const response = await getPublicCurrentEvent();
   return response.event.id;
 }
 
 export async function getAdminCurrentEvent() {
   if (adminEventCache) {
-    return adminEventCache;
-  }
-  if (configuredEventId) {
-    adminEventCache = {
-      ok: true,
-      event: {
-        id: configuredEventId,
-        name: ""
-      }
-    };
     return adminEventCache;
   }
   try {
@@ -105,9 +90,6 @@ export async function getAdminCurrentEvent() {
 }
 
 export async function getAdminEventId() {
-  if (configuredEventId) {
-    return configuredEventId;
-  }
   const response = await getAdminCurrentEvent();
   return response.event.id;
 }

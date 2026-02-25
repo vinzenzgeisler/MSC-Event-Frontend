@@ -24,7 +24,6 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 ## Environment
 
 - `VITE_API_BASE_URL` API-Basis-URL
-- `VITE_PUBLIC_EVENT_ID` optional feste Event-ID (überschreibt `/events/current`)
 - `VITE_COGNITO_ENABLED` `true|false`
 - `VITE_COGNITO_DOMAIN` z. B. `https://<domain>.auth.<region>.amazoncognito.com`
 - `VITE_COGNITO_CLIENT_ID` Cognito App Client ID (ohne Secret)
