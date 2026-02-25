@@ -1,6 +1,8 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
 import type {
+  AdminDeletedEntriesPageResult,
+  AdminDeletedEntryListItem,
   AdminEntriesPageResult,
   AdminEntriesFilter,
   AdminEntryDetailDto,
@@ -66,6 +68,14 @@ function parseName(first: string | null | undefined, last: string | null | undef
   return name || fallback;
 }
 
+function normalizeAcceptanceStatus(value: unknown): AcceptanceStatus {
+  return value === "shortlist" || value === "accepted" || value === "rejected" || value === "pending" ? value : "pending";
+}
+
+function normalizePaymentStatus(value: unknown): PaymentStatus {
+  return value === "paid" ? "paid" : "due";
+}
+
 function payloadToText(payload: Record<string, unknown> | null | undefined) {
   if (!payload) {
     return "-";
@@ -111,16 +121,32 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     id: dto.id,
     classId: dto.classId,
     name: dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
-    classLabel: dto.className,
+    classLabel: dto.className || dto.classId || "-",
     startNumber: dto.startNumber ?? dto.startNumberNorm ?? "-",
     vehicleLabel: dto.vehicleLabel,
     vehicleThumbUrl: dto.vehicleThumbUrl,
-    status: dto.acceptanceStatus,
-    payment: dto.paymentStatus ?? "due",
+    status: normalizeAcceptanceStatus(dto.acceptanceStatus),
+    payment: normalizePaymentStatus(dto.paymentStatus),
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     createdAt: asDateTime(dto.createdAt)
+  };
+}
+
+function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntryListItem {
+  return {
+    id: dto.id,
+    classId: dto.classId,
+    name: dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
+    classLabel: dto.className || dto.classId || "-",
+    startNumber: dto.startNumber ?? dto.startNumberNorm ?? "-",
+    vehicleLabel: dto.vehicleLabel || "-",
+    status: normalizeAcceptanceStatus(dto.acceptanceStatus),
+    payment: normalizePaymentStatus(dto.paymentStatus),
+    deletedAt: asDateTime(dto.deletedAt),
+    deletedBy: (dto.deletedBy ?? "").trim() || "-",
+    deleteReason: (dto.deleteReason ?? "").trim() || "-"
   };
 }
 
@@ -230,6 +256,12 @@ type AdminEntriesListResponse = {
   meta?: ListMeta;
 };
 
+type AdminDeletedEntriesListResponse = {
+  ok: boolean;
+  entries: AdminEntryListItemDto[];
+  meta?: ListMeta;
+};
+
 type AdminEntryDetailResponse = {
   ok: boolean;
   entry: AdminEntryDetailDto;
@@ -269,6 +301,11 @@ type AdminInvoicePaymentMutationResponse = {
 type AdminEntryDeleteResponse = {
   ok: boolean;
   deletedEntryId: string;
+};
+
+type AdminEntryRestoreResponse = {
+  ok: boolean;
+  restoredEntryId: string;
 };
 
 async function resolveEntryContext(entryId: string): Promise<EntryContext> {
@@ -398,6 +435,37 @@ export const adminEntriesService = {
     return response.entries;
   },
 
+  async listDeletedEntriesPage(
+    filter: AdminEntriesFilter,
+    options?: {
+      cursor?: string;
+      limit?: number;
+    }
+  ): Promise<AdminDeletedEntriesPageResult> {
+    const pageSize = clampPageSize(options?.limit);
+
+    const eventId = await getAdminEventId();
+    const response = await requestJson<AdminDeletedEntriesListResponse>("/admin/entries/deleted", {
+      query: {
+        eventId,
+        q: filter.query.trim() || undefined,
+        classId: filter.classId !== "all" ? filter.classId : undefined,
+        acceptanceStatus: filter.acceptanceStatus !== "all" ? filter.acceptanceStatus : undefined,
+        paymentStatus: filter.paymentStatus !== "all" ? filter.paymentStatus : undefined,
+        checkinIdVerified: filter.checkinIdVerified !== "all" ? filter.checkinIdVerified === "true" : undefined,
+        cursor: options?.cursor || undefined,
+        limit: pageSize,
+        sortBy: "createdAt",
+        sortDir: "desc"
+      }
+    });
+
+    return {
+      entries: response.entries.map(fromAdminDeletedEntryDto),
+      meta: normalizeListMeta(response.meta, response.entries.length, pageSize)
+    };
+  },
+
   async getEntryDetail(entryId: string): Promise<AdminEntryDetailViewModel | null> {
     const response = await requestJson<AdminEntryDetailResponse>(`/admin/entries/${entryId}`);
     if (!response.ok) {
@@ -509,6 +577,12 @@ export const adminEntriesService = {
   async deleteEntry(entryId: string) {
     return requestJson<AdminEntryDeleteResponse>(`/admin/entries/${entryId}`, {
       method: "DELETE"
+    });
+  },
+
+  async restoreEntry(entryId: string) {
+    return requestJson<AdminEntryRestoreResponse>(`/admin/entries/${entryId}/restore`, {
+      method: "POST"
     });
   }
 };

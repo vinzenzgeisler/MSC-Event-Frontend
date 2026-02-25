@@ -8,6 +8,7 @@ import { AnmeldungVerifyPage } from "@/pages/public/anmeldung-verify-page";
 import { LegalPlaceholderPage } from "@/pages/public/legal-placeholder-page";
 import { AdminDashboardPage } from "@/pages/admin/dashboard-page";
 import { AdminEntriesPage } from "@/pages/admin/entries-page";
+import { AdminDeletedEntriesPage } from "@/pages/admin/deleted-entries-page";
 import { AdminEntryDetailPage } from "@/pages/admin/entry-detail-page";
 import { AdminExportsPage } from "@/pages/admin/exports-page";
 import { ForbiddenPage } from "@/pages/admin/forbidden-page";
@@ -51,6 +52,14 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="dashboard" replace /> },
           { path: "dashboard", element: <AdminDashboardPage /> },
           { path: "entries", element: <AdminEntriesPage /> },
+          {
+            path: "entries/deleted",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminDeletedEntriesPage />
+              </ProtectedRoute>
+            )
+          },
           { path: "entries/:entryId", element: <AdminEntryDetailPage /> },
           {
             path: "communication",

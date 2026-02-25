@@ -873,7 +873,9 @@ export function AdminEntryDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Nennung löschen?</h2>
-            <p className="mt-2 text-sm text-slate-600">Diese Aktion entfernt die Nennung dauerhaft.</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Diese Aktion verschiebt die Nennung in die gelöschte Liste und kann dort wiederhergestellt werden.
+            </p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setPendingDeleteConfirm(false)}>
                 Abbrechen

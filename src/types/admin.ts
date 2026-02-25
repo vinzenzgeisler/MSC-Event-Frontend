@@ -15,7 +15,7 @@ export type AdminEntryListItemDto = {
   classId?: Id;
   vehicleId?: Id;
   name?: string;
-  className: string;
+  className?: string;
   startNumber?: string | null;
   startNumberNorm?: string | null;
   driverPersonId?: Id;
@@ -31,6 +31,9 @@ export type AdminEntryListItemDto = {
   confirmationMailSent: boolean;
   internalNote?: string | null;
   driverNote?: string | null;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  deleteReason?: string | null;
   createdAt: string;
   updatedAt?: string;
 };
@@ -67,6 +70,25 @@ export type AdminEntryListItem = {
 
 export type AdminEntriesPageResult = {
   entries: AdminEntryListItem[];
+  meta: ListMeta;
+};
+
+export type AdminDeletedEntryListItem = {
+  id: Id;
+  classId?: Id;
+  name: string;
+  classLabel: string;
+  startNumber: string;
+  vehicleLabel: string;
+  status: AcceptanceStatus;
+  payment: PaymentStatus;
+  deletedAt: string;
+  deletedBy: string;
+  deleteReason: string;
+};
+
+export type AdminDeletedEntriesPageResult = {
+  entries: AdminDeletedEntryListItem[];
   meta: ListMeta;
 };
 

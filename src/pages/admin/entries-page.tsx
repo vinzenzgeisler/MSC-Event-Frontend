@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar";
@@ -189,6 +189,7 @@ function writeEntriesCache(filter: AdminEntriesFilter, rows: AdminEntryListItem[
 export function AdminEntriesPage() {
   const { roles } = useAuth();
   const canManageStatus = hasPermission(roles, "entries.status.write");
+  const canDeleteEntries = hasPermission(roles, "entries.delete");
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
@@ -505,7 +506,14 @@ export function AdminEntriesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
+        {canDeleteEntries && (
+          <Button asChild type="button" size="sm" variant="outline">
+            <Link to="/admin/entries/deleted">Gelöschte Nennungen</Link>
+          </Button>
+        )}
+      </div>
       <div className="rounded-xl border bg-white p-4">
         <EntriesFilterBar
           filter={filterDraft}
