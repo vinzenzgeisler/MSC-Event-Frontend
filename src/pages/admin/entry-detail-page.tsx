@@ -200,6 +200,15 @@ export function AdminEntryDetailPage() {
     return getApiErrorMessage(error, fallback);
   };
 
+  const isTransitionNotAllowedError = (error: unknown) => {
+    if (!(error instanceof ApiError)) {
+      return false;
+    }
+    const message = (error.message || "").toLowerCase();
+    const code = (error.code || "").toLowerCase();
+    return message.includes("transition is not allowed") || code.includes("transition");
+  };
+
   const loadDetail = () => {
     adminEntriesService
       .getEntryDetail(entryId)
@@ -943,11 +952,11 @@ export function AdminEntryDetailPage() {
                       flashMessage("Bereits zugelassen. Keine Berechtigung zum erneuten Mailversand.");
                       return;
                     }
-                    await runAction(
-                      "status-accepted",
-                      () =>
-                        adminEntriesService.queueLifecycleMail(detail.id, "accepted_open_payment", {
-                          includeDriverNote: includeDriverNoteOnAccept,
+                  await runAction(
+                    "status-accepted",
+                    () =>
+                      adminEntriesService.queueLifecycleMail(detail.id, "accepted_open_payment", {
+                        includeDriverNote: includeDriverNoteOnAccept,
                           allowDuplicate: true
                         }),
                       "Zulassungs-Mail wurde erneut eingeplant.",
@@ -955,15 +964,32 @@ export function AdminEntryDetailPage() {
                     );
                     return;
                   }
-                  await runAction(
-                    "status-accepted",
-                    () =>
-                      adminEntriesService.setEntryStatus(detail.id, "to_accepted", {
+                  if (actionInFlight) {
+                    return;
+                  }
+                  setActionInFlight("status-accepted");
+                  try {
+                    try {
+                      await adminEntriesService.setEntryStatus(detail.id, "to_accepted", {
                         includeDriverNoteInLifecycleMail: includeDriverNoteOnAccept
-                      }),
-                    "Status auf Zugelassen gesetzt.",
-                    "Status konnte nicht geändert werden."
-                  );
+                      });
+                      flashMessage("Status auf Zugelassen gesetzt.");
+                    } catch (error) {
+                      if (!isTransitionNotAllowedError(error)) {
+                        throw error;
+                      }
+                      await adminEntriesService.queueLifecycleMail(detail.id, "accepted_open_payment", {
+                        includeDriverNote: includeDriverNoteOnAccept,
+                        allowDuplicate: true
+                      });
+                      flashMessage("Status war bereits gesetzt. Zulassungs-Mail wurde erneut eingeplant.");
+                    }
+                    loadDetail();
+                  } catch (error) {
+                    flashMessage(getApiErrorMessage(error, "Status konnte nicht geändert werden."), 2800);
+                  } finally {
+                    setActionInFlight((current) => (current === "status-accepted" ? null : current));
+                  }
                 }}
               >
                 {actionInFlight === "status-accepted" ? (
@@ -1073,10 +1099,10 @@ export function AdminEntryDetailPage() {
                       flashMessage("Bereits abgelehnt. Keine Berechtigung zum erneuten Mailversand.");
                       return;
                     }
-                    await runAction(
-                      "status-rejected",
-                      () =>
-                        adminEntriesService.queueLifecycleMail(detail.id, "rejected", {
+                  await runAction(
+                    "status-rejected",
+                    () =>
+                      adminEntriesService.queueLifecycleMail(detail.id, "rejected", {
                           includeDriverNote: includeDriverNoteOnReject,
                           allowDuplicate: true
                         }),
@@ -1085,15 +1111,32 @@ export function AdminEntryDetailPage() {
                     );
                     return;
                   }
-                  await runAction(
-                    "status-rejected",
-                    () =>
-                      adminEntriesService.setEntryStatus(detail.id, "to_rejected", {
+                  if (actionInFlight) {
+                    return;
+                  }
+                  setActionInFlight("status-rejected");
+                  try {
+                    try {
+                      await adminEntriesService.setEntryStatus(detail.id, "to_rejected", {
                         includeDriverNoteInLifecycleMail: includeDriverNoteOnReject
-                      }),
-                    "Status auf Abgelehnt gesetzt.",
-                    "Status konnte nicht geändert werden."
-                  );
+                      });
+                      flashMessage("Status auf Abgelehnt gesetzt.");
+                    } catch (error) {
+                      if (!isTransitionNotAllowedError(error)) {
+                        throw error;
+                      }
+                      await adminEntriesService.queueLifecycleMail(detail.id, "rejected", {
+                        includeDriverNote: includeDriverNoteOnReject,
+                        allowDuplicate: true
+                      });
+                      flashMessage("Status war bereits gesetzt. Ablehnungs-Mail wurde erneut eingeplant.");
+                    }
+                    loadDetail();
+                  } catch (error) {
+                    flashMessage(getApiErrorMessage(error, "Status konnte nicht geändert werden."), 2800);
+                  } finally {
+                    setActionInFlight((current) => (current === "status-rejected" ? null : current));
+                  }
                 }}
               >
                 {actionInFlight === "status-rejected" ? (
