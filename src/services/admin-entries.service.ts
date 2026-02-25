@@ -504,6 +504,17 @@ export const adminEntriesService = {
     };
 
     const mapped = statusMap[transition];
+    const enqueueLifecycleMailIfNeeded = async () => {
+      if (!mapped.sendLifecycleMail) {
+        return;
+      }
+      if (mapped.lifecycleEventType !== "accepted_open_payment" && mapped.lifecycleEventType !== "rejected") {
+        return;
+      }
+      await adminEntriesService.queueLifecycleMail(entryId, mapped.lifecycleEventType, {
+        includeDriverNote: options?.includeDriverNoteInLifecycleMail
+      });
+    };
     const waitForTargetStatus = async () => {
       const attempts = 8;
       const delayMs = 350;
@@ -540,6 +551,7 @@ export const adminEntriesService = {
     } catch (error) {
       if (!isTransitionNotAllowedError(error)) {
         if (await waitForTargetStatus()) {
+          await enqueueLifecycleMailIfNeeded();
           return { ok: true, eventuallyConsistent: true };
         }
         throw error;
@@ -547,6 +559,7 @@ export const adminEntriesService = {
     }
 
     if (await waitForTargetStatus()) {
+      await enqueueLifecycleMailIfNeeded();
       return { ok: true, alreadyInTargetStatus: true };
     }
 
@@ -572,6 +585,7 @@ export const adminEntriesService = {
       return { ok: true, viaShortlist: true };
     } catch (error) {
       if (await waitForTargetStatus()) {
+        await enqueueLifecycleMailIfNeeded();
         return { ok: true, alreadyInTargetStatus: true };
       }
       throw error;

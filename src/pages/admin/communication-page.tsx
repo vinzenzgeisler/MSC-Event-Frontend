@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ export function AdminCommunicationPage() {
   const [eventName, setEventName] = useState("");
   const [outboxExpanded, setOutboxExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [loadingOutbox, setLoadingOutbox] = useState(false);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -37,10 +39,13 @@ export function AdminCommunicationPage() {
   };
 
   const loadOutbox = async () => {
+    setLoadingOutbox(true);
     try {
       setOutbox(await communicationService.listOutbox());
     } catch (error) {
       showToast(getApiErrorMessage(error, "Postausgang konnte nicht geladen werden."));
+    } finally {
+      setLoadingOutbox(false);
     }
   };
 
@@ -151,7 +156,19 @@ export function AdminCommunicationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Postausgang</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Postausgang</CardTitle>
+            <Button type="button" size="sm" variant="outline" disabled={loadingOutbox} onClick={() => void loadOutbox()}>
+              {loadingOutbox ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Lädt…
+                </>
+              ) : (
+                "Aktualisieren"
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2 md:hidden">
