@@ -104,6 +104,15 @@ function normalizePaymentStatus(value: unknown): PaymentStatus {
   return value === "paid" ? "paid" : "due";
 }
 
+function isTransitionNotAllowedError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+  const message = (error.message || "").toLowerCase();
+  const code = (error.code || "").toLowerCase();
+  return message.includes("transition is not allowed") || code.includes("transition");
+}
+
 function lifecycleEventTypeForStatus(status: AcceptanceStatus): "preselection" | "accepted_open_payment" | "rejected" {
   if (status === "accepted") {
     return "accepted_open_payment";
@@ -495,21 +504,60 @@ export const adminEntriesService = {
     };
 
     const mapped = statusMap[transition];
+    const statusPayload = {
+      acceptanceStatus: mapped.status,
+      sendLifecycleMail: mapped.sendLifecycleMail,
+      lifecycleEventType: mapped.lifecycleEventType,
+      includeDriverNoteInLifecycleMail:
+        mapped.sendLifecycleMail && typeof options?.includeDriverNoteInLifecycleMail === "boolean"
+          ? options.includeDriverNoteInLifecycleMail
+          : undefined
+    };
 
-    await requestJson(`/admin/entries/${entryId}/status`, {
-      method: "PATCH",
-      body: {
-        acceptanceStatus: mapped.status,
-        sendLifecycleMail: mapped.sendLifecycleMail,
-        lifecycleEventType: mapped.lifecycleEventType,
-        includeDriverNoteInLifecycleMail:
-          mapped.sendLifecycleMail && typeof options?.includeDriverNoteInLifecycleMail === "boolean"
-            ? options.includeDriverNoteInLifecycleMail
-            : undefined
+    try {
+      await requestJson(`/admin/entries/${entryId}/status`, {
+        method: "PATCH",
+        body: statusPayload
+      });
+      return { ok: true };
+    } catch (error) {
+      if (!isTransitionNotAllowedError(error)) {
+        throw error;
       }
-    });
+    }
 
-    return { ok: true };
+    const current = await adminEntriesService.getEntryDetail(entryId).catch(() => null);
+    if (current?.status === mapped.status) {
+      return { ok: true, alreadyInTargetStatus: true };
+    }
+
+    if (transition === "to_shortlist") {
+      throw new Error("Statuswechsel auf Vorauswahl ist derzeit nicht erlaubt.");
+    }
+
+    try {
+      await requestJson(`/admin/entries/${entryId}/status`, {
+        method: "PATCH",
+        body: {
+          acceptanceStatus: "shortlist",
+          sendLifecycleMail: false,
+          lifecycleEventType: "preselection"
+        }
+      });
+
+      await requestJson(`/admin/entries/${entryId}/status`, {
+        method: "PATCH",
+        body: statusPayload
+      });
+
+      return { ok: true, viaShortlist: true };
+    } catch (error) {
+      const latest = await adminEntriesService.getEntryDetail(entryId).catch(() => null);
+      if (latest?.status === mapped.status) {
+        return { ok: true, alreadyInTargetStatus: true };
+      }
+      throw error;
+    }
   },
 
   async setEntryPaymentStatus(entryId: string, paymentStatus: "due" | "paid") {
