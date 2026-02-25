@@ -1,5 +1,5 @@
 import { getAdminEventId } from "@/services/api/event-context";
-import { requestJson } from "@/services/api/http-client";
+import { ApiError, requestJson } from "@/services/api/http-client";
 import type {
   AdminDeletedEntriesPageResult,
   AdminDeletedEntryListItem,
@@ -34,6 +34,34 @@ function asDate(value: string | null | undefined): string {
   if (!value) {
     return "-";
   }
+
+  const raw = value.trim();
+  if (!raw) {
+    return "-";
+  }
+
+  const dateOnlyMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+    if (!Number.isNaN(parsed.getTime())) {
+      return new Intl.DateTimeFormat("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }).format(parsed);
+    }
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return new Intl.DateTimeFormat("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }).format(parsed);
+  }
+
   return value;
 }
 
@@ -168,12 +196,16 @@ function fromAdminEntryDetailDto(
 
   return {
     id: dto.ids.entryId,
+    eventId: dto.ids.eventId,
+    classId: dto.ids.classId,
     headline: `${driverName} · ${vehicleLabel}`,
     classLabel: dto.className,
     startNumber: dto.startNumberNorm ?? "-",
     status: dto.acceptanceStatus,
     paymentStatus: dto.payment.paymentStatus,
     registrationStatus: dto.registrationStatus,
+    createdAt: dto.createdAt,
+    isBackupVehicle: dto.isBackupVehicle,
     checkinVerified: dto.checkin.checkinIdVerified,
     driver: {
       name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
@@ -504,13 +536,26 @@ export const adminEntriesService = {
   },
 
   async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string }) {
-    return requestJson(`/admin/entries/${entryId}/notes`, {
-      method: "PATCH",
-      body: {
-        internalNote: payload.internalNote,
-        driverNote: payload.driverNote
+    const body = {
+      internalNote: payload.internalNote,
+      driverNote: payload.driverNote
+    };
+
+    try {
+      return await requestJson(`/admin/entries/${entryId}/notes`, {
+        method: "PATCH",
+        body
+      });
+    } catch (error) {
+      if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 405)) {
+        throw error;
       }
-    });
+
+      return requestJson(`/admin/entries/${entryId}`, {
+        method: "PATCH",
+        body
+      });
+    }
   },
 
   async markConfirmationMailSent(entryId: string) {

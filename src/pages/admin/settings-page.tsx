@@ -456,9 +456,10 @@ export function AdminSettingsPage() {
     try {
       const updated = await adminSettingsService.updateEvent(eventState.id, eventForm);
       await adminSettingsService.savePricingRules(eventState.id, pricingForm);
+      const recalculateResult = await adminSettingsService.recalculateInvoices(eventState.id);
       setEventState(updated);
       setEventForm(eventToForm(updated));
-      showToast("Event-Konfiguration gespeichert.");
+      showToast(`Event-Konfiguration gespeichert (${recalculateResult.recalculated} Nennungen neu berechnet).`);
     } catch (error) {
       setEventError(getApiErrorMessage(error, "Event-Konfiguration konnte nicht gespeichert werden."));
     } finally {

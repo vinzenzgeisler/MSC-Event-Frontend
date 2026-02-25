@@ -16,6 +16,7 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
+import { adminSettingsService } from "@/services/admin-settings.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 
@@ -120,19 +121,37 @@ export function AdminEntryDetailPage() {
   const [paymentTotalInput, setPaymentTotalInput] = useState("0,00");
   const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [actionInFlight, setActionInFlight] = useState<string | null>(null);
+  const [fallbackPaymentTotalCents, setFallbackPaymentTotalCents] = useState<number | null>(null);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
     setTimeout(() => setActionMessage(""), timeout);
   };
 
-  const runAction = async (operation: () => Promise<unknown>, successMessage: string, errorMessage: string) => {
+  const runAction = async (
+    actionKey: string,
+    operation: () => Promise<unknown>,
+    successMessage: string,
+    errorMessage: string,
+    options?: { reload?: boolean }
+  ) => {
+    if (actionInFlight) {
+      return false;
+    }
+    setActionInFlight(actionKey);
     try {
       await operation();
       flashMessage(successMessage);
-      loadDetail();
+      if (options?.reload !== false) {
+        loadDetail();
+      }
+      return true;
     } catch (error) {
       flashMessage(getApiErrorMessage(error, errorMessage), 2800);
+      return false;
+    } finally {
+      setActionInFlight((current) => (current === actionKey ? null : current));
     }
   };
 
@@ -171,7 +190,11 @@ export function AdminEntryDetailPage() {
       });
   };
 
-  const handleDocumentDownload = async (type: "waiver" | "tech_check", label: string) => {
+  const handleDocumentDownload = async (type: "waiver" | "tech_check", label: string, actionKey: string) => {
+    if (actionInFlight) {
+      return;
+    }
+    setActionInFlight(actionKey);
     try {
       const url = await adminEntriesService.getEntryDocumentDownloadUrl(entryId, type);
       if (!url) {
@@ -181,6 +204,8 @@ export function AdminEntryDetailPage() {
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       flashMessage(getApiErrorMessage(error, `${label} konnte nicht geladen werden.`), 2800);
+    } finally {
+      setActionInFlight((current) => (current === actionKey ? null : current));
     }
   };
 
@@ -188,6 +213,52 @@ export function AdminEntryDetailPage() {
     setHasLoadedOnce(false);
     loadDetail();
   }, [entryId]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!detail || detail.payment.totalCents > 0) {
+      setFallbackPaymentTotalCents(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    adminSettingsService
+      .getPricingRules(detail.eventId)
+      .then((rules) => {
+        if (!active || !rules) {
+          return;
+        }
+
+        const classRule = rules.classRules.find((rule) => rule.classId === detail.classId);
+        if (!classRule) {
+          setFallbackPaymentTotalCents(null);
+          return;
+        }
+
+        const createdAt = new Date(detail.createdAt);
+        const earlyDeadline = new Date(rules.earlyDeadline);
+        const isLate =
+          Number.isFinite(createdAt.getTime()) &&
+          Number.isFinite(earlyDeadline.getTime()) &&
+          createdAt.getTime() > earlyDeadline.getTime();
+
+        const lateFeeCents = isLate ? Math.max(0, rules.lateFeeCents) : 0;
+        const secondVehicleDiscountCents = detail.isBackupVehicle ? Math.max(0, rules.secondVehicleDiscountCents) : 0;
+        const calculatedTotal = Math.max(0, classRule.baseFeeCents + lateFeeCents - secondVehicleDiscountCents);
+        setFallbackPaymentTotalCents(calculatedTotal);
+      })
+      .catch(() => {
+        if (active) {
+          setFallbackPaymentTotalCents(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [detail]);
 
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
@@ -197,13 +268,26 @@ export function AdminEntryDetailPage() {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung nicht gefunden.</div>;
   }
 
+  const hasFallbackPayment =
+    detail.payment.totalCents === 0 && detail.payment.paidAmountCents === 0 && detail.payment.amountOpenCents === 0 && fallbackPaymentTotalCents !== null;
+  const displayedPaymentTotalCents = hasFallbackPayment ? fallbackPaymentTotalCents : detail.payment.totalCents;
+  const displayedPaymentPaidCents = detail.payment.paidAmountCents;
+  const displayedPaymentOpenCents = hasFallbackPayment
+    ? Math.max(0, displayedPaymentTotalCents - displayedPaymentPaidCents)
+    : detail.payment.amountOpenCents;
   const paymentState = paid ? "paid" : "due";
-  const paidPercent = detail.payment.totalCents > 0 ? Math.max(0, Math.min(100, Math.round((detail.payment.paidAmountCents / detail.payment.totalCents) * 100))) : 0;
+  const paidPercent = displayedPaymentTotalCents > 0
+    ? Math.max(0, Math.min(100, Math.round((displayedPaymentPaidCents / displayedPaymentTotalCents) * 100)))
+    : 0;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
+  const anyActionInFlight = actionInFlight !== null;
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
   const actionActiveClass = "border-primary bg-primary text-primary-foreground hover:bg-primary/90";
   const statusDisabledReason = (target: "pending" | "shortlist" | "accepted" | "rejected") => {
+    if (anyActionInFlight) {
+      return "Aktion wird verarbeitet…";
+    }
     if (!canSetStatus) {
       return "Nur Admin-Rollen dürfen Status ändern.";
     }
@@ -428,10 +512,15 @@ export function AdminEntryDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-slate-700">
                 <div className="grid gap-2">
-                  <div className="rounded-md border bg-slate-50 p-3">Gesamt: {asEuro(detail.payment.totalCents)}</div>
-                  <div className="rounded-md border bg-slate-50 p-3">Bezahlt: {asEuro(detail.payment.paidAmountCents)}</div>
-                  <div className="rounded-md border bg-slate-50 p-3">Offen: {asEuro(detail.payment.amountOpenCents)}</div>
+                  <div className="rounded-md border bg-slate-50 p-3">Gesamt: {asEuro(displayedPaymentTotalCents)}</div>
+                  <div className="rounded-md border bg-slate-50 p-3">Bezahlt: {asEuro(displayedPaymentPaidCents)}</div>
+                  <div className="rounded-md border bg-slate-50 p-3">Offen: {asEuro(displayedPaymentOpenCents)}</div>
                 </div>
+                {hasFallbackPayment && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Betrag wird aus aktueller Preisregel angezeigt, da vom Backend noch kein Rechnungsbetrag geliefert wurde.
+                  </div>
+                )}
                 <div>
                   <div className="mb-1 text-xs text-slate-500">Zahlungsfortschritt</div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
@@ -499,12 +588,14 @@ export function AdminEntryDetailPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-2">
                 <HintButton
-                  label="Auf Vorauswahl setzen"
+                  label={actionInFlight === "status-shortlist" ? "Status wird gesetzt…" : "Auf Vorauswahl setzen"}
+                  icon={actionInFlight === "status-shortlist" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
                   variant={status === "shortlist" ? "default" : "outline"}
                   className={status === "shortlist" ? actionActiveClass : actionOutlineClass}
                   disabledReason={statusDisabledReason("shortlist")}
                   onClick={() => {
                     void runAction(
+                      "status-shortlist",
                       () => adminEntriesService.setEntryStatus(detail.id, "to_shortlist"),
                       "Status auf Vorauswahl gesetzt.",
                       "Status konnte nicht geändert werden."
@@ -512,24 +603,35 @@ export function AdminEntryDetailPage() {
                   }}
                 />
                 <HintButton
-                  label="Auf Zugelassen setzen"
+                  label={actionInFlight === "status-accepted" ? "Status wird gesetzt…" : "Auf Zugelassen setzen"}
+                  icon={actionInFlight === "status-accepted" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
                   variant={status === "accepted" ? "default" : "outline"}
                   className={status === "accepted" ? actionActiveClass : actionOutlineClass}
                   disabledReason={statusDisabledReason("accepted")}
                   onClick={() => setPendingAcceptConfirm(true)}
                 />
                 <HintButton
-                  label="Auf Abgelehnt setzen"
+                  label={actionInFlight === "status-rejected" ? "Status wird gesetzt…" : "Auf Abgelehnt setzen"}
+                  icon={actionInFlight === "status-rejected" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
                   variant={status === "rejected" ? "default" : "outline"}
                   className={status === "rejected" ? actionActiveClass : actionOutlineClass}
                   disabledReason={statusDisabledReason("rejected")}
                   onClick={() => setPendingRejectConfirm(true)}
                 />
                 <HintButton
-                  label="Einchecken bestätigen"
+                  label={actionInFlight === "checkin-confirm" ? "Check-in wird bestätigt…" : "Einchecken bestätigen"}
+                  icon={actionInFlight === "checkin-confirm" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
                   variant={checkinDone ? "default" : "outline"}
                   className={checkinDone ? actionActiveClass : actionOutlineClass}
-                  disabledReason={!canCheckin ? "Nur Admin/Editor-Rollen dürfen einchecken." : status !== "accepted" ? "Check-in erst nach Zulassung möglich." : undefined}
+                  disabledReason={
+                    anyActionInFlight
+                      ? "Aktion wird verarbeitet…"
+                      : !canCheckin
+                        ? "Nur Admin/Editor-Rollen dürfen einchecken."
+                        : status !== "accepted"
+                          ? "Check-in erst nach Zulassung möglich."
+                          : undefined
+                  }
                   onClick={() => setPendingCheckinConfirm(true)}
                 />
               </div>
@@ -613,36 +715,52 @@ export function AdminEntryDetailPage() {
 
               <div className="grid gap-2 border-t border-slate-200 pt-4">
                 <HintButton
-                  label="Zahlung als eingegangen markieren"
-                  icon={<Wallet className="mr-2 h-4 w-4" />}
+                  label={actionInFlight === "payment-mark" ? "Zahlung wird bestätigt…" : "Zahlung als eingegangen markieren"}
+                  icon={
+                    actionInFlight === "payment-mark" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wallet className="mr-2 h-4 w-4" />
+                    )
+                  }
                   variant={paid ? "default" : "outline"}
                   className={paid ? actionActiveClass : actionOutlineClass}
                   disabledReason={
-                    !canPaymentWrite
-                      ? "Nur Admin-Rollen dürfen Zahlungen ändern."
-                      : status !== "accepted"
-                        ? "Zahlung kann erst nach Zulassung bestätigt werden."
-                        : undefined
+                    anyActionInFlight
+                      ? "Aktion wird verarbeitet…"
+                      : !canPaymentWrite
+                        ? "Nur Admin-Rollen dürfen Zahlungen ändern."
+                        : status !== "accepted"
+                          ? "Zahlung kann erst nach Zulassung bestätigt werden."
+                          : undefined
                   }
                   onClick={async () => {
                     setPendingPaymentConfirm(true);
                   }}
                 />
                 <HintButton
-                  label="Zahlung manuell anpassen"
-                  icon={<Wallet className="mr-2 h-4 w-4" />}
+                  label={actionInFlight === "payment-adjust" ? "Zahlungsdaten werden gespeichert…" : "Zahlung manuell anpassen"}
+                  icon={
+                    actionInFlight === "payment-adjust" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wallet className="mr-2 h-4 w-4" />
+                    )
+                  }
                   variant="outline"
                   className={actionOutlineClass}
                   disabledReason={
-                    !canPaymentWrite
-                      ? "Nur Admin-Rollen dürfen Zahlungen ändern."
-                      : status !== "accepted"
-                        ? "Betragsanpassung erst nach Zulassung möglich."
-                        : undefined
+                    anyActionInFlight
+                      ? "Aktion wird verarbeitet…"
+                      : !canPaymentWrite
+                        ? "Nur Admin-Rollen dürfen Zahlungen ändern."
+                        : status !== "accepted"
+                          ? "Betragsanpassung erst nach Zulassung möglich."
+                          : undefined
                   }
                   onClick={() => {
-                    setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
-                    setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
+                    setPaymentTotalInput(euroInputFromCents(displayedPaymentTotalCents));
+                    setPaymentPaidInput(euroInputFromCents(displayedPaymentPaidCents));
                     setPaymentEditorOpen(true);
                   }}
                 />
@@ -652,34 +770,56 @@ export function AdminEntryDetailPage() {
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
-                    void handleDocumentDownload("waiver", "Haftverzicht");
+                    void handleDocumentDownload("waiver", "Haftverzicht", "download-waiver");
                   }}
                 >
-                  <Download className="mr-2 h-4 w-4" />
-                  PDF Haftverzicht
+                  {actionInFlight === "download-waiver" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  {actionInFlight === "download-waiver" ? "Haftverzicht wird geladen…" : "PDF Haftverzicht"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
-                    void handleDocumentDownload("tech_check", "Technische Abnahme");
+                    void handleDocumentDownload("tech_check", "Technische Abnahme", "download-tech-check");
                   }}
                 >
-                  <Download className="mr-2 h-4 w-4" />
-                  PDF Technische Abnahme
+                  {actionInFlight === "download-tech-check" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  {actionInFlight === "download-tech-check" ? "Technische Abnahme wird geladen…" : "PDF Technische Abnahme"}
                 </Button>
               </div>
 
               <div className="grid gap-2 border-t border-slate-200 pt-4">
                 <HintButton
-                  label="Nennung löschen (Admin)"
-                  icon={<Trash2 className="mr-2 h-4 w-4" />}
+                  label={actionInFlight === "entry-delete" ? "Nennung wird gelöscht…" : "Nennung löschen (Admin)"}
+                  icon={
+                    actionInFlight === "entry-delete" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )
+                  }
                   variant="outline"
                   className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                  disabledReason={!canDeleteEntry ? "Nur Admin-Rollen dürfen Nennungen löschen." : undefined}
+                  disabledReason={
+                    anyActionInFlight
+                      ? "Aktion wird verarbeitet…"
+                      : !canDeleteEntry
+                        ? "Nur Admin-Rollen dürfen Nennungen löschen."
+                        : undefined
+                  }
                   onClick={() => setPendingDeleteConfirm(true)}
                 />
               </div>
@@ -713,16 +853,24 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!canNotesWrite}
+                disabled={!canNotesWrite || anyActionInFlight}
                 onClick={async () => {
                   await runAction(
+                    "notes-save",
                     () => adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote }),
                     "Notizen gespeichert.",
                     "Notizen konnten nicht gespeichert werden."
                   );
                 }}
               >
-                Notizen speichern
+                {actionInFlight === "notes-save" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Speichert…
+                  </>
+                ) : (
+                  "Notizen speichern"
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -741,24 +889,41 @@ export function AdminEntryDetailPage() {
             <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
             <p className="mt-2 text-sm text-slate-600">Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen.</p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingAcceptConfirm(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionInFlight === "status-accepted"}
+                onClick={() => setPendingAcceptConfirm(false)}
+              >
                 Abbrechen
               </Button>
               <Button
                 type="button"
+                disabled={actionInFlight === "status-accepted"}
                 onClick={async () => {
-                  setPendingAcceptConfirm(false);
                   if (status === "accepted") {
+                    setPendingAcceptConfirm(false);
                     return;
                   }
-                  await runAction(
+                  const success = await runAction(
+                    "status-accepted",
                     () => adminEntriesService.setEntryStatus(detail.id, "to_accepted"),
                     "Status auf Zugelassen gesetzt.",
                     "Status konnte nicht geändert werden."
                   );
+                  if (success) {
+                    setPendingAcceptConfirm(false);
+                  }
                 }}
               >
-                Ja, zulassen
+                {actionInFlight === "status-accepted" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird gesetzt…
+                  </>
+                ) : (
+                  "Ja, zulassen"
+                )}
               </Button>
             </div>
           </div>
@@ -777,21 +942,37 @@ export function AdminEntryDetailPage() {
               <li>Technische Abnahme durchgeführt und dokumentiert</li>
             </ul>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingCheckinConfirm(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionInFlight === "checkin-confirm"}
+                onClick={() => setPendingCheckinConfirm(false)}
+              >
                 Abbrechen
               </Button>
               <Button
                 type="button"
+                disabled={actionInFlight === "checkin-confirm"}
                 onClick={async () => {
-                  setPendingCheckinConfirm(false);
-                  await runAction(
+                  const success = await runAction(
+                    "checkin-confirm",
                     () => adminEntriesService.setEntryCheckinVerified(detail.id),
                     "Einchecken wurde bestätigt.",
                     "Check-in konnte nicht bestätigt werden."
                   );
+                  if (success) {
+                    setPendingCheckinConfirm(false);
+                  }
                 }}
               >
-                Ja, bestätigen
+                {actionInFlight === "checkin-confirm" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird bestätigt…
+                  </>
+                ) : (
+                  "Ja, bestätigen"
+                )}
               </Button>
             </div>
           </div>
@@ -806,25 +987,42 @@ export function AdminEntryDetailPage() {
               Diese Nennung wird als abgelehnt markiert. Der Status kann später wieder geändert werden.
             </p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingRejectConfirm(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionInFlight === "status-rejected"}
+                onClick={() => setPendingRejectConfirm(false)}
+              >
                 Abbrechen
               </Button>
               <Button
                 type="button"
                 variant="destructive"
+                disabled={actionInFlight === "status-rejected"}
                 onClick={async () => {
-                  setPendingRejectConfirm(false);
                   if (status === "rejected") {
+                    setPendingRejectConfirm(false);
                     return;
                   }
-                  await runAction(
+                  const success = await runAction(
+                    "status-rejected",
                     () => adminEntriesService.setEntryStatus(detail.id, "to_rejected"),
                     "Status auf Abgelehnt gesetzt.",
                     "Status konnte nicht geändert werden."
                   );
+                  if (success) {
+                    setPendingRejectConfirm(false);
+                  }
                 }}
               >
-                Ja, ablehnen
+                {actionInFlight === "status-rejected" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird gesetzt…
+                  </>
+                ) : (
+                  "Ja, ablehnen"
+                )}
               </Button>
             </div>
           </div>
@@ -839,21 +1037,37 @@ export function AdminEntryDetailPage() {
               Diese Aktion bestätigt den Zahlungseingang für diese Nennung.
             </p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingPaymentConfirm(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionInFlight === "payment-mark"}
+                onClick={() => setPendingPaymentConfirm(false)}
+              >
                 Abbrechen
               </Button>
               <Button
                 type="button"
+                disabled={actionInFlight === "payment-mark"}
                 onClick={async () => {
-                  setPendingPaymentConfirm(false);
-                  await runAction(
+                  const success = await runAction(
+                    "payment-mark",
                     () => adminEntriesService.setEntryPaymentStatus(detail.id, "paid"),
                     "Zahlung als eingegangen markiert.",
                     "Zahlungsstatus konnte nicht aktualisiert werden."
                   );
+                  if (success) {
+                    setPendingPaymentConfirm(false);
+                  }
                 }}
               >
-                Ja, bestätigen
+                {actionInFlight === "payment-mark" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird bestätigt…
+                  </>
+                ) : (
+                  "Ja, bestätigen"
+                )}
               </Button>
             </div>
           </div>
@@ -884,26 +1098,41 @@ export function AdminEntryDetailPage() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPaymentEditorOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionInFlight === "payment-adjust"}
+                onClick={() => setPaymentEditorOpen(false)}
+              >
                 Abbrechen
               </Button>
               <Button
                 type="button"
+                disabled={actionInFlight === "payment-adjust"}
                 onClick={async () => {
-                  try {
-                    await adminEntriesService.setEntryPaymentAmounts(detail.id, {
-                      totalCents: centsFromEuroInput(paymentTotalInput),
-                      paidAmountCents: centsFromEuroInput(paymentPaidInput)
-                    });
+                  const success = await runAction(
+                    "payment-adjust",
+                    () =>
+                      adminEntriesService.setEntryPaymentAmounts(detail.id, {
+                        totalCents: centsFromEuroInput(paymentTotalInput),
+                        paidAmountCents: centsFromEuroInput(paymentPaidInput)
+                      }),
+                    "Zahlungsdaten wurden aktualisiert.",
+                    "Zahlungsdaten konnten nicht aktualisiert werden."
+                  );
+                  if (success) {
                     setPaymentEditorOpen(false);
-                    flashMessage("Zahlungsdaten wurden aktualisiert.");
-                    loadDetail();
-                  } catch (error) {
-                    flashMessage(getApiErrorMessage(error, "Zahlungsdaten konnten nicht aktualisiert werden."), 2800);
                   }
                 }}
               >
-                Speichern
+                {actionInFlight === "payment-adjust" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Speichert…
+                  </>
+                ) : (
+                  "Speichern"
+                )}
               </Button>
             </div>
           </div>
@@ -918,23 +1147,41 @@ export function AdminEntryDetailPage() {
               Diese Aktion verschiebt die Nennung in die gelöschte Liste und kann dort wiederhergestellt werden.
             </p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingDeleteConfirm(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={actionInFlight === "entry-delete"}
+                onClick={() => setPendingDeleteConfirm(false)}
+              >
                 Abbrechen
               </Button>
               <Button
                 type="button"
                 variant="destructive"
+                disabled={actionInFlight === "entry-delete"}
                 onClick={async () => {
-                  setPendingDeleteConfirm(false);
+                  if (anyActionInFlight) {
+                    return;
+                  }
+                  setActionInFlight("entry-delete");
                   try {
                     await adminEntriesService.deleteEntry(detail.id);
                     navigate(`/admin/entries${location.search}`);
                   } catch (error) {
                     flashMessage(getLocalizedActionError(error, "Nennung konnte nicht gelöscht werden."), 3200);
+                  } finally {
+                    setActionInFlight((current) => (current === "entry-delete" ? null : current));
                   }
                 }}
               >
-                Ja, löschen
+                {actionInFlight === "entry-delete" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird gelöscht…
+                  </>
+                ) : (
+                  "Ja, löschen"
+                )}
               </Button>
             </div>
           </div>

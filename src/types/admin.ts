@@ -207,12 +207,16 @@ export type AdminEntryHistoryItem = {
 
 export type AdminEntryDetailViewModel = {
   id: Id;
+  eventId: Id;
+  classId: Id;
   headline: string;
   classLabel: string;
   startNumber: string;
   status: AcceptanceStatus;
   paymentStatus: PaymentStatus;
   registrationStatus: RegistrationStatus;
+  createdAt: string;
+  isBackupVehicle: boolean;
   checkinVerified: boolean;
   driver: {
     name: string;
