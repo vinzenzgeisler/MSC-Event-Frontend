@@ -481,10 +481,10 @@ export const adminEntriesService = {
   },
 
   async setEntryStatus(entryId: string, transition: "to_shortlist" | "to_accepted" | "to_rejected") {
-    const statusMap: Record<typeof transition, { status: AcceptanceStatus; lifecycleEventType: string }> = {
-      to_shortlist: { status: "shortlist", lifecycleEventType: "preselection" },
-      to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment" },
-      to_rejected: { status: "rejected", lifecycleEventType: "rejected" }
+    const statusMap: Record<typeof transition, { status: AcceptanceStatus; lifecycleEventType: string; sendLifecycleMail: boolean }> = {
+      to_shortlist: { status: "shortlist", lifecycleEventType: "preselection", sendLifecycleMail: false },
+      to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment", sendLifecycleMail: true },
+      to_rejected: { status: "rejected", lifecycleEventType: "rejected", sendLifecycleMail: true }
     };
 
     const mapped = statusMap[transition];
@@ -493,7 +493,7 @@ export const adminEntriesService = {
       method: "PATCH",
       body: {
         acceptanceStatus: mapped.status,
-        sendLifecycleMail: true,
+        sendLifecycleMail: mapped.sendLifecycleMail,
         lifecycleEventType: mapped.lifecycleEventType
       }
     });

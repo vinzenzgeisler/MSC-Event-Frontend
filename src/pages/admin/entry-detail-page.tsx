@@ -112,6 +112,7 @@ export function AdminEntryDetailPage() {
   const [pendingAcceptConfirm, setPendingAcceptConfirm] = useState(false);
   const [pendingRejectConfirm, setPendingRejectConfirm] = useState(false);
   const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
+  const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState(false);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
   const [sendingVerificationMail, setSendingVerificationMail] = useState(false);
   const [paymentEditorOpen, setPaymentEditorOpen] = useState(false);
@@ -609,11 +610,7 @@ export function AdminEntryDetailPage() {
                         : undefined
                   }
                   onClick={async () => {
-                    await runAction(
-                      () => adminEntriesService.setEntryPaymentStatus(detail.id, "paid"),
-                      "Zahlung als eingegangen markiert.",
-                      "Zahlungsstatus konnte nicht aktualisiert werden."
-                    );
+                    setPendingPaymentConfirm(true);
                   }}
                 />
                 <HintButton
@@ -813,6 +810,35 @@ export function AdminEntryDetailPage() {
                 }}
               >
                 Ja, ablehnen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canPaymentWrite && pendingPaymentConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Zahlung als eingegangen markieren?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Diese Aktion bestätigt den Zahlungseingang für diese Nennung.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingPaymentConfirm(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  setPendingPaymentConfirm(false);
+                  await runAction(
+                    () => adminEntriesService.setEntryPaymentStatus(detail.id, "paid"),
+                    "Zahlung als eingegangen markiert.",
+                    "Zahlungsstatus konnte nicht aktualisiert werden."
+                  );
+                }}
+              >
+                Ja, bestätigen
               </Button>
             </div>
           </div>
