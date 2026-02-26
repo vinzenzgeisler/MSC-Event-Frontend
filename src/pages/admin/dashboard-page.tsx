@@ -5,6 +5,7 @@ import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { adminEntriesService } from "@/services/admin-entries.service";
 import { getAdminEventId } from "@/services/api/event-context";
 import { getApiErrorMessage, requestJson } from "@/services/api/http-client";
 
@@ -51,6 +52,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
 const RECENT_CHANGES_LIMIT = 4;
 const ACTIVITY_WINDOW_DAYS = 7;
 const CLASS_COLORS = ["#0f766e", "#2563eb", "#f59e0b", "#db2777", "#7c3aed", "#64748b"];
+const BRAND_STATS_LIMIT = 8;
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -71,6 +73,43 @@ function formatDayLabel(value: Date) {
   return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(value);
 }
 
+function normalizeVehicleBrand(label: string) {
+  const raw = (label ?? "").trim();
+  if (!raw || raw === "-") {
+    return "Unbekannt";
+  }
+
+  const cleaned = raw.replace(/^\d{2,4}\s+/, "").trim();
+  const parts = cleaned.split(/[\s/,-]+/).filter(Boolean);
+  if (!parts.length) {
+    return "Unbekannt";
+  }
+
+  const pairKey = `${(parts[0] ?? "").toLowerCase()} ${(parts[1] ?? "").toLowerCase()}`.trim();
+  const pairLabels: Record<string, string> = {
+    "alfa romeo": "Alfa Romeo",
+    "aston martin": "Aston Martin",
+    "land rover": "Land Rover",
+    "can am": "Can-Am",
+    "mercedes benz": "Mercedes-Benz"
+  };
+  if (pairLabels[pairKey]) {
+    return pairLabels[pairKey];
+  }
+
+  const token = parts[0] ?? "Unbekannt";
+  if (token.length <= 3) {
+    return token.toUpperCase();
+  }
+  return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+}
+
+type BrandDistributionItem = {
+  brand: string;
+  count: number;
+  sharePercent: number;
+};
+
 export function AdminDashboardPage() {
   const { roles } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
@@ -78,6 +117,10 @@ export function AdminDashboardPage() {
   const [recentEntries, setRecentEntries] = useState<DashboardRecentEntryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [advancedLoading, setAdvancedLoading] = useState(false);
+  const [advancedError, setAdvancedError] = useState("");
+  const [brandDistribution, setBrandDistribution] = useState<BrandDistributionItem[] | null>(null);
   const [error, setError] = useState("");
 
   const canReadOutbox = hasPermission(roles, "communication.read");
@@ -190,7 +233,82 @@ export function AdminDashboardPage() {
     });
     return `conic-gradient(${segments.join(",")})`;
   }, [classLegendItems, totalClassEntries]);
-  const maxClass = classDistribution.length > 0 ? Math.max(...classDistribution.map((item) => item.count)) : 1;
+
+  const loadBrandDistribution = useCallback(async () => {
+    setAdvancedLoading(true);
+    setAdvancedError("");
+    try {
+      const filter = {
+        query: "",
+        classId: "all",
+        acceptanceStatus: "all",
+        paymentStatus: "all",
+        checkinIdVerified: "all",
+        sortBy: "createdAt",
+        sortDir: "desc"
+      } as const;
+
+      const seenIds = new Set<string>();
+      const brandCounts = new Map<string, number>();
+      let cursor: string | undefined;
+      let safetyCounter = 0;
+
+      while (safetyCounter < 50) {
+        safetyCounter += 1;
+        const page = await adminEntriesService.listEntriesPage(filter, {
+          cursor,
+          limit: 100
+        });
+
+        page.entries.forEach((entry) => {
+          if (seenIds.has(entry.id)) {
+            return;
+          }
+          seenIds.add(entry.id);
+          const brand = normalizeVehicleBrand(entry.vehicleLabel);
+          brandCounts.set(brand, (brandCounts.get(brand) ?? 0) + 1);
+        });
+
+        if (!page.meta.hasMore || !page.meta.nextCursor) {
+          break;
+        }
+        cursor = page.meta.nextCursor;
+      }
+
+      const total = Array.from(brandCounts.values()).reduce((sum, count) => sum + count, 0);
+      const sorted = Array.from(brandCounts.entries())
+        .map(([brand, count]) => ({ brand, count }))
+        .sort((left, right) => right.count - left.count);
+
+      const top = sorted.slice(0, BRAND_STATS_LIMIT);
+      const otherCount = sorted.slice(BRAND_STATS_LIMIT).reduce((sum, item) => sum + item.count, 0);
+      const combined = otherCount > 0 ? [...top, { brand: "Weitere Marken", count: otherCount }] : top;
+      const withShare = combined.map((item) => ({
+        brand: item.brand,
+        count: item.count,
+        sharePercent: total > 0 ? Math.round((item.count / total) * 1000) / 10 : 0
+      }));
+
+      setBrandDistribution(withShare);
+    } catch (err) {
+      setBrandDistribution([]);
+      setAdvancedError(getApiErrorMessage(err, "Markenverteilung konnte nicht geladen werden."));
+    } finally {
+      setAdvancedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!advancedExpanded || brandDistribution !== null || advancedLoading) {
+      return;
+    }
+    void loadBrandDistribution();
+  }, [advancedExpanded, advancedLoading, brandDistribution, loadBrandDistribution]);
+
+  const brandMaxCount = useMemo(() => {
+    const counts = (brandDistribution ?? []).map((item) => item.count);
+    return counts.length ? Math.max(...counts) : 1;
+  }, [brandDistribution]);
 
   const actionItems = useMemo(
     () =>
@@ -426,6 +544,65 @@ export function AdminDashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base">Weitere Statistiken</CardTitle>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={advancedLoading}
+              onClick={() => setAdvancedExpanded((prev) => !prev)}
+            >
+              {advancedExpanded ? "Ausblenden" : "Aufklappen"}
+            </Button>
+          </div>
+        </CardHeader>
+        {advancedExpanded && (
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-md border bg-slate-50 p-3 text-sm">
+              <span className="text-slate-700">Markenverteilung über alle Nennungen</span>
+              <Button type="button" size="sm" variant="outline" disabled={advancedLoading} onClick={() => void loadBrandDistribution()}>
+                {advancedLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Lädt…
+                  </>
+                ) : (
+                  "Neu laden"
+                )}
+              </Button>
+            </div>
+            {advancedError && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{advancedError}</div>}
+            {advancedLoading && <div className="text-sm text-slate-500">Markenstatistik wird geladen…</div>}
+            {!advancedLoading && brandDistribution && brandDistribution.length > 0 && (
+              <div className="space-y-2">
+                {brandDistribution.map((item) => (
+                  <div key={item.brand} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="truncate pr-2 text-slate-700">{item.brand}</span>
+                      <span className="shrink-0 font-medium text-slate-900">
+                        {item.count} · {item.sharePercent.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.round((item.count / brandMaxCount) * 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!advancedLoading && brandDistribution && brandDistribution.length === 0 && (
+              <div className="text-sm text-slate-500">Keine Markenstatistik verfügbar.</div>
+            )}
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Für Werte wie „ältester Fahrer“ braucht das Dashboard zusätzliche API-Daten (Geburtsdatum-Aggregate), damit keine langsamen Einzelabfragen nötig sind.
+            </div>
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 }
