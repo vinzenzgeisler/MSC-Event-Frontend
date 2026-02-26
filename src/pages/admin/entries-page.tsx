@@ -11,6 +11,7 @@ import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { acceptanceStatusClasses, acceptanceStatusLabel, paymentStatusClasses, paymentStatusLabel } from "@/lib/admin-status";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
+import { adminIamService } from "@/services/admin-iam.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
@@ -304,6 +305,7 @@ export function AdminEntriesPage() {
   const { roles } = useAuth();
   const canManageStatus = hasPermission(roles, "entries.status.write");
   const canDeleteEntries = hasPermission(roles, "entries.delete");
+  const canReadIam = hasPermission(roles, "iam.read");
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
@@ -338,6 +340,8 @@ export function AdminEntriesPage() {
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
   const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
+  const [actorLabelById, setActorLabelById] = useState<Map<string, string>>(new Map());
+  const [actorLookupLoaded, setActorLookupLoaded] = useState(false);
   const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
 
@@ -656,6 +660,43 @@ export function AdminEntriesPage() {
   }, []);
 
   useEffect(() => {
+    if (viewScope !== "deleted" || !canDeleteEntries || !canReadIam || actorLookupLoaded) {
+      return;
+    }
+
+    const unresolvedUuidExists = deletedRows.some((row) => UUID_PATTERN.test(row.deletedBy.trim()));
+    if (!unresolvedUuidExists) {
+      return;
+    }
+
+    let cancelled = false;
+    adminIamService
+      .getOverview()
+      .then((overview) => {
+        if (cancelled) {
+          return;
+        }
+        const mapping = new Map<string, string>();
+        overview.accounts.forEach((account) => {
+          const preferred = (account.email ?? "").trim() || account.username.trim() || account.id;
+          mapping.set(account.id, preferred);
+        });
+        setActorLabelById(mapping);
+        setActorLookupLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setActorLookupLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actorLookupLoaded, canDeleteEntries, canReadIam, deletedRows, viewScope]);
+
+  useEffect(() => {
     const nextFilter = filterFromSearchParams(searchParams);
     setFilterDraft((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
 
@@ -806,6 +847,10 @@ export function AdminEntriesPage() {
     const raw = rawValue.trim();
     if (!raw) {
       return "Unbekannt";
+    }
+
+    if (actorLabelById.has(raw)) {
+      return actorLabelById.get(raw) ?? raw;
     }
 
     if (UUID_PATTERN.test(raw)) {
