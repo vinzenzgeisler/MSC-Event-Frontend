@@ -163,6 +163,24 @@ function splitNationalityFromNotes(value: string | null | undefined) {
   };
 }
 
+function extractDeleteReasonFromInternalNote(value: string | null | undefined) {
+  const source = (value ?? "").trim();
+  if (!source) {
+    return "";
+  }
+
+  const lines = source.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    const match = line.match(/^löschgrund(?:\s*\([^)]*\))?\s*:\s*(.+)$/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return "";
+}
+
 function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
   return {
     id: dto.id,
@@ -183,6 +201,10 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
 }
 
 function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntryListItem {
+  const backendDeleteReason = (dto.deleteReason ?? "").trim();
+  const internalNoteDeleteReason = extractDeleteReasonFromInternalNote(dto.internalNote);
+  const resolvedDeleteReason = backendDeleteReason || internalNoteDeleteReason || "Kein Löschgrund";
+
   return {
     id: dto.id,
     classId: dto.classId,
@@ -194,7 +216,7 @@ function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntry
     payment: normalizePaymentStatus(dto.paymentStatus),
     deletedAt: asDateTime(dto.deletedAt),
     deletedBy: (dto.deletedBy ?? "").trim() || "Unbekannt",
-    deleteReason: (dto.deleteReason ?? "").trim() || "Kein Löschgrund"
+    deleteReason: resolvedDeleteReason
   };
 }
 
