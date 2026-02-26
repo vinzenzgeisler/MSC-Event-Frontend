@@ -32,7 +32,7 @@ export const communicationService = {
     const response = await requestJson<AdminOutboxListResponse>("/admin/mail/outbox", {
       query: {
         eventId,
-        limit: 250,
+        limit: 100,
         sortBy: "createdAt",
         sortDir: "desc"
       }
