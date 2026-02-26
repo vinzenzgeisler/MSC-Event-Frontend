@@ -832,7 +832,7 @@ export function AdminEntryDetailPage() {
 
               <div className="grid gap-2 border-t border-slate-200 pt-4">
                 <HintButton
-                  label={actionInFlight === "entry-delete" ? "Nennung wird gelöscht…" : "Nennung löschen (Admin)"}
+                  label={actionInFlight === "entry-delete" ? "Nennung wird gelöscht…" : "Nennung löschen"}
                   icon={
                     actionInFlight === "entry-delete" ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

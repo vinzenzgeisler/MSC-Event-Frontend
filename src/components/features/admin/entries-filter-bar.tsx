@@ -67,7 +67,7 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
           <option value="shortlist">Vorauswahl</option>
           <option value="accepted">Zugelassen</option>
           <option value="rejected">Abgelehnt</option>
-          {allowDeletedStatusOption && <option value={DELETED_SCOPE_VALUE}>Gelöschte (Admin)</option>}
+          {allowDeletedStatusOption && <option value={DELETED_SCOPE_VALUE}>Gelöschte</option>}
         </select>
       </div>
       <div className="space-y-1">
