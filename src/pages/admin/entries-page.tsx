@@ -73,7 +73,22 @@ function formatEntryHeadline(entry: Pick<AdminEntryListItem, "name" | "vehicleLa
   return `${entry.name} · ${entry.vehicleLabel}`;
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_EMBEDDED_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+function isLikelyTechnicalActor(value: string) {
+  const raw = value.trim();
+  if (!raw) {
+    return true;
+  }
+  if (UUID_PATTERN.test(raw) || UUID_EMBEDDED_PATTERN.test(raw)) {
+    return true;
+  }
+  if (raw.startsWith("arn:") || raw.includes("|")) {
+    return true;
+  }
+  return false;
+}
 
 function MailNoteSwitch(props: {
   checked: boolean;
@@ -664,11 +679,6 @@ export function AdminEntriesPage() {
       return;
     }
 
-    const unresolvedUuidExists = deletedRows.some((row) => UUID_PATTERN.test(row.deletedBy.trim()));
-    if (!unresolvedUuidExists) {
-      return;
-    }
-
     let cancelled = false;
     adminIamService
       .getOverview()
@@ -680,6 +690,13 @@ export function AdminEntriesPage() {
         overview.accounts.forEach((account) => {
           const preferred = (account.email ?? "").trim() || account.username.trim() || account.id;
           mapping.set(account.id, preferred);
+          mapping.set(account.id.toLowerCase(), preferred);
+          mapping.set(account.username, preferred);
+          mapping.set(account.username.toLowerCase(), preferred);
+          if (account.email) {
+            mapping.set(account.email, preferred);
+            mapping.set(account.email.toLowerCase(), preferred);
+          }
         });
         setActorLabelById(mapping);
         setActorLookupLoaded(true);
@@ -694,7 +711,7 @@ export function AdminEntriesPage() {
     return () => {
       cancelled = true;
     };
-  }, [actorLookupLoaded, canDeleteEntries, canReadIam, deletedRows, viewScope]);
+  }, [actorLookupLoaded, canDeleteEntries, canReadIam, viewScope]);
 
   useEffect(() => {
     const nextFilter = filterFromSearchParams(searchParams);
@@ -852,8 +869,23 @@ export function AdminEntriesPage() {
     if (actorLabelById.has(raw)) {
       return actorLabelById.get(raw) ?? raw;
     }
+    const lowered = raw.toLowerCase();
+    if (actorLabelById.has(lowered)) {
+      return actorLabelById.get(lowered) ?? raw;
+    }
 
-    if (UUID_PATTERN.test(raw)) {
+    const embeddedId = raw.match(UUID_EMBEDDED_PATTERN)?.[0];
+    if (embeddedId) {
+      if (actorLabelById.has(embeddedId)) {
+        return actorLabelById.get(embeddedId) ?? raw;
+      }
+      const embeddedLower = embeddedId.toLowerCase();
+      if (actorLabelById.has(embeddedLower)) {
+        return actorLabelById.get(embeddedLower) ?? raw;
+      }
+    }
+
+    if (isLikelyTechnicalActor(raw)) {
       return "Unbekannt";
     }
 
