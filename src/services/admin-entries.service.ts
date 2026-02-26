@@ -163,24 +163,6 @@ function splitNationalityFromNotes(value: string | null | undefined) {
   };
 }
 
-function extractDeleteReasonFromInternalNote(value: string | null | undefined) {
-  const source = (value ?? "").trim();
-  if (!source) {
-    return "";
-  }
-
-  const lines = source.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index];
-    const match = line.match(/^löschgrund(?:\s*\([^)]*\))?\s*:\s*(.+)$/i);
-    if (match && match[1]) {
-      return match[1].trim();
-    }
-  }
-
-  return "";
-}
-
 function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
   return {
     id: dto.id,
@@ -201,9 +183,8 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
 }
 
 function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntryListItem {
-  const backendDeleteReason = (dto.deleteReason ?? "").trim();
-  const internalNoteDeleteReason = extractDeleteReasonFromInternalNote(dto.internalNote);
-  const resolvedDeleteReason = backendDeleteReason || internalNoteDeleteReason || "Kein Löschgrund";
+  const resolvedDeleteReason = (dto.deleteReason ?? "").trim() || "Kein Löschgrund";
+  const resolvedDeletedBy = (dto.deletedByDisplay ?? dto.deletedBy ?? "").trim() || "Unbekannt";
 
   return {
     id: dto.id,
@@ -215,7 +196,7 @@ function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntry
     status: normalizeAcceptanceStatus(dto.acceptanceStatus),
     payment: normalizePaymentStatus(dto.paymentStatus),
     deletedAt: asDateTime(dto.deletedAt),
-    deletedBy: (dto.deletedBy ?? "").trim() || "Unbekannt",
+    deletedBy: resolvedDeletedBy,
     deleteReason: resolvedDeleteReason
   };
 }
@@ -351,6 +332,9 @@ type AdminEntryDetailResponse = {
 type AdminEntryDeleteResponse = {
   ok: boolean;
   deletedEntryId: string;
+  deletedReason?: string | null;
+  deletedByUserId?: string | null;
+  deletedByDisplay?: string | null;
 };
 
 type AdminEntryRestoreResponse = {
@@ -746,9 +730,16 @@ export const adminEntriesService = {
     return response.url;
   },
 
-  async deleteEntry(entryId: string) {
+  async deleteEntry(entryId: string, options?: { deleteReason?: string | null }) {
+    const reason = options?.deleteReason?.trim();
     return requestJson<AdminEntryDeleteResponse>(`/admin/entries/${entryId}`, {
-      method: "DELETE"
+      method: "DELETE",
+      body:
+        typeof reason === "string"
+          ? {
+              deleteReason: reason || null
+            }
+          : undefined
     });
   },
 

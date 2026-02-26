@@ -32,6 +32,8 @@ export type AdminEntryListItemDto = {
   internalNote?: string | null;
   driverNote?: string | null;
   deletedAt?: string | null;
+  deletedByUserId?: string | null;
+  deletedByDisplay?: string | null;
   deletedBy?: string | null;
   deleteReason?: string | null;
   createdAt: string;

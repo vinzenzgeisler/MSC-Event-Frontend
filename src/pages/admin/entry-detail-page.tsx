@@ -1230,18 +1230,9 @@ export function AdminEntryDetailPage() {
                   setActionInFlight("entry-delete");
                   try {
                     const reason = deleteReasonDraft.trim();
-                    if (reason) {
-                      const timestamp = new Date().toLocaleString("de-DE");
-                      const reasonLine = `Löschgrund (${timestamp}): ${reason}`;
-                      const mergedInternalNote = internalNote.trim() ? `${internalNote.trim()}\n\n${reasonLine}` : reasonLine;
-                      await adminEntriesService.saveEntryNotes(detail.id, {
-                        internalNote: mergedInternalNote,
-                        driverNote,
-                        status: detail.status
-                      });
-                      setInternalNote(mergedInternalNote);
-                    }
-                    await adminEntriesService.deleteEntry(detail.id);
+                    await adminEntriesService.deleteEntry(detail.id, {
+                      deleteReason: reason || null
+                    });
                     setDeleteReasonDraft("");
                     navigate(`/admin/entries${location.search}`);
                   } catch (error) {

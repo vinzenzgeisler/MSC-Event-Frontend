@@ -11,7 +11,6 @@ import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { acceptanceStatusClasses, acceptanceStatusLabel, paymentStatusClasses, paymentStatusLabel } from "@/lib/admin-status";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
-import { adminIamService } from "@/services/admin-iam.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
@@ -305,7 +304,6 @@ export function AdminEntriesPage() {
   const { roles } = useAuth();
   const canManageStatus = hasPermission(roles, "entries.status.write");
   const canDeleteEntries = hasPermission(roles, "entries.delete");
-  const canReadIam = hasPermission(roles, "iam.read");
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
@@ -340,7 +338,6 @@ export function AdminEntriesPage() {
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
   const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
-  const [actorLabelById, setActorLabelById] = useState<Map<string, string>>(new Map());
   const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
 
@@ -659,38 +656,6 @@ export function AdminEntriesPage() {
   }, []);
 
   useEffect(() => {
-    if (!canDeleteEntries || !canReadIam) {
-      setActorLabelById(new Map());
-      return;
-    }
-
-    let cancelled = false;
-    adminIamService
-      .getOverview()
-      .then((overview) => {
-        if (cancelled) {
-          return;
-        }
-        const mapping = new Map<string, string>();
-        overview.accounts.forEach((account) => {
-          const preferred = (account.email ?? "").trim() || account.username.trim() || account.id;
-          mapping.set(account.id, preferred);
-        });
-        setActorLabelById(mapping);
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        setActorLabelById(new Map());
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canDeleteEntries, canReadIam]);
-
-  useEffect(() => {
     const nextFilter = filterFromSearchParams(searchParams);
     setFilterDraft((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
 
@@ -843,17 +808,8 @@ export function AdminEntriesPage() {
       return "Unbekannt";
     }
 
-    if (actorLabelById.has(raw)) {
-      return actorLabelById.get(raw) ?? raw;
-    }
-
     if (UUID_PATTERN.test(raw)) {
       return "Unbekannt";
-    }
-
-    const embeddedId = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i)?.[0];
-    if (embeddedId && actorLabelById.has(embeddedId)) {
-      return actorLabelById.get(embeddedId) ?? raw;
     }
 
     return raw;
