@@ -150,6 +150,7 @@ export function AdminEntryDetailPage() {
   const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
   const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState(false);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
+  const [deleteReasonDraft, setDeleteReasonDraft] = useState("");
   const [sendingVerificationMail, setSendingVerificationMail] = useState(false);
   const [sendingPaymentReminder, setSendingPaymentReminder] = useState(false);
   const [paymentEditorOpen, setPaymentEditorOpen] = useState(false);
@@ -848,7 +849,10 @@ export function AdminEntryDetailPage() {
                         ? "Nur Admin-Rollen dürfen Nennungen löschen."
                         : undefined
                   }
-                  onClick={() => setPendingDeleteConfirm(true)}
+                  onClick={() => {
+                    setDeleteReasonDraft("");
+                    setPendingDeleteConfirm(true);
+                  }}
                 />
               </div>
             </CardContent>
@@ -1192,12 +1196,26 @@ export function AdminEntryDetailPage() {
             <p className="mt-2 text-sm text-slate-600">
               Diese Aktion verschiebt die Nennung in die gelöschte Liste und kann dort wiederhergestellt werden.
             </p>
+            <div className="mt-3 space-y-1">
+              <label className="text-sm font-medium text-slate-900">Löschgrund (optional)</label>
+              <textarea
+                className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="Optionaler Hinweis für interne Nachvollziehbarkeit"
+                value={deleteReasonDraft}
+                disabled={actionInFlight === "entry-delete"}
+                onChange={(event) => setDeleteReasonDraft(event.target.value)}
+              />
+              <p className="text-xs text-slate-500">Wird als interne Notiz zur Nennung gespeichert.</p>
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "entry-delete"}
-                onClick={() => setPendingDeleteConfirm(false)}
+                onClick={() => {
+                  setPendingDeleteConfirm(false);
+                  setDeleteReasonDraft("");
+                }}
               >
                 Abbrechen
               </Button>
@@ -1211,7 +1229,20 @@ export function AdminEntryDetailPage() {
                   }
                   setActionInFlight("entry-delete");
                   try {
+                    const reason = deleteReasonDraft.trim();
+                    if (reason) {
+                      const timestamp = new Date().toLocaleString("de-DE");
+                      const reasonLine = `Löschgrund (${timestamp}): ${reason}`;
+                      const mergedInternalNote = internalNote.trim() ? `${internalNote.trim()}\n\n${reasonLine}` : reasonLine;
+                      await adminEntriesService.saveEntryNotes(detail.id, {
+                        internalNote: mergedInternalNote,
+                        driverNote,
+                        status: detail.status
+                      });
+                      setInternalNote(mergedInternalNote);
+                    }
                     await adminEntriesService.deleteEntry(detail.id);
+                    setDeleteReasonDraft("");
                     navigate(`/admin/entries${location.search}`);
                   } catch (error) {
                     flashMessage(getLocalizedActionError(error, "Nennung konnte nicht gelöscht werden."), 3200);
