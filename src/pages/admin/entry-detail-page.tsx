@@ -1200,12 +1200,11 @@ export function AdminEntryDetailPage() {
               <label className="text-sm font-medium text-slate-900">Löschgrund (optional)</label>
               <textarea
                 className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="Optionaler Hinweis für interne Nachvollziehbarkeit"
+                placeholder="Optionaler Löschgrund"
                 value={deleteReasonDraft}
                 disabled={actionInFlight === "entry-delete"}
                 onChange={(event) => setDeleteReasonDraft(event.target.value)}
               />
-              <p className="text-xs text-slate-500">Wird als interne Notiz zur Nennung gespeichert.</p>
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button
