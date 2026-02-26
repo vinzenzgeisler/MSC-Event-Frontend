@@ -17,6 +17,12 @@ type DashboardSummary = {
   mailQueuedTotal: number;
   exportsQueuedTotal: number;
   exportsProcessingTotal: number;
+  driverAgeStats: {
+    oldestDriverAge: number | null;
+    oldestDriverLabel: string;
+    youngestDriverAge: number | null;
+    medianDriverAge: number | null;
+  };
 };
 
 type DashboardClassDistributionItem = {
@@ -46,7 +52,13 @@ const EMPTY_SUMMARY: DashboardSummary = {
   mailFailedTotal: 0,
   mailQueuedTotal: 0,
   exportsQueuedTotal: 0,
-  exportsProcessingTotal: 0
+  exportsProcessingTotal: 0,
+  driverAgeStats: {
+    oldestDriverAge: null,
+    oldestDriverLabel: "",
+    youngestDriverAge: null,
+    medianDriverAge: null
+  }
 };
 
 const RECENT_CHANGES_LIMIT = 4;
@@ -71,6 +83,29 @@ function toDayKey(value: Date) {
 
 function formatDayLabel(value: Date) {
   return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(value);
+}
+
+function formatAge(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "—";
+  }
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+function formatAgeWithUnit(value: number | null | undefined) {
+  const formatted = formatAge(value);
+  return formatted === "—" ? formatted : `${formatted} J.`;
+}
+
+function normalizeDashboardSummary(summary: DashboardSummary | null | undefined): DashboardSummary {
+  return {
+    ...EMPTY_SUMMARY,
+    ...(summary ?? {}),
+    driverAgeStats: {
+      ...EMPTY_SUMMARY.driverAgeStats,
+      ...(summary?.driverAgeStats ?? {})
+    }
+  };
 }
 
 function normalizeVehicleBrand(label: string) {
@@ -141,7 +176,7 @@ export function AdminDashboardPage() {
         }
       });
 
-      setSummary(response.summary ?? EMPTY_SUMMARY);
+      setSummary(normalizeDashboardSummary(response.summary));
       setClassDistribution(response.classDistribution ?? []);
       setRecentEntries(response.recentEntries ?? []);
     } catch (err) {
@@ -206,7 +241,14 @@ export function AdminDashboardPage() {
   }, [recentEntries]);
   const maxDailyCount = Math.max(1, ...dailyActivity.map((item) => item.count));
   const newEntriesLast7Days = dailyActivity.reduce((sum, item) => sum + item.count, 0);
-  const averageNewEntriesPerDay = (newEntriesLast7Days / ACTIVITY_WINDOW_DAYS).toFixed(1);
+  const medianDriverAge = summary.driverAgeStats.medianDriverAge;
+  const youngestDriverAge = summary.driverAgeStats.youngestDriverAge;
+  const oldestDriverAge = summary.driverAgeStats.oldestDriverAge;
+  const oldestDriverLabel = summary.driverAgeStats.oldestDriverLabel?.trim() || "—";
+  const ageRangeText =
+    typeof youngestDriverAge === "number" && typeof oldestDriverAge === "number"
+      ? `${formatAge(youngestDriverAge)} - ${formatAge(oldestDriverAge)} J.`
+      : "—";
 
   const classDistributionSorted = useMemo(
     () => [...classDistribution].sort((left, right) => right.count - left.count),
@@ -216,8 +258,6 @@ export function AdminDashboardPage() {
   const totalClassEntries = classDistributionSorted.reduce((sum, item) => sum + item.count, 0);
   const shownClassEntries = topClasses.reduce((sum, item) => sum + item.count, 0);
   const otherClassEntries = Math.max(0, totalClassEntries - shownClassEntries);
-  const activeClassesCount = classDistributionSorted.filter((item) => item.count > 0).length;
-  const topClassesSharePercent = totalClassEntries > 0 ? Math.round((shownClassEntries / totalClassEntries) * 100) : 0;
   const classLegendItems = otherClassEntries > 0 ? [...topClasses, { classId: "other", className: "Weitere Klassen", count: otherClassEntries }] : topClasses;
   const donutGradient = useMemo(() => {
     if (totalClassEntries <= 0 || classLegendItems.length === 0) {
@@ -381,8 +421,8 @@ export function AdminDashboardPage() {
               <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : summary.paymentsDueTotal}</div>
             </div>
             <div className="rounded-lg border bg-white p-3">
-              <div className="text-xs uppercase text-slate-500">Klassen aktiv</div>
-              <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : activeClassesCount}</div>
+              <div className="text-xs uppercase text-slate-500">Median-Alter</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : formatAgeWithUnit(medianDriverAge)}</div>
             </div>
             <div className="rounded-lg border bg-white p-3">
               <div className="text-xs uppercase text-slate-500">Neue Nennungen (7 Tage)</div>
@@ -405,14 +445,14 @@ export function AdminDashboardPage() {
             </div>
             <div className="rounded-lg border bg-white p-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">Top-Klassenanteil</span>
-                <span className="font-semibold text-slate-900">{loading ? "…" : `${topClassesSharePercent}%`}</span>
+                <span className="text-slate-700">Fahrer-Altersspanne</span>
+                <span className="font-semibold text-slate-900">{loading ? "…" : ageRangeText}</span>
               </div>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                <div className="h-2 rounded-full bg-sky-500" style={{ width: `${loading ? 0 : topClassesSharePercent}%` }} />
+                <div className="h-2 rounded-full bg-sky-500" style={{ width: `${loading ? 0 : 100}%` }} />
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                {loading ? "…" : `${averageNewEntriesPerDay} neue Nennungen pro Tag (Ø letzte 7 Tage)`}
+                {loading ? "…" : `Ältester Fahrer: ${oldestDriverLabel}`}
               </div>
             </div>
           </div>
@@ -597,9 +637,7 @@ export function AdminDashboardPage() {
             {!advancedLoading && brandDistribution && brandDistribution.length === 0 && (
               <div className="text-sm text-slate-500">Keine Markenstatistik verfügbar.</div>
             )}
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Für Werte wie „ältester Fahrer“ braucht das Dashboard zusätzliche API-Daten (Geburtsdatum-Aggregate), damit keine langsamen Einzelabfragen nötig sind.
-            </div>
+            <div className="text-xs text-slate-500">Marken werden aus den Fahrzeugbezeichnungen der Nennungen abgeleitet.</div>
           </CardContent>
         )}
       </Card>
