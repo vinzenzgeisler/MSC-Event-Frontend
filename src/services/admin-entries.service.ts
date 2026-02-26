@@ -193,8 +193,8 @@ function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntry
     status: normalizeAcceptanceStatus(dto.acceptanceStatus),
     payment: normalizePaymentStatus(dto.paymentStatus),
     deletedAt: asDateTime(dto.deletedAt),
-    deletedBy: (dto.deletedBy ?? "").trim() || "-",
-    deleteReason: (dto.deleteReason ?? "").trim() || "-"
+    deletedBy: (dto.deletedBy ?? "").trim() || "Unbekannt",
+    deleteReason: (dto.deleteReason ?? "").trim() || "Kein Löschgrund"
   };
 }
 

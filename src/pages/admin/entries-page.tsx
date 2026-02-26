@@ -11,6 +11,7 @@ import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { acceptanceStatusClasses, acceptanceStatusLabel, paymentStatusClasses, paymentStatusLabel } from "@/lib/admin-status";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
+import { adminIamService } from "@/services/admin-iam.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
@@ -64,6 +65,15 @@ const SORT_LABELS: Record<`${AdminEntriesFilter["sortBy"]}:${AdminEntriesFilter[
 function sortLabel(sortBy: AdminEntriesFilter["sortBy"], sortDir: AdminEntriesFilter["sortDir"]) {
   return SORT_LABELS[`${sortBy}:${sortDir}`] ?? `${sortBy} ${sortDir}`;
 }
+
+function formatEntryHeadline(entry: Pick<AdminEntryListItem, "name" | "vehicleLabel"> | Pick<AdminDeletedEntryListItem, "name" | "vehicleLabel"> | null | undefined) {
+  if (!entry) {
+    return "Nennung";
+  }
+  return `${entry.name} · ${entry.vehicleLabel}`;
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function MailNoteSwitch(props: {
   checked: boolean;
@@ -295,6 +305,7 @@ export function AdminEntriesPage() {
   const { roles } = useAuth();
   const canManageStatus = hasPermission(roles, "entries.status.write");
   const canDeleteEntries = hasPermission(roles, "entries.delete");
+  const canReadIam = hasPermission(roles, "iam.read");
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
@@ -329,6 +340,7 @@ export function AdminEntriesPage() {
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
   const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
+  const [actorLabelById, setActorLabelById] = useState<Map<string, string>>(new Map());
   const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
 
@@ -647,6 +659,38 @@ export function AdminEntriesPage() {
   }, []);
 
   useEffect(() => {
+    if (!canDeleteEntries || !canReadIam) {
+      setActorLabelById(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    adminIamService
+      .getOverview()
+      .then((overview) => {
+        if (cancelled) {
+          return;
+        }
+        const mapping = new Map<string, string>();
+        overview.accounts.forEach((account) => {
+          const preferred = (account.email ?? "").trim() || account.username.trim() || account.id;
+          mapping.set(account.id, preferred);
+        });
+        setActorLabelById(mapping);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setActorLabelById(new Map());
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canDeleteEntries, canReadIam]);
+
+  useEffect(() => {
     const nextFilter = filterFromSearchParams(searchParams);
     setFilterDraft((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
 
@@ -793,6 +837,28 @@ export function AdminEntriesPage() {
       ? `${shownTotal} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${shownCount < shownTotal ? ` · ${shownCount} geladen` : ""}${refreshing ? " · aktualisiere…" : ""}`
       : `${shownCount} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${loadingInitial ? " · lädt…" : ""}`;
 
+  const resolveActorLabel = (rawValue: string) => {
+    const raw = rawValue.trim();
+    if (!raw) {
+      return "Unbekannt";
+    }
+
+    if (actorLabelById.has(raw)) {
+      return actorLabelById.get(raw) ?? raw;
+    }
+
+    if (UUID_PATTERN.test(raw)) {
+      return "Unbekannt";
+    }
+
+    const embeddedId = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i)?.[0];
+    if (embeddedId && actorLabelById.has(embeddedId)) {
+      return actorLabelById.get(embeddedId) ?? raw;
+    }
+
+    return raw;
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
@@ -846,7 +912,7 @@ export function AdminEntriesPage() {
                       <th className="px-3 py-2 font-semibold">Zahlung</th>
                       <th className="px-3 py-2 font-semibold">Gelöscht am</th>
                       <th className="px-3 py-2 font-semibold">Gelöscht von</th>
-                      <th className="px-3 py-2 font-semibold">Grund</th>
+                      <th className="px-3 py-2 font-semibold">Löschgrund</th>
                       <th className="px-3 py-2 font-semibold">Aktion</th>
                     </tr>
                   </thead>
@@ -871,7 +937,7 @@ export function AdminEntriesPage() {
                           </Badge>
                         </td>
                         <td className="px-3 py-2 text-slate-700">{row.deletedAt}</td>
-                        <td className="px-3 py-2 text-slate-700">{row.deletedBy}</td>
+                        <td className="px-3 py-2 text-slate-700">{resolveActorLabel(row.deletedBy)}</td>
                         <td className="px-3 py-2 text-slate-700">{row.deleteReason}</td>
                         <td className="px-3 py-2">
                           <Button type="button" size="sm" variant="outline" onClick={() => setPendingRestoreEntryId(row.id)}>
@@ -921,7 +987,7 @@ export function AdminEntriesPage() {
             try {
               await adminEntriesService.setEntryStatus(entryId, "to_shortlist");
               applyLocalStatusUpdate(entryId, "shortlist");
-              showToast(`Nennung ${entryId} wurde auf Vorauswahl gesetzt.`);
+              showToast(`${formatEntryHeadline(row)} wurde auf Vorauswahl gesetzt.`);
             } catch (error) {
               showToast(getApiErrorMessage(error, "Status konnte nicht aktualisiert werden."));
             } finally {
@@ -1005,7 +1071,7 @@ export function AdminEntriesPage() {
                       includeDriverNoteInLifecycleMail: includeDriverNoteOnAccept
                     });
                     applyLocalStatusUpdate(entryId, "accepted");
-                    showToast(`Nennung ${entryId} wurde zugelassen.`);
+                    showToast(`${formatEntryHeadline(pendingAcceptRow)} wurde zugelassen.`);
                     setPendingAcceptEntryId(null);
                   } catch (error) {
                     showToast(getApiErrorMessage(error, "Nennung konnte nicht zugelassen werden."));
@@ -1065,7 +1131,7 @@ export function AdminEntriesPage() {
                       includeDriverNoteInLifecycleMail: includeDriverNoteOnReject
                     });
                     applyLocalStatusUpdate(entryId, "rejected");
-                    showToast(`Nennung ${entryId} wurde abgelehnt.`);
+                    showToast(`${formatEntryHeadline(pendingRejectRow)} wurde abgelehnt.`);
                     setPendingRejectEntryId(null);
                   } catch (error) {
                     showToast(getApiErrorMessage(error, "Nennung konnte nicht abgelehnt werden."));
@@ -1101,6 +1167,7 @@ export function AdminEntriesPage() {
                 type="button"
                 onClick={async () => {
                   const entryId = pendingRestoreEntryId;
+                  const deletedEntry = deletedRows.find((item) => item.id === entryId);
                   if (!entryId) {
                     return;
                   }
@@ -1112,7 +1179,7 @@ export function AdminEntriesPage() {
                       ...prev,
                       total: Math.max(0, prev.total - 1)
                     }));
-                    showToast(`Nennung ${entryId} wurde wiederhergestellt.`);
+                    showToast(`${formatEntryHeadline(deletedEntry)} wurde wiederhergestellt.`);
                   } catch (error) {
                     showToast(getApiErrorMessage(error, "Nennung konnte nicht wiederhergestellt werden."));
                   }
