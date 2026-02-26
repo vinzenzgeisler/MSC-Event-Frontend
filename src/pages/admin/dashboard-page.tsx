@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, ClipboardCheck, Filter, Loader2, Mail, MessageSquareWarning, Wallet } from "lucide-react";
+import { Filter, Loader2, Mail, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
-import { getEffectiveRoles, hasPermission } from "@/app/auth/iam";
-import { Badge } from "@/components/ui/badge";
+import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminEventId } from "@/services/api/event-context";
@@ -81,7 +80,6 @@ export function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const isAdmin = useMemo(() => getEffectiveRoles(roles).includes("admin"), [roles]);
   const canReadOutbox = hasPermission(roles, "communication.read");
 
   const loadDashboard = useCallback(async (options?: { refresh?: boolean }) => {
@@ -134,9 +132,7 @@ export function AdminDashboardPage() {
   }, [recentEntries]);
 
   const paidCount = Math.max(0, summary.entriesTotal - summary.paymentsDueTotal);
-  const checkinDoneCount = Math.max(0, summary.entriesTotal - summary.checkinPendingTotal);
   const paymentCompletionPercent = summary.entriesTotal > 0 ? Math.round((paidCount / summary.entriesTotal) * 100) : 0;
-  const checkinCompletionPercent = summary.entriesTotal > 0 ? Math.round((checkinDoneCount / summary.entriesTotal) * 100) : 0;
 
   const dailyActivity = useMemo(() => {
     const counts = new Map<string, number>();
@@ -166,6 +162,8 @@ export function AdminDashboardPage() {
     return days;
   }, [recentEntries]);
   const maxDailyCount = Math.max(1, ...dailyActivity.map((item) => item.count));
+  const newEntriesLast7Days = dailyActivity.reduce((sum, item) => sum + item.count, 0);
+  const averageNewEntriesPerDay = (newEntriesLast7Days / ACTIVITY_WINDOW_DAYS).toFixed(1);
 
   const classDistributionSorted = useMemo(
     () => [...classDistribution].sort((left, right) => right.count - left.count),
@@ -175,6 +173,8 @@ export function AdminDashboardPage() {
   const totalClassEntries = classDistributionSorted.reduce((sum, item) => sum + item.count, 0);
   const shownClassEntries = topClasses.reduce((sum, item) => sum + item.count, 0);
   const otherClassEntries = Math.max(0, totalClassEntries - shownClassEntries);
+  const activeClassesCount = classDistributionSorted.filter((item) => item.count > 0).length;
+  const topClassesSharePercent = totalClassEntries > 0 ? Math.round((shownClassEntries / totalClassEntries) * 100) : 0;
   const classLegendItems = otherClassEntries > 0 ? [...topClasses, { classId: "other", className: "Weitere Klassen", count: otherClassEntries }] : topClasses;
   const donutGradient = useMemo(() => {
     if (totalClassEntries <= 0 || classLegendItems.length === 0) {
@@ -200,12 +200,6 @@ export function AdminDashboardPage() {
           subtitle: "Zugelassen + Zahlung offen",
           to: "/admin/entries?status=accepted&payment=due",
           icon: Wallet
-        },
-        {
-          label: "Check-in offen",
-          subtitle: "Zugelassen + nicht eingecheckt",
-          to: "/admin/entries?status=accepted&checkin=false",
-          icon: ClipboardCheck
         },
         {
           label: "Nennungen",
@@ -269,12 +263,12 @@ export function AdminDashboardPage() {
               <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : summary.paymentsDueTotal}</div>
             </div>
             <div className="rounded-lg border bg-white p-3">
-              <div className="text-xs uppercase text-slate-500">Check-in ausstehend</div>
-              <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : summary.checkinPendingTotal}</div>
+              <div className="text-xs uppercase text-slate-500">Klassen aktiv</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : activeClassesCount}</div>
             </div>
             <div className="rounded-lg border bg-white p-3">
-              <div className="text-xs uppercase text-slate-500">Mail-Fehler</div>
-              <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : isAdmin && canReadOutbox ? summary.mailFailedTotal : "-"}</div>
+              <div className="text-xs uppercase text-slate-500">Neue Nennungen (7 Tage)</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : newEntriesLast7Days}</div>
             </div>
           </div>
 
@@ -293,14 +287,14 @@ export function AdminDashboardPage() {
             </div>
             <div className="rounded-lg border bg-white p-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">Check-in-Quote</span>
-                <span className="font-semibold text-slate-900">{loading ? "…" : `${checkinCompletionPercent}%`}</span>
+                <span className="text-slate-700">Top-Klassenanteil</span>
+                <span className="font-semibold text-slate-900">{loading ? "…" : `${topClassesSharePercent}%`}</span>
               </div>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                <div className="h-2 rounded-full bg-sky-500" style={{ width: `${loading ? 0 : checkinCompletionPercent}%` }} />
+                <div className="h-2 rounded-full bg-sky-500" style={{ width: `${loading ? 0 : topClassesSharePercent}%` }} />
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                {loading ? "…" : `${checkinDoneCount} von ${summary.entriesTotal} Nennungen eingecheckt`}
+                {loading ? "…" : `${averageNewEntriesPerDay} neue Nennungen pro Tag (Ø letzte 7 Tage)`}
               </div>
             </div>
           </div>
@@ -429,18 +423,6 @@ export function AdminDashboardPage() {
                 </Button>
               );
             })}
-            {isAdmin && (
-              <div className="mt-3 rounded-md border bg-slate-50 p-3 text-xs text-slate-700">
-                <div className="mb-2 flex items-center gap-2 font-medium text-slate-900">
-                  <MessageSquareWarning className="h-4 w-4" />
-                  Admin Monitor
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">Mail-Queue: {loading || !canReadOutbox ? "-" : summary.mailQueuedTotal}</Badge>
-                  <Badge variant="outline">Mail-Fehler: {loading || !canReadOutbox ? "-" : summary.mailFailedTotal}</Badge>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       </section>
