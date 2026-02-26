@@ -32,13 +32,19 @@ export const communicationService = {
     const response = await requestJson<AdminOutboxListResponse>("/admin/mail/outbox", {
       query: {
         eventId,
-        limit: 100,
+        limit: 250,
         sortBy: "createdAt",
         sortDir: "desc"
       }
     });
 
-    return response.outbox.map(fromOutboxDto);
+    const sortedOutbox = [...response.outbox].sort((left, right) => {
+      const leftTs = Number(new Date(left.createdAt));
+      const rightTs = Number(new Date(right.createdAt));
+      return rightTs - leftTs;
+    });
+
+    return sortedOutbox.map(fromOutboxDto);
   },
 
   async queueBroadcast(form: BroadcastForm) {

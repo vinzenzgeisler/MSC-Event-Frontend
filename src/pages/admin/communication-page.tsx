@@ -20,7 +20,7 @@ const initialForm: BroadcastForm = {
   templateKey: "",
   subjectOverride: ""
 };
-const OUTBOX_PREVIEW_LIMIT = 5;
+const OUTBOX_PREVIEW_LIMIT = 20;
 
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
@@ -38,14 +38,20 @@ export function AdminCommunicationPage() {
     setTimeout(() => setToastMessage(""), 2600);
   };
 
-  const loadOutbox = async () => {
-    setLoadingOutbox(true);
+  const loadOutbox = async (options?: { silentError?: boolean }) => {
+    if (!options?.silentError) {
+      setLoadingOutbox(true);
+    }
     try {
       setOutbox(await communicationService.listOutbox());
     } catch (error) {
-      showToast(getApiErrorMessage(error, "Postausgang konnte nicht geladen werden."));
+      if (!options?.silentError) {
+        showToast(getApiErrorMessage(error, "Postausgang konnte nicht geladen werden."));
+      }
     } finally {
-      setLoadingOutbox(false);
+      if (!options?.silentError) {
+        setLoadingOutbox(false);
+      }
     }
   };
 
@@ -61,6 +67,9 @@ export function AdminCommunicationPage() {
 
   useEffect(() => {
     void loadOutbox();
+    const refreshTimer = window.setInterval(() => {
+      void loadOutbox({ silentError: true });
+    }, 15000);
 
     adminMetaService
       .getCurrentEvent()
@@ -71,6 +80,10 @@ export function AdminCommunicationPage() {
       .listClassOptions()
       .then(setClassOptions)
       .catch((error) => showToast(getApiErrorMessage(error, "Klassen konnten nicht geladen werden.")));
+
+    return () => {
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   return (
