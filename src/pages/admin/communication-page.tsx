@@ -20,7 +20,7 @@ const initialForm: BroadcastForm = {
   templateKey: "",
   subjectOverride: ""
 };
-const OUTBOX_PREVIEW_LIMIT = 20;
+const OUTBOX_PREVIEW_LIMIT = 10;
 
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
