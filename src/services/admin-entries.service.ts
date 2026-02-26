@@ -512,7 +512,8 @@ export const adminEntriesService = {
         return;
       }
       await adminEntriesService.queueLifecycleMail(entryId, mapped.lifecycleEventType, {
-        includeDriverNote: options?.includeDriverNoteInLifecycleMail
+        includeDriverNote: options?.includeDriverNoteInLifecycleMail,
+        allowDuplicate: true
       });
     };
     const waitForTargetStatus = async () => {
