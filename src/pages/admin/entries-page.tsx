@@ -26,7 +26,9 @@ const initialFilter: AdminEntriesFilter = {
   classId: "all",
   acceptanceStatus: "all",
   paymentStatus: "all",
-  checkinIdVerified: "all"
+  checkinIdVerified: "all",
+  sortBy: "createdAt",
+  sortDir: "desc"
 };
 
 const EMPTY_META: ListMeta = {
@@ -40,6 +42,27 @@ const EMPTY_META: ListMeta = {
 const ACCEPTANCE_VALUES: AdminEntriesFilter["acceptanceStatus"][] = ["all", "pending", "shortlist", "accepted", "rejected"];
 const PAYMENT_VALUES: AdminEntriesFilter["paymentStatus"][] = ["all", "due", "paid"];
 const CHECKIN_VALUES: AdminEntriesFilter["checkinIdVerified"][] = ["all", "true", "false"];
+const SORT_BY_VALUES: AdminEntriesFilter["sortBy"][] = ["createdAt", "updatedAt", "driverLastName", "driverFirstName", "className", "startNumberNorm"];
+const SORT_DIR_VALUES: AdminEntriesFilter["sortDir"][] = ["asc", "desc"];
+
+const SORT_LABELS: Record<`${AdminEntriesFilter["sortBy"]}:${AdminEntriesFilter["sortDir"]}`, string> = {
+  "createdAt:desc": "Neueste zuerst",
+  "createdAt:asc": "Älteste zuerst",
+  "updatedAt:desc": "Zuletzt aktualisiert",
+  "updatedAt:asc": "Zuletzt aktualisiert (alt zuerst)",
+  "driverLastName:asc": "Name A-Z",
+  "driverLastName:desc": "Name Z-A",
+  "driverFirstName:asc": "Vorname A-Z",
+  "driverFirstName:desc": "Vorname Z-A",
+  "className:asc": "Klasse A-Z",
+  "className:desc": "Klasse Z-A",
+  "startNumberNorm:asc": "Startnummer aufsteigend",
+  "startNumberNorm:desc": "Startnummer absteigend"
+};
+
+function sortLabel(sortBy: AdminEntriesFilter["sortBy"], sortDir: AdminEntriesFilter["sortDir"]) {
+  return SORT_LABELS[`${sortBy}:${sortDir}`] ?? `${sortBy} ${sortDir}`;
+}
 
 type EntriesCachePayload = {
   savedAt: number;
@@ -58,13 +81,17 @@ function filterFromSearchParams(searchParams: URLSearchParams): AdminEntriesFilt
   const acceptanceStatus = searchParams.get("status");
   const paymentStatus = searchParams.get("payment");
   const checkin = searchParams.get("checkin");
+  const sortBy = searchParams.get("sortBy");
+  const sortDir = searchParams.get("sortDir");
 
   return {
     query: query ?? "",
     classId: classId && classId.trim() ? classId : "all",
     acceptanceStatus: hasValue(acceptanceStatus, ACCEPTANCE_VALUES) ? acceptanceStatus : "all",
     paymentStatus: hasValue(paymentStatus, PAYMENT_VALUES) ? paymentStatus : "all",
-    checkinIdVerified: hasValue(checkin, CHECKIN_VALUES) ? checkin : "all"
+    checkinIdVerified: hasValue(checkin, CHECKIN_VALUES) ? checkin : "all",
+    sortBy: hasValue(sortBy, SORT_BY_VALUES) ? sortBy : "createdAt",
+    sortDir: hasValue(sortDir, SORT_DIR_VALUES) ? sortDir : "desc"
   };
 }
 
@@ -93,6 +120,12 @@ function searchParamsFromState(filter: AdminEntriesFilter, scope: EntriesScope, 
   if (filter.checkinIdVerified !== "all") {
     params.set("checkin", filter.checkinIdVerified);
   }
+  if (filter.sortBy !== initialFilter.sortBy) {
+    params.set("sortBy", filter.sortBy);
+  }
+  if (filter.sortDir !== initialFilter.sortDir) {
+    params.set("sortDir", filter.sortDir);
+  }
   if (canDeleteEntries && scope === "deleted") {
     params.set("scope", "deleted");
   }
@@ -105,7 +138,9 @@ function sameFilter(a: AdminEntriesFilter, b: AdminEntriesFilter) {
     a.classId === b.classId &&
     a.acceptanceStatus === b.acceptanceStatus &&
     a.paymentStatus === b.paymentStatus &&
-    a.checkinIdVerified === b.checkinIdVerified
+    a.checkinIdVerified === b.checkinIdVerified &&
+    a.sortBy === b.sortBy &&
+    a.sortDir === b.sortDir
   );
 }
 
@@ -234,9 +269,11 @@ export function AdminEntriesPage() {
       classId: filterDraft.classId,
       acceptanceStatus: filterDraft.acceptanceStatus,
       paymentStatus: filterDraft.paymentStatus,
-      checkinIdVerified: filterDraft.checkinIdVerified
+      checkinIdVerified: filterDraft.checkinIdVerified,
+      sortBy: filterDraft.sortBy,
+      sortDir: filterDraft.sortDir
     }),
-    [debouncedQuery, filterDraft.classId, filterDraft.acceptanceStatus, filterDraft.paymentStatus, filterDraft.checkinIdVerified]
+    [debouncedQuery, filterDraft.classId, filterDraft.acceptanceStatus, filterDraft.paymentStatus, filterDraft.checkinIdVerified, filterDraft.sortBy, filterDraft.sortDir]
   );
 
   const [rows, setRows] = useState<AdminEntryListItem[]>([]);
@@ -662,10 +699,22 @@ export function AdminEntriesPage() {
     filterDraft.checkinIdVerified !== "all" && {
       key: "checkinIdVerified",
       label: `Einchecken: ${filterDraft.checkinIdVerified === "true" ? "Ja" : "Nein"}`
+    },
+    (filterDraft.sortBy !== initialFilter.sortBy || filterDraft.sortDir !== initialFilter.sortDir) && {
+      key: "sortBy",
+      label: `Sortierung: ${sortLabel(filterDraft.sortBy, filterDraft.sortDir)}`
     }
   ].filter(Boolean) as Array<{ key: keyof AdminEntriesFilter; label: string }>;
 
   const removeFilterChip = (key: keyof AdminEntriesFilter) => {
+    if (key === "sortBy" || key === "sortDir") {
+      setFilterDraft((prev) => ({
+        ...prev,
+        sortBy: initialFilter.sortBy,
+        sortDir: initialFilter.sortDir
+      }));
+      return;
+    }
     setFilterDraft((prev) => ({
       ...prev,
       [key]: initialFilter[key]

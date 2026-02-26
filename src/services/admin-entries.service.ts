@@ -420,8 +420,8 @@ export const adminEntriesService = {
         checkinIdVerified: filter.checkinIdVerified !== "all" ? filter.checkinIdVerified === "true" : undefined,
         cursor: options?.cursor || undefined,
         limit: pageSize,
-        sortBy: "createdAt",
-        sortDir: "desc"
+        sortBy: filter.sortBy,
+        sortDir: filter.sortDir
       }
     });
 
@@ -467,8 +467,8 @@ export const adminEntriesService = {
         checkinIdVerified: filter.checkinIdVerified !== "all" ? filter.checkinIdVerified === "true" : undefined,
         cursor: options?.cursor || undefined,
         limit: pageSize,
-        sortBy: "createdAt",
-        sortDir: "desc"
+        sortBy: filter.sortBy,
+        sortDir: filter.sortDir
       }
     });
 

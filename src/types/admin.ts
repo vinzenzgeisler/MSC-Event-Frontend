@@ -98,6 +98,8 @@ export type AdminEntriesFilter = {
   acceptanceStatus: "all" | AcceptanceStatus;
   paymentStatus: "all" | PaymentStatus;
   checkinIdVerified: "all" | "true" | "false";
+  sortBy: "createdAt" | "updatedAt" | "driverLastName" | "driverFirstName" | "className" | "startNumberNorm";
+  sortDir: "asc" | "desc";
 };
 
 export type AdminEntryDetailDto = {

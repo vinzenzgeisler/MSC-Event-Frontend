@@ -16,9 +16,10 @@ const DELETED_SCOPE_VALUE = "__deleted_scope__";
 
 export function EntriesFilterBar({ filter, classOptions, statusScope = "active", allowDeletedStatusOption = false, onStatusScopeChange, onChange }: EntriesFilterBarProps) {
   const statusSelectValue = statusScope === "deleted" ? DELETED_SCOPE_VALUE : filter.acceptanceStatus;
+  const sortValue = `${filter.sortBy}:${filter.sortDir}`;
 
   return (
-    <div className="grid gap-3 md:grid-cols-5">
+    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
       <div className="space-y-1">
         <Label htmlFor="admin-filter-search">Suche</Label>
         <Input
@@ -93,6 +94,29 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
           <option value="all">Alle</option>
           <option value="true">Eingecheckt</option>
           <option value="false">Nicht eingecheckt</option>
+        </select>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="admin-filter-sort">Sortierung</Label>
+        <select
+          id="admin-filter-sort"
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          value={sortValue}
+          onChange={(event) => {
+            const [nextSortBy, nextSortDir] = event.target.value.split(":");
+            onChange("sortBy", nextSortBy as AdminEntriesFilter["sortBy"]);
+            onChange("sortDir", nextSortDir as AdminEntriesFilter["sortDir"]);
+          }}
+        >
+          <option value="createdAt:desc">Neueste zuerst</option>
+          <option value="createdAt:asc">Älteste zuerst</option>
+          <option value="updatedAt:desc">Zuletzt aktualisiert</option>
+          <option value="driverLastName:asc">Name A-Z</option>
+          <option value="driverLastName:desc">Name Z-A</option>
+          <option value="startNumberNorm:asc">Startnummer aufsteigend</option>
+          <option value="startNumberNorm:desc">Startnummer absteigend</option>
+          <option value="className:asc">Klasse A-Z</option>
+          <option value="className:desc">Klasse Z-A</option>
         </select>
       </div>
     </div>
