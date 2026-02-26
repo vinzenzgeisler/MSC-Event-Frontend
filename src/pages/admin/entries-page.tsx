@@ -1180,6 +1180,7 @@ export function AdminEntriesPage() {
                       ...prev,
                       total: Math.max(0, prev.total - 1)
                     }));
+                    setViewScope("active");
                     showToast(`${formatEntryHeadline(deletedEntry)} wurde wiederhergestellt.`);
                   } catch (error) {
                     showToast(getApiErrorMessage(error, "Nennung konnte nicht wiederhergestellt werden."));
