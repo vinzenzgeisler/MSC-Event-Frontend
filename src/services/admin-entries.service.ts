@@ -177,6 +177,7 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
+    driverNote: (dto.driverNote ?? "").trim(),
     createdAt: asDateTime(dto.createdAt)
   };
 }

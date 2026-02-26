@@ -65,6 +65,7 @@ export type AdminEntryListItem = {
   checkin: "offen" | "bestätigt";
   confirmationMailSent: boolean;
   confirmationMailVerified: boolean;
+  driverNote: string;
   createdAt: string;
 };
 

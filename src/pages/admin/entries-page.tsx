@@ -8,6 +8,7 @@ import { EntriesTable } from "@/components/features/admin/entries-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { cn } from "@/lib/utils";
 import { acceptanceStatusClasses, acceptanceStatusLabel, paymentStatusClasses, paymentStatusLabel } from "@/lib/admin-status";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
@@ -62,6 +63,44 @@ const SORT_LABELS: Record<`${AdminEntriesFilter["sortBy"]}:${AdminEntriesFilter[
 
 function sortLabel(sortBy: AdminEntriesFilter["sortBy"], sortDir: AdminEntriesFilter["sortDir"]) {
   return SORT_LABELS[`${sortBy}:${sortDir}`] ?? `${sortBy} ${sortDir}`;
+}
+
+function MailNoteSwitch(props: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-md border bg-slate-50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium text-slate-900">{props.title}</div>
+          <div className="text-xs text-slate-500">{props.description}</div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={props.checked}
+          disabled={props.disabled}
+          onClick={() => props.onChange(!props.checked)}
+          className={cn(
+            "relative inline-flex h-6 w-11 items-center rounded-full border transition",
+            props.checked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-slate-200",
+            props.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-5 w-5 transform rounded-full bg-white shadow transition",
+              props.checked ? "translate-x-5" : "translate-x-0.5"
+            )}
+          />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 type EntriesCachePayload = {
@@ -288,6 +327,8 @@ export function AdminEntriesPage() {
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
+  const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
+  const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
   const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
 
@@ -743,6 +784,10 @@ export function AdminEntriesPage() {
 
   const shownCount = viewScope === "deleted" ? deletedRows.length : rows.length;
   const shownTotal = viewScope === "deleted" ? deletedMeta.total : meta.total;
+  const pendingAcceptRow = pendingAcceptEntryId ? rows.find((item) => item.id === pendingAcceptEntryId) : null;
+  const pendingRejectRow = pendingRejectEntryId ? rows.find((item) => item.id === pendingRejectEntryId) : null;
+  const hasAcceptDriverNote = Boolean(pendingAcceptRow?.driverNote);
+  const hasRejectDriverNote = Boolean(pendingRejectRow?.driverNote);
   const loadedCountText =
     shownTotal > 0
       ? `${shownTotal} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${shownCount < shownTotal ? ` · ${shownCount} geladen` : ""}${refreshing ? " · aktualisiere…" : ""}`
@@ -896,6 +941,7 @@ export function AdminEntriesPage() {
               showToast("Nennung ist bereits zugelassen.");
               return;
             }
+            setIncludeDriverNoteOnAccept(true);
             setPendingAcceptEntryId(entryId);
           }}
           onSetRejected={async (entryId) => {
@@ -911,6 +957,7 @@ export function AdminEntriesPage() {
               showToast("Nennung ist bereits abgelehnt.");
               return;
             }
+            setIncludeDriverNoteOnReject(true);
             setPendingRejectEntryId(entryId);
           }}
         />
@@ -927,6 +974,19 @@ export function AdminEntriesPage() {
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Auf „Zugelassen“ setzen?</h2>
             <p className="mt-2 text-sm text-slate-600">Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen.</p>
+            <div className="mt-3">
+              <MailNoteSwitch
+                checked={includeDriverNoteOnAccept}
+                disabled={!hasAcceptDriverNote}
+                onChange={setIncludeDriverNoteOnAccept}
+                title="Fahrer-Notiz in Mail mitsenden"
+                description={
+                  hasAcceptDriverNote
+                    ? "Die aktuelle Fahrer-Notiz wird in der Zulassungs-Mail ergänzt."
+                    : "Keine Fahrer-Notiz vorhanden."
+                }
+              />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setPendingAcceptEntryId(null)}>
                 Abbrechen
@@ -941,7 +1001,9 @@ export function AdminEntriesPage() {
                   }
                   setStatusActionBusy({ entryId, action: "accepted" });
                   try {
-                    await adminEntriesService.setEntryStatus(entryId, "to_accepted");
+                    await adminEntriesService.setEntryStatus(entryId, "to_accepted", {
+                      includeDriverNoteInLifecycleMail: includeDriverNoteOnAccept
+                    });
                     applyLocalStatusUpdate(entryId, "accepted");
                     showToast(`Nennung ${entryId} wurde zugelassen.`);
                     setPendingAcceptEntryId(null);
@@ -971,6 +1033,19 @@ export function AdminEntriesPage() {
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Nennung ablehnen?</h2>
             <p className="mt-2 text-sm text-slate-600">Die Nennung wird auf den Status „Abgelehnt“ gesetzt. Das kann später wieder geändert werden.</p>
+            <div className="mt-3">
+              <MailNoteSwitch
+                checked={includeDriverNoteOnReject}
+                disabled={!hasRejectDriverNote}
+                onChange={setIncludeDriverNoteOnReject}
+                title="Fahrer-Notiz in Mail mitsenden"
+                description={
+                  hasRejectDriverNote
+                    ? "Die aktuelle Fahrer-Notiz wird in der Ablehnungs-Mail ergänzt."
+                    : "Keine Fahrer-Notiz vorhanden."
+                }
+              />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setPendingRejectEntryId(null)}>
                 Abbrechen
@@ -986,7 +1061,9 @@ export function AdminEntriesPage() {
                   }
                   setStatusActionBusy({ entryId, action: "rejected" });
                   try {
-                    await adminEntriesService.setEntryStatus(entryId, "to_rejected");
+                    await adminEntriesService.setEntryStatus(entryId, "to_rejected", {
+                      includeDriverNoteInLifecycleMail: includeDriverNoteOnReject
+                    });
                     applyLocalStatusUpdate(entryId, "rejected");
                     showToast(`Nennung ${entryId} wurde abgelehnt.`);
                     setPendingRejectEntryId(null);
