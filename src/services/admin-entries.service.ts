@@ -1,5 +1,6 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { ApiError, requestJson } from "@/services/api/http-client";
+import { getCountryLabel } from "@/lib/countries";
 import type {
   AdminDeletedEntriesPageResult,
   AdminDeletedEntryListItem,
@@ -134,6 +135,20 @@ function payloadToText(payload: Record<string, unknown> | null | undefined) {
   return JSON.stringify(payload);
 }
 
+function resolveImageUrl(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  // Accept only browser-loadable URL forms. Raw S3 object keys are not valid image URLs.
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/")) {
+    return raw;
+  }
+
+  return null;
+}
+
 function splitNationalityFromNotes(value: string | null | undefined) {
   const source = (value ?? "").trim();
   if (!source) {
@@ -164,21 +179,33 @@ function splitNationalityFromNotes(value: string | null | undefined) {
 }
 
 function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
+  const nameFirst = (dto.driverFirstName ?? "").trim();
+  const nameLast = (dto.driverLastName ?? "").trim();
   return {
     id: dto.id,
     classId: dto.classId,
     name: dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
+    driverPersonIdRaw: (dto.driverPersonId ?? "").trim(),
+    driverEmailRaw: (dto.driverEmail ?? "").trim().toLowerCase(),
+    groupIdRaw: (dto.groupId ?? "").trim(),
+    groupSizeRaw: typeof dto.groupSize === "number" && Number.isFinite(dto.groupSize) ? Math.max(0, Math.floor(dto.groupSize)) : 0,
     classLabel: dto.className || dto.classId || "-",
     startNumber: dto.startNumber ?? dto.startNumberNorm ?? "-",
     vehicleLabel: dto.vehicleLabel,
-    vehicleThumbUrl: dto.vehicleThumbUrl,
+    vehicleThumbUrl: resolveImageUrl(dto.vehicleThumbUrl),
     status: normalizeAcceptanceStatus(dto.acceptanceStatus),
     payment: normalizePaymentStatus(dto.paymentStatus),
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     driverNote: (dto.driverNote ?? "").trim(),
-    createdAt: asDateTime(dto.createdAt)
+    createdAt: asDateTime(dto.createdAt),
+    createdAtRaw: dto.createdAt ?? "",
+    updatedAtRaw: dto.updatedAt ?? "",
+    driverFirstNameRaw: nameFirst,
+    driverLastNameRaw: nameLast,
+    classNameRaw: (dto.className ?? dto.classId ?? "").trim(),
+    startNumberNormRaw: (dto.startNumberNorm ?? dto.startNumber ?? "").trim()
   };
 }
 
@@ -212,10 +239,13 @@ function fromAdminEntryDetailDto(
   }>
 ): AdminEntryDetailViewModel {
   const codriver = dto.person.codriver ?? null;
+  const backupVehicle = dto.backupVehicle ?? null;
   const driverName = parseName(dto.person.driver.firstName, dto.person.driver.lastName, `Fahrer ${dto.ids.entryId.slice(0, 8)}`);
   const vehicleLabel = dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug");
+  const backupVehicleLabel = backupVehicle ? ([backupVehicle.make, backupVehicle.model].filter(Boolean).join(" ") || "Ersatzfahrzeug") : "Ersatzfahrzeug";
   const notesSplit = splitNationalityFromNotes(dto.specialNotes);
-  const driverNationality = (dto.person.driver.nationality ?? "").trim() || notesSplit.nationality || "-";
+  const rawDriverNationality = (dto.person.driver.nationality ?? "").trim() || notesSplit.nationality || "";
+  const driverNationality = (getCountryLabel(rawDriverNationality, "de-DE") ?? rawDriverNationality) || "-";
 
   return {
     id: dto.ids.entryId,
@@ -259,7 +289,7 @@ function fromAdminEntryDetailDto(
     },
     vehicle: {
       label: dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug"),
-      thumbUrl: dto.vehicleThumbUrl ?? dto.vehicle.imageS3Key,
+      thumbUrl: resolveImageUrl(dto.vehicleThumbUrl) ?? resolveImageUrl(dto.vehicle.imageS3Key),
       type: dto.vehicle.vehicleType,
       make: dto.vehicle.make ?? "-",
       model: dto.vehicle.model ?? "-",
@@ -270,6 +300,21 @@ function fromAdminEntryDetailDto(
       brakes: dto.vehicle.brakes ?? "-",
       ownerName: dto.vehicle.ownerName ?? "-",
       vehicleHistory: dto.vehicle.vehicleHistory ?? "Keine Angabe"
+    },
+    backupVehicle: {
+      assigned: Boolean(backupVehicle),
+      label: backupVehicleLabel,
+      thumbUrl: resolveImageUrl(dto.backupVehicleThumbUrl) ?? resolveImageUrl(backupVehicle?.imageS3Key ?? null),
+      type: backupVehicle?.vehicleType ?? dto.vehicle.vehicleType,
+      make: backupVehicle?.make ?? "-",
+      model: backupVehicle?.model ?? "-",
+      year: backupVehicle?.year ? String(backupVehicle.year) : "-",
+      displacementCcm: backupVehicle?.displacementCcm ? `${backupVehicle.displacementCcm} ccm` : "-",
+      engineType: backupVehicle?.engineType ?? "-",
+      cylinders: backupVehicle?.cylinders ? String(backupVehicle.cylinders) : "-",
+      brakes: backupVehicle?.brakes ?? "-",
+      ownerName: backupVehicle?.ownerName ?? "-",
+      vehicleHistory: backupVehicle?.vehicleHistory ?? "Keine Angabe"
     },
     payment: {
       totalCents: dto.payment.totalCents,
