@@ -197,7 +197,6 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       : undefined,
     startNumber: start.startNumber.trim().toUpperCase(),
     specialNotes,
-    isBackupVehicle: start.backupVehicleEnabled,
     consent: {
       ...buildConsentPayload(form, consentCapturedAt)
     },
@@ -362,9 +361,7 @@ function toBatchRequestDto(form: RegistrationWizardForm, clientSubmissionKey: st
       vehicle: entry.vehicle,
       backupVehicle: entry.backupVehicle,
       specialNotes: entry.specialNotes,
-      backupOfEntryId: entry.backupOfEntryId,
       startNumber: entry.startNumber,
-      isBackupVehicle: entry.isBackupVehicle
     }))
   };
 }
