@@ -68,8 +68,8 @@ export const communicationService = {
     });
   },
 
-  async queuePaymentReminderForEntry(entryId: string, options?: { allowDuplicate?: boolean }) {
-    const eventId = await getAdminEventId();
+  async queuePaymentReminderForEntry(entryId: string, options?: { allowDuplicate?: boolean; eventId?: string }) {
+    const eventId = options?.eventId?.trim() || (await getAdminEventId());
     return requestJson<AdminMailQueueResponse>("/admin/payment/reminders/queue", {
       method: "POST",
       body: {
@@ -80,8 +80,11 @@ export const communicationService = {
     });
   },
 
-  async queueAcceptedMailForEntry(entryId: string, options?: { allowDuplicate?: boolean; includeDriverNote?: boolean }) {
-    const eventId = await getAdminEventId();
+  async queueAcceptedMailForEntry(
+    entryId: string,
+    options?: { allowDuplicate?: boolean; includeDriverNote?: boolean; eventId?: string }
+  ) {
+    const eventId = options?.eventId?.trim() || (await getAdminEventId());
     return requestJson<AdminMailQueueResponse>("/admin/mail/lifecycle/queue", {
       method: "POST",
       body: {
@@ -92,5 +95,30 @@ export const communicationService = {
         allowDuplicate: options?.allowDuplicate === true ? true : undefined
       }
     });
+  },
+
+  async queueVerificationMailForEntry(entryId: string, options?: { allowDuplicate?: boolean; eventId?: string }) {
+    const eventId = options?.eventId?.trim() || (await getAdminEventId());
+    const sendRequest = async (allowDuplicate?: boolean) =>
+      requestJson<AdminMailQueueResponse>("/admin/mail/lifecycle/queue", {
+        method: "POST",
+        body: {
+          eventId,
+          entryId,
+          eventType: "registration_received",
+          allowDuplicate: allowDuplicate === true ? true : undefined
+        }
+      });
+
+    try {
+      return await sendRequest(options?.allowDuplicate);
+    } catch (error) {
+      // Some backend builds still fail on forced duplicate mode for registration_received.
+      // Retry once without allowDuplicate to keep the action usable.
+      if (options?.allowDuplicate && error instanceof Error && error.message.toLowerCase().includes("internal_error")) {
+        return sendRequest(false);
+      }
+      throw error;
+    }
   }
 };

@@ -1,6 +1,9 @@
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
+import { CONSENT_VERSION } from "@/config/legal-texts";
+import { resolveCountryCode, resolveCountryToCanonical } from "@/lib/countries";
 import type {
+  PublicCreateEntriesBatchRequestDto,
   PublicCreateEntryRequestDto,
   PublicEventOverview,
   PublicPricingRules,
@@ -10,6 +13,7 @@ import type {
 } from "@/types/registration";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
+const CONSENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 function parseCylinders(value: string): number {
   const digits = value.replace(/\D/g, "");
@@ -19,6 +23,10 @@ function parseCylinders(value: string): number {
 
 function normalizePhone(value: string): string {
   return value.replace(/\D/g, "").slice(0, 15);
+}
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function buildSpecialNotes(nationality: string, notes: string): string | undefined {
@@ -45,16 +53,108 @@ function buildEmergencyContactName(firstName: string, lastName: string): string 
   return `${firstName} ${lastName}`.replace(/\s+/g, " ").trim();
 }
 
-function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: number): PublicCreateEntryRequestDto {
+function toIsoBirthdate(value: string): string {
+  const match = value.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return value;
+  }
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+}
+
+function parseIsoBirthdate(value: string): Date | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+function isMinorBirthdate(value: string): boolean {
+  const isoBirthdate = toIsoBirthdate(value.trim());
+  const birthdate = parseIsoBirthdate(isoBirthdate);
+  if (!birthdate) {
+    return false;
+  }
+  const now = new Date();
+  let age = now.getUTCFullYear() - birthdate.getUTCFullYear();
+  const birthdayReached =
+    now.getUTCMonth() > birthdate.getUTCMonth() || (now.getUTCMonth() === birthdate.getUTCMonth() && now.getUTCDate() >= birthdate.getUTCDate());
+  if (!birthdayReached) {
+    age -= 1;
+  }
+  return age < 18;
+}
+
+function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: string): PublicCreateEntryRequestDto["consent"] {
+  if (!form.consent.termsAccepted || !form.consent.privacyAccepted) {
+    throw new Error("CONSENT_REQUIRED_MISSING");
+  }
+  const consentTextHash = form.consent.consentTextHash.trim().toLowerCase();
+  if (!CONSENT_HASH_PATTERN.test(consentTextHash)) {
+    throw new Error("CONSENT_TEXT_HASH_INVALID");
+  }
+  const consentLocale = form.consent.locale.trim();
+  if (!consentLocale) {
+    throw new Error("CONSENT_LOCALE_MISSING");
+  }
+  return {
+    termsAccepted: true,
+    privacyAccepted: true,
+    mediaAccepted: Boolean(form.consent.mediaAccepted),
+    consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
+    consentTextHash,
+    locale: consentLocale,
+    consentSource: "public_form",
+    consentCapturedAt
+  };
+}
+
+function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicleType"], value: RegistrationWizardForm["starts"][number]["vehicle"]) {
+  return {
+    vehicleType,
+    make: value.make,
+    model: value.model,
+    year: value.year ? Number(value.year) : undefined,
+    displacementCcm: Number(value.displacementCcm),
+    engineType: value.engineType,
+    cylinders: parseCylinders(value.cylinders),
+    brakes: value.brakes,
+    vehicleHistory: value.vehicleHistory,
+    ownerName: value.ownerName,
+    imageS3Key: value.imageS3Key || undefined
+  };
+}
+
+function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: number, consentCapturedAt: string): PublicCreateEntryRequestDto {
   const start = form.starts[startIndex];
-  const specialNotes = buildSpecialNotes(form.driver.nationality, form.driver.specialNotes);
+  const isMinorDriver = isMinorBirthdate(form.driver.birthdate);
+  const driverNationalityCode = resolveCountryCode(form.driver.nationality) ?? form.driver.nationality.trim();
+  const driverNationality = driverNationalityCode || undefined;
+  const driverNationalityForNotes = driverNationality ? resolveCountryToCanonical(driverNationality) ?? driverNationality : "";
+  const codriverNationality =
+    start.codriverEnabled && start.codriver.nationality
+      ? resolveCountryCode(start.codriver.nationality) ?? start.codriver.nationality.trim()
+      : undefined;
+  const specialNotes = buildSpecialNotes(driverNationalityForNotes, form.driver.specialNotes);
   return {
     classId: start.classId,
     driver: {
-      email: form.driver.email,
+      email: normalizeEmail(form.driver.email),
       firstName: form.driver.firstName,
       lastName: form.driver.lastName,
-      birthdate: form.driver.birthdate,
+      birthdate: toIsoBirthdate(form.driver.birthdate),
+      nationality: driverNationality,
       street: form.driver.street,
       zip: form.driver.zip,
       city: form.driver.city,
@@ -64,41 +164,43 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       emergencyContactLastName: form.driver.emergencyContactLastName.trim() || undefined,
       emergencyContactPhone: normalizePhone(form.driver.emergencyContactPhone),
       motorsportHistory: form.driver.motorsportHistory,
-      specialNotes
+      specialNotes,
+      guardianFullName: isMinorDriver ? form.driver.guardianFullName.trim() || undefined : undefined,
+      guardianEmail: isMinorDriver ? normalizeEmail(form.driver.guardianEmail) || undefined : undefined,
+      guardianPhone: isMinorDriver ? normalizePhone(form.driver.guardianPhone) || undefined : undefined,
+      guardianConsentAccepted: isMinorDriver ? form.driver.guardianConsentAccepted : undefined
     },
     codriver: start.codriverEnabled
       ? {
           firstName: start.codriver.firstName,
           lastName: start.codriver.lastName,
-          email: start.codriver.email,
-          phone: start.codriver.phone ? normalizePhone(start.codriver.phone) : undefined
+          birthdate: toIsoBirthdate(start.codriver.birthdate),
+          nationality: codriverNationality || "",
+          street: start.codriver.street,
+          zip: start.codriver.zip,
+          city: start.codriver.city,
+          email: normalizeEmail(start.codriver.email),
+          phone: normalizePhone(start.codriver.phone)
         }
       : undefined,
     codriverEnabled: start.codriverEnabled,
     vehicle: {
-      vehicleType: start.vehicleType,
-      make: start.vehicle.make,
-      model: start.vehicle.model,
-      year: start.vehicle.year ? Number(start.vehicle.year) : undefined,
-      displacementCcm: Number(start.vehicle.displacementCcm),
-      engineType: start.vehicle.engineType,
-      cylinders: parseCylinders(start.vehicle.cylinders),
-      brakes: start.vehicle.brakes,
-      vehicleHistory: start.vehicle.vehicleHistory,
+      ...mapVehicle(start.vehicleType, start.vehicle),
       ownerName: start.vehicle.ownerName || `${form.driver.firstName} ${form.driver.lastName}`.trim(),
       startNumberRaw: start.startNumber.trim().toUpperCase() || undefined,
-      imageS3Key: start.vehicle.imageS3Key || undefined
     },
+    backupVehicle: start.backupVehicleEnabled
+      ? {
+          ...mapVehicle(start.vehicleType, start.backupVehicle),
+          ownerName: start.backupVehicle.ownerName || `${form.driver.firstName} ${form.driver.lastName}`.trim()
+        }
+      : undefined,
     startNumber: start.startNumber.trim().toUpperCase(),
     specialNotes,
     isBackupVehicle: start.backupVehicleEnabled,
     consent: {
-      termsAccepted: true,
-      privacyAccepted: true,
-      mediaAccepted: true,
-      consentVersion: "2026-01",
-      consentCapturedAt: new Date().toISOString()
-    }
+      ...buildConsentPayload(form, consentCapturedAt)
+    },
   };
 }
 
@@ -116,7 +218,17 @@ type PublicCreateEntryResponse = {
   entryId: string;
   registrationStatus: RegistrationSubmitResult["status"];
   verificationToken: string;
-  confirmationMailSent?: boolean;
+  confirmationMailSent: boolean;
+};
+
+type PublicCreateEntriesBatchResponse = {
+  ok: boolean;
+  groupId: string;
+  entryIds: string[];
+  entryCount: number;
+  registrationStatus: RegistrationSubmitResult["status"];
+  verificationToken: string;
+  confirmationMailSent: boolean;
 };
 
 type PublicVehicleImageUploadInitResponse = {
@@ -228,6 +340,35 @@ function extractPublicPricingRules(response: unknown): PublicPricingRules | null
   return normalizePricingRules(eventRecord.pricing);
 }
 
+function buildClientSubmissionKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `submission-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function toBatchRequestDto(form: RegistrationWizardForm, clientSubmissionKey: string): PublicCreateEntriesBatchRequestDto {
+  const consentCapturedAt = new Date().toISOString();
+  const entryPayloads = form.starts.map((_, index) => toCreateEntryRequestDto(form, index, consentCapturedAt));
+  const first = entryPayloads[0];
+  return {
+    clientSubmissionKey,
+    driver: first.driver,
+    consent: first.consent,
+    entries: entryPayloads.map((entry) => ({
+      classId: entry.classId,
+      codriverEnabled: entry.codriverEnabled,
+      codriver: entry.codriver,
+      vehicle: entry.vehicle,
+      backupVehicle: entry.backupVehicle,
+      specialNotes: entry.specialNotes,
+      backupOfEntryId: entry.backupOfEntryId,
+      startNumber: entry.startNumber,
+      isBackupVehicle: entry.isBackupVehicle
+    }))
+  };
+}
+
 export const registrationService = {
   async getCurrentEvent(): Promise<PublicEventOverview> {
     const response = await getPublicCurrentEvent();
@@ -281,43 +422,43 @@ export const registrationService = {
     };
   },
 
-  async submitWizard(form: RegistrationWizardForm): Promise<RegistrationSubmitResult> {
+  async submitWizard(form: RegistrationWizardForm, options?: { clientSubmissionKey?: string }): Promise<RegistrationSubmitResult> {
     if (!form.starts.length) {
       return {
         ok: false,
         createdEntries: 0,
+        attemptedEntries: 0,
         status: "submitted_unverified"
       };
     }
 
-    const eventId = await getPublicEventId();
-    let createdEntries = 0;
-    let latestStatus: RegistrationSubmitResult["status"] = "submitted_unverified";
-
-    for (let index = 0; index < form.starts.length; index += 1) {
-      const payload = toCreateEntryRequestDto(form, index);
-      const response = await requestJson<PublicCreateEntryResponse>(`/public/events/${eventId}/entries`, {
-        method: "POST",
-        auth: false,
-        body: payload
-      });
-
-      if (!response.ok) {
-        return {
-          ok: false,
-          createdEntries,
-          status: latestStatus
-        };
+    const normalizedForm: RegistrationWizardForm = {
+      ...form,
+      consent: {
+        ...form.consent,
+        consentSource: "public_form",
+        consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
+        locale: form.consent.locale.trim()
       }
+    };
 
-      createdEntries += 1;
-      latestStatus = response.registrationStatus;
-    }
+    const eventId = await getPublicEventId();
+    const clientSubmissionKey = options?.clientSubmissionKey?.trim() || buildClientSubmissionKey();
+    const batchPayload = toBatchRequestDto(normalizedForm, clientSubmissionKey);
+    const batchResponse = await requestJson<PublicCreateEntriesBatchResponse>(`/public/events/${eventId}/entries/batch`, {
+      method: "POST",
+      auth: false,
+      body: batchPayload
+    });
 
     return {
       ok: true,
-      createdEntries,
-      status: latestStatus
+      createdEntries: batchResponse.entryCount,
+      attemptedEntries: normalizedForm.starts.length,
+      status: batchResponse.registrationStatus,
+      groupId: batchResponse.groupId,
+      entryIds: batchResponse.entryIds,
+      entryCount: batchResponse.entryCount
     };
   },
 

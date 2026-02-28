@@ -32,6 +32,16 @@ function euroInputFromCents(value: number): string {
   return (value / 100).toFixed(2).replace(".", ",");
 }
 
+function brakeLabel(value: string) {
+  if (value === "steel") {
+    return "Stahlbremsen";
+  }
+  if (value === "ceramic") {
+    return "Keramikbremsen";
+  }
+  return value;
+}
+
 function VehiclePreview({ src, label, onOpen }: { src: string | null; label: string; onOpen: () => void }) {
   if (src) {
     return (
@@ -140,7 +150,7 @@ export function AdminEntryDetailPage() {
   const [confirmationMailSent, setConfirmationMailSent] = useState(false);
   const [confirmationMailVerified, setConfirmationMailVerified] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
-  const [imageOpen, setImageOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; label: string } | null>(null);
   const [internalNote, setInternalNote] = useState("");
   const [driverNote, setDriverNote] = useState("");
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
@@ -193,9 +203,30 @@ export function AdminEntryDetailPage() {
   const getLocalizedActionError = (error: unknown, fallback: string) => {
     if (error instanceof ApiError) {
       const code = (error.code ?? "").toLowerCase();
-      const message = error.message.toLowerCase();
-      if (code.includes("duplicate") || message.includes("duplicate request") || message.includes("duplicate")) {
+      const reason = typeof error.details?.reason === "string" ? error.details.reason.trim() : "";
+      if (code === "no_recipient") {
+        return "Für diese Nennung ist keine Empfänger-E-Mail vorhanden.";
+      }
+      if (code === "not_allowed") {
+        return "Für diese Nennung ist diese Mail-Aktion aktuell nicht zulässig.";
+      }
+      if (code === "template_render_failed") {
+        return `Mail-Template konnte nicht gerendert werden.${reason ? ` Grund: ${reason}` : ""}`;
+      }
+      if (code === "template_not_found") {
+        return "Mail-Template wurde im Backend nicht gefunden.";
+      }
+      if (code === "entry_not_found") {
+        return "Nennung wurde im Backend nicht gefunden.";
+      }
+      if (code === "outbox_insert_failed") {
+        return `Mail konnte nicht in die Outbox geschrieben werden.${reason ? ` Grund: ${reason}` : ""}`;
+      }
+      if (code.includes("duplicate")) {
         return "Doppelte Anfrage: Eine identische Mail-Aktion wurde bereits ausgelöst. Bitte Outbox prüfen.";
+      }
+      if (code === "internal_error") {
+        return "Mail konnte aktuell nicht eingeplant werden. Bitte erneut versuchen.";
       }
     }
     return getApiErrorMessage(error, fallback);
@@ -439,7 +470,14 @@ export function AdminEntryDetailPage() {
               <CardTitle>Fahrzeugdetails</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-700">
-              <VehiclePreview src={detail.vehicle.thumbUrl} label={detail.vehicle.label} onOpen={() => setImageOpen(true)} />
+              <VehiclePreview
+                src={detail.vehicle.thumbUrl}
+                label={detail.vehicle.label}
+                onOpen={() => {
+                  if (!detail.vehicle.thumbUrl) return;
+                  setPreviewImage({ url: detail.vehicle.thumbUrl, label: detail.vehicle.label });
+                }}
+              />
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Klasse</div>
@@ -477,7 +515,7 @@ export function AdminEntryDetailPage() {
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Bremsen</div>
-                  <div className="font-medium text-slate-900">{detail.vehicle.brakes}</div>
+                  <div className="font-medium text-slate-900">{brakeLabel(detail.vehicle.brakes)}</div>
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Besitzer</div>
@@ -490,6 +528,55 @@ export function AdminEntryDetailPage() {
                   </div>
                 </div>
               </div>
+              {detail.backupVehicle.assigned && (
+                <div className="space-y-3 rounded-lg border border-dashed bg-slate-50/60 p-3">
+                  <div className="text-sm font-semibold text-slate-900">Ersatzfahrzeug</div>
+                  <VehiclePreview
+                    src={detail.backupVehicle.thumbUrl}
+                    label={detail.backupVehicle.label}
+                    onOpen={() => {
+                      if (!detail.backupVehicle.thumbUrl) return;
+                      setPreviewImage({ url: detail.backupVehicle.thumbUrl, label: detail.backupVehicle.label });
+                    }}
+                  />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Hersteller / Modell</div>
+                      <div className="font-medium text-slate-900">
+                        {detail.backupVehicle.make} {detail.backupVehicle.model}
+                      </div>
+                    </div>
+                    <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Baujahr</div>
+                      <div className="font-medium text-slate-900">{detail.backupVehicle.year}</div>
+                    </div>
+                    <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Hubraum</div>
+                      <div className="font-medium text-slate-900">{detail.backupVehicle.displacementCcm}</div>
+                    </div>
+                    <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Motor / Zylinder</div>
+                      <div className="font-medium text-slate-900">
+                        {detail.backupVehicle.engineType} · {detail.backupVehicle.cylinders}
+                      </div>
+                    </div>
+                    <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Bremsen</div>
+                      <div className="font-medium text-slate-900">{brakeLabel(detail.backupVehicle.brakes)}</div>
+                    </div>
+                    <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Besitzer</div>
+                      <div className="font-medium text-slate-900">{detail.backupVehicle.ownerName}</div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <div className="text-xs uppercase text-slate-500">Fahrzeughistorie</div>
+                      <div className="rounded-md border bg-white p-3 leading-relaxed text-slate-800">
+                        {detail.backupVehicle.vehicleHistory}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -675,8 +762,27 @@ export function AdminEntryDetailPage() {
                     }
                     setSendingVerificationMail(true);
                     try {
-                      await communicationService.queueAcceptedMailForEntry(detail.id, { allowDuplicate: true });
-                      flashMessage("Verifizierungs-Mail wurde in die Queue gelegt.");
+                      const result = await communicationService.queueVerificationMailForEntry(detail.id, {
+                        allowDuplicate: confirmationMailSent ? true : undefined,
+                        eventId: detail.eventId
+                      });
+                      if (result.queued < 1) {
+                        const reason = (result.reason ?? "").trim().toLowerCase();
+                        if (reason.includes("not_allowed")) {
+                          flashMessage("Für diese Nennung ist das erneute Senden aktuell nicht zulässig.", 4200);
+                          return;
+                        }
+                        if (reason.includes("no_recipient")) {
+                          flashMessage("Für diese Nennung ist keine Empfänger-E-Mail vorhanden.", 4200);
+                          return;
+                        }
+                        flashMessage(
+                          result.reason?.trim() || "Es wurde keine Verifizierungs-Mail eingeplant.",
+                          4200
+                        );
+                        return;
+                      }
+                      flashMessage(`Verifizierungs-Mail eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
                       loadDetail();
                     } catch (error) {
                       flashMessage(getLocalizedActionError(error, "Verifizierungs-Mail konnte nicht versendet werden."), 3200);
@@ -711,7 +817,10 @@ export function AdminEntryDetailPage() {
                     }
                     setSendingPaymentReminder(true);
                     try {
-                      const result = await communicationService.queuePaymentReminderForEntry(detail.id, { allowDuplicate: true });
+                      const result = await communicationService.queuePaymentReminderForEntry(detail.id, {
+                        allowDuplicate: true,
+                        eventId: detail.eventId
+                      });
                       if (result.queued < 1) {
                         const reason = (result.reason ?? "").trim().toLowerCase();
                         if (reason.includes("not_allowed")) {
@@ -909,9 +1018,9 @@ export function AdminEntryDetailPage() {
         </div>
       </div>
 
-      {imageOpen && detail.vehicle.thumbUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setImageOpen(false)}>
-          <img className="max-h-[90vh] max-w-[90vw] rounded-md border border-white/20 object-contain" src={detail.vehicle.thumbUrl} alt={detail.vehicle.label} />
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewImage(null)}>
+          <img className="max-h-[90vh] max-w-[90vw] rounded-md border border-white/20 object-contain" src={previewImage.url} alt={previewImage.label} />
         </div>
       )}
 
