@@ -284,6 +284,41 @@ function isEmailAlreadyUsedError(error: unknown) {
   );
 }
 
+function isStartNumberTakenError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+
+  const code = (error.code ?? "").trim().toLowerCase();
+  if (code.includes("start_number") || code.includes("same_class_taken")) {
+    return true;
+  }
+
+  if (error.status !== 400 && error.status !== 409 && error.status !== 422) {
+    return false;
+  }
+
+  const hasStartNumberFieldError = (error.fieldErrors ?? []).some((fieldError) => {
+    const field = (fieldError.field ?? "").toLowerCase();
+    if (!field.includes("start") || !field.includes("number")) {
+      return false;
+    }
+    const detail = `${fieldError.code ?? ""} ${fieldError.message ?? ""}`.toLowerCase();
+    return /(duplicate|already|exists|taken|conflict|used|unique|same_class_taken)/.test(detail);
+  });
+
+  if (hasStartNumberFieldError) {
+    return true;
+  }
+
+  const detailsText = error.details ? JSON.stringify(error.details).toLowerCase() : "";
+  const haystack = `${(error.code ?? "").toLowerCase()} ${(error.message ?? "").toLowerCase()} ${detailsText}`;
+  return (
+    /(start|number).*(duplicate|already|exists|taken|conflict|used|unique|same_class_taken)/.test(haystack) ||
+    /(duplicate|already|exists|taken|conflict|used|unique|same_class_taken).*(start|number)/.test(haystack)
+  );
+}
+
 function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, attemptedEntries: number) {
   if (locale === "en") {
     return `Only ${createdEntries} of ${attemptedEntries} entries were created. Please do not resubmit to avoid duplicates. Contact the event team.`;
@@ -1011,9 +1046,9 @@ export function AnmeldungPage() {
     }
   };
 
-  const validateStartNumber = async (): Promise<boolean> => {
+  const validateStartNumber = async (): Promise<{ ok: boolean; reason: "empty" | "invalid" | "taken" | "error" | "ok" }> => {
     if (!draftStart.classId || !draftStart.startNumber.trim()) {
-      return false;
+      return { ok: false, reason: "empty" };
     }
 
     const normalizedStartNumber = draftStart.startNumber.trim().toUpperCase();
@@ -1021,7 +1056,7 @@ export function AnmeldungPage() {
       setStartNumberState("invalid");
       setStartNumberHint("");
       setStartFieldErrors((prev) => ({ ...prev, startNumber: m.errors.invalidStartNumber }));
-      return false;
+      return { ok: false, reason: "invalid" };
     }
 
     setStartNumberState("checking");
@@ -1031,21 +1066,21 @@ export function AnmeldungPage() {
     } catch {
       setStartNumberState("idle");
       setStartNumberHint("");
-      return false;
+      return { ok: false, reason: "error" };
     }
 
     if (!validation.validFormat || validation.conflictType === "invalid_format") {
       setStartNumberState("invalid");
       setStartNumberHint("");
       setStartFieldErrors((prev) => ({ ...prev, startNumber: m.errors.invalidApiStartFormat }));
-      return false;
+      return { ok: false, reason: "invalid" };
     }
 
     if (!validation.available || validation.conflictType === "same_class_taken") {
       setStartNumberState("taken");
       setStartNumberHint("");
       setStartFieldErrors((prev) => ({ ...prev, startNumber: m.errors.startTaken }));
-      return false;
+      return { ok: false, reason: "taken" };
     }
 
     setStartNumberState("available");
@@ -1054,7 +1089,7 @@ export function AnmeldungPage() {
     if (validation.normalizedStartNumber) {
       setDraftStart((prev) => ({ ...prev, startNumber: validation.normalizedStartNumber ?? prev.startNumber }));
     }
-    return true;
+    return { ok: true, reason: "ok" };
   };
 
   const saveDraft = async () => {
@@ -1065,8 +1100,8 @@ export function AnmeldungPage() {
       return;
     }
 
-    const isStartNumberValid = await validateStartNumber();
-    if (!isStartNumberValid) {
+    const startNumberValidation = await validateStartNumber();
+    if (!startNumberValidation.ok && startNumberValidation.reason !== "taken") {
       setStartError("");
       return;
     }
@@ -1227,6 +1262,10 @@ export function AnmeldungPage() {
         setDriverErrors((prev) => ({ ...prev, email: m.page.submitErrorEmailInUse }));
         setSubmitError(m.page.submitErrorEmailInUse);
         setStep(1);
+      } else if (isStartNumberTakenError(error)) {
+        setStartError(m.errors.startTaken);
+        setSubmitError(m.errors.startTaken);
+        setStep(2);
       } else {
         setSubmitError(m.page.submitErrorGeneric);
       }
