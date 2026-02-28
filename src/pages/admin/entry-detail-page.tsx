@@ -280,6 +280,16 @@ export function AdminEntryDetailPage() {
     loadDetail();
   }, [entryId]);
 
+  const hasDriverNote = driverNote.trim().length > 0;
+
+  useEffect(() => {
+    if (hasDriverNote) {
+      return;
+    }
+    setIncludeDriverNoteOnAccept(false);
+    setIncludeDriverNoteOnReject(false);
+  }, [hasDriverNote]);
+
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
   }
@@ -289,7 +299,6 @@ export function AdminEntryDetailPage() {
   }
 
   const paymentState = paid ? "paid" : "due";
-  const hasDriverNote = driverNote.trim().length > 0;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const anyActionInFlight = actionInFlight !== null;
@@ -1060,7 +1069,7 @@ export function AdminEntryDetailPage() {
                     "status-accepted",
                     () =>
                       adminEntriesService.setEntryStatus(detail.id, "to_accepted", {
-                        includeDriverNoteInLifecycleMail: includeDriverNoteOnAccept
+                        includeDriverNoteInLifecycleMail: hasDriverNote ? includeDriverNoteOnAccept : false
                       }),
                     "Status auf Zugelassen gesetzt.",
                     "Status konnte nicht geändert werden."
@@ -1167,7 +1176,7 @@ export function AdminEntryDetailPage() {
                     "status-rejected",
                     () =>
                       adminEntriesService.setEntryStatus(detail.id, "to_rejected", {
-                        includeDriverNoteInLifecycleMail: includeDriverNoteOnReject
+                        includeDriverNoteInLifecycleMail: hasDriverNote ? includeDriverNoteOnReject : false
                       }),
                     "Status auf Abgelehnt gesetzt.",
                     "Status konnte nicht geändert werden."

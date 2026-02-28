@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { AnmeldungI18nProvider, type AnmeldungLocale, useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { getLegalTexts } from "@/config/legal-texts";
 import { publicContactEmail, publicWebsiteUrl } from "@/config/public-info";
 import { ApiError } from "@/services/api/http-client";
 import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
@@ -60,38 +61,10 @@ function formatDateRange(startsAt: string, endsAt: string, locale: AnmeldungLoca
   return `${formatDate(startsAt, locale)} - ${formatDate(endsAt, locale)}`;
 }
 
-function formatDateTime(value: string, locale: AnmeldungLocale) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat(toIntlLocale(locale), {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(parsed);
-}
-
-function phaseLabel(locale: AnmeldungLocale, phase: "early" | "late") {
-  if (locale === "en") {
-    return phase === "early" ? "Early phase" : "Late phase";
-  }
-  if (locale === "cz") {
-    return phase === "early" ? "Raná fáze" : "Pozdní fáze";
-  }
-  return phase === "early" ? "Frühphase" : "Spätphase";
-}
-
-function deadlineLabel(locale: AnmeldungLocale, phase: "early" | "late") {
-  if (locale === "en") {
-    return phase === "early" ? "Early registration until" : "Registration deadline";
-  }
-  if (locale === "cz") {
-    return phase === "early" ? "Raná registrace do" : "Uzávěrka registrace";
-  }
-  return phase === "early" ? "Frühmelder bis" : "Meldeschluss";
+function latePhaseLabel(locale: AnmeldungLocale) {
+  if (locale === "en") return "2nd registration phase";
+  if (locale === "cz") return "2. faze registrace";
+  return "2. Anmeldephase";
 }
 
 function priceTitle(locale: AnmeldungLocale) {
@@ -108,6 +81,7 @@ function priceFallback(locale: AnmeldungLocale) {
 
 function PublicLayoutContent() {
   const { locale, setLocale, m } = useAnmeldungI18n();
+  const legalTexts = getLegalTexts(locale);
   const [headerEvent, setHeaderEvent] = useState<HeaderEvent | null>(null);
 
   useEffect(() => {
@@ -165,26 +139,18 @@ function PublicLayoutContent() {
       return priceFallback(locale);
     }
     const formatted = formatPriceRange(locale, pricingSnapshot.entryPrice);
-    if (pricingSnapshot.phase === "early" || pricingSnapshot.phase === "late") {
-      return `${formatted} (${phaseLabel(locale, pricingSnapshot.phase)})`;
+    const perVehicle = locale === "en" ? "per vehicle" : locale === "cz" ? "za vozidlo" : "pro Fahrzeug";
+    if (pricingSnapshot.phase === "late") {
+      return `${formatted} ${perVehicle} (${latePhaseLabel(locale)})`;
     }
-    return formatted;
+    return `${formatted} ${perVehicle}`;
   }, [locale, pricingSnapshot]);
 
   const headerDeadline = useMemo(() => {
     if (!pricingSnapshot || !pricingSnapshot.deadlineAt) {
       return "";
     }
-    if (pricingSnapshot.phase === "closed") {
-      if (locale === "en") return "Registration closed";
-      if (locale === "cz") return "Registrace uzavřena";
-      return "Anmeldung geschlossen";
-    }
-    const formattedDate = formatDateTime(pricingSnapshot.deadlineAt.toISOString(), locale);
-    if (pricingSnapshot.phase === "early" || pricingSnapshot.phase === "late") {
-      return `${deadlineLabel(locale, pricingSnapshot.phase)}: ${formattedDate}`;
-    }
-    return formattedDate;
+    return formatDate(pricingSnapshot.deadlineAt.toISOString(), locale);
   }, [locale, pricingSnapshot]);
 
   return (
@@ -266,13 +232,16 @@ function PublicLayoutContent() {
           <p>{m.layout.footerCopyright}</p>
           <div className="flex flex-wrap items-center gap-3">
             <Link to="/anmeldung/rechtliches/impressum" className="hover:text-primary">
-              {m.layout.footerImprint}
+              {legalTexts.footerImprintLabel}
             </Link>
             <Link to="/anmeldung/rechtliches/datenschutz" className="hover:text-primary">
-              {m.layout.footerPrivacy}
+              {legalTexts.footerPrivacyLabel}
             </Link>
-            <Link to="/anmeldung/rechtliches/haftung" className="hover:text-primary">
-              {m.layout.footerLiability}
+            <Link to="/anmeldung/rechtliches/teilnahmebedingungen" className="hover:text-primary">
+              {legalTexts.footerTermsLabel}
+            </Link>
+            <Link to="/anmeldung/rechtliches/haftverzicht" className="hover:text-primary">
+              {legalTexts.footerWaiverLabel}
             </Link>
             {headerWebsiteUrl && (
               <a href={headerWebsiteUrl} target="_blank" rel="noreferrer" className="hover:text-primary">

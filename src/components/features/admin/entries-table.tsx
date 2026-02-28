@@ -28,6 +28,22 @@ type EntriesTableProps = {
   onSetRejected: (entryId: string) => void;
 };
 
+function doppelstarterKey(row: AdminEntryListItem) {
+  const groupId = (row.groupIdRaw ?? "").trim();
+  if (groupId) {
+    return `group:${groupId}`;
+  }
+  const driverPersonId = (row.driverPersonIdRaw ?? "").trim();
+  if (driverPersonId) {
+    return `person:${driverPersonId}`;
+  }
+  const driverEmail = (row.driverEmailRaw ?? "").trim().toLowerCase();
+  if (driverEmail) {
+    return `email:${driverEmail}`;
+  }
+  return "";
+}
+
 function ActionButton(props: {
   label: string;
   onClick?: () => void;
@@ -79,6 +95,25 @@ export function EntriesTable({
   onSetRejected
 }: EntriesTableProps) {
   const location = useLocation();
+  const doppelstarterCounts = new Map<string, number>();
+  rows.forEach((row) => {
+    const key = doppelstarterKey(row);
+    if (!key) {
+      return;
+    }
+    doppelstarterCounts.set(key, (doppelstarterCounts.get(key) ?? 0) + 1);
+  });
+  const isDoppelstarter = (row: AdminEntryListItem) => {
+    if ((row.groupSizeRaw ?? 0) > 1) {
+      return true;
+    }
+    const key = doppelstarterKey(row);
+    if (!key) {
+      return false;
+    }
+    return (doppelstarterCounts.get(key) ?? 0) > 1;
+  };
+
   const statusDisabledReason = (row: AdminEntryListItem, target: AdminEntryListItem["status"]) => {
     if (statusActionBusy) {
       return "Status wird aktualisiert…";
@@ -123,6 +158,11 @@ export function EntriesTable({
                     {row.classLabel} · #{row.startNumber}
                   </div>
                   <div className="text-xs text-slate-500">{row.vehicleLabel}</div>
+                  {isDoppelstarter(row) && (
+                    <Badge className="mt-1 h-5 border-amber-300 bg-amber-50 px-1.5 text-[10px] text-amber-800" variant="outline">
+                      Doppelstarter
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-1">
@@ -216,13 +256,13 @@ export function EntriesTable({
               {rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`h-[116px] border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowAccentClasses(row.status) : "border-l-4 border-l-slate-300 bg-slate-50"}`}
+                  className={`border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowAccentClasses(row.status) : "border-l-4 border-l-slate-300 bg-slate-50"}`}
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-start gap-3">
                       <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
                       <div className="min-w-0 pt-0.5">
-                        <div className="flex items-center gap-1.5 truncate font-semibold leading-tight text-slate-900">
+                        <div className="flex items-center gap-1.5 font-semibold leading-tight text-slate-900">
                           <span className="truncate">{row.name}</span>
                           {row.confirmationMailVerified && (
                             <span title="E-Mail verifiziert">
@@ -231,6 +271,11 @@ export function EntriesTable({
                           )}
                         </div>
                         <div className="mt-1 truncate text-xs text-slate-600">{row.vehicleLabel}</div>
+                        {isDoppelstarter(row) && (
+                          <Badge className="mt-1 h-5 border-amber-300 bg-amber-50 px-1.5 text-[10px] text-amber-800" variant="outline">
+                            Doppelstarter
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </td>

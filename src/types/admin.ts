@@ -13,6 +13,8 @@ export type AdminEntryListItemDto = {
   id: Id;
   eventId?: Id;
   classId?: Id;
+  groupId?: Id | null;
+  groupSize?: number | null;
   vehicleId?: Id;
   name?: string;
   className?: string;
@@ -58,6 +60,10 @@ export type AdminEntryListItem = {
   id: Id;
   classId?: Id;
   name: string;
+  driverPersonIdRaw: string;
+  driverEmailRaw: string;
+  groupIdRaw: string;
+  groupSizeRaw: number;
   classLabel: string;
   startNumber: string;
   vehicleLabel: string;
@@ -69,6 +75,12 @@ export type AdminEntryListItem = {
   confirmationMailVerified: boolean;
   driverNote: string;
   createdAt: string;
+  createdAtRaw: string;
+  updatedAtRaw: string;
+  driverFirstNameRaw: string;
+  driverLastNameRaw: string;
+  classNameRaw: string;
+  startNumberNormRaw: string;
 };
 
 export type AdminEntriesPageResult = {
@@ -113,7 +125,8 @@ export type AdminEntryDetailDto = {
     driverPersonId: Id;
     codriverPersonId: Id | null;
     vehicleId: Id;
-    backupOfEntryId: Id | null;
+    backupOfEntryId?: Id | null;
+    backupVehicleId?: Id | null;
   };
   className: string;
   registrationStatus: RegistrationStatus;
@@ -168,6 +181,20 @@ export type AdminEntryDetailDto = {
     vehicleHistory: string | null;
     imageS3Key: string | null;
   };
+  backupVehicle?: {
+    vehicleType: VehicleType;
+    make: string | null;
+    model: string | null;
+    year: number | null;
+    displacementCcm: number | null;
+    engineType: string | null;
+    cylinders: number | null;
+    brakes: string | null;
+    ownerName: string | null;
+    vehicleHistory: string | null;
+    imageS3Key: string | null;
+  } | null;
+  backupVehicleThumbUrl?: string | null;
   payment: {
     totalCents: number;
     paidAmountCents: number;
@@ -251,6 +278,21 @@ export type AdminEntryDetailViewModel = {
     addressLine: string;
   };
   vehicle: {
+    label: string;
+    thumbUrl: string | null;
+    type: VehicleType;
+    make: string;
+    model: string;
+    year: string;
+    displacementCcm: string;
+    engineType: string;
+    cylinders: string;
+    brakes: string;
+    ownerName: string;
+    vehicleHistory: string;
+  };
+  backupVehicle: {
+    assigned: boolean;
     label: string;
     thumbUrl: string | null;
     type: VehicleType;

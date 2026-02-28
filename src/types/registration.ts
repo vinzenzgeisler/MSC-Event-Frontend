@@ -15,11 +15,20 @@ export type DriverForm = {
   emergencyContactPhone: string;
   motorsportHistory: string;
   specialNotes: string;
+  guardianFullName: string;
+  guardianEmail: string;
+  guardianPhone: string;
+  guardianConsentAccepted: boolean;
 };
 
 export type CodriverForm = {
   firstName: string;
   lastName: string;
+  birthdate: string;
+  nationality: string;
+  street: string;
+  zip: string;
+  city: string;
   email: string;
   phone: string;
 };
@@ -57,6 +66,10 @@ export type ConsentForm = {
   termsAccepted: boolean;
   privacyAccepted: boolean;
   mediaAccepted: boolean;
+  consentVersion: string;
+  consentTextHash: string;
+  locale: string;
+  consentSource: "public_form";
 };
 
 export type RegistrationWizardForm = {
@@ -124,12 +137,21 @@ export type PublicCreateEntryRequestDto = {
     emergencyContactPhone: string;
     motorsportHistory: string;
     specialNotes?: string;
+    guardianFullName?: string;
+    guardianEmail?: string;
+    guardianPhone?: string;
+    guardianConsentAccepted?: boolean;
   };
   codriver?: {
     email: string;
     firstName: string;
     lastName: string;
-    phone?: string;
+    birthdate: string;
+    nationality: string;
+    street: string;
+    zip: string;
+    city: string;
+    phone: string;
   };
   codriverEnabled?: boolean;
   vehicle: {
@@ -146,6 +168,19 @@ export type PublicCreateEntryRequestDto = {
     startNumberRaw?: string;
     imageS3Key?: string;
   };
+  backupVehicle?: {
+    vehicleType: VehicleType;
+    make: string;
+    model: string;
+    year?: number;
+    displacementCcm: number;
+    engineType: string;
+    cylinders: number;
+    brakes: string;
+    vehicleHistory: string;
+    ownerName: string;
+    imageS3Key?: string;
+  };
   startNumber: string;
   isBackupVehicle?: boolean;
   backupOfEntryId?: Id;
@@ -153,10 +188,30 @@ export type PublicCreateEntryRequestDto = {
   consent: {
     termsAccepted: true;
     privacyAccepted: true;
-    mediaAccepted: true;
+    mediaAccepted: boolean;
     consentVersion: string;
+    consentTextHash: string;
+    locale: string;
+    consentSource: "public_form";
     consentCapturedAt: string;
   };
+};
+
+export type PublicCreateEntriesBatchRequestDto = {
+  clientSubmissionKey: string;
+  driver: PublicCreateEntryRequestDto["driver"];
+  consent: PublicCreateEntryRequestDto["consent"];
+  entries: Array<{
+    classId: Id;
+    codriverEnabled?: boolean;
+    codriver?: PublicCreateEntryRequestDto["codriver"];
+    vehicle: PublicCreateEntryRequestDto["vehicle"];
+    backupVehicle?: PublicCreateEntryRequestDto["backupVehicle"];
+    specialNotes?: string;
+    backupOfEntryId?: Id;
+    startNumber: string;
+    isBackupVehicle?: boolean;
+  }>;
 };
 
 export type PublicCreateEntryResponseDto = {
@@ -164,10 +219,25 @@ export type PublicCreateEntryResponseDto = {
   entryId: Id;
   registrationStatus: RegistrationStatus;
   verificationToken: string;
+  confirmationMailSent: boolean;
+};
+
+export type PublicCreateEntriesBatchResponseDto = {
+  ok: boolean;
+  groupId: Id;
+  entryIds: Id[];
+  entryCount: number;
+  registrationStatus: RegistrationStatus;
+  verificationToken: string;
+  confirmationMailSent: boolean;
 };
 
 export type RegistrationSubmitResult = {
   ok: boolean;
   createdEntries: number;
+  attemptedEntries: number;
   status: RegistrationStatus;
+  groupId?: Id;
+  entryIds?: Id[];
+  entryCount?: number;
 };

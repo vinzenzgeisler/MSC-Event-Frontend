@@ -19,7 +19,7 @@ import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem,
 const PAGE_SIZE = 25;
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const CACHE_KEY = "admin.entries.page.cache.v1";
+const CACHE_KEY = "admin.entries.page.cache.v3";
 
 type EntriesScope = "active" | "deleted";
 
@@ -213,16 +213,11 @@ function mergeRowsById(existing: AdminEntryListItem[], incoming: AdminEntryListI
     return existing;
   }
 
-  const seen = new Set(existing.map((item) => item.id));
-  const merged = [...existing];
+  const byId = new Map(existing.map((item) => [item.id, item]));
   incoming.forEach((item) => {
-    if (seen.has(item.id)) {
-      return;
-    }
-    seen.add(item.id);
-    merged.push(item);
+    byId.set(item.id, item);
   });
-  return merged;
+  return Array.from(byId.values());
 }
 
 function mergeDeletedRowsById(existing: AdminDeletedEntryListItem[], incoming: AdminDeletedEntryListItem[]) {
@@ -240,6 +235,76 @@ function mergeDeletedRowsById(existing: AdminDeletedEntryListItem[], incoming: A
     merged.push(item);
   });
   return merged;
+}
+
+function toTimestamp(value: string) {
+  if (!value) {
+    return 0;
+  }
+  const parsed = Number(new Date(value));
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  const germanDateTimeMatch =
+    value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/) ??
+    value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (germanDateTimeMatch) {
+    const [, dayRaw, monthRaw, yearRaw, hourRaw = "0", minuteRaw = "0", secondRaw = "0"] = germanDateTimeMatch;
+    const date = new Date(
+      Number(yearRaw),
+      Number(monthRaw) - 1,
+      Number(dayRaw),
+      Number(hourRaw),
+      Number(minuteRaw),
+      Number(secondRaw)
+    );
+    const fromGerman = Number(date);
+    return Number.isFinite(fromGerman) ? fromGerman : 0;
+  }
+
+  return 0;
+}
+
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, "de-DE", { sensitivity: "base", numeric: true });
+}
+
+function sortRowsByFilter(rows: AdminEntryListItem[], filter: AdminEntriesFilter) {
+  if (!rows.length) {
+    return rows;
+  }
+
+  const direction = filter.sortDir === "asc" ? 1 : -1;
+  const decorated = rows.map((row, index) => ({ row, index }));
+  decorated.sort((left, right) => {
+    let compare = 0;
+    if (filter.sortBy === "createdAt") {
+      compare = toTimestamp(left.row.createdAtRaw || left.row.createdAt) - toTimestamp(right.row.createdAtRaw || right.row.createdAt);
+    } else if (filter.sortBy === "updatedAt") {
+      compare = toTimestamp(left.row.updatedAtRaw || left.row.createdAtRaw || left.row.createdAt) - toTimestamp(right.row.updatedAtRaw || right.row.createdAtRaw || right.row.createdAt);
+    } else if (filter.sortBy === "driverLastName") {
+      compare = compareText(left.row.driverLastNameRaw || "", right.row.driverLastNameRaw || "");
+      if (compare === 0) {
+        compare = compareText(left.row.driverFirstNameRaw || "", right.row.driverFirstNameRaw || "");
+      }
+    } else if (filter.sortBy === "driverFirstName") {
+      compare = compareText(left.row.driverFirstNameRaw || "", right.row.driverFirstNameRaw || "");
+      if (compare === 0) {
+        compare = compareText(left.row.driverLastNameRaw || "", right.row.driverLastNameRaw || "");
+      }
+    } else if (filter.sortBy === "className") {
+      compare = compareText(left.row.classNameRaw || "", right.row.classNameRaw || "");
+    } else if (filter.sortBy === "startNumberNorm") {
+      compare = compareText(left.row.startNumberNormRaw || "", right.row.startNumberNormRaw || "");
+    }
+
+    if (compare === 0) {
+      compare = left.index - right.index;
+    }
+    return compare * direction;
+  });
+  return decorated.map((item) => item.row);
 }
 
 function rowMatchesFilter(row: AdminEntryListItem, filter: AdminEntriesFilter, classNameById: Map<string, string>) {
@@ -384,7 +449,9 @@ export function AdminEntriesPage() {
 
   const fetchActiveSnapshot = useCallback(
     async (filter: AdminEntriesFilter, minimumRows: number, requestId: number): Promise<{ rows: AdminEntryListItem[]; meta: ListMeta } | null> => {
-      const targetSize = Math.max(minimumRows, PAGE_SIZE);
+      const minimumRowsForStableNewest =
+        filter.sortBy === "createdAt" && filter.sortDir === "desc" ? PAGE_SIZE * 2 : PAGE_SIZE;
+      const targetSize = Math.max(minimumRows, minimumRowsForStableNewest);
       let nextCursor: string | undefined;
       let mergedRows: AdminEntryListItem[] = [];
       let latestMeta = EMPTY_META;
@@ -483,9 +550,10 @@ export function AdminEntriesPage() {
           return;
         }
 
-        setRows(snapshot.rows);
+        const sortedRows = sortRowsByFilter(snapshot.rows, filter);
+        setRows(sortedRows);
         setMeta(snapshot.meta);
-        writeEntriesCache(filter, snapshot.rows, snapshot.meta);
+        writeEntriesCache(filter, sortedRows, snapshot.meta);
       } catch (error) {
         if (!isRequestActive(requestId)) {
           return;
@@ -565,8 +633,9 @@ export function AdminEntriesPage() {
 
       setRows((prev) => {
         const merged = mergeRowsById(prev, page.entries);
-        writeEntriesCache(appliedFilter, merged, page.meta);
-        return merged;
+        const sorted = sortRowsByFilter(merged, appliedFilter);
+        writeEntriesCache(appliedFilter, sorted, page.meta);
+        return sorted;
       });
       setMeta(page.meta);
     } catch (error) {
@@ -660,7 +729,7 @@ export function AdminEntriesPage() {
     }
 
     hydratedFromCacheRef.current = true;
-    setRows(cached.rows);
+    setRows(sortRowsByFilter(cached.rows, initialFilterRef.current));
     setMeta(cached.meta);
     if (viewScope === "active") {
       setLoadingInitial(false);
@@ -845,11 +914,13 @@ export function AdminEntriesPage() {
         return prev.filter((item) => item.id !== entryId);
       }
 
-      return prev.map((item) => (item.id === entryId ? updatedRow : item));
+      const updated = prev.map((item) => (item.id === entryId ? updatedRow : item));
+      return sortRowsByFilter(updated, appliedFilter);
     });
   };
 
-  const shownCount = viewScope === "deleted" ? deletedRows.length : rows.length;
+  const visibleRows = useMemo(() => sortRowsByFilter(rows, appliedFilter), [rows, appliedFilter]);
+  const shownCount = viewScope === "deleted" ? deletedRows.length : visibleRows.length;
   const shownTotal = viewScope === "deleted" ? deletedMeta.total : meta.total;
   const pendingAcceptRow = pendingAcceptEntryId ? rows.find((item) => item.id === pendingAcceptEntryId) : null;
   const pendingRejectRow = pendingRejectEntryId ? rows.find((item) => item.id === pendingRejectEntryId) : null;
@@ -995,7 +1066,7 @@ export function AdminEntriesPage() {
         </>
       ) : (
         <EntriesTable
-          rows={rows}
+          rows={visibleRows}
           canManageStatus={canManageStatus}
           statusActionBusy={statusActionBusy !== null}
           isLoadingInitial={loadingInitial}

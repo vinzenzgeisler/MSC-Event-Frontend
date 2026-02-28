@@ -1,5 +1,6 @@
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { getCountrySelectOptions } from "@/lib/countries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,9 +19,25 @@ type StartFieldKey =
   | "cylinders"
   | "brakes"
   | "vehicleHistory"
+  | "vehicleImage"
   | "codriverFirstName"
   | "codriverLastName"
-  | "codriverEmail";
+  | "codriverBirthdate"
+  | "codriverNationality"
+  | "codriverStreet"
+  | "codriverZip"
+  | "codriverCity"
+  | "codriverEmail"
+  | "codriverPhone"
+  | "backupMake"
+  | "backupModel"
+  | "backupYear"
+  | "backupDisplacementCcm"
+  | "backupEngineType"
+  | "backupCylinders"
+  | "backupBrakes"
+  | "backupVehicleHistory"
+  | "backupVehicleImage";
 
 type StartEntriesStepProps = {
   classes: PublicEventClass[];
@@ -32,8 +49,12 @@ type StartEntriesStepProps = {
   fieldErrors: Partial<Record<StartFieldKey, string>>;
   startNumberState: StartNumberState;
   startNumberHint: string;
+  showDraftForm: boolean;
+  addAnotherStart: boolean;
   onDraftChange: <K extends keyof StartRegistrationForm>(field: K, value: StartRegistrationForm[K]) => void;
+  onAddAnotherStartChange: (checked: boolean) => void;
   onVehicleFieldChange: (field: keyof StartRegistrationForm["vehicle"], value: string) => void;
+  onBackupVehicleImageSelect: (file: File | null) => void;
   onVehicleImageSelect: (file: File | null) => void;
   onCodriverFieldChange: (field: keyof StartRegistrationForm["codriver"], value: string) => void;
   onBackupFieldChange: (field: keyof StartRegistrationForm["backupVehicle"], value: string) => void;
@@ -64,8 +85,12 @@ export function StartEntriesStep({
   fieldErrors,
   startNumberState,
   startNumberHint,
+  showDraftForm,
+  addAnotherStart,
   onDraftChange,
+  onAddAnotherStartChange,
   onVehicleFieldChange,
+  onBackupVehicleImageSelect,
   onVehicleImageSelect,
   onCodriverFieldChange,
   onBackupFieldChange,
@@ -74,7 +99,9 @@ export function StartEntriesStep({
   onEdit,
   onRemove
 }: StartEntriesStepProps) {
-  const { m } = useAnmeldungI18n();
+  const { m, locale } = useAnmeldungI18n();
+  const countryOptions = getCountrySelectOptions(locale);
+  const usedClassIds = new Set(starts.filter((item) => item.id !== editingId).map((item) => item.classId));
 
   return (
     <div className="space-y-6">
@@ -123,11 +150,23 @@ export function StartEntriesStep({
         ))}
       </div>
 
-      <div className="space-y-4 rounded-xl border bg-white p-4 md:p-6">
-        <div className="flex items-center justify-between gap-2">
-          <h4 className="font-semibold text-slate-900">{editingId ? m.start.editTitle : m.start.addTitle}</h4>
-        </div>
-        {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+      {starts.length > 0 && !editingId && (
+        <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+          <input
+            type="checkbox"
+            checked={addAnotherStart}
+            onChange={(event) => onAddAnotherStartChange(event.target.checked)}
+          />
+          {m.start.addAnotherToggle}
+        </label>
+      )}
+
+      {showDraftForm && (
+        <div className="space-y-4 rounded-xl border bg-white p-4 md:p-6">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="font-semibold text-slate-900">{editingId ? m.start.editTitle : m.start.addTitle}</h4>
+          </div>
+          {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
@@ -146,7 +185,7 @@ export function StartEntriesStep({
             >
               <option value="">{m.start.classPlaceholder}</option>
               {classes.map((item) => (
-                <option key={item.id} value={item.id}>
+                <option key={item.id} value={item.id} disabled={usedClassIds.has(item.id)}>
                   {item.name}
                 </option>
               ))}
@@ -202,7 +241,6 @@ export function StartEntriesStep({
             <Input
               value={draft.vehicle.displacementCcm}
               onChange={(event) => onVehicleFieldChange("displacementCcm", event.target.value.replace(/\D/g, "").slice(0, 5))}
-              placeholder="1998"
             />
             <FieldError message={fieldErrors.displacementCcm} />
           </div>
@@ -222,7 +260,15 @@ export function StartEntriesStep({
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label>{m.start.brakes}</Label>
-            <Input value={draft.vehicle.brakes} onChange={(event) => onVehicleFieldChange("brakes", event.target.value)} placeholder="Brembo 4-Kolben" />
+            <select
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={draft.vehicle.brakes}
+              onChange={(event) => onVehicleFieldChange("brakes", event.target.value)}
+            >
+              <option value="">{m.start.classPlaceholder}</option>
+              <option value="steel">{m.start.brakesSteel}</option>
+              <option value="ceramic">{m.start.brakesCeramic}</option>
+            </select>
             <FieldError message={fieldErrors.brakes} />
           </div>
           <div className="space-y-2">
@@ -257,6 +303,7 @@ export function StartEntriesStep({
             {draft.vehicle.imageUploadState === "error" && (
               <p className="text-xs text-destructive">{draft.vehicle.imageUploadError || "Upload fehlgeschlagen."}</p>
             )}
+            <FieldError message={fieldErrors.vehicleImage} />
           </div>
         </div>
 
@@ -271,6 +318,7 @@ export function StartEntriesStep({
           </label>
           {draft.codriverEnabled && (
             <div className="grid gap-4 md:grid-cols-2">
+              <h5 className="md:col-span-2 text-sm font-semibold text-slate-900">{m.start.codriverTitle}</h5>
               <div className="space-y-2">
                 <Label>{m.start.codriverFirstName}</Label>
                 <Input value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="Anna" />
@@ -280,6 +328,48 @@ export function StartEntriesStep({
                 <Label>{m.start.codriverLastName}</Label>
                 <Input value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="Beispiel" />
                 <FieldError message={fieldErrors.codriverLastName} />
+              </div>
+              <div className="space-y-2">
+                <Label>{m.start.codriverBirthdate}</Label>
+                <Input
+                  value={draft.codriver.birthdate}
+                  onChange={(event) => onCodriverFieldChange("birthdate", event.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder={m.start.codriverBirthdatePlaceholder}
+                />
+                <FieldError message={fieldErrors.codriverBirthdate} />
+              </div>
+              <div className="space-y-2">
+                <Label>{m.start.codriverNationality}</Label>
+                <select
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={draft.codriver.nationality}
+                  onChange={(event) => onCodriverFieldChange("nationality", event.target.value)}
+                >
+                  <option value="">{m.start.codriverNationalityPlaceholder}</option>
+                  {countryOptions.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.label}
+                    </option>
+                  ))}
+                </select>
+                <FieldError message={fieldErrors.codriverNationality} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>{m.start.codriverStreet}</Label>
+                <Input value={draft.codriver.street} onChange={(event) => onCodriverFieldChange("street", event.target.value)} />
+                <FieldError message={fieldErrors.codriverStreet} />
+              </div>
+              <div className="space-y-2">
+                <Label>{m.start.codriverZip}</Label>
+                <Input value={draft.codriver.zip} onChange={(event) => onCodriverFieldChange("zip", event.target.value)} />
+                <FieldError message={fieldErrors.codriverZip} />
+              </div>
+              <div className="space-y-2">
+                <Label>{m.start.codriverCity}</Label>
+                <Input value={draft.codriver.city} onChange={(event) => onCodriverFieldChange("city", event.target.value)} />
+                <FieldError message={fieldErrors.codriverCity} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverEmail}</Label>
@@ -294,6 +384,7 @@ export function StartEntriesStep({
                   inputMode="tel"
                   placeholder={m.start.codriverPhonePlaceholder}
                 />
+                <FieldError message={fieldErrors.codriverPhone} />
               </div>
             </div>
           )}
@@ -316,35 +407,102 @@ export function StartEntriesStep({
                 <div className="space-y-2">
                   <Label>{m.start.backupMake}</Label>
                   <Input value={draft.backupVehicle.make} onChange={(event) => onBackupFieldChange("make", event.target.value)} placeholder="BMW" />
+                  <FieldError message={fieldErrors.backupMake} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupModel}</Label>
                   <Input value={draft.backupVehicle.model} onChange={(event) => onBackupFieldChange("model", event.target.value)} placeholder="2002 tii" />
+                  <FieldError message={fieldErrors.backupModel} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.backupYear}</Label>
+                  <Input
+                    value={draft.backupVehicle.year}
+                    onChange={(event) => onBackupFieldChange("year", event.target.value.replace(/\D/g, "").slice(0, 4))}
+                    inputMode="numeric"
+                  />
+                  <FieldError message={fieldErrors.backupYear} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupDisplacement}</Label>
                   <Input
                     value={draft.backupVehicle.displacementCcm}
                     onChange={(event) => onBackupFieldChange("displacementCcm", event.target.value.replace(/\D/g, "").slice(0, 5))}
-                    placeholder="1990"
                   />
+                  <FieldError message={fieldErrors.backupDisplacementCcm} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupEngine}</Label>
                   <Input value={draft.backupVehicle.engineType} onChange={(event) => onBackupFieldChange("engineType", event.target.value)} placeholder="BMW M10" />
+                  <FieldError message={fieldErrors.backupEngineType} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.backupCylinders}</Label>
+                  <Input
+                    value={draft.backupVehicle.cylinders}
+                    onChange={(event) => onBackupFieldChange("cylinders", event.target.value.toUpperCase())}
+                  />
+                  <FieldError message={fieldErrors.backupCylinders} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.backupBrakes}</Label>
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={draft.backupVehicle.brakes}
+                    onChange={(event) => onBackupFieldChange("brakes", event.target.value)}
+                  >
+                    <option value="">{m.start.classPlaceholder}</option>
+                    <option value="steel">{m.start.brakesSteel}</option>
+                    <option value="ceramic">{m.start.brakesCeramic}</option>
+                  </select>
+                  <FieldError message={fieldErrors.backupBrakes} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>{m.start.backupOwner}</Label>
+                  <Input value={draft.backupVehicle.ownerName} onChange={(event) => onBackupFieldChange("ownerName", event.target.value)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>{m.start.backupHistory}</Label>
+                  <textarea
+                    className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={draft.backupVehicle.vehicleHistory}
+                    onChange={(event) => onBackupFieldChange("vehicleHistory", event.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">{m.start.backupHistoryHint}</p>
+                  <FieldError message={fieldErrors.backupVehicleHistory} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>{m.start.backupUpload}</Label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="block h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1"
+                    onClick={(event) => {
+                      (event.currentTarget as HTMLInputElement).value = "";
+                    }}
+                    onChange={(event) => onBackupVehicleImageSelect(event.target.files?.[0] ?? null)}
+                  />
+                  {draft.backupVehicle.imageFileName && <p className="text-xs text-slate-600">Datei: {draft.backupVehicle.imageFileName}</p>}
+                  {draft.backupVehicle.imageUploadState === "uploading" && <p className="text-xs text-slate-600">Upload läuft…</p>}
+                  {draft.backupVehicle.imageUploadState === "uploaded" && <p className="text-xs text-emerald-700">Upload abgeschlossen.</p>}
+                  {draft.backupVehicle.imageUploadState === "error" && (
+                    <p className="text-xs text-destructive">{draft.backupVehicle.imageUploadError || "Upload fehlgeschlagen."}</p>
+                  )}
+                  <FieldError message={fieldErrors.backupVehicleImage} />
                 </div>
               </div>
             )}
           </div>
         </details>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-slate-500">{m.start.footerHint}</p>
-          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onSave}>
-            {editingId ? m.start.saveEdit : m.start.saveAdd}
-          </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">{m.start.footerHint}</p>
+            <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onSave}>
+              {editingId ? m.start.saveEdit : m.start.saveAdd}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

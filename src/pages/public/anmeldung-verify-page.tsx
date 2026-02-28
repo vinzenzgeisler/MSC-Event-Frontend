@@ -1,14 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CircleAlert, CircleX } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError } from "@/services/api/http-client";
 import { registrationService } from "@/services/registration.service";
 
-type VerifyViewState = "loading" | "success" | "already" | "invalid" | "error";
+type VerifyViewState = "loading" | "success" | "already" | "invalid" | "conflict" | "error";
 
 const verificationResendUrl = String(import.meta.env.VITE_PUBLIC_VERIFY_RESEND_URL || "").trim();
+
+function apiErrorCode(error: ApiError) {
+  return (error.code ?? "").trim().toUpperCase();
+}
+
+function isAlreadyVerifiedConflict(error: ApiError) {
+  const code = apiErrorCode(error);
+  if (code === "VERIFY_TOKEN_ALREADY_USED") {
+    return true;
+  }
+  const haystack = `${(error.code ?? "").toLowerCase()} ${(error.message ?? "").toLowerCase()}`;
+  return /already/.test(haystack) && /(verify|verified|used|token|link)/.test(haystack);
+}
 
 export function AnmeldungVerifyPage() {
   const [searchParams] = useSearchParams();
@@ -50,11 +63,24 @@ export function AnmeldungVerifyPage() {
           return;
         }
         if (error instanceof ApiError) {
+          const code = apiErrorCode(error);
           if (error.status === 409) {
-            setState("already");
+            if (code === "EMAIL_ALREADY_IN_USE_ACTIVE_ENTRY") {
+              setState("conflict");
+              return;
+            }
+            if (code === "VERIFY_TOKEN_EXPIRED") {
+              setState("invalid");
+              return;
+            }
+            setState(isAlreadyVerifiedConflict(error) ? "already" : "invalid");
             return;
           }
           if (error.status === 400 || error.status === 404) {
+            if (!code || code === "VERIFY_TOKEN_INVALID") {
+              setState("invalid");
+              return;
+            }
             setState("invalid");
             return;
           }
@@ -116,6 +142,18 @@ export function AnmeldungVerifyPage() {
           </div>
         )}
 
+        {state === "conflict" && (
+          <div className="rounded-md border border-orange-300 bg-orange-50 p-4">
+            <div className="flex items-start gap-2">
+              <CircleAlert className="mt-0.5 h-5 w-5 text-orange-700" />
+              <div>
+                <p className="font-medium text-orange-900">Diese E-Mail ist bereits in einer aktiven Nennung verwendet.</p>
+                <p className="mt-1 text-xs text-orange-800">Bitte verwende eine andere E-Mail oder kontaktiere das Orga-Team.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {state === "error" && (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-destructive">
             <p className="font-medium">Verifizierung derzeit nicht möglich.</p>
@@ -129,9 +167,6 @@ export function AnmeldungVerifyPage() {
               <a href={verificationResendUrl}>Neue Verifizierungs-Mail anfordern</a>
             </Button>
           )}
-          <Button asChild type="button" variant="outline">
-            <Link to="/anmeldung">Zur Anmeldung</Link>
-          </Button>
         </div>
       </CardContent>
     </Card>

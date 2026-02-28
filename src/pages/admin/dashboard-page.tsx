@@ -40,9 +40,9 @@ type DashboardRecentEntryItem = {
 
 type AdminDashboardSummaryResponse = {
   ok: boolean;
-  summary: DashboardSummary;
-  classDistribution: DashboardClassDistributionItem[];
-  recentEntries: DashboardRecentEntryItem[];
+  summary?: unknown;
+  classDistribution?: DashboardClassDistributionItem[];
+  recentEntries?: DashboardRecentEntryItem[];
 };
 
 const EMPTY_SUMMARY: DashboardSummary = {
@@ -97,14 +97,104 @@ function formatAgeWithUnit(value: number | null | undefined) {
   return formatted === "—" ? formatted : `${formatted} J.`;
 }
 
-function normalizeDashboardSummary(summary: DashboardSummary | null | undefined): DashboardSummary {
-  return {
-    ...EMPTY_SUMMARY,
-    ...(summary ?? {}),
-    driverAgeStats: {
-      ...EMPTY_SUMMARY.driverAgeStats,
-      ...(summary?.driverAgeStats ?? {})
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (isRecord(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return isRecord(parsed) ? parsed : null;
+    } catch {
+      return null;
     }
+  }
+  return null;
+}
+
+function toNullableNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim().replace(",", "."));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+function toNullableCount(value: unknown): number | null {
+  const parsed = toNullableNumber(value);
+  if (parsed === null) {
+    return null;
+  }
+  return Math.max(0, Math.round(parsed));
+}
+
+function pickFirstNumber(sources: Record<string, unknown>[], keys: string[]): number | null {
+  for (const source of sources) {
+    for (const key of keys) {
+      const parsed = toNullableNumber(source[key]);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function pickFirstString(sources: Record<string, unknown>[], keys: string[]): string {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (trimmed) {
+          return trimmed;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function normalizeDriverAgeStats(summaryStats: unknown): DashboardSummary["driverAgeStats"] {
+  const record = toRecord(summaryStats);
+  const sources = record ? [record] : [];
+  if (!sources.length) {
+    return EMPTY_SUMMARY.driverAgeStats;
+  }
+
+  return {
+    oldestDriverAge: pickFirstNumber(sources, ["oldestDriverAge", "oldestAge", "oldest_driver_age"]),
+    oldestDriverLabel: pickFirstString(sources, ["oldestDriverLabel", "oldestLabel", "oldest_driver_label"]),
+    youngestDriverAge: pickFirstNumber(sources, ["youngestDriverAge", "youngestAge", "youngest_driver_age"]),
+    medianDriverAge: pickFirstNumber(sources, ["medianDriverAge", "medianAge", "median_driver_age"])
+  };
+}
+
+function normalizeDashboardSummary(summary: unknown): DashboardSummary {
+  const record = toRecord(summary);
+  if (!record) {
+    return EMPTY_SUMMARY;
+  }
+
+  const ageStatsSource = record.driverAgeStats ?? record.driver_age_stats ?? record.ageStats ?? record.age_stats;
+  return {
+    entriesTotal: toNullableCount(record.entriesTotal) ?? EMPTY_SUMMARY.entriesTotal,
+    paymentsDueTotal: toNullableCount(record.paymentsDueTotal) ?? EMPTY_SUMMARY.paymentsDueTotal,
+    checkinPendingTotal: toNullableCount(record.checkinPendingTotal) ?? EMPTY_SUMMARY.checkinPendingTotal,
+    mailFailedTotal: toNullableCount(record.mailFailedTotal) ?? EMPTY_SUMMARY.mailFailedTotal,
+    mailQueuedTotal: toNullableCount(record.mailQueuedTotal) ?? EMPTY_SUMMARY.mailQueuedTotal,
+    exportsQueuedTotal: toNullableCount(record.exportsQueuedTotal) ?? EMPTY_SUMMARY.exportsQueuedTotal,
+    exportsProcessingTotal: toNullableCount(record.exportsProcessingTotal) ?? EMPTY_SUMMARY.exportsProcessingTotal,
+    driverAgeStats: normalizeDriverAgeStats(ageStatsSource)
   };
 }
 
@@ -175,7 +265,6 @@ export function AdminDashboardPage() {
           eventId
         }
       });
-
       setSummary(normalizeDashboardSummary(response.summary));
       setClassDistribution(response.classDistribution ?? []);
       setRecentEntries(response.recentEntries ?? []);
