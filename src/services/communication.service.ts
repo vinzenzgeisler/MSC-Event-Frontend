@@ -68,6 +68,27 @@ export const communicationService = {
     });
   },
 
+  async queueDirectMail(payload: {
+    toEmail: string;
+    templateKey: string;
+    subjectOverride?: string;
+    bodyOverride?: string;
+    sendAfter?: string;
+  }) {
+    const eventId = await getAdminEventId();
+    return requestJson<{ ok: boolean; queued?: number; skipped?: number; reason?: string }>("/admin/mail/queue", {
+      method: "POST",
+      body: {
+        eventId,
+        toEmail: payload.toEmail,
+        templateKey: payload.templateKey,
+        subjectOverride: payload.subjectOverride || undefined,
+        bodyOverride: payload.bodyOverride || undefined,
+        sendAfter: payload.sendAfter || undefined
+      }
+    });
+  },
+
   async queuePaymentReminderForEntry(entryId: string, options?: { allowDuplicate?: boolean; eventId?: string }) {
     const eventId = options?.eventId?.trim() || (await getAdminEventId());
     return requestJson<AdminMailQueueResponse>("/admin/payment/reminders/queue", {

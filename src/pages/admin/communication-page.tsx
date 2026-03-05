@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
@@ -21,17 +22,107 @@ const initialForm: BroadcastForm = {
   subjectOverride: ""
 };
 const OUTBOX_PREVIEW_LIMIT = 10;
+const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
+
+type TemplatePreset = {
+  key: string;
+  label: string;
+  defaultSubject: string;
+  defaultBody: string;
+  requiresVerificationLink?: boolean;
+};
+
+const TEMPLATE_PRESETS: TemplatePreset[] = [
+  {
+    key: "registration_received",
+    label: "Verifizierungs-Mail",
+    defaultSubject: "Bitte E-Mail verifizieren: {{eventName}}",
+    defaultBody:
+      "Hallo {{firstName}} {{lastName}},\n\nbitte bestaetige deine Anmeldung ueber diesen Link:\n{{verificationUrl}}\n\nDanach wird deine Nennung weiter verarbeitet.\n\nViele Gruesse\n{{eventName}}",
+    requiresVerificationLink: true
+  },
+  {
+    key: "preselection",
+    label: "Vorauswahl",
+    defaultSubject: "Vorauswahl fuer {{eventName}}",
+    defaultBody:
+      "Hallo {{firstName}} {{lastName}},\n\ndeine Nennung ist aktuell in der Vorauswahl. Wir melden uns mit dem finalen Status.\n\nViele Gruesse\n{{eventName}}"
+  },
+  {
+    key: "accepted_open_payment",
+    label: "Zulassung",
+    defaultSubject: "Zulassung: {{eventName}}",
+    defaultBody:
+      "Hallo {{firstName}} {{lastName}},\n\ndeine Nennung wurde zugelassen. Offener Betrag: {{amountOpen}}.\n\nViele Gruesse\n{{eventName}}"
+  },
+  {
+    key: "rejected",
+    label: "Ablehnung",
+    defaultSubject: "Statusupdate: {{eventName}}",
+    defaultBody:
+      "Hallo {{firstName}} {{lastName}},\n\nleider koennen wir deine Nennung fuer {{eventName}} nicht zulassen.\n\nViele Gruesse\n{{eventName}}"
+  },
+  {
+    key: "payment_reminder",
+    label: "Zahlungserinnerung",
+    defaultSubject: "Erinnerung Zahlung: {{eventName}}",
+    defaultBody:
+      "Hallo {{firstName}} {{lastName}},\n\nbitte begleiche den offenen Betrag von {{amountOpen}} fuer deine Nennung.\n\nViele Gruesse\n{{eventName}}"
+  }
+];
+
+type TemplateDrafts = Record<string, { subject: string; body: string }>;
+
+function parseEmailList(value: string) {
+  const parts = value
+    .split(/[\n,;]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  parts.forEach((email) => {
+    if (seen.has(email)) {
+      return;
+    }
+    seen.add(email);
+    unique.push(email);
+  });
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return {
+    valid: unique.filter((email) => emailPattern.test(email)),
+    invalid: unique.filter((email) => !emailPattern.test(email))
+  };
+}
+
+function extractTemplateTokens(value: string) {
+  const tokens = new Set<string>();
+  value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => {
+    tokens.add(token);
+    return "";
+  });
+  return Array.from(tokens.values());
+}
+
+function renderTemplate(value: string, data: Record<string, string>) {
+  return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => data[token] ?? `{{${token}}}`);
+}
 
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
+  const [templateBody, setTemplateBody] = useState("");
+  const [templateDrafts, setTemplateDrafts] = useState<TemplateDrafts>({});
+  const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
   const [outboxExpanded, setOutboxExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [loadingOutbox, setLoadingOutbox] = useState(false);
+  const [queueing, setQueueing] = useState(false);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -62,8 +153,59 @@ export function AdminCommunicationPage() {
     const fallback = eventName.trim() || "Aktuelles Event";
     return subject.replace(/\{\{\s*eventName\s*\}\}/gi, fallback);
   };
+
   const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
   const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
+
+  const selectedPreset = useMemo(() => TEMPLATE_PRESETS.find((item) => item.key === form.templateKey), [form.templateKey]);
+
+  const previewData = useMemo(
+    () => ({
+      eventName: eventName.trim() || "12. Oberlausitzer Dreieck",
+      firstName: "Max",
+      lastName: "Mustermann",
+      driverName: "Max Mustermann",
+      className: "Historische Klasse A",
+      startNumber: "42",
+      amountOpen: "89,00 EUR",
+      verificationUrl: "https://example.org/anmeldung/verify?token=abc123"
+    }),
+    [eventName]
+  );
+
+  const renderedSubject = useMemo(() => renderTemplate(form.subjectOverride || "", previewData), [form.subjectOverride, previewData]);
+  const renderedBody = useMemo(() => renderTemplate(templateBody || "", previewData), [templateBody, previewData]);
+
+  const unresolvedTokens = useMemo(() => {
+    const allTokens = [...extractTemplateTokens(form.subjectOverride), ...extractTemplateTokens(templateBody)];
+    const unique = Array.from(new Set(allTokens));
+    return unique.filter((token) => !(token in previewData));
+  }, [form.subjectOverride, previewData, templateBody]);
+
+  const verificationLinkMissing = useMemo(() => {
+    const requiresVerification = selectedPreset?.requiresVerificationLink || /registration|verify|verification/i.test(form.templateKey);
+    if (!requiresVerification) {
+      return false;
+    }
+    return !/\{\{\s*verificationUrl\s*\}\}/i.test(templateBody) && !/https?:\/\//i.test(templateBody);
+  }, [form.templateKey, selectedPreset?.requiresVerificationLink, templateBody]);
+
+  const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(TEMPLATE_DRAFTS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as TemplateDrafts;
+      if (parsed && typeof parsed === "object") {
+        setTemplateDrafts(parsed);
+      }
+    } catch {
+      setTemplateDrafts({});
+    }
+  }, []);
 
   useEffect(() => {
     void loadOutbox();
@@ -86,79 +228,256 @@ export function AdminCommunicationPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!form.templateKey.trim()) {
+      return;
+    }
+
+    const fromDraft = templateDrafts[form.templateKey];
+    if (fromDraft) {
+      if (fromDraft.subject === form.subjectOverride && fromDraft.body === templateBody) {
+        return;
+      }
+      setForm((prev) => ({ ...prev, subjectOverride: fromDraft.subject }));
+      setTemplateBody(fromDraft.body);
+      return;
+    }
+
+    const preset = TEMPLATE_PRESETS.find((item) => item.key === form.templateKey);
+    if (!preset) {
+      return;
+    }
+    setForm((prev) => ({ ...prev, subjectOverride: preset.defaultSubject }));
+    setTemplateBody(preset.defaultBody);
+  }, [form.subjectOverride, form.templateKey, templateBody, templateDrafts]);
+
+  useEffect(() => {
+    const key = form.templateKey.trim();
+    if (!key) {
+      return;
+    }
+    setTemplateDrafts((prev) => {
+      const next: TemplateDrafts = {
+        ...prev,
+        [key]: {
+          subject: form.subjectOverride,
+          body: templateBody
+        }
+      };
+      window.localStorage.setItem(TEMPLATE_DRAFTS_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [form.subjectOverride, form.templateKey, templateBody]);
+
+  const queueBroadcast = async () => {
+    if (!canManageCommunication) {
+      return;
+    }
+    const templateKey = form.templateKey.trim();
+    if (!templateKey) {
+      showToast("Template Key ist erforderlich.");
+      return;
+    }
+
+    if (additionalRecipients.invalid.length > 0) {
+      showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
+      return;
+    }
+
+    setQueueing(true);
+    try {
+      await communicationService.queueBroadcast({
+        ...form,
+        templateKey,
+        subjectOverride: form.subjectOverride.trim()
+      });
+
+      let directSendFailures = 0;
+      for (const email of additionalRecipients.valid) {
+        try {
+          await communicationService.queueDirectMail({
+            toEmail: email,
+            templateKey,
+            subjectOverride: form.subjectOverride.trim(),
+            bodyOverride: templateBody.trim()
+          });
+        } catch {
+          directSendFailures += 1;
+        }
+      }
+
+      if (additionalRecipients.valid.length > 0 && directSendFailures > 0) {
+        showToast(`Broadcast geplant, ${directSendFailures} zusätzliche E-Mails konnten nicht eingeplant werden.`);
+      } else if (additionalRecipients.valid.length > 0) {
+        showToast(`Broadcast geplant, ${additionalRecipients.valid.length} zusätzliche E-Mails ergänzt.`);
+      } else {
+        showToast("Broadcast wurde in die Warteschlange gelegt.");
+      }
+
+      await loadOutbox();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "Broadcast konnte nicht gestartet werden."));
+    } finally {
+      setQueueing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-slate-900">Kommunikation</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Broadcast</CardTitle>
+          <CardTitle>Template Emails & Broadcast</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-1">
-            <Label>Klasse</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
-              value={form.classId}
-              onChange={(event) => setForm((prev) => ({ ...prev, classId: event.target.value }))}
-            >
-              <option value="all">Alle</option>
-              {classOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label>Status</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
-              value={form.acceptanceStatus}
-              onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as BroadcastForm["acceptanceStatus"] }))}
-            >
-              <option value="all">Alle</option>
-              <option value="pending">Offen</option>
-              <option value="shortlist">Vorauswahl</option>
-              <option value="accepted">Zugelassen</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label>Zahlung</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
-              value={form.paymentStatus}
-              onChange={(event) => setForm((prev) => ({ ...prev, paymentStatus: event.target.value as BroadcastForm["paymentStatus"] }))}
-            >
-              <option value="all">Alle</option>
-              <option value="due">{paymentStatusLabel("due")}</option>
-              <option value="paid">{paymentStatusLabel("paid")}</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label>Template Key</Label>
-            <Input value={form.templateKey} onChange={(event) => setForm((prev) => ({ ...prev, templateKey: event.target.value }))} />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label>Betreff (optional)</Label>
-            <Input value={form.subjectOverride} onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))} />
-          </div>
-          <div className="md:col-span-3">
-            {canManageCommunication ? (
-              <Button
-                className="w-full md:w-auto"
-                type="button"
-                onClick={async () => {
-                  try {
-                    await communicationService.queueBroadcast(form);
-                    showToast("Broadcast wurde in die Warteschlange gelegt.");
-                    await loadOutbox();
-                  } catch (error) {
-                    showToast(getApiErrorMessage(error, "Broadcast konnte nicht gestartet werden."));
-                  }
-                }}
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <Label>Klasse</Label>
+              <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
+                <SelectTrigger className="text-base md:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle</SelectItem>
+                  {classOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select
+                value={form.acceptanceStatus}
+                onValueChange={(next) => setForm((prev) => ({ ...prev, acceptanceStatus: next as BroadcastForm["acceptanceStatus"] }))}
               >
-                Broadcast in Warteschlange legen
+                <SelectTrigger className="text-base md:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle</SelectItem>
+                  <SelectItem value="pending">Offen</SelectItem>
+                  <SelectItem value="shortlist">Vorauswahl</SelectItem>
+                  <SelectItem value="accepted">Zugelassen</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Zahlung</Label>
+              <Select
+                value={form.paymentStatus}
+                onValueChange={(next) => setForm((prev) => ({ ...prev, paymentStatus: next as BroadcastForm["paymentStatus"] }))}
+              >
+                <SelectTrigger className="text-base md:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle</SelectItem>
+                  <SelectItem value="due">{paymentStatusLabel("due")}</SelectItem>
+                  <SelectItem value="paid">{paymentStatusLabel("paid")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Template</Label>
+              <Select
+                value={form.templateKey || "__none__"}
+                onValueChange={(next) => setForm((prev) => ({ ...prev, templateKey: next === "__none__" ? "" : next }))}
+              >
+                <SelectTrigger className="text-base md:text-sm">
+                  <SelectValue placeholder="Template wählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Template wählen</SelectItem>
+                  {TEMPLATE_PRESETS.map((preset) => (
+                    <SelectItem key={preset.key} value={preset.key}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Template Key</Label>
+                <Input
+                  value={form.templateKey}
+                  onChange={(event) => setForm((prev) => ({ ...prev, templateKey: event.target.value.trim() }))}
+                  placeholder="z. B. registration_received"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Betreff</Label>
+                <Input
+                  value={form.subjectOverride}
+                  onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))}
+                  placeholder="Betreff mit Platzhaltern, z. B. {{eventName}}"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Text</Label>
+                <textarea
+                  className="min-h-48 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={templateBody}
+                  onChange={(event) => setTemplateBody(event.target.value)}
+                  placeholder="Mailtext, z. B. mit {{firstName}}, {{verificationUrl}}"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Zusätzliche E-Mails trotz Filter</Label>
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={additionalEmailsInput}
+                  onChange={(event) => setAdditionalEmailsInput(event.target.value)}
+                  placeholder="mail1@example.com, mail2@example.com"
+                />
+                <p className="text-xs text-slate-500">
+                  Zusätzlich gültig: {additionalRecipients.valid.length}
+                  {additionalRecipients.invalid.length > 0 ? ` · Ungültig: ${additionalRecipients.invalid.length}` : ""}
+                </p>
+              </div>
+              {verificationLinkMissing && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Verifizierungs-Mail ohne Link erkannt. Bitte <code>{"{{verificationUrl}}"}</code> oder eine URL einfügen.
+                </div>
+              )}
+              {unresolvedTokens.length > 0 && (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  Nicht auflösbare Platzhalter in der Preview: {unresolvedTokens.join(", ")}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-md border bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Mail-Preview</div>
+              <div className="rounded-md border bg-white p-3">
+                <div className="text-xs uppercase text-slate-500">Betreff</div>
+                <div className="mt-1 font-medium text-slate-900">{renderedSubject || "-"}</div>
+              </div>
+              <div className="rounded-md border bg-white p-3">
+                <div className="text-xs uppercase text-slate-500">Text</div>
+                <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{renderedBody || "-"}</pre>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            {canManageCommunication ? (
+              <Button className="w-full md:w-auto" type="button" disabled={queueing} onClick={() => void queueBroadcast()}>
+                {queueing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird eingeplant...
+                  </>
+                ) : (
+                  "Broadcast in Warteschlange legen"
+                )}
               </Button>
             ) : (
               <div className="text-sm text-slate-500">Nur Admin-Rollen dürfen Broadcasts starten.</div>
@@ -175,7 +494,7 @@ export function AdminCommunicationPage() {
               {loadingOutbox ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Lädt…
+                  Lädt...
                 </>
               ) : (
                 "Aktualisieren"
