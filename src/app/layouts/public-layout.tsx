@@ -154,7 +154,7 @@ function PublicLayoutContent() {
   }, [locale, pricingSnapshot]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-slate-50">
       <section className="bg-primary text-primary-foreground">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 md:px-6 md:py-12">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -224,7 +224,7 @@ function PublicLayoutContent() {
           </div>
         </div>
       </section>
-      <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 md:px-6 md:py-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-5 sm:px-4 md:px-6 md:py-10">
         <Outlet />
       </main>
       <footer className="border-t border-slate-200 bg-white">

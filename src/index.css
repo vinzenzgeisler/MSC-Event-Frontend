@@ -32,12 +32,22 @@
 html {
   overflow-y: scroll;
   scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   @apply bg-background text-foreground antialiased;
   overflow-x: hidden;
   font-family: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+    line-height: 1.35;
+  }
 }
 
 h1,

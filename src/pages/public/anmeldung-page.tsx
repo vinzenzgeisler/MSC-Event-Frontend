@@ -1306,7 +1306,7 @@ export function AnmeldungPage() {
 
   if (eventLoadState === "loading") {
     return (
-      <div className="space-y-6 pb-28 md:pb-0">
+      <div className="space-y-6 pb-8">
         <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
           <div className="inline-flex rounded bg-yellow-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
             {m.page.openBadge}
@@ -1323,7 +1323,7 @@ export function AnmeldungPage() {
 
   if (eventLoadState === "missing") {
     return (
-      <div className="space-y-6 pb-28 md:pb-0">
+      <div className="space-y-6 pb-8">
         <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
           <h2 className="mt-1 text-2xl font-semibold md:text-3xl">{m.page.title}</h2>
           <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
@@ -1340,7 +1340,7 @@ export function AnmeldungPage() {
 
   if (eventLoadState === "error") {
     return (
-      <div className="space-y-6 pb-28 md:pb-0">
+      <div className="space-y-6 pb-8">
         <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
           <h2 className="mt-1 text-2xl font-semibold md:text-3xl">{m.page.title}</h2>
           <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
@@ -1393,7 +1393,7 @@ export function AnmeldungPage() {
   }
 
   return (
-    <div className="space-y-6 pb-28 md:pb-0">
+    <div className="space-y-6 pb-8">
       <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
         <div className="inline-flex rounded bg-yellow-400 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-900">
           {m.page.openBadge}
@@ -1542,7 +1542,7 @@ export function AnmeldungPage() {
         </CardContent>
       </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:hidden">
+      <div className="sticky bottom-0 z-20 -mx-3 border-t bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur sm:-mx-4 md:hidden">
         <div className="mx-auto max-w-6xl space-y-2">
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" className="flex-1" disabled={step === 1} onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
