@@ -75,10 +75,6 @@ function extractTemplateTokens(value: string) {
   return Array.from(tokens.values());
 }
 
-function renderTemplate(value: string, data: Record<string, string>) {
-  return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => data[token] ?? `{{${token}}}`);
-}
-
 function normalizeTemplateOption(template: MailTemplate): StaticTemplateOption {
   return {
     key: template.key,
@@ -107,6 +103,7 @@ export function AdminCommunicationPage() {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingPlaceholders, setLoadingPlaceholders] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewFormat, setPreviewFormat] = useState<"html" | "text">("html");
   const [resolvingRecipients, setResolvingRecipients] = useState(false);
   const [queueing, setQueueing] = useState(false);
 
@@ -176,9 +173,6 @@ export function AdminCommunicationPage() {
     }),
     [eventName]
   );
-
-  const renderedSubject = useMemo(() => renderTemplate(form.subjectOverride || "", previewData), [form.subjectOverride, previewData]);
-  const renderedBody = useMemo(() => renderTemplate(templateBody || "", previewData), [templateBody, previewData]);
 
   const unresolvedTokens = useMemo(() => {
     if (!form.templateKey) {
@@ -277,32 +271,54 @@ export function AdminCommunicationPage() {
         }
       });
 
-    setLoadingPreview(true);
-    communicationService
-      .previewTemplate({
-        templateKey: form.templateKey,
-        sampleData: previewData
-      })
-      .then((result) => {
-        if (!cancelled) {
-          setBackendPreview(result);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBackendPreview(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingPreview(false);
-        }
-      });
-
     return () => {
       cancelled = true;
     };
-  }, [form.templateKey, previewData]);
+  }, [form.templateKey]);
+
+  useEffect(() => {
+    if (!form.templateKey) {
+      setBackendPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoadingPreview(true);
+      communicationService
+        .previewTemplate({
+          templateKey: form.templateKey,
+          sampleData: previewData,
+          subjectOverride: form.subjectOverride.trim() || undefined,
+          bodyOverride: templateBody.trim() || undefined,
+          previewMode: "draft"
+        })
+        .then((result) => {
+          if (!cancelled) {
+            setBackendPreview(result);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setBackendPreview(null);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoadingPreview(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [form.templateKey, form.subjectOverride, previewData, templateBody]);
+
+  useEffect(() => {
+    setPreviewFormat("html");
+  }, [form.templateKey]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -554,6 +570,9 @@ export function AdminCommunicationPage() {
                       <div className="font-mono text-xs text-slate-900">{`{{${item.name}}}`}</div>
                       <div className="text-xs text-slate-600">{item.description}</div>
                       <div className="mt-1 text-[11px] text-slate-500">{item.required ? "Pflichtplatzhalter" : "Optional"}</div>
+                      <div className="text-[11px] text-slate-500">
+                        Beispiel: <span className="font-mono">{item.example || "-"}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -588,17 +607,29 @@ export function AdminCommunicationPage() {
             </div>
 
             <div className="space-y-3 rounded-md border bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Editor-Preview</div>
-              <div className="rounded-md border bg-white p-3">
-                <div className="text-xs uppercase text-slate-500">Betreff</div>
-                <div className="mt-1 font-medium text-slate-900">{renderedSubject || "-"}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-slate-900">Mail-Preview (Final Rendering)</div>
+                <div className="flex gap-1 rounded-md border bg-white p-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={previewFormat === "html" ? "default" : "ghost"}
+                    onClick={() => setPreviewFormat("html")}
+                    className="h-7 px-2 text-xs"
+                  >
+                    HTML
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={previewFormat === "text" ? "default" : "ghost"}
+                    onClick={() => setPreviewFormat("text")}
+                    className="h-7 px-2 text-xs"
+                  >
+                    Text
+                  </Button>
+                </div>
               </div>
-              <div className="rounded-md border bg-white p-3">
-                <div className="text-xs uppercase text-slate-500">Text</div>
-                <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{renderedBody || "-"}</pre>
-              </div>
-
-              <div className="pt-2 text-sm font-semibold text-slate-900">Backend-Preview (gespeichertes Template)</div>
               {loadingPreview ? (
                 <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Lade Backend-Preview...</div>
               ) : backendPreview ? (
@@ -607,14 +638,32 @@ export function AdminCommunicationPage() {
                     <div className="text-xs uppercase text-slate-500">Betreff</div>
                     <div className="mt-1 font-medium text-slate-900">{backendPreview.subjectRendered || "-"}</div>
                   </div>
-                  <div className="rounded-md border bg-white p-3">
-                    <div className="text-xs uppercase text-slate-500">Text</div>
-                    <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{backendPreview.bodyTextRendered || "-"}</pre>
-                  </div>
+                  {previewFormat === "html" ? (
+                    <div className="rounded-md border bg-white p-2">
+                      <iframe
+                        title="Mail HTML Preview"
+                        srcDoc={backendPreview.htmlDocument}
+                        sandbox=""
+                        className="h-[480px] w-full rounded border-0"
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-md border bg-white p-3">
+                      <div className="text-xs uppercase text-slate-500">Text</div>
+                      <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{backendPreview.bodyTextRendered || "-"}</pre>
+                    </div>
+                  )}
+                  {backendPreview.warnings.length > 0 && (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                      Warnungen: {backendPreview.warnings.join(" | ")}
+                    </div>
+                  )}
                   <div className="rounded-md border bg-white p-3 text-xs text-slate-600">
                     Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}
                     <br />
                     Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}
+                    <br />
+                    Unbekannt: {backendPreview.unknownPlaceholders.join(", ") || "-"}
                   </div>
                 </>
               ) : (

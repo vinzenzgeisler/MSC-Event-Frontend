@@ -158,13 +158,25 @@ export const communicationService = {
     );
   },
 
-  async previewTemplate(payload: { templateKey: string; entryId?: string; sampleData?: Record<string, unknown> }) {
+  async previewTemplate(payload: {
+    templateKey: string;
+    entryId?: string;
+    sampleData?: Record<string, unknown>;
+    subjectOverride?: string;
+    bodyOverride?: string;
+    bodyHtmlOverride?: string;
+    previewMode?: "stored" | "draft";
+  }) {
     return requestJson<MailTemplatePreview>("/admin/mail/templates/preview", {
       method: "POST",
       body: {
         templateKey: payload.templateKey,
         entryId: payload.entryId || undefined,
-        sampleData: payload.sampleData || undefined
+        sampleData: payload.sampleData || undefined,
+        subjectOverride: payload.subjectOverride || undefined,
+        bodyOverride: payload.bodyOverride || undefined,
+        bodyHtmlOverride: payload.bodyHtmlOverride || undefined,
+        previewMode: payload.previewMode || undefined
       }
     });
   },

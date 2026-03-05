@@ -360,15 +360,20 @@ export type MailTemplatePlaceholder = {
   name: string;
   required: boolean;
   description: string;
+  example: string;
 };
 
 export type MailTemplatePreview = {
   ok: true;
+  templateKey: string;
   subjectRendered: string;
   bodyTextRendered: string;
   bodyHtmlRendered: string;
+  htmlDocument: string;
   usedPlaceholders: string[];
   missingPlaceholders: string[];
+  unknownPlaceholders: string[];
+  warnings: string[];
 };
 
 export type ResolveRecipientsResult = {
