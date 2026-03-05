@@ -1,6 +1,7 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
 import type {
+  MailRenderOptionsInput,
   MailRecipientSearchItem,
   MailTemplate,
   MailTemplatePlaceholder,
@@ -167,10 +168,12 @@ export const communicationService = {
   async previewTemplate(payload: {
     templateKey: string;
     entryId?: string;
+    templateData?: Record<string, unknown>;
     sampleData?: Record<string, unknown>;
     subjectOverride?: string;
     bodyOverride?: string;
     bodyHtmlOverride?: string;
+    renderOptions?: MailRenderOptionsInput;
     previewMode?: "stored" | "draft";
   }) {
     return requestJson<MailTemplatePreview>("/admin/mail/templates/preview", {
@@ -178,10 +181,12 @@ export const communicationService = {
       body: {
         templateKey: payload.templateKey,
         entryId: payload.entryId || undefined,
+        templateData: payload.templateData || undefined,
         sampleData: payload.sampleData || undefined,
         subjectOverride: payload.subjectOverride || undefined,
         bodyOverride: payload.bodyOverride || undefined,
         bodyHtmlOverride: payload.bodyHtmlOverride || undefined,
+        renderOptions: payload.renderOptions || undefined,
         previewMode: payload.previewMode || undefined
       }
     });
@@ -242,6 +247,7 @@ export const communicationService = {
     bodyOverride?: string;
     bodyHtmlOverride?: string;
     templateData?: Record<string, unknown>;
+    renderOptions?: MailRenderOptionsInput;
     additionalEmails?: string[];
     driverPersonIds?: string[];
     entryIds?: string[];
@@ -261,6 +267,7 @@ export const communicationService = {
         bodyOverride: payload.bodyOverride || undefined,
         bodyHtmlOverride: payload.bodyHtmlOverride || undefined,
         templateData: payload.templateData || undefined,
+        renderOptions: payload.renderOptions || undefined,
         additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
         driverPersonIds: payload.driverPersonIds?.length ? payload.driverPersonIds : undefined,
         entryIds: payload.entryIds?.length ? payload.entryIds : undefined,

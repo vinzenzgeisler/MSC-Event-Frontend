@@ -16,6 +16,7 @@ import type {
   BroadcastForm,
   MailRecipientSearchItem,
   MailTemplate,
+  MailTemplateComposerField,
   MailTemplatePlaceholder,
   MailTemplatePreview,
   OutboxItem,
@@ -33,12 +34,11 @@ const initialForm: BroadcastForm = {
 const OUTBOX_PREVIEW_LIMIT = 10;
 const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 
-type TemplateDrafts = Record<string, { subject: string; body: string; data?: Partial<Record<DynamicFieldKey, string>> }>;
+type TemplateDrafts = Record<string, { subject: string; body: string; data?: Record<string, string> }>;
 type StaticTemplateOption = { key: string; label: string };
 type RecipientTarget = { id: string; label: string; previewEntryId?: string };
 type RecipientSearchItem = MailRecipientSearchItem;
 type RecipientMode = "filter" | "individual" | "combined";
-type DynamicFieldKey = "introText" | "detailsText" | "closingText" | "ctaText" | "ctaUrl" | "paymentDeadline" | "verificationUrl";
 
 const FALLBACK_CAMPAIGN_TEMPLATE_KEYS = new Set([
   "newsletter",
@@ -67,22 +67,6 @@ const TEMPLATE_DEFAULTS: Record<string, { subject: string; body: string }> = {
 const TEMPLATE_LABEL_OVERRIDES: Record<string, string> = Object.fromEntries(
   FALLBACK_TEMPLATE_OPTIONS.map((item) => [item.key, item.label])
 );
-
-const DYNAMIC_FIELD_META: Record<DynamicFieldKey, { label: string; placeholder: string; multiline?: boolean; type?: "text" | "url" | "date" }> = {
-  introText: { label: "Einleitung", placeholder: "Kurze Einleitung für die Mail", multiline: true },
-  detailsText: { label: "Details", placeholder: "Wichtige Details für den Inhalt", multiline: true },
-  closingText: { label: "Abschluss", placeholder: "Abschluss / Grußformel", multiline: true },
-  ctaText: { label: "CTA-Text (optional)", placeholder: "z. B. Jetzt bestätigen" },
-  ctaUrl: { label: "CTA-URL (optional)", placeholder: "https://...", type: "url" },
-  paymentDeadline: { label: "Zahlungsfrist", placeholder: "YYYY-MM-DD", type: "date" },
-  verificationUrl: { label: "Verifizierungs-URL", placeholder: "https://...", type: "url" }
-};
-
-const TEMPLATE_DYNAMIC_BASE_FIELDS: DynamicFieldKey[] = ["introText", "detailsText", "closingText", "ctaText", "ctaUrl"];
-const TEMPLATE_DYNAMIC_REQUIRED_FIELDS: Partial<Record<string, DynamicFieldKey[]>> = {
-  payment_reminder_followup: ["paymentDeadline"],
-  email_confirmation: ["verificationUrl"]
-};
 
 function parseEmailList(value: string) {
   const parts = value
@@ -197,8 +181,28 @@ function getMissingPlaceholdersMessage(error: ApiError): string | null {
     : `Pflicht-Platzhalter fehlen beim Versand: ${missing.join(", ")}.`;
 }
 
-function dynamicFieldLabel(key: DynamicFieldKey) {
-  return DYNAMIC_FIELD_META[key]?.label ?? key;
+function dynamicFieldLabel(key: string, fields: MailTemplateComposerField[]) {
+  return fields.find((field) => field.key === key)?.label ?? key;
+}
+
+function defaultTemplateDataFromComposer(template: MailTemplate | null | undefined): Record<string, string> {
+  if (!template?.composer?.enabled || !Array.isArray(template.composer.fields)) {
+    return {};
+  }
+  return template.composer.fields.reduce<Record<string, string>>((acc, field) => {
+    if (typeof field.defaultValue === "string" && field.defaultValue.length > 0) {
+      acc[field.key] = field.defaultValue;
+    }
+    return acc;
+  }, {});
+}
+
+function fieldInputType(field: MailTemplateComposerField): "text" | "url" | "date" {
+  const key = (field.key || "").toLowerCase();
+  if (key.includes("date") || key.includes("deadline")) {
+    return "date";
+  }
+  return field.type === "url" ? "url" : "text";
 }
 
 export function AdminCommunicationPage() {
@@ -207,11 +211,12 @@ export function AdminCommunicationPage() {
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [templateBody, setTemplateBody] = useState("");
-  const [templateDataDraft, setTemplateDataDraft] = useState<Partial<Record<DynamicFieldKey, string>>>({});
+  const [templateDataDraft, setTemplateDataDraft] = useState<Record<string, string>>({});
   const templateDraftsRef = useRef<TemplateDrafts>({});
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
   const [recipientSearchQuery, setRecipientSearchQuery] = useState("");
   const [recipientSearchResults, setRecipientSearchResults] = useState<RecipientSearchItem[]>([]);
+  const [recipientSearchError, setRecipientSearchError] = useState("");
   const [searchingRecipients, setSearchingRecipients] = useState(false);
   const [selectedDriverTargets, setSelectedDriverTargets] = useState<RecipientTarget[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
@@ -221,6 +226,7 @@ export function AdminCommunicationPage() {
   const [templatesByKey, setTemplatesByKey] = useState<Map<string, MailTemplate>>(new Map());
   const [templatePlaceholders, setTemplatePlaceholders] = useState<MailTemplatePlaceholder[]>([]);
   const [backendPreview, setBackendPreview] = useState<MailTemplatePreview | null>(null);
+  const [previewError, setPreviewError] = useState("");
   const [resolvedRecipients, setResolvedRecipients] = useState<ResolveRecipientsResult | null>(null);
   const [outboxExpanded, setOutboxExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -287,19 +293,35 @@ export function AdminCommunicationPage() {
     }
     return templatesByKey.get(form.templateKey) ?? null;
   }, [form.templateKey, templatesByKey]);
+  const composerFields = useMemo(() => {
+    if (!selectedTemplate?.composer?.enabled) {
+      return [] as MailTemplateComposerField[];
+    }
+    return Array.isArray(selectedTemplate.composer.fields) ? selectedTemplate.composer.fields : [];
+  }, [selectedTemplate]);
+  const requiredDynamicFields = useMemo(() => composerFields.filter((field) => field.required).map((field) => field.key), [composerFields]);
+  const missingRequiredDynamicFields = useMemo(
+    () => requiredDynamicFields.filter((fieldKey) => !(templateDataDraft[fieldKey] ?? "").trim()),
+    [requiredDynamicFields, templateDataDraft]
+  );
+  const sendBlockedByTemplateData = missingRequiredDynamicFields.length > 0;
 
   const unresolvedTokens = useMemo(() => {
     if (!form.templateKey) {
       return [];
     }
-    const allowed = new Set(templatePlaceholders.map((item) => item.name));
+    const allowed = new Set(
+      selectedTemplate?.composer?.allowedPlaceholders?.length
+        ? selectedTemplate.composer.allowedPlaceholders
+        : templatePlaceholders.map((item) => item.name)
+    );
     if (allowed.size === 0) {
       return [];
     }
     const tokens = [...extractTemplateTokens(form.subjectOverride), ...extractTemplateTokens(templateBody)];
     const unique = Array.from(new Set(tokens));
     return unique.filter((token) => !allowed.has(token));
-  }, [form.subjectOverride, form.templateKey, templateBody, templatePlaceholders]);
+  }, [form.subjectOverride, form.templateKey, selectedTemplate, templateBody, templatePlaceholders]);
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
   const selectedDriverPersonIds = useMemo(() => selectedDriverTargets.map((target) => target.id), [selectedDriverTargets]);
@@ -325,6 +347,22 @@ export function AdminCommunicationPage() {
     }, {});
     return Object.keys(payload).length > 0 ? payload : undefined;
   }, [templateDataDraft]);
+  const previewSampleData = useMemo(() => {
+    const selectedDriverLabel = selectedDriverTargets[0]?.label ?? "";
+    const selectedDriverName = selectedDriverLabel.replace(/\s*\([^)]+\)\s*$/, "").trim();
+    const [firstName = "Max", ...restNames] = selectedDriverName.split(/\s+/).filter(Boolean);
+    const lastName = restNames.join(" ").trim() || "Mustermann";
+    return {
+      eventName: eventName.trim() || "MSC Event",
+      driverName: selectedDriverName || "Max Mustermann",
+      firstName,
+      lastName,
+      amountOpen: "0,00 EUR",
+      paymentDeadline: new Date().toISOString().slice(0, 10),
+      verificationUrl: "https://example.com/verify",
+      ...(templateDataValue ?? {})
+    };
+  }, [eventName, selectedDriverTargets, templateDataValue]);
   const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
   const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
   const previewEntryId = useMemo(() => {
@@ -355,23 +393,6 @@ export function AdminCommunicationPage() {
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
-  const templatePlaceholderNames = useMemo(() => new Set(templatePlaceholders.map((item) => item.name)), [templatePlaceholders]);
-  const requiredDynamicFields = useMemo(() => TEMPLATE_DYNAMIC_REQUIRED_FIELDS[form.templateKey] ?? [], [form.templateKey]);
-  const missingRequiredDynamicFields = useMemo(
-    () => requiredDynamicFields.filter((fieldKey) => !(templateDataDraft[fieldKey] ?? "").trim()),
-    [requiredDynamicFields, templateDataDraft]
-  );
-  const sendBlockedByTemplateData = missingRequiredDynamicFields.length > 0;
-  const dynamicFieldsToRender = useMemo(() => {
-    const keys = new Set<DynamicFieldKey>(TEMPLATE_DYNAMIC_BASE_FIELDS);
-    requiredDynamicFields.forEach((field) => keys.add(field));
-    (Object.keys(DYNAMIC_FIELD_META) as DynamicFieldKey[]).forEach((field) => {
-      if (templatePlaceholderNames.has(field)) {
-        keys.add(field);
-      }
-    });
-    return Array.from(keys.values());
-  }, [requiredDynamicFields, templatePlaceholderNames]);
   const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
   const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
 
@@ -449,6 +470,7 @@ export function AdminCommunicationPage() {
   useEffect(() => {
     if (!form.templateKey) {
       setBackendPreview(null);
+      setPreviewError("");
       return;
     }
 
@@ -459,20 +481,26 @@ export function AdminCommunicationPage() {
         .previewTemplate({
           templateKey: form.templateKey,
           entryId: previewEntryId,
-          sampleData: templateDataValue,
+          templateData: previewSampleData,
           subjectOverride: subjectOverrideValue,
           bodyOverride: bodyOverrideValue,
           bodyHtmlOverride: bodyHtmlOverrideValue,
+          renderOptions: {
+            showBadge: false,
+            mailLabel: null
+          },
           previewMode: "draft"
         })
         .then((result) => {
           if (!cancelled) {
             setBackendPreview(result);
+            setPreviewError("");
           }
         })
-        .catch(() => {
+        .catch((error) => {
           if (!cancelled) {
             setBackendPreview(null);
+            setPreviewError(getApiErrorMessage(error, "Preview konnte nicht geladen werden."));
           }
         })
         .finally(() => {
@@ -486,7 +514,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, subjectOverrideValue, templateDataValue]);
+  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, previewSampleData, subjectOverrideValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -512,6 +540,23 @@ export function AdminCommunicationPage() {
   }, [form.subjectOverride, form.templateKey, templateBody, templateDataDraft]);
 
   useEffect(() => {
+    if (!selectedTemplate?.composer?.enabled) {
+      return;
+    }
+    const defaults = defaultTemplateDataFromComposer(selectedTemplate);
+    if (Object.keys(defaults).length === 0) {
+      return;
+    }
+    setTemplateDataDraft((prev) => {
+      const merged = { ...defaults, ...prev };
+      if (JSON.stringify(merged) === JSON.stringify(prev)) {
+        return prev;
+      }
+      return merged;
+    });
+  }, [selectedTemplate]);
+
+  useEffect(() => {
     setResolvedRecipients(null);
   }, [
     additionalEmailsInput,
@@ -528,15 +573,11 @@ export function AdminCommunicationPage() {
     if (!allowIndividualRecipients) {
       setRecipientSearchResults([]);
       setSearchingRecipients(false);
+      setRecipientSearchError("");
       return;
     }
 
     const query = recipientSearchQuery.trim();
-    if (query.length < 2) {
-      setRecipientSearchResults([]);
-      setSearchingRecipients(false);
-      return;
-    }
 
     let cancelled = false;
     const timer = window.setTimeout(() => {
@@ -554,10 +595,12 @@ export function AdminCommunicationPage() {
             return;
           }
           setRecipientSearchResults(recipients);
+          setRecipientSearchError("");
         })
-        .catch(() => {
+        .catch((error) => {
           if (!cancelled) {
             setRecipientSearchResults([]);
+            setRecipientSearchError(getApiErrorMessage(error, "Fahrersuche fehlgeschlagen."));
           }
         })
         .finally(() => {
@@ -614,9 +657,11 @@ export function AdminCommunicationPage() {
 
     const fromDraft = templateDraftsRef.current[nextTemplateKey];
     if (fromDraft) {
+      const template = templatesByKey.get(nextTemplateKey) ?? null;
+      const defaults = defaultTemplateDataFromComposer(template);
       setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
       setTemplateBody(fromDraft.body);
-      setTemplateDataDraft(fromDraft.data ?? {});
+      setTemplateDataDraft({ ...defaults, ...(fromDraft.data ?? {}) });
       return;
     }
 
@@ -628,7 +673,7 @@ export function AdminCommunicationPage() {
       subjectOverride: template?.subject ?? defaults.subject
     }));
     setTemplateBody(template?.bodyText ?? defaults.body);
-    setTemplateDataDraft({});
+    setTemplateDataDraft(defaultTemplateDataFromComposer(template ?? null));
   };
 
   const resolveRecipients = async () => {
@@ -695,7 +740,7 @@ export function AdminCommunicationPage() {
       return;
     }
     if (sendBlockedByTemplateData) {
-      showToast(`Bitte Pflichtfeld ausfüllen: ${missingRequiredDynamicFields.map(dynamicFieldLabel).join(", ")}.`);
+      showToast(`Bitte Pflichtfeld ausfüllen: ${missingRequiredDynamicFields.map((key) => dynamicFieldLabel(key, composerFields)).join(", ")}.`);
       return;
     }
 
@@ -707,6 +752,10 @@ export function AdminCommunicationPage() {
         bodyOverride: bodyOverrideValue,
         bodyHtmlOverride: bodyHtmlOverrideValue,
         templateData: templateDataValue,
+        renderOptions: {
+          showBadge: false,
+          mailLabel: null
+        },
         additionalEmails: additionalRecipients.valid,
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
         filters: {
@@ -856,8 +905,8 @@ export function AdminCommunicationPage() {
                   <div className="px-3 py-2 text-xs text-slate-500">Deaktiviert.</div>
                 ) : searchingRecipients ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Suche läuft...</div>
-                ) : recipientSearchQuery.trim().length < 2 ? (
-                  <></>
+                ) : recipientSearchError ? (
+                  <div className="px-3 py-2 text-xs text-amber-700">{recipientSearchError}</div>
                 ) : recipientSearchResults.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
                 ) : (
@@ -973,51 +1022,54 @@ export function AdminCommunicationPage() {
             {form.templateKey && (
               <div className="space-y-2 rounded-md border bg-white p-3">
                 <div className="text-sm font-medium text-slate-900">Dynamische Inhalte</div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {dynamicFieldsToRender.map((fieldKey) => {
-                    const meta = DYNAMIC_FIELD_META[fieldKey];
-                    const isRequired = requiredDynamicFields.includes(fieldKey);
-                    const value = templateDataDraft[fieldKey] ?? "";
-                    return (
-                      <div key={fieldKey} className={meta.multiline ? "space-y-1 md:col-span-2" : "space-y-1"}>
-                        <Label>
-                          {meta.label}
-                          {isRequired ? " *" : ""}
-                        </Label>
-                        {meta.multiline ? (
-                          <textarea
-                            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            value={value}
-                            onChange={(event) =>
-                              setTemplateDataDraft((prev) => ({
-                                ...prev,
-                                [fieldKey]: event.target.value
-                              }))
-                            }
-                            placeholder={meta.placeholder}
-                            disabled={!form.templateKey}
-                          />
-                        ) : (
-                          <Input
-                            type={meta.type ?? "text"}
-                            value={value}
-                            onChange={(event) =>
-                              setTemplateDataDraft((prev) => ({
-                                ...prev,
-                                [fieldKey]: event.target.value
-                              }))
-                            }
-                            placeholder={meta.placeholder}
-                            disabled={!form.templateKey}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                {composerFields.length === 0 ? (
+                  <div className="text-xs text-slate-500">Für dieses Template sind keine Composer-Felder hinterlegt.</div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {composerFields.map((field) => {
+                      const value = templateDataDraft[field.key] ?? "";
+                      return (
+                        <div key={field.key} className={field.multiline ? "space-y-1 md:col-span-2" : "space-y-1"}>
+                          <Label>
+                            {field.label}
+                            {field.required ? " *" : ""}
+                          </Label>
+                          {field.multiline ? (
+                            <textarea
+                              className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={value}
+                              onChange={(event) =>
+                                setTemplateDataDraft((prev) => ({
+                                  ...prev,
+                                  [field.key]: event.target.value
+                                }))
+                              }
+                              placeholder={field.placeholder}
+                              disabled={!form.templateKey}
+                            />
+                          ) : (
+                            <Input
+                              type={fieldInputType(field)}
+                              value={value}
+                              onChange={(event) =>
+                                setTemplateDataDraft((prev) => ({
+                                  ...prev,
+                                  [field.key]: event.target.value
+                                }))
+                              }
+                              placeholder={field.placeholder}
+                              disabled={!form.templateKey}
+                            />
+                          )}
+                          {field.helpText ? <p className="text-xs text-slate-500">{field.helpText}</p> : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {missingRequiredDynamicFields.length > 0 && (
                   <div className="text-xs text-amber-700">
-                    Fehlende Pflichtfelder: {missingRequiredDynamicFields.map(dynamicFieldLabel).join(", ")}
+                    Fehlende Pflichtfelder: {missingRequiredDynamicFields.map((key) => dynamicFieldLabel(key, composerFields)).join(", ")}
                   </div>
                 )}
               </div>
@@ -1085,7 +1137,9 @@ export function AdminCommunicationPage() {
                 </div>
               </>
             ) : (
-              <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Keine Preview verfügbar.</div>
+              <div className="rounded-md border bg-white p-3 text-sm text-slate-500">
+                {previewError || "Keine Preview verfügbar."}
+              </div>
             )}
           </section>
 

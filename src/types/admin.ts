@@ -344,6 +344,33 @@ export type BroadcastForm = {
 export type MailTemplateStatus = "draft" | "published";
 export type MailTemplateScope = "process" | "campaign";
 export type MailTemplateChannel = "campaign" | "detail" | "quick_action";
+export type MailTemplateComposerField = {
+  key: string;
+  label: string;
+  type: "text" | "url";
+  required: boolean;
+  multiline: boolean;
+  placeholder: string;
+  helpText: string;
+  defaultValue?: string;
+};
+
+export type MailTemplateComposer = {
+  enabled: boolean;
+  fields: MailTemplateComposerField[];
+  allowedPlaceholders: string[];
+  requiredPlaceholders: string[];
+};
+
+export type MailTemplateRenderOptions = {
+  showBadgeDefault: boolean;
+  defaultMailLabel: string | null;
+};
+
+export type MailRenderOptionsInput = {
+  showBadge?: boolean;
+  mailLabel?: string | null;
+};
 
 export type MailTemplate = {
   key: string;
@@ -356,8 +383,10 @@ export type MailTemplate = {
   updatedAt: string | null;
   updatedBy: string | null;
   isActive: boolean;
-  scope?: MailTemplateScope;
-  channels?: MailTemplateChannel[];
+  scope: MailTemplateScope;
+  channels: MailTemplateChannel[];
+  composer: MailTemplateComposer;
+  renderOptions: MailTemplateRenderOptions;
 };
 
 export type MailTemplatePlaceholder = {
