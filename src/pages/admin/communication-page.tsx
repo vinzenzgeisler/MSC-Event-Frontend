@@ -242,6 +242,12 @@ export function AdminCommunicationPage() {
   }, [form.templateKey, selectedPreset?.requiresVerificationLink, templateBody]);
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
+  const visiblePlaceholderHelp = useMemo(() => {
+    if (!form.templateKey) {
+      return PLACEHOLDER_HELP;
+    }
+    return PLACEHOLDER_HELP.filter((item) => item.usedIn.includes(form.templateKey));
+  }, [form.templateKey]);
 
   useEffect(() => {
     try {
@@ -494,8 +500,13 @@ export function AdminCommunicationPage() {
               <details className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                 <summary className="cursor-pointer font-medium text-slate-900">Hilfe: Dynamische Platzhalter</summary>
                 <div className="mt-3 space-y-2">
-                  {PLACEHOLDER_HELP.map((item) => {
-                    const isUsedBySelectedTemplate = form.templateKey ? item.usedIn.includes(form.templateKey) : true;
+                  {!form.templateKey && (
+                    <div className="text-xs text-slate-500">Kein Template gewählt: es werden alle verfügbaren Platzhalter angezeigt.</div>
+                  )}
+                  {form.templateKey && (
+                    <div className="text-xs text-slate-500">Template gewählt: es werden nur relevante Platzhalter angezeigt.</div>
+                  )}
+                  {visiblePlaceholderHelp.map((item) => {
                     return (
                       <div key={item.token} className="rounded border border-slate-200 bg-white px-2 py-1.5">
                         <div className="font-mono text-xs text-slate-900">{`{{${item.token}}}`}</div>
@@ -503,11 +514,13 @@ export function AdminCommunicationPage() {
                         <div className="mt-1 text-[11px] text-slate-500">
                           Verwendet in: {item.usedIn.join(", ")}
                           {item.requiredIn?.length ? ` · Pflicht in: ${item.requiredIn.join(", ")}` : ""}
-                          {form.templateKey ? ` · Für gewähltes Template: ${isUsedBySelectedTemplate ? "Ja" : "Nein"}` : ""}
                         </div>
                       </div>
                     );
                   })}
+                  {form.templateKey && visiblePlaceholderHelp.length === 0 && (
+                    <div className="text-xs text-slate-500">Für dieses Template sind aktuell keine Platzhalter hinterlegt.</div>
+                  )}
                 </div>
               </details>
               {verificationLinkMissing && (
