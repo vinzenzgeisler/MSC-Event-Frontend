@@ -80,6 +80,26 @@ function parseEmailList(value: string) {
   };
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function bodyTextToHtml(value: string) {
+  const source = value.trim();
+  if (!source) {
+    return "";
+  }
+  return source
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
+    .join("");
+}
+
 function extractTemplateTokens(value: string) {
   const tokens = new Set<string>();
   value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => {
@@ -251,6 +271,14 @@ export function AdminCommunicationPage() {
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
   const selectedDriverPersonIds = useMemo(() => selectedDriverTargets.map((target) => target.id), [selectedDriverTargets]);
+  const subjectOverrideValue = useMemo(() => form.subjectOverride.trim() || undefined, [form.subjectOverride]);
+  const bodyOverrideValue = useMemo(() => templateBody.trim() || undefined, [templateBody]);
+  const bodyHtmlOverrideValue = useMemo(() => {
+    if (!bodyOverrideValue) {
+      return undefined;
+    }
+    return bodyTextToHtml(templateBody) || undefined;
+  }, [bodyOverrideValue, templateBody]);
   const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
   const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
   const previewEntryId = useMemo(() => {
@@ -368,8 +396,9 @@ export function AdminCommunicationPage() {
         .previewTemplate({
           templateKey: form.templateKey,
           entryId: previewEntryId,
-          subjectOverride: form.subjectOverride.trim() || undefined,
-          bodyOverride: templateBody.trim() || undefined,
+          subjectOverride: subjectOverrideValue,
+          bodyOverride: bodyOverrideValue,
+          bodyHtmlOverride: bodyHtmlOverrideValue,
           previewMode: "draft"
         })
         .then((result) => {
@@ -393,7 +422,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [form.templateKey, form.subjectOverride, previewEntryId, templateBody]);
+  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, subjectOverrideValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -600,8 +629,9 @@ export function AdminCommunicationPage() {
     try {
       const result = await communicationService.sendMail({
         templateKey,
-        subjectOverride: form.subjectOverride.trim() || undefined,
-        bodyOverride: templateBody.trim() || undefined,
+        subjectOverride: subjectOverrideValue,
+        bodyOverride: bodyOverrideValue,
+        bodyHtmlOverride: bodyHtmlOverrideValue,
         additionalEmails: additionalRecipients.valid,
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
         filters: {
