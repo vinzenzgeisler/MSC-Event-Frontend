@@ -191,6 +191,8 @@ export const communicationService = {
     acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
     paymentStatus?: "due" | "paid";
     additionalEmails?: string[];
+    driverPersonIds?: string[];
+    entryIds?: string[];
   }) {
     const eventId = await getAdminEventId();
     return requestJson<ResolveRecipientsResult>("/admin/mail/broadcast/resolve-recipients", {
@@ -200,7 +202,9 @@ export const communicationService = {
         classId: payload.classId || undefined,
         acceptanceStatus: payload.acceptanceStatus || undefined,
         paymentStatus: payload.paymentStatus || undefined,
-        additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined
+        additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
+        driverPersonIds: payload.driverPersonIds?.length ? payload.driverPersonIds : undefined,
+        entryIds: payload.entryIds?.length ? payload.entryIds : undefined
       }
     });
   },
@@ -210,6 +214,8 @@ export const communicationService = {
     subjectOverride?: string;
     bodyOverride?: string;
     additionalEmails?: string[];
+    driverPersonIds?: string[];
+    entryIds?: string[];
     filters?: {
       classId?: string;
       acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
@@ -225,6 +231,8 @@ export const communicationService = {
         subjectOverride: payload.subjectOverride || undefined,
         bodyOverride: payload.bodyOverride || undefined,
         additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
+        driverPersonIds: payload.driverPersonIds?.length ? payload.driverPersonIds : undefined,
+        entryIds: payload.entryIds?.length ? payload.entryIds : undefined,
         filters:
           payload.filters &&
           (payload.filters.classId || payload.filters.acceptanceStatus || payload.filters.paymentStatus)
@@ -241,27 +249,6 @@ export const communicationService = {
   async retryOutbox(id: string) {
     return requestJson<{ ok: boolean }>(`/admin/mail/outbox/${id}/retry`, {
       method: "POST"
-    });
-  },
-
-  async queueDirectMail(payload: {
-    toEmail: string;
-    templateKey: string;
-    subjectOverride?: string;
-    bodyOverride?: string;
-    sendAfter?: string;
-  }) {
-    const eventId = await getAdminEventId();
-    return requestJson<{ ok: boolean; queued?: number; skipped?: number; reason?: string }>("/admin/mail/queue", {
-      method: "POST",
-      body: {
-        eventId,
-        toEmail: payload.toEmail,
-        templateKey: payload.templateKey,
-        subjectOverride: payload.subjectOverride || undefined,
-        bodyOverride: payload.bodyOverride || undefined,
-        sendAfter: payload.sendAfter || undefined
-      }
     });
   },
 

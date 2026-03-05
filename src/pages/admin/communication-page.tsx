@@ -66,6 +66,30 @@ function parseEmailList(value: string) {
   };
 }
 
+function parseUuidList(value: string) {
+  const parts = value
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  parts.forEach((rawValue) => {
+    const normalized = rawValue.toLowerCase();
+    if (seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    unique.push(rawValue);
+  });
+
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return {
+    valid: unique.filter((id) => uuidPattern.test(id)),
+    invalid: unique.filter((id) => !uuidPattern.test(id))
+  };
+}
+
 function extractTemplateTokens(value: string) {
   const tokens = new Set<string>();
   value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => {
@@ -89,6 +113,8 @@ export function AdminCommunicationPage() {
   const [templateBody, setTemplateBody] = useState("");
   const templateDraftsRef = useRef<TemplateDrafts>({});
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
+  const [driverPersonIdsInput, setDriverPersonIdsInput] = useState("");
+  const [entryIdsInput, setEntryIdsInput] = useState("");
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
@@ -103,7 +129,6 @@ export function AdminCommunicationPage() {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingPlaceholders, setLoadingPlaceholders] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
-  const [previewFormat, setPreviewFormat] = useState<"html" | "text">("html");
   const [resolvingRecipients, setResolvingRecipients] = useState(false);
   const [queueing, setQueueing] = useState(false);
 
@@ -187,21 +212,13 @@ export function AdminCommunicationPage() {
     return unique.filter((token) => !allowed.has(token));
   }, [form.subjectOverride, form.templateKey, templateBody, templatePlaceholders]);
 
-  const verificationLinkMissing = useMemo(() => {
-    if (!form.templateKey) {
-      return false;
-    }
-    const verificationRule = templatePlaceholders.find((item) => item.name === "verificationUrl" && item.required);
-    if (!verificationRule && !/registration|verify|verification/i.test(form.templateKey)) {
-      return false;
-    }
-
-    const bodyHasToken = /\{\{\s*verificationUrl\s*\}\}/i.test(templateBody);
-    const bodyHasUrl = /https?:\/\//i.test(templateBody);
-    return !bodyHasToken && !bodyHasUrl;
-  }, [form.templateKey, templateBody, templatePlaceholders]);
-
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
+  const selectedDriverPersonIds = useMemo(() => parseUuidList(driverPersonIdsInput), [driverPersonIdsInput]);
+  const selectedEntryIds = useMemo(() => parseUuidList(entryIdsInput), [entryIdsInput]);
+  const hasDirectTargets = selectedDriverPersonIds.valid.length > 0 || selectedEntryIds.valid.length > 0;
+  const sendBlockedByMissingPlaceholders = Boolean(
+    backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
+  );
   const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
   const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
 
@@ -317,10 +334,6 @@ export function AdminCommunicationPage() {
   }, [form.templateKey, form.subjectOverride, previewData, templateBody]);
 
   useEffect(() => {
-    setPreviewFormat("html");
-  }, [form.templateKey]);
-
-  useEffect(() => {
     const key = form.templateKey.trim();
     if (!key) {
       return;
@@ -372,14 +385,20 @@ export function AdminCommunicationPage() {
       showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
       return;
     }
+    if (selectedDriverPersonIds.invalid.length > 0 || selectedEntryIds.invalid.length > 0) {
+      showToast("Gezielte Empfänger enthalten ungültige UUIDs.");
+      return;
+    }
 
     setResolvingRecipients(true);
     try {
       const result = await communicationService.resolveBroadcastRecipients({
-        classId: form.classId !== "all" ? form.classId : undefined,
-        acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-        paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined,
-        additionalEmails: additionalRecipients.valid
+        classId: hasDirectTargets ? undefined : form.classId !== "all" ? form.classId : undefined,
+        acceptanceStatus: hasDirectTargets ? undefined : form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+        paymentStatus: hasDirectTargets ? undefined : form.paymentStatus !== "all" ? form.paymentStatus : undefined,
+        additionalEmails: additionalRecipients.valid,
+        driverPersonIds: selectedDriverPersonIds.valid,
+        entryIds: selectedEntryIds.valid
       });
       setResolvedRecipients(result);
       showToast(`Empfänger aufgelöst: ${result.finalCount}`);
@@ -405,6 +424,14 @@ export function AdminCommunicationPage() {
       showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
       return;
     }
+    if (selectedDriverPersonIds.invalid.length > 0 || selectedEntryIds.invalid.length > 0) {
+      showToast("Gezielte Empfänger enthalten ungültige UUIDs.");
+      return;
+    }
+    if (sendBlockedByMissingPlaceholders) {
+      showToast("Pflicht-Platzhalter fehlen im Preview. Versand ist blockiert.");
+      return;
+    }
 
     setQueueing(true);
     try {
@@ -413,11 +440,15 @@ export function AdminCommunicationPage() {
         subjectOverride: form.subjectOverride.trim() || undefined,
         bodyOverride: templateBody.trim() || undefined,
         additionalEmails: additionalRecipients.valid,
-        filters: {
-          classId: form.classId !== "all" ? form.classId : undefined,
-          acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-          paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined
-        }
+        driverPersonIds: selectedDriverPersonIds.valid,
+        entryIds: selectedEntryIds.valid,
+        filters: hasDirectTargets
+          ? undefined
+          : {
+              classId: form.classId !== "all" ? form.classId : undefined,
+              acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+              paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined
+            }
       });
 
       showToast(`Mailversand eingeplant (${result.queued} Empfänger).`);
@@ -445,7 +476,7 @@ export function AdminCommunicationPage() {
             <div className="space-y-1">
               <Label>Klasse</Label>
               <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
-                <SelectTrigger className="text-base md:text-sm">
+                <SelectTrigger className="text-base md:text-sm" disabled={hasDirectTargets}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -464,7 +495,7 @@ export function AdminCommunicationPage() {
                 value={form.acceptanceStatus}
                 onValueChange={(next) => setForm((prev) => ({ ...prev, acceptanceStatus: next as BroadcastForm["acceptanceStatus"] }))}
               >
-                <SelectTrigger className="text-base md:text-sm">
+                <SelectTrigger className="text-base md:text-sm" disabled={hasDirectTargets}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -481,7 +512,7 @@ export function AdminCommunicationPage() {
                 value={form.paymentStatus}
                 onValueChange={(next) => setForm((prev) => ({ ...prev, paymentStatus: next as BroadcastForm["paymentStatus"] }))}
               >
-                <SelectTrigger className="text-base md:text-sm">
+                <SelectTrigger className="text-base md:text-sm" disabled={hasDirectTargets}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -554,6 +585,39 @@ export function AdminCommunicationPage() {
                   {additionalRecipients.invalid.length > 0 ? ` · Ungültig: ${additionalRecipients.invalid.length}` : ""}
                 </p>
               </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Gezielte Fahrer-IDs (driverPersonIds)</Label>
+                  <textarea
+                    className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={driverPersonIdsInput}
+                    onChange={(event) => setDriverPersonIdsInput(event.target.value)}
+                    placeholder="UUIDs, getrennt mit Komma oder Zeilenumbruch"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Gültig: {selectedDriverPersonIds.valid.length}
+                    {selectedDriverPersonIds.invalid.length > 0 ? ` · Ungültig: ${selectedDriverPersonIds.invalid.length}` : ""}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label>Gezielte Nennungs-IDs (entryIds)</Label>
+                  <textarea
+                    className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={entryIdsInput}
+                    onChange={(event) => setEntryIdsInput(event.target.value)}
+                    placeholder="UUIDs, getrennt mit Komma oder Zeilenumbruch"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Gültig: {selectedEntryIds.valid.length}
+                    {selectedEntryIds.invalid.length > 0 ? ` · Ungültig: ${selectedEntryIds.invalid.length}` : ""}
+                  </p>
+                </div>
+              </div>
+              {hasDirectTargets && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                  Gezielte Empfänger aktiv: Klassen-/Status-/Zahlungsfilter werden für Resolve und Send ignoriert.
+                </div>
+              )}
 
               <details className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                 <summary className="cursor-pointer font-medium text-slate-900">Hilfe: Dynamische Platzhalter</summary>
@@ -578,11 +642,6 @@ export function AdminCommunicationPage() {
                 </div>
               </details>
 
-              {verificationLinkMissing && (
-                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  Verifizierungs-Mail ohne Link erkannt. Bitte <code>{"{{verificationUrl}}"}</code> oder eine URL einfügen.
-                </div>
-              )}
               {unresolvedTokens.length > 0 && (
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   Nicht bekannte Platzhalter im aktuellen Entwurf: {unresolvedTokens.join(", ")}
@@ -607,29 +666,7 @@ export function AdminCommunicationPage() {
             </div>
 
             <div className="space-y-3 rounded-md border bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-slate-900">Mail-Preview (Final Rendering)</div>
-                <div className="flex gap-1 rounded-md border bg-white p-1">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={previewFormat === "html" ? "default" : "ghost"}
-                    onClick={() => setPreviewFormat("html")}
-                    className="h-7 px-2 text-xs"
-                  >
-                    HTML
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={previewFormat === "text" ? "default" : "ghost"}
-                    onClick={() => setPreviewFormat("text")}
-                    className="h-7 px-2 text-xs"
-                  >
-                    Text
-                  </Button>
-                </div>
-              </div>
+              <div className="text-sm font-semibold text-slate-900">Mail-Preview (Backend HTML)</div>
               {loadingPreview ? (
                 <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Lade Backend-Preview...</div>
               ) : backendPreview ? (
@@ -638,24 +675,22 @@ export function AdminCommunicationPage() {
                     <div className="text-xs uppercase text-slate-500">Betreff</div>
                     <div className="mt-1 font-medium text-slate-900">{backendPreview.subjectRendered || "-"}</div>
                   </div>
-                  {previewFormat === "html" ? (
-                    <div className="rounded-md border bg-white p-2">
-                      <iframe
-                        title="Mail HTML Preview"
-                        srcDoc={backendPreview.htmlDocument}
-                        sandbox=""
-                        className="h-[480px] w-full rounded border-0"
-                      />
-                    </div>
-                  ) : (
-                    <div className="rounded-md border bg-white p-3">
-                      <div className="text-xs uppercase text-slate-500">Text</div>
-                      <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{backendPreview.bodyTextRendered || "-"}</pre>
-                    </div>
-                  )}
+                  <div className="rounded-md border bg-white p-2">
+                    <iframe
+                      title="Mail HTML Preview"
+                      srcDoc={backendPreview.htmlDocument}
+                      sandbox="allow-popups allow-popups-to-escape-sandbox"
+                      className="h-[520px] w-full rounded border-0"
+                    />
+                  </div>
                   {backendPreview.warnings.length > 0 && (
                     <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
                       Warnungen: {backendPreview.warnings.join(" | ")}
+                    </div>
+                  )}
+                  {backendPreview.missingPlaceholders.length > 0 && (
+                    <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-900">
+                      Pflicht-Platzhalter fehlen: {backendPreview.missingPlaceholders.join(", ")}. Versand ist blockiert.
                     </div>
                   )}
                   <div className="rounded-md border bg-white p-3 text-xs text-slate-600">
@@ -674,7 +709,12 @@ export function AdminCommunicationPage() {
 
           <div>
             {canManageCommunication ? (
-              <Button className="w-full md:w-auto" type="button" disabled={queueing || !form.templateKey} onClick={() => void queueBroadcast()}>
+              <Button
+                className="w-full md:w-auto"
+                type="button"
+                disabled={queueing || !form.templateKey || sendBlockedByMissingPlaceholders}
+                onClick={() => void queueBroadcast()}
+              >
                 {queueing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
