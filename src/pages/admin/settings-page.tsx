@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { adminIamService } from "@/services/admin-iam.service";
 import { adminSettingsService } from "@/services/admin-settings.service";
@@ -134,6 +135,33 @@ function rolesEqual(a: IamRole[], b: IamRole[]) {
   const left = [...a].sort().join("|");
   const right = [...b].sort().join("|");
   return left === right;
+}
+
+function getIamCreateUserErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    const code = (error.code ?? "").trim().toUpperCase();
+    const reason =
+      typeof error.details?.reason === "string" ? error.details.reason.trim().toUpperCase() : "";
+    const normalized = code || reason;
+
+    if (normalized === "USER_ALREADY_EXISTS") {
+      return "Für diese E-Mail existiert bereits ein Account.";
+    }
+    if (normalized === "PERMISSION_DENIED") {
+      return "Du hast keine Berechtigung, Accounts anzulegen.";
+    }
+    if (normalized === "INVALID_TEMP_PASSWORD") {
+      return "Das temporäre Passwort erfüllt die Anforderungen nicht.";
+    }
+    if (normalized === "ROLE_MAPPING_FAILED") {
+      return "Die Rollen konnten dem neuen Account nicht zugeordnet werden.";
+    }
+    if (normalized === "INVITATION_SEND_FAILED") {
+      return "Account wurde erstellt, aber die Einladung konnte nicht gesendet werden.";
+    }
+  }
+
+  return getApiErrorMessage(error, "IAM-Account konnte nicht angelegt werden.");
 }
 
 export function AdminSettingsPage() {
@@ -562,14 +590,15 @@ export function AdminSettingsPage() {
     }
   };
 
-  const runOperation = async (operation: "close" | "archive") => {
+  const runOperation = async (operation: "close" | "archive" | "activate") => {
     if (!eventState) {
       return;
     }
 
     const confirmText: Record<typeof operation, string> = {
       close: "Event wirklich schließen?",
-      archive: "Event wirklich archivieren?"
+      archive: "Event wirklich archivieren?",
+      activate: "Archiviertes Event wirklich wieder aktivieren?"
     };
 
     if (!window.confirm(confirmText[operation])) {
@@ -583,6 +612,9 @@ export function AdminSettingsPage() {
       if (operation === "close") {
         setEventState(await adminSettingsService.closeEvent(eventState.id));
         showToast("Event wurde geschlossen.");
+      } else if (operation === "activate") {
+        setEventState(await adminSettingsService.activateEvent(eventState.id));
+        showToast("Event wurde wieder aktiviert.");
       } else {
         setEventState(await adminSettingsService.archiveEvent(eventState.id));
         showToast("Event wurde archiviert.");
@@ -638,7 +670,7 @@ export function AdminSettingsPage() {
       });
       showToast("IAM-Account angelegt.");
     } catch (error) {
-      setIamError(getApiErrorMessage(error, "IAM-Account konnte nicht angelegt werden."));
+      setIamError(getIamCreateUserErrorMessage(error));
     } finally {
       setIamCreatingUser(false);
     }
@@ -919,20 +951,24 @@ export function AdminSettingsPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Fahrzeugtyp</Label>
-                  <select
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  <Select
                     value={newClassDraft.vehicleType}
                     disabled={!canManage || !eventState}
-                    onChange={(event) =>
+                    onValueChange={(next) =>
                       setNewClassDraft((prev) => ({
                         ...prev,
-                        vehicleType: event.target.value as VehicleType
+                        vehicleType: next as VehicleType
                       }))
                     }
                   >
-                    <option value="auto">auto</option>
-                    <option value="moto">moto</option>
-                  </select>
+                    <SelectTrigger className="text-base md:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">auto</SelectItem>
+                      <SelectItem value="moto">moto</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-end">
                   <Button type="button" disabled={!canManage || creatingClass || !eventState} onClick={() => void createClass()}>
@@ -962,23 +998,27 @@ export function AdminSettingsPage() {
                           }))
                         }
                       />
-                      <select
-                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      <Select
                         value={draft.vehicleType}
                         disabled={!canManage || rowBusy}
-                        onChange={(event) =>
+                        onValueChange={(next) =>
                           setClassDrafts((prev) => ({
                             ...prev,
                             [item.id]: {
                               ...draft,
-                              vehicleType: event.target.value as VehicleType
+                              vehicleType: next as VehicleType
                             }
                           }))
                         }
                       >
-                        <option value="auto">auto</option>
-                        <option value="moto">moto</option>
-                      </select>
+                        <SelectTrigger className="text-base md:text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">auto</SelectItem>
+                          <SelectItem value="moto">moto</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Button type="button" variant="outline" disabled={!canManage || rowBusy} onClick={() => void saveClass(item.id)}>
                         <Save className="mr-2 h-4 w-4" />
                         Speichern
@@ -999,10 +1039,21 @@ export function AdminSettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Event schließen / archivieren</CardTitle>
+              <CardTitle>Event-Status ändern</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
+                {eventState?.status === "archived" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!canManage || !eventState || operationBusy !== null}
+                    onClick={() => void runOperation("activate")}
+                  >
+                    <Archive className="mr-2 h-4 w-4" />
+                    Event wiederherstellen
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -1015,7 +1066,7 @@ export function AdminSettingsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={!canManage || !eventState || operationBusy !== null}
+                  disabled={!canManage || !eventState || operationBusy !== null || eventState?.status === "archived"}
                   onClick={() => void runOperation("archive")}
                 >
                   <Archive className="mr-2 h-4 w-4" />
