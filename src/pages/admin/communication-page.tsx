@@ -35,6 +35,14 @@ const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 type TemplateDrafts = Record<string, { subject: string; body: string }>;
 type StaticTemplateOption = { key: string; label: string };
 
+const FALLBACK_TEMPLATE_OPTIONS: StaticTemplateOption[] = [
+  { key: "registration_received", label: "Verifizierungs-Mail" },
+  { key: "preselection", label: "Vorauswahl" },
+  { key: "accepted_open_payment", label: "Zulassung" },
+  { key: "rejected", label: "Ablehnung" },
+  { key: "payment_reminder", label: "Zahlungserinnerung" }
+];
+
 function parseEmailList(value: string) {
   const parts = value
     .split(/[\n,;]+/)
@@ -88,7 +96,7 @@ export function AdminCommunicationPage() {
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
-  const [templateOptions, setTemplateOptions] = useState<Array<{ key: string; label: string }>>([]);
+  const [templateOptions, setTemplateOptions] = useState<Array<{ key: string; label: string }>>(FALLBACK_TEMPLATE_OPTIONS);
   const [templatesByKey, setTemplatesByKey] = useState<Map<string, MailTemplate>>(new Map());
   const [templatePlaceholders, setTemplatePlaceholders] = useState<MailTemplatePlaceholder[]>([]);
   const [backendPreview, setBackendPreview] = useState<MailTemplatePreview | null>(null);
@@ -129,11 +137,11 @@ export function AdminCommunicationPage() {
     try {
       const templates = await communicationService.listTemplates();
       const mappedOptions = templates.map(normalizeTemplateOption);
-      setTemplateOptions(mappedOptions);
+      setTemplateOptions(mappedOptions.length > 0 ? mappedOptions : FALLBACK_TEMPLATE_OPTIONS);
       setTemplatesByKey(new Map(templates.map((item) => [item.key, item])));
     } catch (error) {
       showToast(getApiErrorMessage(error, "Mail-Templates konnten nicht geladen werden."));
-      setTemplateOptions([]);
+      setTemplateOptions(FALLBACK_TEMPLATE_OPTIONS);
       setTemplatesByKey(new Map());
     } finally {
       setLoadingTemplates(false);
@@ -472,7 +480,6 @@ export function AdminCommunicationPage() {
               <Select
                 value={form.templateKey || "__none__"}
                 onValueChange={(next) => applyTemplateSelection(next === "__none__" ? "" : next)}
-                disabled={loadingTemplates}
               >
                 <SelectTrigger className="text-base md:text-sm">
                   <SelectValue placeholder={loadingTemplates ? "Templates laden..." : "Template wählen"} />
