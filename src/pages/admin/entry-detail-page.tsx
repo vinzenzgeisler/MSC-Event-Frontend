@@ -44,6 +44,10 @@ function brakeLabel(value: string) {
   return value;
 }
 
+function vehicleTypeLabel(value: "auto" | "moto") {
+  return value === "moto" ? "Motorrad" : "Auto";
+}
+
 function VehiclePreview({ src, label, onOpen }: { src: string | null; label: string; onOpen: () => void }) {
   if (src) {
     return (
@@ -210,6 +214,7 @@ export function AdminEntryDetailPage() {
     if (error instanceof ApiError) {
       const code = (error.code ?? "").toLowerCase();
       const reason = typeof error.details?.reason === "string" ? error.details.reason.trim() : "";
+      const haystack = `${(error.code ?? "").toLowerCase()} ${(error.message ?? "").toLowerCase()}`;
       if (code === "no_recipient") {
         return "Für diese Nennung ist keine Empfänger-E-Mail vorhanden.";
       }
@@ -230,6 +235,9 @@ export function AdminEntryDetailPage() {
       }
       if (code.includes("duplicate")) {
         return "Doppelte Anfrage: Eine identische Mail-Aktion wurde bereits ausgelöst. Bitte Outbox prüfen.";
+      }
+      if (haystack.includes("class does not match vehicle type") || haystack.includes("vehicle type")) {
+        return "Die gewählte Klasse passt nicht zum Fahrzeugtyp. Prüfe die Zielklasse und optional das Ersatzfahrzeug.";
       }
       if (code === "internal_error") {
         return "Mail konnte aktuell nicht eingeplant werden. Bitte erneut versuchen.";
@@ -305,6 +313,25 @@ export function AdminEntryDetailPage() {
     setIncludeDriverNoteOnReject(false);
   }, [hasDriverNote]);
 
+  useEffect(() => {
+    if (!detail?.backupVehicle.assigned) {
+      return;
+    }
+    if (detail.backupVehicle.type !== detail.vehicle.type) {
+      setClassChangeIncludeBackup(false);
+    }
+  }, [detail?.backupVehicle.assigned, detail?.backupVehicle.type, detail?.vehicle.type]);
+
+  useEffect(() => {
+    if (!detail || !classDraft) {
+      return;
+    }
+    const isStillValid = classOptions.some((option) => option.id === classDraft && option.vehicleType === detail.vehicle.type);
+    if (!isStillValid) {
+      setClassDraft("");
+    }
+  }, [classDraft, classOptions, detail]);
+
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
   }
@@ -317,6 +344,8 @@ export function AdminEntryDetailPage() {
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const anyActionInFlight = actionInFlight !== null;
+  const classOptionsForVehicle = classOptions.filter((option) => option.vehicleType === detail.vehicle.type);
+  const backupVehicleTypeMismatch = detail.backupVehicle.assigned && detail.backupVehicle.type !== detail.vehicle.type;
   const statusActionInFlight =
     actionInFlight === "status-shortlist" || actionInFlight === "status-accepted" || actionInFlight === "status-rejected";
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
@@ -1056,13 +1085,16 @@ export function AdminEntryDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Klasse wählen</SelectItem>
-                    {classOptions.map((option) => (
+                    {classOptionsForVehicle.map((option) => (
                       <SelectItem key={option.id} value={option.id}>
                         {option.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-slate-500">
+                  Verfügbare Klassen für Fahrzeugtyp: {vehicleTypeLabel(detail.vehicle.type)}
+                </p>
               </div>
               {detail.backupVehicle.assigned && (
                 <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -1070,10 +1102,16 @@ export function AdminEntryDetailPage() {
                     type="checkbox"
                     checked={classChangeIncludeBackup}
                     onChange={(event) => setClassChangeIncludeBackup(event.target.checked)}
-                    disabled={!canChangeClass || anyActionInFlight}
+                    disabled={!canChangeClass || anyActionInFlight || backupVehicleTypeMismatch}
                   />
                   Auch Ersatzfahrzeug auf Zielklasse umstellen
                 </label>
+              )}
+              {backupVehicleTypeMismatch && (
+                <div className="text-xs text-amber-700">
+                  Ersatzfahrzeug hat den Typ {vehicleTypeLabel(detail.backupVehicle.type)} und wird beim Klassenwechsel nicht automatisch
+                  mit geändert.
+                </div>
               )}
               <Button
                 type="button"
