@@ -285,28 +285,24 @@ export function AdminCommunicationPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!form.templateKey.trim()) {
+  const applyTemplateSelection = (nextTemplateKey: string) => {
+    if (!nextTemplateKey) {
+      setForm((prev) => ({ ...prev, templateKey: "", subjectOverride: "" }));
+      setTemplateBody("");
       return;
     }
 
-    const fromDraft = templateDrafts[form.templateKey];
+    const fromDraft = templateDrafts[nextTemplateKey];
     if (fromDraft) {
-      if (fromDraft.subject === form.subjectOverride && fromDraft.body === templateBody) {
-        return;
-      }
-      setForm((prev) => ({ ...prev, subjectOverride: fromDraft.subject }));
+      setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
       setTemplateBody(fromDraft.body);
       return;
     }
 
-    const preset = TEMPLATE_PRESETS.find((item) => item.key === form.templateKey);
-    if (!preset) {
-      return;
-    }
-    setForm((prev) => ({ ...prev, subjectOverride: preset.defaultSubject }));
-    setTemplateBody(preset.defaultBody);
-  }, [form.subjectOverride, form.templateKey, templateBody, templateDrafts]);
+    const preset = TEMPLATE_PRESETS.find((item) => item.key === nextTemplateKey);
+    setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: preset?.defaultSubject ?? "" }));
+    setTemplateBody(preset?.defaultBody ?? "");
+  };
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -314,6 +310,10 @@ export function AdminCommunicationPage() {
       return;
     }
     setTemplateDrafts((prev) => {
+      const existing = prev[key];
+      if (existing && existing.subject === form.subjectOverride && existing.body === templateBody) {
+        return prev;
+      }
       const next: TemplateDrafts = {
         ...prev,
         [key]: {
@@ -332,7 +332,7 @@ export function AdminCommunicationPage() {
     }
     const templateKey = form.templateKey.trim();
     if (!templateKey) {
-      showToast("Template Key ist erforderlich.");
+      showToast("Template ist erforderlich.");
       return;
     }
 
@@ -442,7 +442,7 @@ export function AdminCommunicationPage() {
               <Label>Template</Label>
               <Select
                 value={form.templateKey || "__none__"}
-                onValueChange={(next) => setForm((prev) => ({ ...prev, templateKey: next === "__none__" ? "" : next }))}
+                onValueChange={(next) => applyTemplateSelection(next === "__none__" ? "" : next)}
               >
                 <SelectTrigger className="text-base md:text-sm">
                   <SelectValue placeholder="Template wählen" />
@@ -461,12 +461,6 @@ export function AdminCommunicationPage() {
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="space-y-4">
-              <div className="space-y-1">
-                <Label>Template Key</Label>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {form.templateKey || "Bitte oben ein Template wählen"}
-                </div>
-              </div>
               <div className="space-y-1">
                 <Label>Betreff</Label>
                 <Input
