@@ -154,7 +154,6 @@ export function AdminEntryDetailPage() {
   const [confirmationMailVerified, setConfirmationMailVerified] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [previewImage, setPreviewImage] = useState<{ url: string; label: string } | null>(null);
-  const [documentPreview, setDocumentPreview] = useState<{ url: string; label: string } | null>(null);
   const [internalNote, setInternalNote] = useState("");
   const [driverNote, setDriverNote] = useState("");
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
@@ -277,25 +276,6 @@ export function AdminEntryDetailPage() {
         return;
       }
       window.open(url, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      flashMessage(getApiErrorMessage(error, `${label} konnte nicht geladen werden.`), 2800);
-    } finally {
-      setActionInFlight((current) => (current === actionKey ? null : current));
-    }
-  };
-
-  const handleDocumentPreview = async (type: "waiver" | "tech_check", label: string, actionKey: string) => {
-    if (actionInFlight) {
-      return;
-    }
-    setActionInFlight(actionKey);
-    try {
-      const url = await adminEntriesService.getEntryDocumentDownloadUrl(entryId, type);
-      if (!url) {
-        flashMessage(`${label} nicht verfügbar.`, 2600);
-        return;
-      }
-      setDocumentPreview({ url, label });
     } catch (error) {
       flashMessage(getApiErrorMessage(error, `${label} konnte nicht geladen werden.`), 2800);
     } finally {
@@ -958,22 +938,6 @@ export function AdminEntryDetailPage() {
                   disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
-                    void handleDocumentPreview("waiver", "Haftverzicht", "preview-waiver");
-                  }}
-                >
-                  {actionInFlight === "preview-waiver" ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="mr-2 h-4 w-4" />
-                  )}
-                  {actionInFlight === "preview-waiver" ? "Vorschau wird geladen…" : "Vorschau Haftverzicht"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={anyActionInFlight}
-                  className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
-                  onClick={() => {
                     void handleDocumentDownload("waiver", "Haftverzicht", "download-waiver");
                   }}
                 >
@@ -983,22 +947,6 @@ export function AdminEntryDetailPage() {
                     <Download className="mr-2 h-4 w-4" />
                   )}
                   {actionInFlight === "download-waiver" ? "Haftverzicht wird geladen…" : "PDF Haftverzicht"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={anyActionInFlight}
-                  className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
-                  onClick={() => {
-                    void handleDocumentPreview("tech_check", "Technische Abnahme", "preview-tech-check");
-                  }}
-                >
-                  {actionInFlight === "preview-tech-check" ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="mr-2 h-4 w-4" />
-                  )}
-                  {actionInFlight === "preview-tech-check" ? "Vorschau wird geladen…" : "Vorschau Technische Abnahme"}
                 </Button>
                 <Button
                   type="button"
@@ -1164,20 +1112,6 @@ export function AdminEntryDetailPage() {
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewImage(null)}>
           <img className="max-h-[90vh] max-w-[90vw] rounded-md border border-white/20 object-contain" src={previewImage.url} alt={previewImage.label} />
-        </div>
-      )}
-
-      {documentPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-white/20 bg-white">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <div className="text-sm font-semibold text-slate-900">{documentPreview.label}</div>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDocumentPreview(null)}>
-                Schließen
-              </Button>
-            </div>
-            <iframe title={documentPreview.label} src={documentPreview.url} className="h-full w-full" />
-          </div>
         </div>
       )}
 
