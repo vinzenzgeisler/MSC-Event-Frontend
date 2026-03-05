@@ -167,7 +167,12 @@ export function EntriesTable({
               </div>
               <div className="flex flex-col gap-1">
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/admin/entries/${row.id}${location.search}`}>Details</Link>
+                  <Link
+                    to={`/admin/entries/${row.id}${location.search}`}
+                    state={{ fromEntriesList: true, scrollY: window.scrollY }}
+                  >
+                    Details
+                  </Link>
                 </Button>
                 {canManageStatus && (
                   <>
@@ -317,7 +322,12 @@ export function EntriesTable({
                     <div className="grid grid-cols-2 gap-1.5">
                       <div className="col-span-2 h-8 w-full">
                         <Button asChild size="sm" variant="outline" className="h-full w-full justify-center px-3.5 text-xs">
-                          <Link to={`/admin/entries/${row.id}${location.search}`}>Details</Link>
+                          <Link
+                            to={`/admin/entries/${row.id}${location.search}`}
+                            state={{ fromEntriesList: true, scrollY: window.scrollY }}
+                          >
+                            Details
+                          </Link>
                         </Button>
                       </div>
                       {canManageStatus && (

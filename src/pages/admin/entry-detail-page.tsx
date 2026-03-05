@@ -6,6 +6,7 @@ import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   acceptanceStatusClasses,
@@ -16,6 +17,7 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
+import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 
@@ -139,6 +141,7 @@ export function AdminEntryDetailPage() {
   const canNotesWrite = hasPermission(roles, "entries.notes.write");
   const canDeleteEntry = hasPermission(roles, "entries.delete");
   const canSendMail = hasPermission(roles, "communication.write");
+  const canChangeClass = hasPermission(roles, "entries.status.write") || roles.includes("admin") || roles.includes("editor");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -151,6 +154,7 @@ export function AdminEntryDetailPage() {
   const [confirmationMailVerified, setConfirmationMailVerified] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [previewImage, setPreviewImage] = useState<{ url: string; label: string } | null>(null);
+  const [documentPreview, setDocumentPreview] = useState<{ url: string; label: string } | null>(null);
   const [internalNote, setInternalNote] = useState("");
   const [driverNote, setDriverNote] = useState("");
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
@@ -168,6 +172,9 @@ export function AdminEntryDetailPage() {
   const [paymentPaidInput, setPaymentPaidInput] = useState("0,00");
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
+  const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
+  const [classDraft, setClassDraft] = useState("");
+  const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -247,6 +254,8 @@ export function AdminEntryDetailPage() {
           setInternalNote(result.internalNote);
           setDriverNote(result.driverNote);
           setHistoryExpanded(false);
+          setClassDraft(result.classId);
+          setClassChangeIncludeBackup(Boolean(result.backupVehicle.assigned));
         }
       })
       .catch((error) => {
@@ -275,10 +284,36 @@ export function AdminEntryDetailPage() {
     }
   };
 
+  const handleDocumentPreview = async (type: "waiver" | "tech_check", label: string, actionKey: string) => {
+    if (actionInFlight) {
+      return;
+    }
+    setActionInFlight(actionKey);
+    try {
+      const url = await adminEntriesService.getEntryDocumentDownloadUrl(entryId, type);
+      if (!url) {
+        flashMessage(`${label} nicht verfügbar.`, 2600);
+        return;
+      }
+      setDocumentPreview({ url, label });
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, `${label} konnte nicht geladen werden.`), 2800);
+    } finally {
+      setActionInFlight((current) => (current === actionKey ? null : current));
+    }
+  };
+
   useEffect(() => {
     setHasLoadedOnce(false);
     loadDetail();
   }, [entryId]);
+
+  useEffect(() => {
+    adminMetaService
+      .listClassOptions()
+      .then(setClassOptions)
+      .catch(() => setClassOptions([]));
+  }, []);
 
   const hasDriverNote = driverNote.trim().length > 0;
 
@@ -330,11 +365,14 @@ export function AdminEntryDetailPage() {
           variant="outline"
           size="sm"
           onClick={() => {
-            if (window.history.length > 1) {
-              navigate(-1);
+            const state = location.state as { fromEntriesList?: boolean; scrollY?: number } | null;
+            if (state?.fromEntriesList && typeof state.scrollY === "number") {
+              navigate(`/admin/entries${location.search}`, {
+                state: { restoreEntriesScrollY: state.scrollY }
+              });
               return;
             }
-            navigate(`/admin/entries${location.search}`);
+            navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
           }}
         >
           Zurück zu Nennungen
@@ -920,6 +958,22 @@ export function AdminEntryDetailPage() {
                   disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
+                    void handleDocumentPreview("waiver", "Haftverzicht", "preview-waiver");
+                  }}
+                >
+                  {actionInFlight === "preview-waiver" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  {actionInFlight === "preview-waiver" ? "Vorschau wird geladen…" : "Vorschau Haftverzicht"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={anyActionInFlight}
+                  className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
+                  onClick={() => {
                     void handleDocumentDownload("waiver", "Haftverzicht", "download-waiver");
                   }}
                 >
@@ -929,6 +983,22 @@ export function AdminEntryDetailPage() {
                     <Download className="mr-2 h-4 w-4" />
                   )}
                   {actionInFlight === "download-waiver" ? "Haftverzicht wird geladen…" : "PDF Haftverzicht"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={anyActionInFlight}
+                  className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
+                  onClick={() => {
+                    void handleDocumentPreview("tech_check", "Technische Abnahme", "preview-tech-check");
+                  }}
+                >
+                  {actionInFlight === "preview-tech-check" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  {actionInFlight === "preview-tech-check" ? "Vorschau wird geladen…" : "Vorschau Technische Abnahme"}
                 </Button>
                 <Button
                   type="button"
@@ -1024,12 +1094,90 @@ export function AdminEntryDetailPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Klasse ändern</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-slate-900">Zielklasse</div>
+                <Select value={classDraft || "__none__"} onValueChange={(next) => setClassDraft(next === "__none__" ? "" : next)}>
+                  <SelectTrigger className="text-base md:text-sm">
+                    <SelectValue placeholder="Klasse wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Klasse wählen</SelectItem>
+                    {classOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {detail.backupVehicle.assigned && (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={classChangeIncludeBackup}
+                    onChange={(event) => setClassChangeIncludeBackup(event.target.checked)}
+                    disabled={!canChangeClass || anyActionInFlight}
+                  />
+                  Auch Ersatzfahrzeug auf Zielklasse umstellen
+                </label>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canChangeClass || anyActionInFlight || !classDraft || classDraft === detail.classId}
+                onClick={async () => {
+                  await runAction(
+                    "class-change",
+                    () =>
+                      adminEntriesService.changeEntryClass(detail.id, {
+                        classId: classDraft,
+                        applyToBackupVehicle: detail.backupVehicle.assigned ? classChangeIncludeBackup : false
+                      }),
+                    "Klasse wurde aktualisiert.",
+                    "Klasse konnte nicht geändert werden. Falls der Endpoint noch fehlt, bitte Backend-Request umsetzen."
+                  );
+                }}
+              >
+                {actionInFlight === "class-change" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird geändert…
+                  </>
+                ) : (
+                  "Klasse ändern"
+                )}
+              </Button>
+              {!canChangeClass && (
+                <div className="text-xs text-slate-500">Nur Admin und Editor dürfen die Klasse ändern.</div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewImage(null)}>
           <img className="max-h-[90vh] max-w-[90vw] rounded-md border border-white/20 object-contain" src={previewImage.url} alt={previewImage.label} />
+        </div>
+      )}
+
+      {documentPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-white/20 bg-white">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="text-sm font-semibold text-slate-900">{documentPreview.label}</div>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDocumentPreview(null)}>
+                Schließen
+              </Button>
+            </div>
+            <iframe title={documentPreview.label} src={documentPreview.url} className="h-full w-full" />
+          </div>
         </div>
       )}
 

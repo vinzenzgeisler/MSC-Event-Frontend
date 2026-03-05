@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar";
@@ -134,6 +134,10 @@ type EntriesCachePayload = {
   rows: AdminEntryListItem[];
   meta: ListMeta;
 };
+
+type EntriesPageLocationState = {
+  restoreEntriesScrollY?: number;
+} | null;
 
 function hasValue<T extends string>(value: string | null, values: readonly T[]): value is T {
   return value !== null && (values as readonly string[]).includes(value);
@@ -386,7 +390,10 @@ export function AdminEntriesPage() {
   const canManageStatus = hasPermission(roles, "entries.status.write");
   const canDeleteEntries = hasPermission(roles, "entries.delete");
   const canReadIam = hasPermission(roles, "iam.read");
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [pendingScrollRestoreY, setPendingScrollRestoreY] = useState<number | null>(null);
 
   const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
   const [filterDraft, setFilterDraft] = useState<AdminEntriesFilter>(initialFilterRef.current);
@@ -430,6 +437,7 @@ export function AdminEntriesPage() {
   const activeRequestRef = useRef(0);
   const hydratedFromCacheRef = useRef(false);
   const firstFilterLoadRef = useRef(true);
+  const hasRestoredFromStateRef = useRef(false);
 
   const classNameById = useMemo(() => {
     return new Map(classOptions.map((item) => [item.id, item.name]));
@@ -798,6 +806,16 @@ export function AdminEntriesPage() {
   }, [appliedFilter, canDeleteEntries, searchParams, setSearchParams, viewScope]);
 
   useEffect(() => {
+    const state = location.state as EntriesPageLocationState;
+    if (hasRestoredFromStateRef.current || typeof state?.restoreEntriesScrollY !== "number") {
+      return;
+    }
+    hasRestoredFromStateRef.current = true;
+    setPendingScrollRestoreY(Math.max(0, state.restoreEntriesScrollY));
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
+
+  useEffect(() => {
     if (viewScope === "deleted") {
       setDeletedRows([]);
       setDeletedMeta((prev) => ({ ...prev, hasMore: false, nextCursor: null }));
@@ -864,6 +882,19 @@ export function AdminEntriesPage() {
   useEffect(() => {
     writeEntriesCache(appliedFilter, rows, meta);
   }, [appliedFilter, meta, rows]);
+
+  useEffect(() => {
+    if (viewScope !== "active" || pendingScrollRestoreY === null || loadingInitial) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: pendingScrollRestoreY, behavior: "auto" });
+      setPendingScrollRestoreY(null);
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [loadingInitial, pendingScrollRestoreY, rows.length, viewScope]);
 
   const activeFilterChips = [
     filterDraft.query && { key: "query", label: `Suche: ${filterDraft.query}` },

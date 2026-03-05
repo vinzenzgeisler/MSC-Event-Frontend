@@ -729,6 +729,16 @@ export const adminEntriesService = {
     });
   },
 
+  async changeEntryClass(entryId: string, payload: { classId: string; applyToBackupVehicle?: boolean }) {
+    return requestJson<{ ok: boolean; entryId: string; classId: string }>(`/admin/entries/${entryId}/class`, {
+      method: "PATCH",
+      body: {
+        classId: payload.classId,
+        applyToBackupVehicle: payload.applyToBackupVehicle === true ? true : undefined
+      }
+    });
+  },
+
   async markConfirmationMailSent(entryId: string) {
     const context = await resolveEntryContext(entryId);
     await requestJson("/admin/mail/lifecycle/queue", {
