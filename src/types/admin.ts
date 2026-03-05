@@ -384,6 +384,15 @@ export type ResolveRecipientsResult = {
   finalCount: number;
 };
 
+export type MailRecipientSearchItem = {
+  driverPersonId: string;
+  driverName: string;
+  driverEmail: string;
+  entryId: string;
+  className: string;
+  startNumber: string;
+};
+
 export type OutboxItemDto = {
   id: Id;
   eventId?: Id | null;

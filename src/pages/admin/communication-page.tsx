@@ -12,9 +12,9 @@ import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/li
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
-import { adminEntriesService } from "@/services/admin-entries.service";
 import type {
   BroadcastForm,
+  MailRecipientSearchItem,
   MailTemplate,
   MailTemplatePlaceholder,
   MailTemplatePreview,
@@ -35,21 +35,27 @@ const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 
 type TemplateDrafts = Record<string, { subject: string; body: string }>;
 type StaticTemplateOption = { key: string; label: string };
-type RecipientTarget = { id: string; label: string };
-type RecipientSearchItem = {
-  entryId: string;
-  driverPersonId: string;
-  driverLabel: string;
-  entryLabel: string;
-};
+type RecipientTarget = { id: string; label: string; previewEntryId?: string };
+type RecipientSearchItem = MailRecipientSearchItem;
+type RecipientMode = "filter" | "individual" | "combined";
+
+const CAMPAIGN_TEMPLATE_KEYS = new Set(["newsletter", "event_update", "free_form"]);
 
 const FALLBACK_TEMPLATE_OPTIONS: StaticTemplateOption[] = [
-  { key: "registration_received", label: "Verifizierungs-Mail" },
-  { key: "preselection", label: "Vorauswahl" },
-  { key: "accepted_open_payment", label: "Zulassung" },
-  { key: "rejected", label: "Ablehnung" },
-  { key: "payment_reminder", label: "Zahlungserinnerung" }
+  { key: "newsletter", label: "Newsletter" },
+  { key: "event_update", label: "Event-Update" },
+  { key: "free_form", label: "Freie Mail (Event-Design)" }
 ];
+
+const TEMPLATE_DEFAULTS: Record<string, { subject: string; body: string }> = {
+  free_form: { subject: "", body: "" },
+  newsletter: { subject: "Newsletter {{eventName}}", body: "Hallo {{driverName}},\n\n" },
+  event_update: { subject: "Update zu {{eventName}}", body: "Hallo {{driverName}},\n\n" }
+};
+
+const TEMPLATE_LABEL_OVERRIDES: Record<string, string> = Object.fromEntries(
+  FALLBACK_TEMPLATE_OPTIONS.map((item) => [item.key, item.label])
+);
 
 function parseEmailList(value: string) {
   const parts = value
@@ -84,9 +90,11 @@ function extractTemplateTokens(value: string) {
 }
 
 function normalizeTemplateOption(template: MailTemplate): StaticTemplateOption {
+  const overrideLabel = TEMPLATE_LABEL_OVERRIDES[template.key];
+  const resolvedLabel = overrideLabel || template.label || template.key;
   return {
     key: template.key,
-    label: template.label || template.key
+    label: resolvedLabel
   };
 }
 
@@ -94,6 +102,7 @@ export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
+  const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [templateBody, setTemplateBody] = useState("");
   const templateDraftsRef = useRef<TemplateDrafts>({});
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
@@ -101,7 +110,6 @@ export function AdminCommunicationPage() {
   const [recipientSearchResults, setRecipientSearchResults] = useState<RecipientSearchItem[]>([]);
   const [searchingRecipients, setSearchingRecipients] = useState(false);
   const [selectedDriverTargets, setSelectedDriverTargets] = useState<RecipientTarget[]>([]);
-  const [selectedEntryTargets, setSelectedEntryTargets] = useState<RecipientTarget[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
@@ -145,9 +153,13 @@ export function AdminCommunicationPage() {
     setLoadingTemplates(true);
     try {
       const templates = await communicationService.listTemplates();
-      const mappedOptions = templates.map(normalizeTemplateOption);
-      setTemplateOptions(mappedOptions.length > 0 ? mappedOptions : FALLBACK_TEMPLATE_OPTIONS);
-      setTemplatesByKey(new Map(templates.map((item) => [item.key, item])));
+      const campaignTemplates = templates.filter((item) => CAMPAIGN_TEMPLATE_KEYS.has(item.key));
+      const mappedOptions = campaignTemplates.map(normalizeTemplateOption);
+      const merged = new Map<string, StaticTemplateOption>();
+      FALLBACK_TEMPLATE_OPTIONS.forEach((option) => merged.set(option.key, option));
+      mappedOptions.forEach((option) => merged.set(option.key, option));
+      setTemplateOptions(Array.from(merged.values()));
+      setTemplatesByKey(new Map(campaignTemplates.map((item) => [item.key, item])));
     } catch (error) {
       showToast(getApiErrorMessage(error, "Mail-Templates konnten nicht geladen werden."));
       setTemplateOptions(FALLBACK_TEMPLATE_OPTIONS);
@@ -172,20 +184,6 @@ export function AdminCommunicationPage() {
     return templatesByKey.get(form.templateKey) ?? null;
   }, [form.templateKey, templatesByKey]);
 
-  const previewData = useMemo(
-    () => ({
-      eventName: eventName.trim() || "12. Oberlausitzer Dreieck",
-      firstName: "Max",
-      lastName: "Mustermann",
-      driverName: "Max Mustermann",
-      className: "Historische Klasse A",
-      startNumber: "42",
-      amountOpen: "89,00 EUR",
-      verificationUrl: "https://example.org/anmeldung/verify?token=abc123"
-    }),
-    [eventName]
-  );
-
   const unresolvedTokens = useMemo(() => {
     if (!form.templateKey) {
       return [];
@@ -201,12 +199,21 @@ export function AdminCommunicationPage() {
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
   const selectedDriverPersonIds = useMemo(() => selectedDriverTargets.map((target) => target.id), [selectedDriverTargets]);
-  const selectedEntryIds = useMemo(() => selectedEntryTargets.map((target) => target.id), [selectedEntryTargets]);
-  const hasDirectTargets = selectedDriverPersonIds.length > 0 || selectedEntryIds.length > 0;
-  const hasFilterTargets = useMemo(
-    () => form.classId !== "all" || form.acceptanceStatus !== "all" || form.paymentStatus !== "all",
-    [form.acceptanceStatus, form.classId, form.paymentStatus]
-  );
+  const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
+  const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
+  const previewEntryId = useMemo(() => {
+    if (!allowIndividualRecipients) {
+      return undefined;
+    }
+    return selectedDriverTargets.find((item) => item.previewEntryId)?.previewEntryId;
+  }, [allowIndividualRecipients, selectedDriverTargets]);
+  const templateExistsInBackend = useMemo(() => {
+    if (!form.templateKey) {
+      return true;
+    }
+    return templatesByKey.has(form.templateKey);
+  }, [form.templateKey, templatesByKey]);
+  const sendBlockedByRecipientSelection = allowIndividualRecipients && !allowFilterRecipients && selectedDriverPersonIds.length === 0 && additionalRecipients.valid.length === 0;
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
@@ -296,7 +303,7 @@ export function AdminCommunicationPage() {
       communicationService
         .previewTemplate({
           templateKey: form.templateKey,
-          sampleData: previewData,
+          entryId: previewEntryId,
           subjectOverride: form.subjectOverride.trim() || undefined,
           bodyOverride: templateBody.trim() || undefined,
           previewMode: "draft"
@@ -322,7 +329,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [form.templateKey, form.subjectOverride, previewData, templateBody]);
+  }, [form.templateKey, form.subjectOverride, previewEntryId, templateBody]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -345,6 +352,25 @@ export function AdminCommunicationPage() {
   }, [form.subjectOverride, form.templateKey, templateBody]);
 
   useEffect(() => {
+    setResolvedRecipients(null);
+  }, [
+    additionalEmailsInput,
+    allowFilterRecipients,
+    allowIndividualRecipients,
+    form.acceptanceStatus,
+    form.classId,
+    form.paymentStatus,
+    recipientMode,
+    selectedDriverPersonIds
+  ]);
+
+  useEffect(() => {
+    if (!allowIndividualRecipients) {
+      setRecipientSearchResults([]);
+      setSearchingRecipients(false);
+      return;
+    }
+
     const query = recipientSearchQuery.trim();
     if (query.length < 2) {
       setRecipientSearchResults([]);
@@ -355,39 +381,19 @@ export function AdminCommunicationPage() {
     let cancelled = false;
     const timer = window.setTimeout(() => {
       setSearchingRecipients(true);
-      adminEntriesService
-        .listEntriesPage(
-          {
-            query,
-            classId: "all",
-            acceptanceStatus: "all",
-            paymentStatus: "all",
-            checkinIdVerified: "all",
-            sortBy: "createdAt",
-            sortDir: "desc"
-          },
-          { limit: 20 }
-        )
-        .then((result) => {
+      communicationService
+        .searchRecipients({
+          query,
+          classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
+          acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+          paymentStatus: allowFilterRecipients && form.paymentStatus !== "all" ? form.paymentStatus : undefined,
+          limit: 20
+        })
+        .then((recipients) => {
           if (cancelled) {
             return;
           }
-
-          const mapped = result.entries
-            .map((entry): RecipientSearchItem | null => {
-              if (!entry.driverPersonIdRaw) {
-                return null;
-              }
-              return {
-                entryId: entry.id,
-                driverPersonId: entry.driverPersonIdRaw,
-                driverLabel: `${entry.name}${entry.driverEmailRaw ? ` (${entry.driverEmailRaw})` : ""}`,
-                entryLabel: `${entry.name} · ${entry.classLabel} · #${entry.startNumber}`
-              };
-            })
-            .filter((item): item is RecipientSearchItem => item !== null);
-
-          setRecipientSearchResults(mapped);
+          setRecipientSearchResults(recipients);
         })
         .catch(() => {
           if (!cancelled) {
@@ -405,32 +411,33 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [recipientSearchQuery]);
+  }, [
+    allowFilterRecipients,
+    allowIndividualRecipients,
+    form.acceptanceStatus,
+    form.classId,
+    form.paymentStatus,
+    recipientSearchQuery
+  ]);
 
   const addDriverTarget = (candidate: RecipientSearchItem) => {
     setSelectedDriverTargets((prev) => {
       if (prev.some((item) => item.id === candidate.driverPersonId)) {
         return prev;
       }
-      return [...prev, { id: candidate.driverPersonId, label: candidate.driverLabel }];
-    });
-  };
-
-  const addEntryTarget = (candidate: RecipientSearchItem) => {
-    setSelectedEntryTargets((prev) => {
-      if (prev.some((item) => item.id === candidate.entryId)) {
-        return prev;
-      }
-      return [...prev, { id: candidate.entryId, label: candidate.entryLabel }];
+      return [
+        ...prev,
+        {
+          id: candidate.driverPersonId,
+          label: `${candidate.driverName}${candidate.driverEmail ? ` (${candidate.driverEmail})` : ""}`,
+          previewEntryId: candidate.entryId
+        }
+      ];
     });
   };
 
   const removeDriverTarget = (id: string) => {
     setSelectedDriverTargets((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const removeEntryTarget = (id: string) => {
-    setSelectedEntryTargets((prev) => prev.filter((item) => item.id !== id));
   };
 
   const applyTemplateSelection = (nextTemplateKey: string) => {
@@ -452,8 +459,13 @@ export function AdminCommunicationPage() {
     }
 
     const template = templatesByKey.get(nextTemplateKey);
-    setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: template?.subject ?? "" }));
-    setTemplateBody(template?.bodyText ?? "");
+    const defaults = TEMPLATE_DEFAULTS[nextTemplateKey] ?? { subject: "", body: "" };
+    setForm((prev) => ({
+      ...prev,
+      templateKey: nextTemplateKey,
+      subjectOverride: template?.subject ?? defaults.subject
+    }));
+    setTemplateBody(template?.bodyText ?? defaults.body);
   };
 
   const resolveRecipients = async () => {
@@ -465,16 +477,19 @@ export function AdminCommunicationPage() {
       showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
       return;
     }
+    if (sendBlockedByRecipientSelection) {
+      showToast("Bitte mindestens einen Fahrer oder eine zusätzliche E-Mail auswählen.");
+      return;
+    }
 
     setResolvingRecipients(true);
     try {
       const result = await communicationService.resolveBroadcastRecipients({
-        classId: form.classId !== "all" ? form.classId : undefined,
-        acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-        paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined,
+        classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
+        acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+        paymentStatus: allowFilterRecipients && form.paymentStatus !== "all" ? form.paymentStatus : undefined,
         additionalEmails: additionalRecipients.valid,
-        driverPersonIds: selectedDriverPersonIds,
-        entryIds: selectedEntryIds
+        driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined
       });
       setResolvedRecipients(result);
       showToast(`Empfänger aufgelöst: ${result.finalCount}`);
@@ -495,9 +510,21 @@ export function AdminCommunicationPage() {
       showToast("Template ist erforderlich.");
       return;
     }
+    if (!CAMPAIGN_TEMPLATE_KEYS.has(templateKey)) {
+      showToast("Auf der Kampagnenseite sind nur Newsletter-, Event-Update- oder freie Mails erlaubt.");
+      return;
+    }
 
     if (additionalRecipients.invalid.length > 0) {
       showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
+      return;
+    }
+    if (sendBlockedByRecipientSelection) {
+      showToast("Bitte mindestens einen Fahrer oder eine zusätzliche E-Mail auswählen.");
+      return;
+    }
+    if (!templateExistsInBackend) {
+      showToast("Dieses Template ist im Backend nicht verfügbar.");
       return;
     }
     if (sendBlockedByMissingPlaceholders) {
@@ -512,12 +539,11 @@ export function AdminCommunicationPage() {
         subjectOverride: form.subjectOverride.trim() || undefined,
         bodyOverride: templateBody.trim() || undefined,
         additionalEmails: additionalRecipients.valid,
-        driverPersonIds: selectedDriverPersonIds,
-        entryIds: selectedEntryIds,
+        driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
         filters: {
-          classId: form.classId !== "all" ? form.classId : undefined,
-          acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-          paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined
+          classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
+          acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+          paymentStatus: allowFilterRecipients && form.paymentStatus !== "all" ? form.paymentStatus : undefined
         }
       });
 
@@ -540,16 +566,41 @@ export function AdminCommunicationPage() {
       <Card>
         <CardHeader className="space-y-2">
           <CardTitle>Kampagne erstellen</CardTitle>
-          <p className="text-sm text-slate-600">Schrittweise: Empfänger wählen, Template anpassen, Preview prüfen, senden.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
             <div className="text-sm font-semibold text-slate-900">1. Empfänger definieren</div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientMode === "filter" ? "default" : "outline"}
+                onClick={() => setRecipientMode("filter")}
+              >
+                Nur Filter
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientMode === "individual" ? "default" : "outline"}
+                onClick={() => setRecipientMode("individual")}
+              >
+                Nur Fahrerauswahl
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={recipientMode === "combined" ? "default" : "outline"}
+                onClick={() => setRecipientMode("combined")}
+              >
+                Filter + Fahrerauswahl
+              </Button>
+            </div>
             <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1">
                 <Label>Klasse</Label>
                 <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
-                  <SelectTrigger className="text-base md:text-sm">
+                  <SelectTrigger className="text-base md:text-sm" disabled={!allowFilterRecipients}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -568,7 +619,7 @@ export function AdminCommunicationPage() {
                   value={form.acceptanceStatus}
                   onValueChange={(next) => setForm((prev) => ({ ...prev, acceptanceStatus: next as BroadcastForm["acceptanceStatus"] }))}
                 >
-                  <SelectTrigger className="text-base md:text-sm">
+                  <SelectTrigger className="text-base md:text-sm" disabled={!allowFilterRecipients}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -585,7 +636,7 @@ export function AdminCommunicationPage() {
                   value={form.paymentStatus}
                   onValueChange={(next) => setForm((prev) => ({ ...prev, paymentStatus: next as BroadcastForm["paymentStatus"] }))}
                 >
-                  <SelectTrigger className="text-base md:text-sm">
+                  <SelectTrigger className="text-base md:text-sm" disabled={!allowFilterRecipients}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -611,29 +662,36 @@ export function AdminCommunicationPage() {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Gezielt Fahrer oder Nennung hinzufügen</Label>
+            <div className="space-y-2" aria-disabled={!allowIndividualRecipients}>
+              <Label>Fahrer suchen und auswählen</Label>
               <Input
                 value={recipientSearchQuery}
                 onChange={(event) => setRecipientSearchQuery(event.target.value)}
-                placeholder="Name, E-Mail, Klasse oder Startnummer suchen"
+                placeholder="Name oder E-Mail suchen"
+                disabled={!allowIndividualRecipients}
               />
               <div className="rounded-md border bg-white">
-                {searchingRecipients ? (
+                {!allowIndividualRecipients ? (
+                  <div className="px-3 py-2 text-xs text-slate-500">Deaktiviert.</div>
+                ) : searchingRecipients ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Suche läuft...</div>
                 ) : recipientSearchQuery.trim().length < 2 ? (
-                  <div className="px-3 py-2 text-xs text-slate-500">Mindestens 2 Zeichen eingeben.</div>
+                  <></>
                 ) : recipientSearchResults.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
                 ) : (
                   <div className="max-h-56 overflow-y-auto">
                     {recipientSearchResults.map((item) => {
                       const driverSelected = selectedDriverPersonIds.includes(item.driverPersonId);
-                      const entrySelected = selectedEntryIds.includes(item.entryId);
                       return (
-                        <div key={`${item.entryId}-${item.driverPersonId}`} className="border-t px-3 py-2 first:border-t-0">
-                          <div className="text-sm font-medium text-slate-900">{item.driverLabel}</div>
-                          <div className="text-xs text-slate-600">{item.entryLabel}</div>
+                        <div key={item.driverPersonId} className="border-t px-3 py-2 first:border-t-0">
+                          <div className="text-sm font-medium text-slate-900">
+                            {item.driverName}
+                            {item.driverEmail ? ` (${item.driverEmail})` : ""}
+                          </div>
+                          <div className="text-xs text-slate-600">
+                            {item.className} · #{item.startNumber}
+                          </div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Button
                               type="button"
@@ -644,15 +702,6 @@ export function AdminCommunicationPage() {
                             >
                               {driverSelected ? "Fahrer gewählt" : "Fahrer wählen"}
                             </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={entrySelected ? "default" : "outline"}
-                              disabled={entrySelected}
-                              onClick={() => addEntryTarget(item)}
-                            >
-                              {entrySelected ? "Nennung gewählt" : "Nennung wählen"}
-                            </Button>
                           </div>
                         </div>
                       );
@@ -662,47 +711,25 @@ export function AdminCommunicationPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-md border bg-white p-2">
-                <div className="text-xs font-medium text-slate-700">Ausgewählte Fahrer ({selectedDriverTargets.length})</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedDriverTargets.length === 0 && <span className="text-xs text-slate-500">Keine</span>}
-                  {selectedDriverTargets.map((target) => (
-                    <button
-                      key={target.id}
-                      type="button"
-                      onClick={() => removeDriverTarget(target.id)}
-                      className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                      title="Entfernen"
-                    >
-                      {target.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-md border bg-white p-2">
-                <div className="text-xs font-medium text-slate-700">Ausgewählte Nennungen ({selectedEntryTargets.length})</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedEntryTargets.length === 0 && <span className="text-xs text-slate-500">Keine</span>}
-                  {selectedEntryTargets.map((target) => (
-                    <button
-                      key={target.id}
-                      type="button"
-                      onClick={() => removeEntryTarget(target.id)}
-                      className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                      title="Entfernen"
-                    >
-                      {target.label}
-                    </button>
-                  ))}
-                </div>
+            <div className="rounded-md border bg-white p-2">
+              <div className="text-xs font-medium text-slate-700">Ausgewählte Fahrer ({selectedDriverTargets.length})</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selectedDriverTargets.length === 0 && <span className="text-xs text-slate-500">Keine</span>}
+                {selectedDriverTargets.map((target) => (
+                  <button
+                    key={target.id}
+                    type="button"
+                    onClick={() => removeDriverTarget(target.id)}
+                    className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    title="Entfernen"
+                  >
+                    {target.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
-              <span className="font-medium">Modus:</span>
-              <Badge variant="outline">{hasFilterTargets ? "Filter aktiv" : "Kein Filter"}</Badge>
-              <Badge variant="outline">{hasDirectTargets ? "Direktauswahl aktiv" : "Keine Direktauswahl"}</Badge>
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
               <Button type="button" size="sm" variant="outline" disabled={!form.templateKey || resolvingRecipients} onClick={() => void resolveRecipients()}>
                 {resolvingRecipients ? "Prüfe Empfänger..." : "Empfänger prüfen"}
               </Button>
@@ -835,7 +862,13 @@ export function AdminCommunicationPage() {
               <Button
                 className="w-full bg-white text-slate-900 hover:bg-slate-100 md:w-auto"
                 type="button"
-                disabled={queueing || !form.templateKey || sendBlockedByMissingPlaceholders}
+                disabled={
+                  queueing ||
+                  !form.templateKey ||
+                  !templateExistsInBackend ||
+                  sendBlockedByRecipientSelection ||
+                  sendBlockedByMissingPlaceholders
+                }
                 onClick={() => void queueBroadcast()}
               >
                 {queueing ? (

@@ -1,6 +1,7 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
 import type {
+  MailRecipientSearchItem,
   MailTemplate,
   MailTemplatePlaceholder,
   MailTemplatePreview,
@@ -53,6 +54,11 @@ type MailTemplatePlaceholdersResponse = {
   ok: true;
   templateKey: string;
   placeholders: MailTemplatePlaceholder[];
+};
+
+type MailRecipientSearchResponse = {
+  ok: true;
+  recipients: MailRecipientSearchItem[];
 };
 
 type MailSendResponse = {
@@ -184,6 +190,27 @@ export const communicationService = {
   async listTemplatePlaceholders(key: string) {
     const response = await requestJson<MailTemplatePlaceholdersResponse>(`/admin/mail/templates/${key}/placeholders`);
     return response.placeholders;
+  },
+
+  async searchRecipients(payload: {
+    query?: string;
+    classId?: string;
+    acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+    paymentStatus?: "due" | "paid";
+    limit?: number;
+  }) {
+    const eventId = await getAdminEventId();
+    const response = await requestJson<MailRecipientSearchResponse>("/admin/mail/recipients/search", {
+      query: {
+        eventId,
+        q: payload.query?.trim() || undefined,
+        classId: payload.classId || undefined,
+        acceptanceStatus: payload.acceptanceStatus || undefined,
+        paymentStatus: payload.paymentStatus || undefined,
+        limit: payload.limit || undefined
+      }
+    });
+    return response.recipients;
   },
 
   async resolveBroadcastRecipients(payload: {
