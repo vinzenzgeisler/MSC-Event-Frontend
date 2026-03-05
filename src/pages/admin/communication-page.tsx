@@ -12,6 +12,7 @@ import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/li
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
+import { adminEntriesService } from "@/services/admin-entries.service";
 import type {
   BroadcastForm,
   MailTemplate,
@@ -34,6 +35,13 @@ const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 
 type TemplateDrafts = Record<string, { subject: string; body: string }>;
 type StaticTemplateOption = { key: string; label: string };
+type RecipientTarget = { id: string; label: string };
+type RecipientSearchItem = {
+  entryId: string;
+  driverPersonId: string;
+  driverLabel: string;
+  entryLabel: string;
+};
 
 const FALLBACK_TEMPLATE_OPTIONS: StaticTemplateOption[] = [
   { key: "registration_received", label: "Verifizierungs-Mail" },
@@ -66,30 +74,6 @@ function parseEmailList(value: string) {
   };
 }
 
-function parseUuidList(value: string) {
-  const parts = value
-    .split(/[\n,;]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  const unique: string[] = [];
-  const seen = new Set<string>();
-  parts.forEach((rawValue) => {
-    const normalized = rawValue.toLowerCase();
-    if (seen.has(normalized)) {
-      return;
-    }
-    seen.add(normalized);
-    unique.push(rawValue);
-  });
-
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return {
-    valid: unique.filter((id) => uuidPattern.test(id)),
-    invalid: unique.filter((id) => !uuidPattern.test(id))
-  };
-}
-
 function extractTemplateTokens(value: string) {
   const tokens = new Set<string>();
   value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => {
@@ -113,8 +97,11 @@ export function AdminCommunicationPage() {
   const [templateBody, setTemplateBody] = useState("");
   const templateDraftsRef = useRef<TemplateDrafts>({});
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
-  const [driverPersonIdsInput, setDriverPersonIdsInput] = useState("");
-  const [entryIdsInput, setEntryIdsInput] = useState("");
+  const [recipientSearchQuery, setRecipientSearchQuery] = useState("");
+  const [recipientSearchResults, setRecipientSearchResults] = useState<RecipientSearchItem[]>([]);
+  const [searchingRecipients, setSearchingRecipients] = useState(false);
+  const [selectedDriverTargets, setSelectedDriverTargets] = useState<RecipientTarget[]>([]);
+  const [selectedEntryTargets, setSelectedEntryTargets] = useState<RecipientTarget[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
@@ -213,9 +200,13 @@ export function AdminCommunicationPage() {
   }, [form.subjectOverride, form.templateKey, templateBody, templatePlaceholders]);
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
-  const selectedDriverPersonIds = useMemo(() => parseUuidList(driverPersonIdsInput), [driverPersonIdsInput]);
-  const selectedEntryIds = useMemo(() => parseUuidList(entryIdsInput), [entryIdsInput]);
-  const hasDirectTargets = selectedDriverPersonIds.valid.length > 0 || selectedEntryIds.valid.length > 0;
+  const selectedDriverPersonIds = useMemo(() => selectedDriverTargets.map((target) => target.id), [selectedDriverTargets]);
+  const selectedEntryIds = useMemo(() => selectedEntryTargets.map((target) => target.id), [selectedEntryTargets]);
+  const hasDirectTargets = selectedDriverPersonIds.length > 0 || selectedEntryIds.length > 0;
+  const hasFilterTargets = useMemo(
+    () => form.classId !== "all" || form.acceptanceStatus !== "all" || form.paymentStatus !== "all",
+    [form.acceptanceStatus, form.classId, form.paymentStatus]
+  );
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
@@ -353,6 +344,95 @@ export function AdminCommunicationPage() {
     window.localStorage.setItem(TEMPLATE_DRAFTS_STORAGE_KEY, JSON.stringify(next));
   }, [form.subjectOverride, form.templateKey, templateBody]);
 
+  useEffect(() => {
+    const query = recipientSearchQuery.trim();
+    if (query.length < 2) {
+      setRecipientSearchResults([]);
+      setSearchingRecipients(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setSearchingRecipients(true);
+      adminEntriesService
+        .listEntriesPage(
+          {
+            query,
+            classId: "all",
+            acceptanceStatus: "all",
+            paymentStatus: "all",
+            checkinIdVerified: "all",
+            sortBy: "createdAt",
+            sortDir: "desc"
+          },
+          { limit: 20 }
+        )
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+
+          const mapped = result.entries
+            .map((entry): RecipientSearchItem | null => {
+              if (!entry.driverPersonIdRaw) {
+                return null;
+              }
+              return {
+                entryId: entry.id,
+                driverPersonId: entry.driverPersonIdRaw,
+                driverLabel: `${entry.name}${entry.driverEmailRaw ? ` (${entry.driverEmailRaw})` : ""}`,
+                entryLabel: `${entry.name} · ${entry.classLabel} · #${entry.startNumber}`
+              };
+            })
+            .filter((item): item is RecipientSearchItem => item !== null);
+
+          setRecipientSearchResults(mapped);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setRecipientSearchResults([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setSearchingRecipients(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [recipientSearchQuery]);
+
+  const addDriverTarget = (candidate: RecipientSearchItem) => {
+    setSelectedDriverTargets((prev) => {
+      if (prev.some((item) => item.id === candidate.driverPersonId)) {
+        return prev;
+      }
+      return [...prev, { id: candidate.driverPersonId, label: candidate.driverLabel }];
+    });
+  };
+
+  const addEntryTarget = (candidate: RecipientSearchItem) => {
+    setSelectedEntryTargets((prev) => {
+      if (prev.some((item) => item.id === candidate.entryId)) {
+        return prev;
+      }
+      return [...prev, { id: candidate.entryId, label: candidate.entryLabel }];
+    });
+  };
+
+  const removeDriverTarget = (id: string) => {
+    setSelectedDriverTargets((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const removeEntryTarget = (id: string) => {
+    setSelectedEntryTargets((prev) => prev.filter((item) => item.id !== id));
+  };
+
   const applyTemplateSelection = (nextTemplateKey: string) => {
     if (nextTemplateKey === form.templateKey) {
       return;
@@ -385,20 +465,16 @@ export function AdminCommunicationPage() {
       showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
       return;
     }
-    if (selectedDriverPersonIds.invalid.length > 0 || selectedEntryIds.invalid.length > 0) {
-      showToast("Gezielte Empfänger enthalten ungültige UUIDs.");
-      return;
-    }
 
     setResolvingRecipients(true);
     try {
       const result = await communicationService.resolveBroadcastRecipients({
-        classId: hasDirectTargets ? undefined : form.classId !== "all" ? form.classId : undefined,
-        acceptanceStatus: hasDirectTargets ? undefined : form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-        paymentStatus: hasDirectTargets ? undefined : form.paymentStatus !== "all" ? form.paymentStatus : undefined,
+        classId: form.classId !== "all" ? form.classId : undefined,
+        acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+        paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined,
         additionalEmails: additionalRecipients.valid,
-        driverPersonIds: selectedDriverPersonIds.valid,
-        entryIds: selectedEntryIds.valid
+        driverPersonIds: selectedDriverPersonIds,
+        entryIds: selectedEntryIds
       });
       setResolvedRecipients(result);
       showToast(`Empfänger aufgelöst: ${result.finalCount}`);
@@ -424,10 +500,6 @@ export function AdminCommunicationPage() {
       showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
       return;
     }
-    if (selectedDriverPersonIds.invalid.length > 0 || selectedEntryIds.invalid.length > 0) {
-      showToast("Gezielte Empfänger enthalten ungültige UUIDs.");
-      return;
-    }
     if (sendBlockedByMissingPlaceholders) {
       showToast("Pflicht-Platzhalter fehlen im Preview. Versand ist blockiert.");
       return;
@@ -440,15 +512,13 @@ export function AdminCommunicationPage() {
         subjectOverride: form.subjectOverride.trim() || undefined,
         bodyOverride: templateBody.trim() || undefined,
         additionalEmails: additionalRecipients.valid,
-        driverPersonIds: selectedDriverPersonIds.valid,
-        entryIds: selectedEntryIds.valid,
-        filters: hasDirectTargets
-          ? undefined
-          : {
-              classId: form.classId !== "all" ? form.classId : undefined,
-              acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-              paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined
-            }
+        driverPersonIds: selectedDriverPersonIds,
+        entryIds: selectedEntryIds,
+        filters: {
+          classId: form.classId !== "all" ? form.classId : undefined,
+          acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+          paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined
+        }
       });
 
       showToast(`Mailversand eingeplant (${result.queued} Empfänger).`);
@@ -468,66 +538,191 @@ export function AdminCommunicationPage() {
       <h1 className="text-2xl font-semibold text-slate-900">Kommunikation</h1>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Template Emails & Broadcast</CardTitle>
+        <CardHeader className="space-y-2">
+          <CardTitle>Kampagne erstellen</CardTitle>
+          <p className="text-sm text-slate-600">Schrittweise: Empfänger wählen, Template anpassen, Preview prüfen, senden.</p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <CardContent className="space-y-4">
+          <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <div className="text-sm font-semibold text-slate-900">1. Empfänger definieren</div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-1">
+                <Label>Klasse</Label>
+                <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
+                  <SelectTrigger className="text-base md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    {classOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
+                <Select
+                  value={form.acceptanceStatus}
+                  onValueChange={(next) => setForm((prev) => ({ ...prev, acceptanceStatus: next as BroadcastForm["acceptanceStatus"] }))}
+                >
+                  <SelectTrigger className="text-base md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="pending">Offen</SelectItem>
+                    <SelectItem value="shortlist">Vorauswahl</SelectItem>
+                    <SelectItem value="accepted">Zugelassen</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Zahlung</Label>
+                <Select
+                  value={form.paymentStatus}
+                  onValueChange={(next) => setForm((prev) => ({ ...prev, paymentStatus: next as BroadcastForm["paymentStatus"] }))}
+                >
+                  <SelectTrigger className="text-base md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="due">{paymentStatusLabel("due")}</SelectItem>
+                    <SelectItem value="paid">{paymentStatusLabel("paid")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-1">
-              <Label>Klasse</Label>
-              <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
-                <SelectTrigger className="text-base md:text-sm" disabled={hasDirectTargets}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle</SelectItem>
-                  {classOptions.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>
-                      {option.name}
-                    </SelectItem>
+              <Label>Zusätzliche E-Mails (optional)</Label>
+              <textarea
+                className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={additionalEmailsInput}
+                onChange={(event) => setAdditionalEmailsInput(event.target.value)}
+                placeholder="mail1@example.com, mail2@example.com"
+              />
+              <p className="text-xs text-slate-500">
+                Zusätzlich gültig: {additionalRecipients.valid.length}
+                {additionalRecipients.invalid.length > 0 ? ` · Ungültig: ${additionalRecipients.invalid.length}` : ""}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Gezielt Fahrer oder Nennung hinzufügen</Label>
+              <Input
+                value={recipientSearchQuery}
+                onChange={(event) => setRecipientSearchQuery(event.target.value)}
+                placeholder="Name, E-Mail, Klasse oder Startnummer suchen"
+              />
+              <div className="rounded-md border bg-white">
+                {searchingRecipients ? (
+                  <div className="px-3 py-2 text-xs text-slate-500">Suche läuft...</div>
+                ) : recipientSearchQuery.trim().length < 2 ? (
+                  <div className="px-3 py-2 text-xs text-slate-500">Mindestens 2 Zeichen eingeben.</div>
+                ) : recipientSearchResults.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto">
+                    {recipientSearchResults.map((item) => {
+                      const driverSelected = selectedDriverPersonIds.includes(item.driverPersonId);
+                      const entrySelected = selectedEntryIds.includes(item.entryId);
+                      return (
+                        <div key={`${item.entryId}-${item.driverPersonId}`} className="border-t px-3 py-2 first:border-t-0">
+                          <div className="text-sm font-medium text-slate-900">{item.driverLabel}</div>
+                          <div className="text-xs text-slate-600">{item.entryLabel}</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={driverSelected ? "default" : "outline"}
+                              disabled={driverSelected}
+                              onClick={() => addDriverTarget(item)}
+                            >
+                              {driverSelected ? "Fahrer gewählt" : "Fahrer wählen"}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={entrySelected ? "default" : "outline"}
+                              disabled={entrySelected}
+                              onClick={() => addEntryTarget(item)}
+                            >
+                              {entrySelected ? "Nennung gewählt" : "Nennung wählen"}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-md border bg-white p-2">
+                <div className="text-xs font-medium text-slate-700">Ausgewählte Fahrer ({selectedDriverTargets.length})</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedDriverTargets.length === 0 && <span className="text-xs text-slate-500">Keine</span>}
+                  {selectedDriverTargets.map((target) => (
+                    <button
+                      key={target.id}
+                      type="button"
+                      onClick={() => removeDriverTarget(target.id)}
+                      className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                      title="Entfernen"
+                    >
+                      {target.label}
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
+              <div className="rounded-md border bg-white p-2">
+                <div className="text-xs font-medium text-slate-700">Ausgewählte Nennungen ({selectedEntryTargets.length})</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedEntryTargets.length === 0 && <span className="text-xs text-slate-500">Keine</span>}
+                  {selectedEntryTargets.map((target) => (
+                    <button
+                      key={target.id}
+                      type="button"
+                      onClick={() => removeEntryTarget(target.id)}
+                      className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                      title="Entfernen"
+                    >
+                      {target.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Status</Label>
-              <Select
-                value={form.acceptanceStatus}
-                onValueChange={(next) => setForm((prev) => ({ ...prev, acceptanceStatus: next as BroadcastForm["acceptanceStatus"] }))}
-              >
-                <SelectTrigger className="text-base md:text-sm" disabled={hasDirectTargets}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle</SelectItem>
-                  <SelectItem value="pending">Offen</SelectItem>
-                  <SelectItem value="shortlist">Vorauswahl</SelectItem>
-                  <SelectItem value="accepted">Zugelassen</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+              <span className="font-medium">Modus:</span>
+              <Badge variant="outline">{hasFilterTargets ? "Filter aktiv" : "Kein Filter"}</Badge>
+              <Badge variant="outline">{hasDirectTargets ? "Direktauswahl aktiv" : "Keine Direktauswahl"}</Badge>
+              <Button type="button" size="sm" variant="outline" disabled={!form.templateKey || resolvingRecipients} onClick={() => void resolveRecipients()}>
+                {resolvingRecipients ? "Prüfe Empfänger..." : "Empfänger prüfen"}
+              </Button>
             </div>
-            <div className="space-y-1">
-              <Label>Zahlung</Label>
-              <Select
-                value={form.paymentStatus}
-                onValueChange={(next) => setForm((prev) => ({ ...prev, paymentStatus: next as BroadcastForm["paymentStatus"] }))}
-              >
-                <SelectTrigger className="text-base md:text-sm" disabled={hasDirectTargets}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle</SelectItem>
-                  <SelectItem value="due">{paymentStatusLabel("due")}</SelectItem>
-                  <SelectItem value="paid">{paymentStatusLabel("paid")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {resolvedRecipients && (
+              <div className="rounded-md border bg-white px-3 py-2 text-sm text-slate-700">
+                <div>Finale Empfänger: {resolvedRecipients.finalCount}</div>
+                <div>Duplikate entfernt: {resolvedRecipients.duplicatesRemoved}</div>
+                {resolvedRecipients.invalidEmails.length > 0 && (
+                  <div className="mt-1 text-xs text-amber-700">Ungültige E-Mails: {resolvedRecipients.invalidEmails.join(", ")}</div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <div className="text-sm font-semibold text-slate-900">2. Vorlage & Inhalt</div>
             <div className="space-y-1">
               <Label>Template</Label>
-              <Select
-                value={form.templateKey || "__none__"}
-                onValueChange={(next) => applyTemplateSelection(next === "__none__" ? "" : next)}
-              >
+              <Select value={form.templateKey || "__none__"} onValueChange={(next) => applyTemplateSelection(next === "__none__" ? "" : next)}>
                 <SelectTrigger className="text-base md:text-sm">
                   <SelectValue placeholder={loadingTemplates ? "Templates laden..." : "Template wählen"} />
                 </SelectTrigger>
@@ -541,176 +736,104 @@ export function AdminCommunicationPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="space-y-4">
-              {selectedTemplate && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  <span>Template: {selectedTemplate.label}</span>
-                  <Badge variant="outline">{selectedTemplate.status}</Badge>
-                  <span>Version {selectedTemplate.version}</span>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <Label>Betreff</Label>
-                <Input
-                  value={form.subjectOverride}
-                  onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))}
-                  placeholder="Betreff mit Platzhaltern, z. B. {{eventName}}"
-                  disabled={!form.templateKey}
-                />
+            {selectedTemplate && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border bg-white px-3 py-2 text-xs text-slate-600">
+                <span>{selectedTemplate.label}</span>
+                <Badge variant="outline">{selectedTemplate.status}</Badge>
+                <span>Version {selectedTemplate.version}</span>
               </div>
-              <div className="space-y-1">
-                <Label>Text</Label>
-                <textarea
-                  className="min-h-48 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={templateBody}
-                  onChange={(event) => setTemplateBody(event.target.value)}
-                  placeholder="Mailtext, z. B. mit {{firstName}}, {{verificationUrl}}"
-                  disabled={!form.templateKey}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Zusätzliche E-Mails trotz Filter</Label>
-                <textarea
-                  className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={additionalEmailsInput}
-                  onChange={(event) => setAdditionalEmailsInput(event.target.value)}
-                  placeholder="mail1@example.com, mail2@example.com"
-                />
-                <p className="text-xs text-slate-500">
-                  Zusätzlich gültig: {additionalRecipients.valid.length}
-                  {additionalRecipients.invalid.length > 0 ? ` · Ungültig: ${additionalRecipients.invalid.length}` : ""}
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>Gezielte Fahrer-IDs (driverPersonIds)</Label>
-                  <textarea
-                    className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={driverPersonIdsInput}
-                    onChange={(event) => setDriverPersonIdsInput(event.target.value)}
-                    placeholder="UUIDs, getrennt mit Komma oder Zeilenumbruch"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Gültig: {selectedDriverPersonIds.valid.length}
-                    {selectedDriverPersonIds.invalid.length > 0 ? ` · Ungültig: ${selectedDriverPersonIds.invalid.length}` : ""}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label>Gezielte Nennungs-IDs (entryIds)</Label>
-                  <textarea
-                    className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={entryIdsInput}
-                    onChange={(event) => setEntryIdsInput(event.target.value)}
-                    placeholder="UUIDs, getrennt mit Komma oder Zeilenumbruch"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Gültig: {selectedEntryIds.valid.length}
-                    {selectedEntryIds.invalid.length > 0 ? ` · Ungültig: ${selectedEntryIds.invalid.length}` : ""}
-                  </p>
-                </div>
-              </div>
-              {hasDirectTargets && (
-                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-                  Gezielte Empfänger aktiv: Klassen-/Status-/Zahlungsfilter werden für Resolve und Send ignoriert.
-                </div>
-              )}
-
-              <details className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <summary className="cursor-pointer font-medium text-slate-900">Hilfe: Dynamische Platzhalter</summary>
-                <div className="mt-3 space-y-2">
-                  {!form.templateKey && (
-                    <div className="text-xs text-slate-500">Kein Template gewählt: Platzhalter werden nach Auswahl geladen.</div>
-                  )}
-                  {form.templateKey && loadingPlaceholders && <div className="text-xs text-slate-500">Lade Platzhalter...</div>}
-                  {form.templateKey && !loadingPlaceholders && templatePlaceholders.length === 0 && (
-                    <div className="text-xs text-slate-500">Für dieses Template sind keine Platzhalter hinterlegt.</div>
-                  )}
-                  {templatePlaceholders.map((item) => (
-                    <div key={item.name} className="rounded border border-slate-200 bg-white px-2 py-1.5">
-                      <div className="font-mono text-xs text-slate-900">{`{{${item.name}}}`}</div>
-                      <div className="text-xs text-slate-600">{item.description}</div>
-                      <div className="mt-1 text-[11px] text-slate-500">{item.required ? "Pflichtplatzhalter" : "Optional"}</div>
-                      <div className="text-[11px] text-slate-500">
-                        Beispiel: <span className="font-mono">{item.example || "-"}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </details>
-
-              {unresolvedTokens.length > 0 && (
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  Nicht bekannte Platzhalter im aktuellen Entwurf: {unresolvedTokens.join(", ")}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" disabled={!form.templateKey || resolvingRecipients} onClick={() => void resolveRecipients()}>
-                  {resolvingRecipients ? "Empfänger werden geprüft..." : "Empfänger prüfen"}
-                </Button>
-              </div>
-
-              {resolvedRecipients && (
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <div>Finale Empfänger: {resolvedRecipients.finalCount}</div>
-                  <div>Duplikate entfernt: {resolvedRecipients.duplicatesRemoved}</div>
-                  {resolvedRecipients.invalidEmails.length > 0 && (
-                    <div className="mt-1 text-xs text-amber-700">Ungültige E-Mails: {resolvedRecipients.invalidEmails.join(", ")}</div>
-                  )}
-                </div>
-              )}
+            )}
+            <div className="space-y-1">
+              <Label>Betreff</Label>
+              <Input
+                value={form.subjectOverride}
+                onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))}
+                placeholder="Betreff mit Platzhaltern"
+                disabled={!form.templateKey}
+              />
             </div>
-
-            <div className="space-y-3 rounded-md border bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Mail-Preview (Backend HTML)</div>
-              {loadingPreview ? (
-                <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Lade Backend-Preview...</div>
-              ) : backendPreview ? (
-                <>
-                  <div className="rounded-md border bg-white p-3">
-                    <div className="text-xs uppercase text-slate-500">Betreff</div>
-                    <div className="mt-1 font-medium text-slate-900">{backendPreview.subjectRendered || "-"}</div>
-                  </div>
-                  <div className="rounded-md border bg-white p-2">
-                    <iframe
-                      title="Mail HTML Preview"
-                      srcDoc={backendPreview.htmlDocument}
-                      sandbox="allow-popups allow-popups-to-escape-sandbox"
-                      className="h-[520px] w-full rounded border-0"
-                    />
-                  </div>
-                  {backendPreview.warnings.length > 0 && (
-                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                      Warnungen: {backendPreview.warnings.join(" | ")}
-                    </div>
-                  )}
-                  {backendPreview.missingPlaceholders.length > 0 && (
-                    <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-900">
-                      Pflicht-Platzhalter fehlen: {backendPreview.missingPlaceholders.join(", ")}. Versand ist blockiert.
-                    </div>
-                  )}
-                  <div className="rounded-md border bg-white p-3 text-xs text-slate-600">
-                    Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}
-                    <br />
-                    Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}
-                    <br />
-                    Unbekannt: {backendPreview.unknownPlaceholders.join(", ") || "-"}
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Keine Backend-Preview verfügbar.</div>
-              )}
+            <div className="space-y-1">
+              <Label>Text</Label>
+              <textarea
+                className="min-h-44 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={templateBody}
+                onChange={(event) => setTemplateBody(event.target.value)}
+                placeholder="Mailinhalt"
+                disabled={!form.templateKey}
+              />
             </div>
-          </div>
+            {unresolvedTokens.length > 0 && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                Nicht bekannte Platzhalter: {unresolvedTokens.join(", ")}
+              </div>
+            )}
+            <details className="rounded-md border bg-white p-3 text-sm text-slate-700">
+              <summary className="cursor-pointer font-medium text-slate-900">Platzhalter-Hilfe</summary>
+              <div className="mt-3 space-y-2">
+                {!form.templateKey && <div className="text-xs text-slate-500">Template wählen, um Platzhalter zu sehen.</div>}
+                {form.templateKey && loadingPlaceholders && <div className="text-xs text-slate-500">Lade Platzhalter...</div>}
+                {form.templateKey && !loadingPlaceholders && templatePlaceholders.length === 0 && (
+                  <div className="text-xs text-slate-500">Keine Platzhalter hinterlegt.</div>
+                )}
+                {templatePlaceholders.map((item) => (
+                  <div key={item.name} className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+                    <div className="font-mono text-xs text-slate-900">{`{{${item.name}}}`}</div>
+                    <div className="text-xs text-slate-600">{item.description}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {item.required ? "Pflicht" : "Optional"} · Beispiel: <span className="font-mono">{item.example || "-"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </section>
 
-          <div>
+          <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+            <div className="text-sm font-semibold text-slate-900">3. Preview prüfen (Backend-Rendering)</div>
+            {loadingPreview ? (
+              <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Lade Preview...</div>
+            ) : backendPreview ? (
+              <>
+                <div className="rounded-md border bg-white p-3">
+                  <div className="text-xs uppercase text-slate-500">Betreff</div>
+                  <div className="mt-1 font-medium text-slate-900">{backendPreview.subjectRendered || "-"}</div>
+                </div>
+                <div className="rounded-md border bg-white p-2">
+                  <iframe
+                    title="Mail HTML Preview"
+                    srcDoc={backendPreview.htmlDocument}
+                    sandbox="allow-popups allow-popups-to-escape-sandbox"
+                    className="h-[520px] w-full rounded border-0"
+                  />
+                </div>
+                {backendPreview.warnings.length > 0 && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                    Warnungen: {backendPreview.warnings.join(" | ")}
+                  </div>
+                )}
+                {backendPreview.missingPlaceholders.length > 0 && (
+                  <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-900">
+                    Pflicht-Platzhalter fehlen: {backendPreview.missingPlaceholders.join(", ")}. Versand ist blockiert.
+                  </div>
+                )}
+                <div className="rounded-md border bg-white p-3 text-xs text-slate-600">
+                  Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}
+                  <br />
+                  Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}
+                  <br />
+                  Unbekannt: {backendPreview.unknownPlaceholders.join(", ") || "-"}
+                </div>
+              </>
+            ) : (
+              <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Keine Preview verfügbar.</div>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-slate-900 p-4 text-slate-50">
+            <div className="mb-3 text-sm font-semibold">4. Versand starten</div>
             {canManageCommunication ? (
               <Button
-                className="w-full md:w-auto"
+                className="w-full bg-white text-slate-900 hover:bg-slate-100 md:w-auto"
                 type="button"
                 disabled={queueing || !form.templateKey || sendBlockedByMissingPlaceholders}
                 onClick={() => void queueBroadcast()}
@@ -721,13 +844,13 @@ export function AdminCommunicationPage() {
                     Wird eingeplant...
                   </>
                 ) : (
-                  "Broadcast in Warteschlange legen"
+                  "Mailversand einplanen"
                 )}
               </Button>
             ) : (
-              <div className="text-sm text-slate-500">Nur Admin-Rollen dürfen Broadcasts starten.</div>
+              <div className="text-sm text-slate-300">Nur Admin-Rollen dürfen Broadcasts starten.</div>
             )}
-          </div>
+          </section>
         </CardContent>
       </Card>
 
