@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -12,7 +12,14 @@ import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/li
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
-import type { BroadcastForm, OutboxItem } from "@/types/admin";
+import type {
+  BroadcastForm,
+  MailTemplate,
+  MailTemplatePlaceholder,
+  MailTemplatePreview,
+  OutboxItem,
+  ResolveRecipientsResult
+} from "@/types/admin";
 
 const initialForm: BroadcastForm = {
   classId: "all",
@@ -21,108 +28,12 @@ const initialForm: BroadcastForm = {
   templateKey: "",
   subjectOverride: ""
 };
+
 const OUTBOX_PREVIEW_LIMIT = 10;
 const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 
-type TemplatePreset = {
-  key: string;
-  label: string;
-  defaultSubject: string;
-  defaultBody: string;
-  requiresVerificationLink?: boolean;
-};
-
-const TEMPLATE_PRESETS: TemplatePreset[] = [
-  {
-    key: "registration_received",
-    label: "Verifizierungs-Mail",
-    defaultSubject: "Bitte E-Mail verifizieren: {{eventName}}",
-    defaultBody:
-      "Hallo {{firstName}} {{lastName}},\n\nbitte bestaetige deine Anmeldung ueber diesen Link:\n{{verificationUrl}}\n\nDanach wird deine Nennung weiter verarbeitet.\n\nViele Gruesse\n{{eventName}}",
-    requiresVerificationLink: true
-  },
-  {
-    key: "preselection",
-    label: "Vorauswahl",
-    defaultSubject: "Vorauswahl fuer {{eventName}}",
-    defaultBody:
-      "Hallo {{firstName}} {{lastName}},\n\ndeine Nennung ist aktuell in der Vorauswahl. Wir melden uns mit dem finalen Status.\n\nViele Gruesse\n{{eventName}}"
-  },
-  {
-    key: "accepted_open_payment",
-    label: "Zulassung",
-    defaultSubject: "Zulassung: {{eventName}}",
-    defaultBody:
-      "Hallo {{firstName}} {{lastName}},\n\ndeine Nennung wurde zugelassen. Offener Betrag: {{amountOpen}}.\n\nViele Gruesse\n{{eventName}}"
-  },
-  {
-    key: "rejected",
-    label: "Ablehnung",
-    defaultSubject: "Statusupdate: {{eventName}}",
-    defaultBody:
-      "Hallo {{firstName}} {{lastName}},\n\nleider koennen wir deine Nennung fuer {{eventName}} nicht zulassen.\n\nViele Gruesse\n{{eventName}}"
-  },
-  {
-    key: "payment_reminder",
-    label: "Zahlungserinnerung",
-    defaultSubject: "Erinnerung Zahlung: {{eventName}}",
-    defaultBody:
-      "Hallo {{firstName}} {{lastName}},\n\nbitte begleiche den offenen Betrag von {{amountOpen}} fuer deine Nennung.\n\nViele Gruesse\n{{eventName}}"
-  }
-];
-
 type TemplateDrafts = Record<string, { subject: string; body: string }>;
-
-type PlaceholderHelpItem = {
-  token: string;
-  description: string;
-  usedIn: string[];
-  requiredIn?: string[];
-};
-
-const PLACEHOLDER_HELP: PlaceholderHelpItem[] = [
-  {
-    token: "eventName",
-    description: "Name des aktuellen Events",
-    usedIn: ["registration_received", "preselection", "accepted_open_payment", "rejected", "payment_reminder"]
-  },
-  {
-    token: "firstName",
-    description: "Vorname des Fahrers",
-    usedIn: ["registration_received", "preselection", "accepted_open_payment", "rejected", "payment_reminder"]
-  },
-  {
-    token: "lastName",
-    description: "Nachname des Fahrers",
-    usedIn: ["registration_received", "preselection", "accepted_open_payment", "rejected", "payment_reminder"]
-  },
-  {
-    token: "driverName",
-    description: "Vollständiger Name des Fahrers",
-    usedIn: ["accepted_open_payment", "payment_reminder"]
-  },
-  {
-    token: "className",
-    description: "Klassenname der Nennung",
-    usedIn: ["accepted_open_payment", "rejected"]
-  },
-  {
-    token: "startNumber",
-    description: "Startnummer der Nennung",
-    usedIn: ["accepted_open_payment", "rejected"]
-  },
-  {
-    token: "amountOpen",
-    description: "Offener Zahlungsbetrag",
-    usedIn: ["accepted_open_payment", "payment_reminder"]
-  },
-  {
-    token: "verificationUrl",
-    description: "Verifizierungs-Link aus Backend",
-    usedIn: ["registration_received"],
-    requiredIn: ["registration_received"]
-  }
-];
+type StaticTemplateOption = { key: string; label: string };
 
 function parseEmailList(value: string) {
   const parts = value
@@ -160,19 +71,35 @@ function renderTemplate(value: string, data: Record<string, string>) {
   return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => data[token] ?? `{{${token}}}`);
 }
 
+function normalizeTemplateOption(template: MailTemplate): StaticTemplateOption {
+  return {
+    key: template.key,
+    label: template.label || template.key
+  };
+}
+
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [templateBody, setTemplateBody] = useState("");
-  const [templateDrafts, setTemplateDrafts] = useState<TemplateDrafts>({});
+  const templateDraftsRef = useRef<TemplateDrafts>({});
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
+  const [templateOptions, setTemplateOptions] = useState<Array<{ key: string; label: string }>>([]);
+  const [templatesByKey, setTemplatesByKey] = useState<Map<string, MailTemplate>>(new Map());
+  const [templatePlaceholders, setTemplatePlaceholders] = useState<MailTemplatePlaceholder[]>([]);
+  const [backendPreview, setBackendPreview] = useState<MailTemplatePreview | null>(null);
+  const [resolvedRecipients, setResolvedRecipients] = useState<ResolveRecipientsResult | null>(null);
   const [outboxExpanded, setOutboxExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [loadingOutbox, setLoadingOutbox] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [loadingPlaceholders, setLoadingPlaceholders] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [resolvingRecipients, setResolvingRecipients] = useState(false);
   const [queueing, setQueueing] = useState(false);
 
   const showToast = (message: string) => {
@@ -197,6 +124,22 @@ export function AdminCommunicationPage() {
     }
   };
 
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const templates = await communicationService.listTemplates();
+      const mappedOptions = templates.map(normalizeTemplateOption);
+      setTemplateOptions(mappedOptions);
+      setTemplatesByKey(new Map(templates.map((item) => [item.key, item])));
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "Mail-Templates konnten nicht geladen werden."));
+      setTemplateOptions([]);
+      setTemplatesByKey(new Map());
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
   const resolveSubject = (subject: string) => {
     if (!subject.includes("{{")) {
       return subject;
@@ -205,10 +148,12 @@ export function AdminCommunicationPage() {
     return subject.replace(/\{\{\s*eventName\s*\}\}/gi, fallback);
   };
 
-  const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
-  const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
-
-  const selectedPreset = useMemo(() => TEMPLATE_PRESETS.find((item) => item.key === form.templateKey), [form.templateKey]);
+  const selectedTemplate = useMemo(() => {
+    if (!form.templateKey) {
+      return null;
+    }
+    return templatesByKey.get(form.templateKey) ?? null;
+  }, [form.templateKey, templatesByKey]);
 
   const previewData = useMemo(
     () => ({
@@ -228,26 +173,35 @@ export function AdminCommunicationPage() {
   const renderedBody = useMemo(() => renderTemplate(templateBody || "", previewData), [templateBody, previewData]);
 
   const unresolvedTokens = useMemo(() => {
-    const allTokens = [...extractTemplateTokens(form.subjectOverride), ...extractTemplateTokens(templateBody)];
-    const unique = Array.from(new Set(allTokens));
-    return unique.filter((token) => !(token in previewData));
-  }, [form.subjectOverride, previewData, templateBody]);
+    if (!form.templateKey) {
+      return [];
+    }
+    const allowed = new Set(templatePlaceholders.map((item) => item.name));
+    if (allowed.size === 0) {
+      return [];
+    }
+    const tokens = [...extractTemplateTokens(form.subjectOverride), ...extractTemplateTokens(templateBody)];
+    const unique = Array.from(new Set(tokens));
+    return unique.filter((token) => !allowed.has(token));
+  }, [form.subjectOverride, form.templateKey, templateBody, templatePlaceholders]);
 
   const verificationLinkMissing = useMemo(() => {
-    const requiresVerification = selectedPreset?.requiresVerificationLink || /registration|verify|verification/i.test(form.templateKey);
-    if (!requiresVerification) {
+    if (!form.templateKey) {
       return false;
     }
-    return !/\{\{\s*verificationUrl\s*\}\}/i.test(templateBody) && !/https?:\/\//i.test(templateBody);
-  }, [form.templateKey, selectedPreset?.requiresVerificationLink, templateBody]);
+    const verificationRule = templatePlaceholders.find((item) => item.name === "verificationUrl" && item.required);
+    if (!verificationRule && !/registration|verify|verification/i.test(form.templateKey)) {
+      return false;
+    }
+
+    const bodyHasToken = /\{\{\s*verificationUrl\s*\}\}/i.test(templateBody);
+    const bodyHasUrl = /https?:\/\//i.test(templateBody);
+    return !bodyHasToken && !bodyHasUrl;
+  }, [form.templateKey, templateBody, templatePlaceholders]);
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
-  const visiblePlaceholderHelp = useMemo(() => {
-    if (!form.templateKey) {
-      return PLACEHOLDER_HELP;
-    }
-    return PLACEHOLDER_HELP.filter((item) => item.usedIn.includes(form.templateKey));
-  }, [form.templateKey]);
+  const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
+  const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
 
   useEffect(() => {
     try {
@@ -257,15 +211,17 @@ export function AdminCommunicationPage() {
       }
       const parsed = JSON.parse(raw) as TemplateDrafts;
       if (parsed && typeof parsed === "object") {
-        setTemplateDrafts(parsed);
+        templateDraftsRef.current = parsed;
       }
     } catch {
-      setTemplateDrafts({});
+      templateDraftsRef.current = {};
     }
   }, []);
 
   useEffect(() => {
     void loadOutbox();
+    void loadTemplates();
+
     const refreshTimer = window.setInterval(() => {
       void loadOutbox({ silentError: true });
     }, 15000);
@@ -285,46 +241,131 @@ export function AdminCommunicationPage() {
     };
   }, []);
 
-  const applyTemplateSelection = (nextTemplateKey: string) => {
-    if (!nextTemplateKey) {
-      setForm((prev) => ({ ...prev, templateKey: "", subjectOverride: "" }));
-      setTemplateBody("");
+  useEffect(() => {
+    if (!form.templateKey) {
+      setTemplatePlaceholders([]);
+      setBackendPreview(null);
+      setResolvedRecipients(null);
       return;
     }
 
-    const fromDraft = templateDrafts[nextTemplateKey];
-    if (fromDraft) {
-      setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
-      setTemplateBody(fromDraft.body);
-      return;
-    }
+    let cancelled = false;
+    setLoadingPlaceholders(true);
+    communicationService
+      .listTemplatePlaceholders(form.templateKey)
+      .then((items) => {
+        if (!cancelled) {
+          setTemplatePlaceholders(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTemplatePlaceholders([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingPlaceholders(false);
+        }
+      });
 
-    const preset = TEMPLATE_PRESETS.find((item) => item.key === nextTemplateKey);
-    setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: preset?.defaultSubject ?? "" }));
-    setTemplateBody(preset?.defaultBody ?? "");
-  };
+    setLoadingPreview(true);
+    communicationService
+      .previewTemplate({
+        templateKey: form.templateKey,
+        sampleData: previewData
+      })
+      .then((result) => {
+        if (!cancelled) {
+          setBackendPreview(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBackendPreview(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingPreview(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.templateKey, previewData]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
     if (!key) {
       return;
     }
-    setTemplateDrafts((prev) => {
-      const existing = prev[key];
-      if (existing && existing.subject === form.subjectOverride && existing.body === templateBody) {
-        return prev;
+    const existing = templateDraftsRef.current[key];
+    if (existing && existing.subject === form.subjectOverride && existing.body === templateBody) {
+      return;
+    }
+    const next: TemplateDrafts = {
+      ...templateDraftsRef.current,
+      [key]: {
+        subject: form.subjectOverride,
+        body: templateBody
       }
-      const next: TemplateDrafts = {
-        ...prev,
-        [key]: {
-          subject: form.subjectOverride,
-          body: templateBody
-        }
-      };
-      window.localStorage.setItem(TEMPLATE_DRAFTS_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
+    };
+    templateDraftsRef.current = next;
+    window.localStorage.setItem(TEMPLATE_DRAFTS_STORAGE_KEY, JSON.stringify(next));
   }, [form.subjectOverride, form.templateKey, templateBody]);
+
+  const applyTemplateSelection = (nextTemplateKey: string) => {
+    if (nextTemplateKey === form.templateKey) {
+      return;
+    }
+
+    if (!nextTemplateKey) {
+      setForm((prev) => ({ ...prev, templateKey: "", subjectOverride: "" }));
+      setTemplateBody("");
+      return;
+    }
+
+    const fromDraft = templateDraftsRef.current[nextTemplateKey];
+    if (fromDraft) {
+      setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
+      setTemplateBody(fromDraft.body);
+      return;
+    }
+
+    const template = templatesByKey.get(nextTemplateKey);
+    setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: template?.subject ?? "" }));
+    setTemplateBody(template?.bodyText ?? "");
+  };
+
+  const resolveRecipients = async () => {
+    if (!form.templateKey) {
+      showToast("Bitte zuerst ein Template wählen.");
+      return;
+    }
+    if (additionalRecipients.invalid.length > 0) {
+      showToast("Zusätzliche E-Mails enthalten ungültige Adressen.");
+      return;
+    }
+
+    setResolvingRecipients(true);
+    try {
+      const result = await communicationService.resolveBroadcastRecipients({
+        classId: form.classId !== "all" ? form.classId : undefined,
+        acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+        paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined,
+        additionalEmails: additionalRecipients.valid
+      });
+      setResolvedRecipients(result);
+      showToast(`Empfänger aufgelöst: ${result.finalCount}`);
+    } catch (error) {
+      setResolvedRecipients(null);
+      showToast(getApiErrorMessage(error, "Empfänger konnten nicht aufgelöst werden."));
+    } finally {
+      setResolvingRecipients(false);
+    }
+  };
 
   const queueBroadcast = async () => {
     if (!canManageCommunication) {
@@ -343,37 +384,25 @@ export function AdminCommunicationPage() {
 
     setQueueing(true);
     try {
-      await communicationService.queueBroadcast({
-        ...form,
+      const result = await communicationService.sendMail({
         templateKey,
-        subjectOverride: form.subjectOverride.trim()
+        subjectOverride: form.subjectOverride.trim() || undefined,
+        bodyOverride: templateBody.trim() || undefined,
+        additionalEmails: additionalRecipients.valid,
+        filters: {
+          classId: form.classId !== "all" ? form.classId : undefined,
+          acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+          paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined
+        }
       });
 
-      let directSendFailures = 0;
-      for (const email of additionalRecipients.valid) {
-        try {
-          await communicationService.queueDirectMail({
-            toEmail: email,
-            templateKey,
-            subjectOverride: form.subjectOverride.trim(),
-            bodyOverride: templateBody.trim()
-          });
-        } catch {
-          directSendFailures += 1;
-        }
-      }
-
-      if (additionalRecipients.valid.length > 0 && directSendFailures > 0) {
-        showToast(`Broadcast geplant, ${directSendFailures} zusätzliche E-Mails konnten nicht eingeplant werden.`);
-      } else if (additionalRecipients.valid.length > 0) {
-        showToast(`Broadcast geplant, ${additionalRecipients.valid.length} zusätzliche E-Mails ergänzt.`);
-      } else {
-        showToast("Broadcast wurde in die Warteschlange gelegt.");
-      }
-
+      showToast(`Mailversand eingeplant (${result.queued} Empfänger).`);
       await loadOutbox();
+      if (!resolvedRecipients) {
+        await resolveRecipients();
+      }
     } catch (error) {
-      showToast(getApiErrorMessage(error, "Broadcast konnte nicht gestartet werden."));
+      showToast(getApiErrorMessage(error, "Mailversand konnte nicht gestartet werden."));
     } finally {
       setQueueing(false);
     }
@@ -443,15 +472,16 @@ export function AdminCommunicationPage() {
               <Select
                 value={form.templateKey || "__none__"}
                 onValueChange={(next) => applyTemplateSelection(next === "__none__" ? "" : next)}
+                disabled={loadingTemplates}
               >
                 <SelectTrigger className="text-base md:text-sm">
-                  <SelectValue placeholder="Template wählen" />
+                  <SelectValue placeholder={loadingTemplates ? "Templates laden..." : "Template wählen"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Template wählen</SelectItem>
-                  {TEMPLATE_PRESETS.map((preset) => (
-                    <SelectItem key={preset.key} value={preset.key}>
-                      {preset.label}
+                  {templateOptions.map((item) => (
+                    <SelectItem key={item.key} value={item.key}>
+                      {item.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -461,12 +491,21 @@ export function AdminCommunicationPage() {
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="space-y-4">
+              {selectedTemplate && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  <span>Template: {selectedTemplate.label}</span>
+                  <Badge variant="outline">{selectedTemplate.status}</Badge>
+                  <span>Version {selectedTemplate.version}</span>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <Label>Betreff</Label>
                 <Input
                   value={form.subjectOverride}
                   onChange={(event) => setForm((prev) => ({ ...prev, subjectOverride: event.target.value }))}
                   placeholder="Betreff mit Platzhaltern, z. B. {{eventName}}"
+                  disabled={!form.templateKey}
                 />
               </div>
               <div className="space-y-1">
@@ -476,6 +515,7 @@ export function AdminCommunicationPage() {
                   value={templateBody}
                   onChange={(event) => setTemplateBody(event.target.value)}
                   placeholder="Mailtext, z. B. mit {{firstName}}, {{verificationUrl}}"
+                  disabled={!form.templateKey}
                 />
               </div>
               <div className="space-y-1">
@@ -491,32 +531,27 @@ export function AdminCommunicationPage() {
                   {additionalRecipients.invalid.length > 0 ? ` · Ungültig: ${additionalRecipients.invalid.length}` : ""}
                 </p>
               </div>
+
               <details className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                 <summary className="cursor-pointer font-medium text-slate-900">Hilfe: Dynamische Platzhalter</summary>
                 <div className="mt-3 space-y-2">
                   {!form.templateKey && (
-                    <div className="text-xs text-slate-500">Kein Template gewählt: es werden alle verfügbaren Platzhalter angezeigt.</div>
+                    <div className="text-xs text-slate-500">Kein Template gewählt: Platzhalter werden nach Auswahl geladen.</div>
                   )}
-                  {form.templateKey && (
-                    <div className="text-xs text-slate-500">Template gewählt: es werden nur relevante Platzhalter angezeigt.</div>
+                  {form.templateKey && loadingPlaceholders && <div className="text-xs text-slate-500">Lade Platzhalter...</div>}
+                  {form.templateKey && !loadingPlaceholders && templatePlaceholders.length === 0 && (
+                    <div className="text-xs text-slate-500">Für dieses Template sind keine Platzhalter hinterlegt.</div>
                   )}
-                  {visiblePlaceholderHelp.map((item) => {
-                    return (
-                      <div key={item.token} className="rounded border border-slate-200 bg-white px-2 py-1.5">
-                        <div className="font-mono text-xs text-slate-900">{`{{${item.token}}}`}</div>
-                        <div className="text-xs text-slate-600">{item.description}</div>
-                        <div className="mt-1 text-[11px] text-slate-500">
-                          Verwendet in: {item.usedIn.join(", ")}
-                          {item.requiredIn?.length ? ` · Pflicht in: ${item.requiredIn.join(", ")}` : ""}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {form.templateKey && visiblePlaceholderHelp.length === 0 && (
-                    <div className="text-xs text-slate-500">Für dieses Template sind aktuell keine Platzhalter hinterlegt.</div>
-                  )}
+                  {templatePlaceholders.map((item) => (
+                    <div key={item.name} className="rounded border border-slate-200 bg-white px-2 py-1.5">
+                      <div className="font-mono text-xs text-slate-900">{`{{${item.name}}}`}</div>
+                      <div className="text-xs text-slate-600">{item.description}</div>
+                      <div className="mt-1 text-[11px] text-slate-500">{item.required ? "Pflichtplatzhalter" : "Optional"}</div>
+                    </div>
+                  ))}
                 </div>
               </details>
+
               {verificationLinkMissing && (
                 <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Verifizierungs-Mail ohne Link erkannt. Bitte <code>{"{{verificationUrl}}"}</code> oder eine URL einfügen.
@@ -524,13 +559,29 @@ export function AdminCommunicationPage() {
               )}
               {unresolvedTokens.length > 0 && (
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  Nicht auflösbare Platzhalter in der Preview: {unresolvedTokens.join(", ")}
+                  Nicht bekannte Platzhalter im aktuellen Entwurf: {unresolvedTokens.join(", ")}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" disabled={!form.templateKey || resolvingRecipients} onClick={() => void resolveRecipients()}>
+                  {resolvingRecipients ? "Empfänger werden geprüft..." : "Empfänger prüfen"}
+                </Button>
+              </div>
+
+              {resolvedRecipients && (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <div>Finale Empfänger: {resolvedRecipients.finalCount}</div>
+                  <div>Duplikate entfernt: {resolvedRecipients.duplicatesRemoved}</div>
+                  {resolvedRecipients.invalidEmails.length > 0 && (
+                    <div className="mt-1 text-xs text-amber-700">Ungültige E-Mails: {resolvedRecipients.invalidEmails.join(", ")}</div>
+                  )}
                 </div>
               )}
             </div>
 
             <div className="space-y-3 rounded-md border bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Mail-Preview</div>
+              <div className="text-sm font-semibold text-slate-900">Editor-Preview</div>
               <div className="rounded-md border bg-white p-3">
                 <div className="text-xs uppercase text-slate-500">Betreff</div>
                 <div className="mt-1 font-medium text-slate-900">{renderedSubject || "-"}</div>
@@ -539,12 +590,35 @@ export function AdminCommunicationPage() {
                 <div className="text-xs uppercase text-slate-500">Text</div>
                 <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{renderedBody || "-"}</pre>
               </div>
+
+              <div className="pt-2 text-sm font-semibold text-slate-900">Backend-Preview (gespeichertes Template)</div>
+              {loadingPreview ? (
+                <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Lade Backend-Preview...</div>
+              ) : backendPreview ? (
+                <>
+                  <div className="rounded-md border bg-white p-3">
+                    <div className="text-xs uppercase text-slate-500">Betreff</div>
+                    <div className="mt-1 font-medium text-slate-900">{backendPreview.subjectRendered || "-"}</div>
+                  </div>
+                  <div className="rounded-md border bg-white p-3">
+                    <div className="text-xs uppercase text-slate-500">Text</div>
+                    <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{backendPreview.bodyTextRendered || "-"}</pre>
+                  </div>
+                  <div className="rounded-md border bg-white p-3 text-xs text-slate-600">
+                    Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}
+                    <br />
+                    Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Keine Backend-Preview verfügbar.</div>
+              )}
             </div>
           </div>
 
           <div>
             {canManageCommunication ? (
-              <Button className="w-full md:w-auto" type="button" disabled={queueing} onClick={() => void queueBroadcast()}>
+              <Button className="w-full md:w-auto" type="button" disabled={queueing || !form.templateKey} onClick={() => void queueBroadcast()}>
                 {queueing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

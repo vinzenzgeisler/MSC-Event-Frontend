@@ -1,6 +1,13 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
-import type { BroadcastForm, OutboxItem, OutboxItemDto } from "@/types/admin";
+import type {
+  MailTemplate,
+  MailTemplatePlaceholder,
+  MailTemplatePreview,
+  OutboxItem,
+  OutboxItemDto,
+  ResolveRecipientsResult
+} from "@/types/admin";
 
 function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
   return {
@@ -26,6 +33,33 @@ type AdminMailQueueResponse = {
   outboxIds: string[];
 };
 
+type MailTemplatesResponse = {
+  ok: true;
+  templates: MailTemplate[];
+};
+
+type MailTemplateResponse = {
+  ok: true;
+  template: MailTemplate;
+};
+
+type MailTemplateVersionsResponse = {
+  ok: true;
+  key: string;
+  versions: MailTemplate[];
+};
+
+type MailTemplatePlaceholdersResponse = {
+  ok: true;
+  templateKey: string;
+  placeholders: MailTemplatePlaceholder[];
+};
+
+type MailSendResponse = {
+  ok: true;
+  queued: number;
+};
+
 export const communicationService = {
   async listOutbox() {
     const eventId = await getAdminEventId();
@@ -47,17 +81,147 @@ export const communicationService = {
     return sortedOutbox.map(fromOutboxDto);
   },
 
-  async queueBroadcast(form: BroadcastForm) {
+  async listTemplates() {
+    const response = await requestJson<MailTemplatesResponse>("/admin/mail/templates");
+    return response.templates;
+  },
+
+  async createTemplate(payload: {
+    key: string;
+    label: string;
+    subject: string;
+    bodyText: string;
+    bodyHtml?: string;
+    status?: "draft" | "published";
+    isActive?: boolean;
+  }) {
+    const response = await requestJson<MailTemplateResponse>("/admin/mail/templates", {
+      method: "POST",
+      body: {
+        key: payload.key,
+        label: payload.label,
+        subject: payload.subject,
+        bodyText: payload.bodyText,
+        bodyHtml: payload.bodyHtml || undefined,
+        status: payload.status || undefined,
+        isActive: payload.isActive
+      }
+    });
+    return response.template;
+  },
+
+  async updateTemplate(
+    key: string,
+    payload: {
+      label?: string;
+      subject?: string;
+      bodyText?: string;
+      bodyHtml?: string;
+      status?: "draft" | "published";
+      isActive?: boolean;
+    }
+  ) {
+    const response = await requestJson<MailTemplateResponse>(`/admin/mail/templates/${key}`, {
+      method: "PATCH",
+      body: {
+        label: payload.label,
+        subject: payload.subject,
+        bodyText: payload.bodyText,
+        bodyHtml: payload.bodyHtml,
+        status: payload.status,
+        isActive: payload.isActive
+      }
+    });
+    return response.template;
+  },
+
+  async listTemplateVersions(key: string) {
+    const response = await requestJson<MailTemplateVersionsResponse>(`/admin/mail/templates/${key}/versions`);
+    return response.versions;
+  },
+
+  async createTemplateVersion(
+    key: string,
+    payload: { subject: string; bodyText: string; bodyHtml?: string; status?: "draft" | "published" }
+  ) {
+    return requestJson<{ ok: true; key: string; version: number; status: "draft" | "published"; createdAt: string }>(
+      `/admin/mail/templates/${key}/versions`,
+      {
+        method: "POST",
+        body: {
+          subject: payload.subject,
+          bodyText: payload.bodyText,
+          bodyHtml: payload.bodyHtml || undefined,
+          status: payload.status || undefined
+        }
+      }
+    );
+  },
+
+  async previewTemplate(payload: { templateKey: string; entryId?: string; sampleData?: Record<string, unknown> }) {
+    return requestJson<MailTemplatePreview>("/admin/mail/templates/preview", {
+      method: "POST",
+      body: {
+        templateKey: payload.templateKey,
+        entryId: payload.entryId || undefined,
+        sampleData: payload.sampleData || undefined
+      }
+    });
+  },
+
+  async listTemplatePlaceholders(key: string) {
+    const response = await requestJson<MailTemplatePlaceholdersResponse>(`/admin/mail/templates/${key}/placeholders`);
+    return response.placeholders;
+  },
+
+  async resolveBroadcastRecipients(payload: {
+    classId?: string;
+    acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+    paymentStatus?: "due" | "paid";
+    additionalEmails?: string[];
+  }) {
     const eventId = await getAdminEventId();
-    return requestJson<AdminMailQueueResponse>("/admin/mail/broadcast/queue", {
+    return requestJson<ResolveRecipientsResult>("/admin/mail/broadcast/resolve-recipients", {
       method: "POST",
       body: {
         eventId,
-        templateKey: form.templateKey,
-        classId: form.classId !== "all" ? form.classId : undefined,
-        acceptanceStatus: form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
-        paymentStatus: form.paymentStatus !== "all" ? form.paymentStatus : undefined,
-        subjectOverride: form.subjectOverride || undefined
+        classId: payload.classId || undefined,
+        acceptanceStatus: payload.acceptanceStatus || undefined,
+        paymentStatus: payload.paymentStatus || undefined,
+        additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined
+      }
+    });
+  },
+
+  async sendMail(payload: {
+    templateKey: string;
+    subjectOverride?: string;
+    bodyOverride?: string;
+    additionalEmails?: string[];
+    filters?: {
+      classId?: string;
+      acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+      paymentStatus?: "due" | "paid";
+    };
+  }) {
+    const eventId = await getAdminEventId();
+    return requestJson<MailSendResponse>("/admin/mail/send", {
+      method: "POST",
+      body: {
+        eventId,
+        templateKey: payload.templateKey,
+        subjectOverride: payload.subjectOverride || undefined,
+        bodyOverride: payload.bodyOverride || undefined,
+        additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
+        filters:
+          payload.filters &&
+          (payload.filters.classId || payload.filters.acceptanceStatus || payload.filters.paymentStatus)
+            ? {
+                classId: payload.filters.classId || undefined,
+                acceptanceStatus: payload.filters.acceptanceStatus || undefined,
+                paymentStatus: payload.filters.paymentStatus || undefined
+              }
+            : undefined
       }
     });
   },

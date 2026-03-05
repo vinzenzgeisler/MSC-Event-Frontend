@@ -341,6 +341,44 @@ export type BroadcastForm = {
   subjectOverride: string;
 };
 
+export type MailTemplateStatus = "draft" | "published";
+
+export type MailTemplate = {
+  key: string;
+  label: string;
+  subject: string;
+  bodyText: string;
+  bodyHtml: string | null;
+  version: number;
+  status: MailTemplateStatus;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  isActive: boolean;
+};
+
+export type MailTemplatePlaceholder = {
+  name: string;
+  required: boolean;
+  description: string;
+};
+
+export type MailTemplatePreview = {
+  ok: true;
+  subjectRendered: string;
+  bodyTextRendered: string;
+  bodyHtmlRendered: string;
+  usedPlaceholders: string[];
+  missingPlaceholders: string[];
+};
+
+export type ResolveRecipientsResult = {
+  ok: true;
+  resolvedRecipients: string[];
+  invalidEmails: string[];
+  duplicatesRemoved: number;
+  finalCount: number;
+};
+
 export type OutboxItemDto = {
   id: Id;
   eventId?: Id | null;
