@@ -932,11 +932,11 @@ export function AdminCommunicationPage() {
             )}
           </section>
 
-          <section className="rounded-lg border border-primary/25 bg-primary p-4 text-primary-foreground">
+          <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-slate-900">
             <div className="mb-3 text-sm font-semibold">4. Versand starten</div>
             {canManageCommunication ? (
               <Button
-                className="w-full bg-yellow-400 text-slate-900 hover:bg-yellow-300 md:w-auto"
+                className="w-full border border-slate-200 bg-white text-slate-900 hover:bg-yellow-300 md:w-auto"
                 type="button"
                 disabled={
                   queueing ||
@@ -957,7 +957,7 @@ export function AdminCommunicationPage() {
                 )}
               </Button>
             ) : (
-              <div className="text-sm text-primary-foreground/85">Nur Admin-Rollen dürfen Broadcasts starten.</div>
+              <div className="text-sm text-slate-600">Nur Admin-Rollen dürfen Broadcasts starten.</div>
             )}
           </section>
         </CardContent>
