@@ -108,6 +108,48 @@ function isCampaignTemplate(template: MailTemplate) {
   return FALLBACK_CAMPAIGN_TEMPLATE_KEYS.has(template.key);
 }
 
+function readStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+}
+
+function getMissingPlaceholdersMessage(error: ApiError): string | null {
+  const code = (error.code ?? "").trim().toUpperCase();
+  if (code !== "MISSING_REQUIRED_PLACEHOLDERS") {
+    return null;
+  }
+
+  const details = error.details ?? {};
+  const missing = readStringList(
+    (details.missingPlaceholders as unknown) ??
+      (details.missing as unknown) ??
+      (details.requiredPlaceholders as unknown) ??
+      (details.placeholders as unknown)
+  );
+
+  const recipientCandidates = [
+    details.recipient,
+    details.toEmail,
+    details.email,
+    details.recipientEmail,
+    details.driverEmail
+  ];
+  const recipient = recipientCandidates.find((item) => typeof item === "string" && item.trim());
+  const recipientText = typeof recipient === "string" ? recipient.trim() : "";
+
+  if (missing.length === 0) {
+    return recipientText
+      ? `Pflicht-Platzhalter fehlen beim Versand für ${recipientText}.`
+      : "Pflicht-Platzhalter fehlen beim Versand.";
+  }
+
+  return recipientText
+    ? `Pflicht-Platzhalter fehlen beim Versand für ${recipientText}: ${missing.join(", ")}.`
+    : `Pflicht-Platzhalter fehlen beim Versand: ${missing.join(", ")}.`;
+}
+
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
@@ -579,6 +621,11 @@ export function AdminCommunicationPage() {
         const code = (error.code ?? "").trim().toUpperCase();
         if (code === "TEMPLATE_NOT_ALLOWED_IN_CAMPAIGN") {
           showToast("Dieses Template ist ein Prozess-Template und kann nur in der Detailansicht versendet werden.");
+          return;
+        }
+        const missingPlaceholdersMessage = getMissingPlaceholdersMessage(error);
+        if (missingPlaceholdersMessage) {
+          showToast(missingPlaceholdersMessage);
           return;
         }
       }
