@@ -1,4 +1,5 @@
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
+import { ApiError } from "@/services/api/http-client";
 import { requestJson } from "@/services/api/http-client";
 import { CONSENT_VERSION } from "@/config/legal-texts";
 import { resolveCountryCode, resolveCountryToCanonical } from "@/lib/countries";
@@ -252,6 +253,51 @@ type PublicVerifyEmailResponse = {
   alreadyVerified?: boolean;
 };
 
+async function submitWizardFallbackSingle(
+  eventId: string,
+  normalizedForm: RegistrationWizardForm
+): Promise<RegistrationSubmitResult> {
+  const attemptedEntries = normalizedForm.starts.length;
+  const createdEntryIds: string[] = [];
+  let lastStatus: RegistrationSubmitResult["status"] = "submitted_unverified";
+
+  for (let index = 0; index < attemptedEntries; index += 1) {
+    const consentCapturedAt = new Date().toISOString();
+    const entryPayload = toCreateEntryRequestDto(normalizedForm, index, consentCapturedAt);
+
+    try {
+      const entryResponse = await requestJson<PublicCreateEntryResponse>(`/public/events/${eventId}/entries`, {
+        method: "POST",
+        auth: false,
+        body: entryPayload
+      });
+      createdEntryIds.push(entryResponse.entryId);
+      lastStatus = entryResponse.registrationStatus;
+    } catch (error) {
+      if (createdEntryIds.length > 0) {
+        return {
+          ok: false,
+          createdEntries: createdEntryIds.length,
+          attemptedEntries,
+          status: lastStatus,
+          entryIds: createdEntryIds,
+          entryCount: createdEntryIds.length
+        };
+      }
+      throw error;
+    }
+  }
+
+  return {
+    ok: true,
+    createdEntries: createdEntryIds.length,
+    attemptedEntries,
+    status: lastStatus,
+    entryIds: createdEntryIds,
+    entryCount: createdEntryIds.length
+  };
+}
+
 function asNonNegativeNumber(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isFinite(value) && value >= 0 ? value : null;
@@ -442,11 +488,23 @@ export const registrationService = {
     const eventId = await getPublicEventId();
     const clientSubmissionKey = options?.clientSubmissionKey?.trim() || buildClientSubmissionKey();
     const batchPayload = toBatchRequestDto(normalizedForm, clientSubmissionKey);
-    const batchResponse = await requestJson<PublicCreateEntriesBatchResponse>(`/public/events/${eventId}/entries/batch`, {
-      method: "POST",
-      auth: false,
-      body: batchPayload
-    });
+    let batchResponse: PublicCreateEntriesBatchResponse;
+    try {
+      batchResponse = await requestJson<PublicCreateEntriesBatchResponse>(`/public/events/${eventId}/entries/batch`, {
+        method: "POST",
+        auth: false,
+        body: batchPayload
+      });
+    } catch (error) {
+      // Backward compatibility for deployments where batch route is not yet available.
+      if (error instanceof ApiError) {
+        const status = Number(error.status);
+        if (status === 404 || status === 405 || status === 501) {
+          return submitWizardFallbackSingle(eventId, normalizedForm);
+        }
+      }
+      throw error;
+    }
 
     return {
       ok: true,
