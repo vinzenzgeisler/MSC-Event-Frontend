@@ -241,6 +241,7 @@ export const communicationService = {
     subjectOverride?: string;
     bodyOverride?: string;
     bodyHtmlOverride?: string;
+    templateData?: Record<string, unknown>;
     additionalEmails?: string[];
     driverPersonIds?: string[];
     entryIds?: string[];
@@ -259,6 +260,7 @@ export const communicationService = {
         subjectOverride: payload.subjectOverride || undefined,
         bodyOverride: payload.bodyOverride || undefined,
         bodyHtmlOverride: payload.bodyHtmlOverride || undefined,
+        templateData: payload.templateData || undefined,
         additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
         driverPersonIds: payload.driverPersonIds?.length ? payload.driverPersonIds : undefined,
         entryIds: payload.entryIds?.length ? payload.entryIds : undefined,

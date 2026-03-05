@@ -33,29 +33,56 @@ const initialForm: BroadcastForm = {
 const OUTBOX_PREVIEW_LIMIT = 10;
 const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 
-type TemplateDrafts = Record<string, { subject: string; body: string }>;
+type TemplateDrafts = Record<string, { subject: string; body: string; data?: Partial<Record<DynamicFieldKey, string>> }>;
 type StaticTemplateOption = { key: string; label: string };
 type RecipientTarget = { id: string; label: string; previewEntryId?: string };
 type RecipientSearchItem = MailRecipientSearchItem;
 type RecipientMode = "filter" | "individual" | "combined";
+type DynamicFieldKey = "introText" | "detailsText" | "closingText" | "ctaText" | "ctaUrl" | "paymentDeadline" | "verificationUrl";
 
-const FALLBACK_CAMPAIGN_TEMPLATE_KEYS = new Set(["newsletter", "event_update", "free_form"]);
+const FALLBACK_CAMPAIGN_TEMPLATE_KEYS = new Set([
+  "newsletter",
+  "event_update",
+  "free_form",
+  "payment_reminder_followup",
+  "email_confirmation"
+]);
 
 const FALLBACK_TEMPLATE_OPTIONS: StaticTemplateOption[] = [
   { key: "newsletter", label: "Newsletter" },
   { key: "event_update", label: "Event-Update" },
-  { key: "free_form", label: "Freie Mail (Event-Design)" }
+  { key: "free_form", label: "Freie Mail (Event-Design)" },
+  { key: "payment_reminder_followup", label: "Zahlungserinnerung Follow-up" },
+  { key: "email_confirmation", label: "E-Mail-Bestätigung" }
 ];
 
 const TEMPLATE_DEFAULTS: Record<string, { subject: string; body: string }> = {
   free_form: { subject: "", body: "" },
   newsletter: { subject: "Newsletter {{eventName}}", body: "Hallo {{driverName}},\n\n" },
-  event_update: { subject: "Update zu {{eventName}}", body: "Hallo {{driverName}},\n\n" }
+  event_update: { subject: "Update zu {{eventName}}", body: "Hallo {{driverName}},\n\n" },
+  payment_reminder_followup: { subject: "Zahlungserinnerung {{eventName}}", body: "Hallo {{driverName}},\n\n" },
+  email_confirmation: { subject: "Bitte E-Mail bestätigen - {{eventName}}", body: "Hallo {{driverName}},\n\n" }
 };
 
 const TEMPLATE_LABEL_OVERRIDES: Record<string, string> = Object.fromEntries(
   FALLBACK_TEMPLATE_OPTIONS.map((item) => [item.key, item.label])
 );
+
+const DYNAMIC_FIELD_META: Record<DynamicFieldKey, { label: string; placeholder: string; multiline?: boolean; type?: "text" | "url" | "date" }> = {
+  introText: { label: "Einleitung", placeholder: "Kurze Einleitung für die Mail", multiline: true },
+  detailsText: { label: "Details", placeholder: "Wichtige Details für den Inhalt", multiline: true },
+  closingText: { label: "Abschluss", placeholder: "Abschluss / Grußformel", multiline: true },
+  ctaText: { label: "CTA-Text (optional)", placeholder: "z. B. Jetzt bestätigen" },
+  ctaUrl: { label: "CTA-URL (optional)", placeholder: "https://...", type: "url" },
+  paymentDeadline: { label: "Zahlungsfrist", placeholder: "YYYY-MM-DD", type: "date" },
+  verificationUrl: { label: "Verifizierungs-URL", placeholder: "https://...", type: "url" }
+};
+
+const TEMPLATE_DYNAMIC_BASE_FIELDS: DynamicFieldKey[] = ["introText", "detailsText", "closingText", "ctaText", "ctaUrl"];
+const TEMPLATE_DYNAMIC_REQUIRED_FIELDS: Partial<Record<string, DynamicFieldKey[]>> = {
+  payment_reminder_followup: ["paymentDeadline"],
+  email_confirmation: ["verificationUrl"]
+};
 
 function parseEmailList(value: string) {
   const parts = value
@@ -170,12 +197,17 @@ function getMissingPlaceholdersMessage(error: ApiError): string | null {
     : `Pflicht-Platzhalter fehlen beim Versand: ${missing.join(", ")}.`;
 }
 
+function dynamicFieldLabel(key: DynamicFieldKey) {
+  return DYNAMIC_FIELD_META[key]?.label ?? key;
+}
+
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [templateBody, setTemplateBody] = useState("");
+  const [templateDataDraft, setTemplateDataDraft] = useState<Partial<Record<DynamicFieldKey, string>>>({});
   const templateDraftsRef = useRef<TemplateDrafts>({});
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
   const [recipientSearchQuery, setRecipientSearchQuery] = useState("");
@@ -279,6 +311,20 @@ export function AdminCommunicationPage() {
     }
     return bodyTextToHtml(templateBody) || undefined;
   }, [bodyOverrideValue, templateBody]);
+  const templateDataValue = useMemo(() => {
+    const payload = Object.entries(templateDataDraft).reduce<Record<string, string>>((acc, [key, rawValue]) => {
+      if (typeof rawValue !== "string") {
+        return acc;
+      }
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        return acc;
+      }
+      acc[key] = rawValue;
+      return acc;
+    }, {});
+    return Object.keys(payload).length > 0 ? payload : undefined;
+  }, [templateDataDraft]);
   const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
   const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
   const previewEntryId = useMemo(() => {
@@ -309,6 +355,23 @@ export function AdminCommunicationPage() {
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
+  const templatePlaceholderNames = useMemo(() => new Set(templatePlaceholders.map((item) => item.name)), [templatePlaceholders]);
+  const requiredDynamicFields = useMemo(() => TEMPLATE_DYNAMIC_REQUIRED_FIELDS[form.templateKey] ?? [], [form.templateKey]);
+  const missingRequiredDynamicFields = useMemo(
+    () => requiredDynamicFields.filter((fieldKey) => !(templateDataDraft[fieldKey] ?? "").trim()),
+    [requiredDynamicFields, templateDataDraft]
+  );
+  const sendBlockedByTemplateData = missingRequiredDynamicFields.length > 0;
+  const dynamicFieldsToRender = useMemo(() => {
+    const keys = new Set<DynamicFieldKey>(TEMPLATE_DYNAMIC_BASE_FIELDS);
+    requiredDynamicFields.forEach((field) => keys.add(field));
+    (Object.keys(DYNAMIC_FIELD_META) as DynamicFieldKey[]).forEach((field) => {
+      if (templatePlaceholderNames.has(field)) {
+        keys.add(field);
+      }
+    });
+    return Array.from(keys.values());
+  }, [requiredDynamicFields, templatePlaceholderNames]);
   const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
   const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
 
@@ -396,6 +459,7 @@ export function AdminCommunicationPage() {
         .previewTemplate({
           templateKey: form.templateKey,
           entryId: previewEntryId,
+          sampleData: templateDataValue,
           subjectOverride: subjectOverrideValue,
           bodyOverride: bodyOverrideValue,
           bodyHtmlOverride: bodyHtmlOverrideValue,
@@ -422,7 +486,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, subjectOverrideValue]);
+  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, subjectOverrideValue, templateDataValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -430,19 +494,22 @@ export function AdminCommunicationPage() {
       return;
     }
     const existing = templateDraftsRef.current[key];
-    if (existing && existing.subject === form.subjectOverride && existing.body === templateBody) {
+    const hasEqualData =
+      JSON.stringify(existing?.data ?? {}) === JSON.stringify(templateDataDraft ?? {});
+    if (existing && existing.subject === form.subjectOverride && existing.body === templateBody && hasEqualData) {
       return;
     }
     const next: TemplateDrafts = {
       ...templateDraftsRef.current,
       [key]: {
         subject: form.subjectOverride,
-        body: templateBody
+        body: templateBody,
+        data: templateDataDraft
       }
     };
     templateDraftsRef.current = next;
     window.localStorage.setItem(TEMPLATE_DRAFTS_STORAGE_KEY, JSON.stringify(next));
-  }, [form.subjectOverride, form.templateKey, templateBody]);
+  }, [form.subjectOverride, form.templateKey, templateBody, templateDataDraft]);
 
   useEffect(() => {
     setResolvedRecipients(null);
@@ -541,6 +608,7 @@ export function AdminCommunicationPage() {
     if (!nextTemplateKey) {
       setForm((prev) => ({ ...prev, templateKey: "", subjectOverride: "" }));
       setTemplateBody("");
+      setTemplateDataDraft({});
       return;
     }
 
@@ -548,6 +616,7 @@ export function AdminCommunicationPage() {
     if (fromDraft) {
       setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
       setTemplateBody(fromDraft.body);
+      setTemplateDataDraft(fromDraft.data ?? {});
       return;
     }
 
@@ -559,6 +628,7 @@ export function AdminCommunicationPage() {
       subjectOverride: template?.subject ?? defaults.subject
     }));
     setTemplateBody(template?.bodyText ?? defaults.body);
+    setTemplateDataDraft({});
   };
 
   const resolveRecipients = async () => {
@@ -604,7 +674,7 @@ export function AdminCommunicationPage() {
       return;
     }
     if (!availableCampaignTemplateKeys.has(templateKey)) {
-      showToast("Auf der Kampagnenseite sind nur Newsletter-, Event-Update- oder freie Mails erlaubt.");
+      showToast("Auf der Kampagnenseite sind nur Kampagnen-Templates erlaubt.");
       return;
     }
 
@@ -624,6 +694,10 @@ export function AdminCommunicationPage() {
       showToast("Pflicht-Platzhalter fehlen im Preview. Versand ist blockiert.");
       return;
     }
+    if (sendBlockedByTemplateData) {
+      showToast(`Bitte Pflichtfeld ausfüllen: ${missingRequiredDynamicFields.map(dynamicFieldLabel).join(", ")}.`);
+      return;
+    }
 
     setQueueing(true);
     try {
@@ -632,6 +706,7 @@ export function AdminCommunicationPage() {
         subjectOverride: subjectOverrideValue,
         bodyOverride: bodyOverrideValue,
         bodyHtmlOverride: bodyHtmlOverrideValue,
+        templateData: templateDataValue,
         additionalEmails: additionalRecipients.valid,
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
         filters: {
@@ -895,6 +970,58 @@ export function AdminCommunicationPage() {
                 disabled={!form.templateKey}
               />
             </div>
+            {form.templateKey && (
+              <div className="space-y-2 rounded-md border bg-white p-3">
+                <div className="text-sm font-medium text-slate-900">Dynamische Inhalte</div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {dynamicFieldsToRender.map((fieldKey) => {
+                    const meta = DYNAMIC_FIELD_META[fieldKey];
+                    const isRequired = requiredDynamicFields.includes(fieldKey);
+                    const value = templateDataDraft[fieldKey] ?? "";
+                    return (
+                      <div key={fieldKey} className={meta.multiline ? "space-y-1 md:col-span-2" : "space-y-1"}>
+                        <Label>
+                          {meta.label}
+                          {isRequired ? " *" : ""}
+                        </Label>
+                        {meta.multiline ? (
+                          <textarea
+                            className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={value}
+                            onChange={(event) =>
+                              setTemplateDataDraft((prev) => ({
+                                ...prev,
+                                [fieldKey]: event.target.value
+                              }))
+                            }
+                            placeholder={meta.placeholder}
+                            disabled={!form.templateKey}
+                          />
+                        ) : (
+                          <Input
+                            type={meta.type ?? "text"}
+                            value={value}
+                            onChange={(event) =>
+                              setTemplateDataDraft((prev) => ({
+                                ...prev,
+                                [fieldKey]: event.target.value
+                              }))
+                            }
+                            placeholder={meta.placeholder}
+                            disabled={!form.templateKey}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {missingRequiredDynamicFields.length > 0 && (
+                  <div className="text-xs text-amber-700">
+                    Fehlende Pflichtfelder: {missingRequiredDynamicFields.map(dynamicFieldLabel).join(", ")}
+                  </div>
+                )}
+              </div>
+            )}
             {unresolvedTokens.length > 0 && (
               <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                 Nicht bekannte Platzhalter: {unresolvedTokens.join(", ")}
@@ -968,13 +1095,7 @@ export function AdminCommunicationPage() {
               <Button
                 className="w-full border border-slate-200 bg-white text-slate-900 hover:bg-yellow-300 md:w-auto"
                 type="button"
-                disabled={
-                  queueing ||
-                  !form.templateKey ||
-                  !templateExistsInBackend ||
-                  sendBlockedByRecipientSelection ||
-                  sendBlockedByMissingPlaceholders
-                }
+                disabled={queueing || !form.templateKey || !templateExistsInBackend || sendBlockedByRecipientSelection || sendBlockedByMissingPlaceholders || sendBlockedByTemplateData}
                 onClick={() => void queueBroadcast()}
               >
                 {queueing ? (
