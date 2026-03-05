@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdminEntriesFilter } from "@/types/admin";
 import type { AdminClassOption } from "@/services/admin-meta.service";
 
@@ -31,28 +32,25 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
       </div>
       <div className="space-y-1">
         <Label htmlFor="admin-filter-class">Klasse</Label>
-        <select
-          id="admin-filter-class"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={filter.classId}
-          onChange={(event) => onChange("classId", event.target.value)}
-        >
-          <option value="all">Alle</option>
-          {classOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
+        <Select value={filter.classId} onValueChange={(next) => onChange("classId", next)}>
+          <SelectTrigger id="admin-filter-class" className="text-base md:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle</SelectItem>
+            {classOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <Label htmlFor="admin-filter-status">Status</Label>
-        <select
-          id="admin-filter-status"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={statusSelectValue}
-          onChange={(event) => {
-            const next = event.target.value;
+          onValueChange={(next) => {
             if (next === DELETED_SCOPE_VALUE) {
               onStatusScopeChange?.("deleted");
               onChange("acceptanceStatus", "all");
@@ -62,62 +60,70 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
             onChange("acceptanceStatus", next as AdminEntriesFilter["acceptanceStatus"]);
           }}
         >
-          <option value="all">Alle</option>
-          <option value="pending">Offen</option>
-          <option value="shortlist">Vorauswahl</option>
-          <option value="accepted">Zugelassen</option>
-          <option value="rejected">Abgelehnt</option>
-          {allowDeletedStatusOption && <option value={DELETED_SCOPE_VALUE}>Gelöschte</option>}
-        </select>
+          <SelectTrigger id="admin-filter-status" className="text-base md:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle</SelectItem>
+            <SelectItem value="pending">Offen</SelectItem>
+            <SelectItem value="shortlist">Vorauswahl</SelectItem>
+            <SelectItem value="accepted">Zugelassen</SelectItem>
+            <SelectItem value="rejected">Abgelehnt</SelectItem>
+            {allowDeletedStatusOption && <SelectItem value={DELETED_SCOPE_VALUE}>Gelöschte</SelectItem>}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <Label htmlFor="admin-filter-payment">Zahlung</Label>
-        <select
-          id="admin-filter-payment"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={filter.paymentStatus}
-          onChange={(event) => onChange("paymentStatus", event.target.value as AdminEntriesFilter["paymentStatus"])}
-        >
-          <option value="all">Alle</option>
-          <option value="due">Offen</option>
-          <option value="paid">Bezahlt</option>
-        </select>
+        <Select value={filter.paymentStatus} onValueChange={(next) => onChange("paymentStatus", next as AdminEntriesFilter["paymentStatus"])}>
+          <SelectTrigger id="admin-filter-payment" className="text-base md:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle</SelectItem>
+            <SelectItem value="due">Offen</SelectItem>
+            <SelectItem value="paid">Bezahlt</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <Label htmlFor="admin-filter-checkin">Einchecken</Label>
-        <select
-          id="admin-filter-checkin"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={filter.checkinIdVerified}
-          onChange={(event) => onChange("checkinIdVerified", event.target.value as AdminEntriesFilter["checkinIdVerified"])}
-        >
-          <option value="all">Alle</option>
-          <option value="true">Eingecheckt</option>
-          <option value="false">Nicht eingecheckt</option>
-        </select>
+        <Select value={filter.checkinIdVerified} onValueChange={(next) => onChange("checkinIdVerified", next as AdminEntriesFilter["checkinIdVerified"])}>
+          <SelectTrigger id="admin-filter-checkin" className="text-base md:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle</SelectItem>
+            <SelectItem value="true">Eingecheckt</SelectItem>
+            <SelectItem value="false">Nicht eingecheckt</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <Label htmlFor="admin-filter-sort">Sortierung</Label>
-        <select
-          id="admin-filter-sort"
-          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={sortValue}
-          onChange={(event) => {
-            const [nextSortBy, nextSortDir] = event.target.value.split(":");
+          onValueChange={(next) => {
+            const [nextSortBy, nextSortDir] = next.split(":");
             onChange("sortBy", nextSortBy as AdminEntriesFilter["sortBy"]);
             onChange("sortDir", nextSortDir as AdminEntriesFilter["sortDir"]);
           }}
         >
-          <option value="createdAt:desc">Neueste zuerst</option>
-          <option value="createdAt:asc">Älteste zuerst</option>
-          <option value="updatedAt:desc">Zuletzt aktualisiert</option>
-          <option value="driverLastName:asc">Name A-Z</option>
-          <option value="driverLastName:desc">Name Z-A</option>
-          <option value="startNumberNorm:asc">Startnummer aufsteigend</option>
-          <option value="startNumberNorm:desc">Startnummer absteigend</option>
-          <option value="className:asc">Klasse A-Z</option>
-          <option value="className:desc">Klasse Z-A</option>
-        </select>
+          <SelectTrigger id="admin-filter-sort" className="text-base md:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="createdAt:desc">Neueste zuerst</SelectItem>
+            <SelectItem value="createdAt:asc">Älteste zuerst</SelectItem>
+            <SelectItem value="updatedAt:desc">Zuletzt aktualisiert</SelectItem>
+            <SelectItem value="driverLastName:asc">Name A-Z</SelectItem>
+            <SelectItem value="driverLastName:desc">Name Z-A</SelectItem>
+            <SelectItem value="startNumberNorm:asc">Startnummer aufsteigend</SelectItem>
+            <SelectItem value="startNumberNorm:desc">Startnummer absteigend</SelectItem>
+            <SelectItem value="className:asc">Klasse A-Z</SelectItem>
+            <SelectItem value="className:desc">Klasse Z-A</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

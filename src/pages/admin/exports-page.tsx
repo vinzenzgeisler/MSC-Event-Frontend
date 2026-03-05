@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { acceptanceStatusLabel, exportStatusClasses, exportStatusLabel } from "@/lib/admin-status";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
@@ -59,55 +60,62 @@ export function AdminExportsPage() {
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div className="space-y-1">
             <Label>Typ</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
-              value={form.type}
-              onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value as ExportCreateForm["type"] }))}
-            >
-              <option value="entries_csv">entries_csv</option>
-              <option value="startlist_csv">startlist_csv</option>
-              <option value="participants_csv">participants_csv</option>
-              <option value="payments_open_csv">payments_open_csv</option>
-              <option value="checkin_status_csv">checkin_status_csv</option>
-            </select>
+            <Select value={form.type} onValueChange={(next) => setForm((prev) => ({ ...prev, type: next as ExportCreateForm["type"] }))}>
+              <SelectTrigger className="text-base md:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="entries_csv">entries_csv</SelectItem>
+                <SelectItem value="startlist_csv">startlist_csv</SelectItem>
+                <SelectItem value="participants_csv">participants_csv</SelectItem>
+                <SelectItem value="payments_open_csv">payments_open_csv</SelectItem>
+                <SelectItem value="checkin_status_csv">checkin_status_csv</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label>Klasse (optional)</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
-              value={form.classId}
-              onChange={(event) => setForm((prev) => ({ ...prev, classId: event.target.value }))}
-            >
-              <option value="all">Alle</option>
-              {classOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
+            <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
+              <SelectTrigger className="text-base md:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                {classOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label>Status (optional)</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
+            <Select
               value={form.acceptanceStatus}
-              onChange={(event) => setForm((prev) => ({ ...prev, acceptanceStatus: event.target.value as ExportCreateForm["acceptanceStatus"] }))}
+              onValueChange={(next) => setForm((prev) => ({ ...prev, acceptanceStatus: next as ExportCreateForm["acceptanceStatus"] }))}
             >
-              <option value="all">Alle</option>
-              <option value="pending">{acceptanceStatusLabel("pending")}</option>
-              <option value="shortlist">{acceptanceStatusLabel("shortlist")}</option>
-              <option value="accepted">{acceptanceStatusLabel("accepted")}</option>
-            </select>
+              <SelectTrigger className="text-base md:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                <SelectItem value="pending">{acceptanceStatusLabel("pending")}</SelectItem>
+                <SelectItem value="shortlist">{acceptanceStatusLabel("shortlist")}</SelectItem>
+                <SelectItem value="accepted">{acceptanceStatusLabel("accepted")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label>Format</Label>
-            <select
-              className="h-10 w-full rounded-md border px-3 text-sm"
-              value={form.format}
-              onChange={(event) => setForm((prev) => ({ ...prev, format: event.target.value as "csv" }))}
-            >
-              <option value="csv">csv</option>
-            </select>
+            <Select value={form.format} onValueChange={(next) => setForm((prev) => ({ ...prev, format: next as "csv" }))}>
+              <SelectTrigger className="text-base md:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="csv">csv</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="md:col-span-4">
             {canCreateExports ? (

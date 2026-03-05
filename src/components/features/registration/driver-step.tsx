@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { getLegalTexts } from "@/config/legal-texts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { getCountrySelectOptions } from "@/lib/countries";
 import type { DriverForm } from "@/types/registration";
@@ -77,20 +78,23 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-nationality">{m.driver.nationality}</Label>
-          <select
-            id="driver-nationality"
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            value={value.nationality}
-            onChange={(event) => onChange("nationality", event.target.value)}
-            {...fieldAria(errors.nationality, "driver-nationality-error")}
-          >
-            <option value="">{m.driver.nationalityPlaceholder}</option>
-            {countryOptions.map((country) => (
-              <option key={country.code} value={country.code}>
-                {country.label}
-              </option>
-            ))}
-          </select>
+          <Select value={value.nationality || "__placeholder__"} onValueChange={(next) => onChange("nationality", next === "__placeholder__" ? "" : next)}>
+            <SelectTrigger
+              id="driver-nationality"
+              {...fieldAria(errors.nationality, "driver-nationality-error")}
+              className="text-base md:text-sm"
+            >
+              <SelectValue placeholder={m.driver.nationalityPlaceholder} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__placeholder__">{m.driver.nationalityPlaceholder}</SelectItem>
+              {countryOptions.map((country) => (
+                <SelectItem key={country.code} value={country.code}>
+                  {country.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <FieldError id="driver-nationality-error" message={errors.nationality} />
         </div>
         <div className="space-y-2">

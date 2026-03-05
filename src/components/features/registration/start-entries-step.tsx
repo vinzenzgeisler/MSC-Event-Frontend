@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PublicEventClass, StartRegistrationForm } from "@/types/registration";
 
 type StartNumberState = "idle" | "checking" | "available" | "invalid" | "taken";
@@ -171,25 +172,34 @@ export function StartEntriesStep({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>{m.start.classLabel}</Label>
-            <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={draft.classId}
-              onChange={(event) => {
-                const selected = classes.find((item) => item.id === event.target.value);
-                onDraftChange("classId", event.target.value);
+            <Select
+              value={draft.classId || "__placeholder__"}
+              onValueChange={(next) => {
+                if (next === "__placeholder__") {
+                  onDraftChange("classId", "");
+                  onDraftChange("classLabel", "");
+                  return;
+                }
+                const selected = classes.find((item) => item.id === next);
+                onDraftChange("classId", next);
                 onDraftChange("classLabel", selected?.name ?? "");
                 if (selected) {
                   onDraftChange("vehicleType", selected.vehicleType);
                 }
               }}
             >
-              <option value="">{m.start.classPlaceholder}</option>
-              {classes.map((item) => (
-                <option key={item.id} value={item.id} disabled={usedClassIds.has(item.id)}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="text-base md:text-sm">
+                <SelectValue placeholder={m.start.classPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
+                {classes.map((item) => (
+                  <SelectItem key={item.id} value={item.id} disabled={usedClassIds.has(item.id)}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <FieldError message={fieldErrors.classId} />
           </div>
 
@@ -260,15 +270,16 @@ export function StartEntriesStep({
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label>{m.start.brakes}</Label>
-            <select
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={draft.vehicle.brakes}
-              onChange={(event) => onVehicleFieldChange("brakes", event.target.value)}
-            >
-              <option value="">{m.start.classPlaceholder}</option>
-              <option value="steel">{m.start.brakesSteel}</option>
-              <option value="ceramic">{m.start.brakesCeramic}</option>
-            </select>
+            <Select value={draft.vehicle.brakes || "__placeholder__"} onValueChange={(next) => onVehicleFieldChange("brakes", next === "__placeholder__" ? "" : next)}>
+              <SelectTrigger className="text-base md:text-sm">
+                <SelectValue placeholder={m.start.classPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
+                <SelectItem value="steel">{m.start.brakesSteel}</SelectItem>
+                <SelectItem value="ceramic">{m.start.brakesCeramic}</SelectItem>
+              </SelectContent>
+            </Select>
             <FieldError message={fieldErrors.brakes} />
           </div>
           <div className="space-y-2">
@@ -342,18 +353,22 @@ export function StartEntriesStep({
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverNationality}</Label>
-                <select
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={draft.codriver.nationality}
-                  onChange={(event) => onCodriverFieldChange("nationality", event.target.value)}
+                <Select
+                  value={draft.codriver.nationality || "__placeholder__"}
+                  onValueChange={(next) => onCodriverFieldChange("nationality", next === "__placeholder__" ? "" : next)}
                 >
-                  <option value="">{m.start.codriverNationalityPlaceholder}</option>
-                  {countryOptions.map((country) => (
-                    <option key={country.code} value={country.code}>
-                      {country.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="text-base md:text-sm">
+                    <SelectValue placeholder={m.start.codriverNationalityPlaceholder} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__placeholder__">{m.start.codriverNationalityPlaceholder}</SelectItem>
+                    {countryOptions.map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FieldError message={fieldErrors.codriverNationality} />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -446,15 +461,19 @@ export function StartEntriesStep({
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupBrakes}</Label>
-                  <select
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={draft.backupVehicle.brakes}
-                    onChange={(event) => onBackupFieldChange("brakes", event.target.value)}
+                  <Select
+                    value={draft.backupVehicle.brakes || "__placeholder__"}
+                    onValueChange={(next) => onBackupFieldChange("brakes", next === "__placeholder__" ? "" : next)}
                   >
-                    <option value="">{m.start.classPlaceholder}</option>
-                    <option value="steel">{m.start.brakesSteel}</option>
-                    <option value="ceramic">{m.start.brakesCeramic}</option>
-                  </select>
+                    <SelectTrigger className="text-base md:text-sm">
+                      <SelectValue placeholder={m.start.classPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
+                      <SelectItem value="steel">{m.start.brakesSteel}</SelectItem>
+                      <SelectItem value="ceramic">{m.start.brakesCeramic}</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FieldError message={fieldErrors.backupBrakes} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
