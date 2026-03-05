@@ -73,6 +73,57 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
 
 type TemplateDrafts = Record<string, { subject: string; body: string }>;
 
+type PlaceholderHelpItem = {
+  token: string;
+  description: string;
+  usedIn: string[];
+  requiredIn?: string[];
+};
+
+const PLACEHOLDER_HELP: PlaceholderHelpItem[] = [
+  {
+    token: "eventName",
+    description: "Name des aktuellen Events",
+    usedIn: ["registration_received", "preselection", "accepted_open_payment", "rejected", "payment_reminder"]
+  },
+  {
+    token: "firstName",
+    description: "Vorname des Fahrers",
+    usedIn: ["registration_received", "preselection", "accepted_open_payment", "rejected", "payment_reminder"]
+  },
+  {
+    token: "lastName",
+    description: "Nachname des Fahrers",
+    usedIn: ["registration_received", "preselection", "accepted_open_payment", "rejected", "payment_reminder"]
+  },
+  {
+    token: "driverName",
+    description: "Vollständiger Name des Fahrers",
+    usedIn: ["accepted_open_payment", "payment_reminder"]
+  },
+  {
+    token: "className",
+    description: "Klassenname der Nennung",
+    usedIn: ["accepted_open_payment", "rejected"]
+  },
+  {
+    token: "startNumber",
+    description: "Startnummer der Nennung",
+    usedIn: ["accepted_open_payment", "rejected"]
+  },
+  {
+    token: "amountOpen",
+    description: "Offener Zahlungsbetrag",
+    usedIn: ["accepted_open_payment", "payment_reminder"]
+  },
+  {
+    token: "verificationUrl",
+    description: "Verifizierungs-Link aus Backend",
+    usedIn: ["registration_received"],
+    requiredIn: ["registration_received"]
+  }
+];
+
 function parseEmailList(value: string) {
   const parts = value
     .split(/[\n,;]+/)
@@ -406,11 +457,9 @@ export function AdminCommunicationPage() {
             <div className="space-y-4">
               <div className="space-y-1">
                 <Label>Template Key</Label>
-                <Input
-                  value={form.templateKey}
-                  onChange={(event) => setForm((prev) => ({ ...prev, templateKey: event.target.value.trim() }))}
-                  placeholder="z. B. registration_received"
-                />
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  {form.templateKey || "Bitte oben ein Template wählen"}
+                </div>
               </div>
               <div className="space-y-1">
                 <Label>Betreff</Label>
@@ -442,6 +491,25 @@ export function AdminCommunicationPage() {
                   {additionalRecipients.invalid.length > 0 ? ` · Ungültig: ${additionalRecipients.invalid.length}` : ""}
                 </p>
               </div>
+              <details className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <summary className="cursor-pointer font-medium text-slate-900">Hilfe: Dynamische Platzhalter</summary>
+                <div className="mt-3 space-y-2">
+                  {PLACEHOLDER_HELP.map((item) => {
+                    const isUsedBySelectedTemplate = form.templateKey ? item.usedIn.includes(form.templateKey) : true;
+                    return (
+                      <div key={item.token} className="rounded border border-slate-200 bg-white px-2 py-1.5">
+                        <div className="font-mono text-xs text-slate-900">{`{{${item.token}}}`}</div>
+                        <div className="text-xs text-slate-600">{item.description}</div>
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          Verwendet in: {item.usedIn.join(", ")}
+                          {item.requiredIn?.length ? ` · Pflicht in: ${item.requiredIn.join(", ")}` : ""}
+                          {form.templateKey ? ` · Für gewähltes Template: ${isUsedBySelectedTemplate ? "Ja" : "Nein"}` : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
               {verificationLinkMissing && (
                 <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Verifizierungs-Mail ohne Link erkannt. Bitte <code>{"{{verificationUrl}}"}</code> oder eine URL einfügen.
