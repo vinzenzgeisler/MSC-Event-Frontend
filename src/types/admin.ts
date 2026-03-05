@@ -342,6 +342,8 @@ export type BroadcastForm = {
 };
 
 export type MailTemplateStatus = "draft" | "published";
+export type MailTemplateScope = "process" | "campaign";
+export type MailTemplateChannel = "campaign" | "detail" | "quick_action";
 
 export type MailTemplate = {
   key: string;
@@ -354,6 +356,8 @@ export type MailTemplate = {
   updatedAt: string | null;
   updatedBy: string | null;
   isActive: boolean;
+  scope?: MailTemplateScope;
+  channels?: MailTemplateChannel[];
 };
 
 export type MailTemplatePlaceholder = {

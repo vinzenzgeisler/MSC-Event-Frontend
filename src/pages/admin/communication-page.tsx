@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
-import { getApiErrorMessage } from "@/services/api/http-client";
+import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import type {
@@ -39,7 +39,7 @@ type RecipientTarget = { id: string; label: string; previewEntryId?: string };
 type RecipientSearchItem = MailRecipientSearchItem;
 type RecipientMode = "filter" | "individual" | "combined";
 
-const CAMPAIGN_TEMPLATE_KEYS = new Set(["newsletter", "event_update", "free_form"]);
+const FALLBACK_CAMPAIGN_TEMPLATE_KEYS = new Set(["newsletter", "event_update", "free_form"]);
 
 const FALLBACK_TEMPLATE_OPTIONS: StaticTemplateOption[] = [
   { key: "newsletter", label: "Newsletter" },
@@ -98,6 +98,16 @@ function normalizeTemplateOption(template: MailTemplate): StaticTemplateOption {
   };
 }
 
+function isCampaignTemplate(template: MailTemplate) {
+  if (template.scope === "campaign") {
+    return true;
+  }
+  if (Array.isArray(template.channels) && template.channels.includes("campaign")) {
+    return true;
+  }
+  return FALLBACK_CAMPAIGN_TEMPLATE_KEYS.has(template.key);
+}
+
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
@@ -153,7 +163,7 @@ export function AdminCommunicationPage() {
     setLoadingTemplates(true);
     try {
       const templates = await communicationService.listTemplates();
-      const campaignTemplates = templates.filter((item) => CAMPAIGN_TEMPLATE_KEYS.has(item.key));
+      const campaignTemplates = templates.filter((item) => item.isActive !== false && isCampaignTemplate(item));
       const mappedOptions = campaignTemplates.map(normalizeTemplateOption);
       const merged = new Map<string, StaticTemplateOption>();
       FALLBACK_TEMPLATE_OPTIONS.forEach((option) => merged.set(option.key, option));
@@ -213,6 +223,18 @@ export function AdminCommunicationPage() {
     }
     return templatesByKey.has(form.templateKey);
   }, [form.templateKey, templatesByKey]);
+  const availableCampaignTemplateKeys = useMemo(() => {
+    if (templatesByKey.size === 0) {
+      return FALLBACK_CAMPAIGN_TEMPLATE_KEYS;
+    }
+    const fromBackend = new Set<string>();
+    templatesByKey.forEach((template) => {
+      if (isCampaignTemplate(template)) {
+        fromBackend.add(template.key);
+      }
+    });
+    return fromBackend.size > 0 ? fromBackend : FALLBACK_CAMPAIGN_TEMPLATE_KEYS;
+  }, [templatesByKey]);
   const sendBlockedByRecipientSelection = allowIndividualRecipients && !allowFilterRecipients && selectedDriverPersonIds.length === 0 && additionalRecipients.valid.length === 0;
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
@@ -510,7 +532,7 @@ export function AdminCommunicationPage() {
       showToast("Template ist erforderlich.");
       return;
     }
-    if (!CAMPAIGN_TEMPLATE_KEYS.has(templateKey)) {
+    if (!availableCampaignTemplateKeys.has(templateKey)) {
       showToast("Auf der Kampagnenseite sind nur Newsletter-, Event-Update- oder freie Mails erlaubt.");
       return;
     }
@@ -553,6 +575,13 @@ export function AdminCommunicationPage() {
         await resolveRecipients();
       }
     } catch (error) {
+      if (error instanceof ApiError && error.status === 422) {
+        const code = (error.code ?? "").trim().toUpperCase();
+        if (code === "TEMPLATE_NOT_ALLOWED_IN_CAMPAIGN") {
+          showToast("Dieses Template ist ein Prozess-Template und kann nur in der Detailansicht versendet werden.");
+          return;
+        }
+      }
       showToast(getApiErrorMessage(error, "Mailversand konnte nicht gestartet werden."));
     } finally {
       setQueueing(false);
