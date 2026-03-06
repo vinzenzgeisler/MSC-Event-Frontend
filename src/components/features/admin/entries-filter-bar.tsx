@@ -25,7 +25,7 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
         <Label htmlFor="admin-filter-search">Suche</Label>
         <Input
           id="admin-filter-search"
-          placeholder="Name oder Startnummer"
+          placeholder="Suche nach E-Mail, Startnummer oder Name"
           value={filter.query}
           onChange={(event) => onChange("query", event.target.value)}
         />

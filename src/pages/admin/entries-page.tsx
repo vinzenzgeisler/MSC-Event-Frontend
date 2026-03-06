@@ -19,7 +19,7 @@ import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem,
 const PAGE_SIZE = 25;
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const CACHE_KEY = "admin.entries.page.cache.v3";
+const CACHE_KEY = "admin.entries.page.cache.v4";
 
 type EntriesScope = "active" | "deleted";
 
@@ -270,6 +270,15 @@ function toTimestamp(value: string) {
   return 0;
 }
 
+function normalizeSearchValue(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function compareText(a: string, b: string) {
   return a.localeCompare(b, "de-DE", { sensitivity: "base", numeric: true });
 }
@@ -339,12 +348,46 @@ function rowMatchesFilter(row: AdminEntryListItem, filter: AdminEntriesFilter, c
     }
   }
 
-  const query = filter.query.trim().toLowerCase();
-  if (!query) {
+  const tokens = parseSmartSearchQuery(filter.query);
+  if (!tokens.length) {
     return true;
   }
 
-  return row.name.toLowerCase().includes(query) || row.startNumber.toLowerCase().includes(query) || row.vehicleLabel.toLowerCase().includes(query);
+  const firstName = normalizeSearchValue(row.driverFirstNameRaw || "");
+  const lastName = normalizeSearchValue(row.driverLastNameRaw || "");
+  const startNumber = normalizeSearchValue(row.startNumber || "");
+  const startNumberNorm = normalizeSearchValue(row.startNumberNormRaw || "");
+  const email = normalizeSearchValue(row.driverEmailRaw || "");
+  const anyHaystack = normalizeSearchValue([row.name, row.vehicleLabel, firstName, lastName, startNumber, startNumberNorm, email].join(" "));
+
+  return tokens.every((token) => anyHaystack.includes(token.value));
+}
+
+type SmartSearchToken = {
+  value: string;
+};
+
+function splitSearchTerms(query: string) {
+  const terms: string[] = [];
+  const regex = /"([^"]+)"|(\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(query)) !== null) {
+    const quoted = match[1];
+    const plain = match[2];
+    const raw = (quoted ?? plain ?? "").trim();
+    if (!raw) {
+      continue;
+    }
+    terms.push(raw);
+  }
+  return terms;
+}
+
+function parseSmartSearchQuery(query: string): SmartSearchToken[] {
+  const terms = splitSearchTerms(query);
+  return terms
+    .map((term) => ({ value: normalizeSearchValue(term) }))
+    .filter((item) => Boolean(item.value));
 }
 
 function readEntriesCache(filter: AdminEntriesFilter): EntriesCachePayload | null {
@@ -457,9 +500,7 @@ export function AdminEntriesPage() {
 
   const fetchActiveSnapshot = useCallback(
     async (filter: AdminEntriesFilter, minimumRows: number, requestId: number): Promise<{ rows: AdminEntryListItem[]; meta: ListMeta } | null> => {
-      const minimumRowsForStableNewest =
-        filter.sortBy === "createdAt" && filter.sortDir === "desc" ? PAGE_SIZE * 2 : PAGE_SIZE;
-      const targetSize = Math.max(minimumRows, minimumRowsForStableNewest);
+      const targetSize = Math.max(minimumRows, PAGE_SIZE);
       let nextCursor: string | undefined;
       let mergedRows: AdminEntryListItem[] = [];
       let latestMeta = EMPTY_META;
@@ -950,7 +991,10 @@ export function AdminEntriesPage() {
     });
   };
 
-  const visibleRows = useMemo(() => sortRowsByFilter(rows, appliedFilter), [rows, appliedFilter]);
+  const visibleRows = useMemo(
+    () => sortRowsByFilter(rows.filter((row) => rowMatchesFilter(row, appliedFilter, classNameById)), appliedFilter),
+    [appliedFilter, classNameById, rows]
+  );
   const shownCount = viewScope === "deleted" ? deletedRows.length : visibleRows.length;
   const shownTotal = viewScope === "deleted" ? deletedMeta.total : meta.total;
   const pendingAcceptRow = pendingAcceptEntryId ? rows.find((item) => item.id === pendingAcceptEntryId) : null;
