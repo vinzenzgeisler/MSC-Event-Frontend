@@ -502,8 +502,9 @@ export function AdminDashboardPage() {
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-lg border bg-white p-3">
-              <div className="text-xs uppercase text-slate-500">Nennungen gesamt</div>
+              <div className="text-xs uppercase text-slate-500">Aktive Nennungen</div>
               <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "…" : summary.entriesTotal}</div>
+              <div className="mt-1 text-[11px] text-slate-500">Ohne archivierte/gelöschte Nennungen</div>
             </div>
             <div className="rounded-lg border bg-white p-3">
               <div className="text-xs uppercase text-slate-500">Offene Zahlungen</div>
@@ -529,7 +530,7 @@ export function AdminDashboardPage() {
                 <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${loading ? 0 : paymentCompletionPercent}%` }} />
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                {loading ? "…" : `${paidCount} von ${summary.entriesTotal} Nennungen bezahlt`}
+                {loading ? "…" : `${paidCount} von ${summary.entriesTotal} aktiven Nennungen bezahlt`}
               </div>
             </div>
             <div className="rounded-lg border bg-white p-3">
