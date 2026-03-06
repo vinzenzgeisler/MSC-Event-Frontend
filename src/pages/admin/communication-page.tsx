@@ -216,7 +216,6 @@ export function AdminCommunicationPage() {
   const [additionalEmailsInput, setAdditionalEmailsInput] = useState("");
   const [recipientSearchQuery, setRecipientSearchQuery] = useState("");
   const [recipientSearchResults, setRecipientSearchResults] = useState<RecipientSearchItem[]>([]);
-  const [recipientSearchError, setRecipientSearchError] = useState("");
   const [searchingRecipients, setSearchingRecipients] = useState(false);
   const [selectedDriverTargets, setSelectedDriverTargets] = useState<RecipientTarget[]>([]);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
@@ -226,7 +225,6 @@ export function AdminCommunicationPage() {
   const [templatesByKey, setTemplatesByKey] = useState<Map<string, MailTemplate>>(new Map());
   const [templatePlaceholders, setTemplatePlaceholders] = useState<MailTemplatePlaceholder[]>([]);
   const [backendPreview, setBackendPreview] = useState<MailTemplatePreview | null>(null);
-  const [previewError, setPreviewError] = useState("");
   const [resolvedRecipients, setResolvedRecipients] = useState<ResolveRecipientsResult | null>(null);
   const [outboxExpanded, setOutboxExpanded] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -236,6 +234,8 @@ export function AdminCommunicationPage() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [resolvingRecipients, setResolvingRecipients] = useState(false);
   const [queueing, setQueueing] = useState(false);
+  const previewErrorToastRef = useRef("");
+  const recipientSearchErrorToastRef = useRef("");
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -470,7 +470,7 @@ export function AdminCommunicationPage() {
   useEffect(() => {
     if (!form.templateKey) {
       setBackendPreview(null);
-      setPreviewError("");
+      previewErrorToastRef.current = "";
       return;
     }
 
@@ -494,13 +494,17 @@ export function AdminCommunicationPage() {
         .then((result) => {
           if (!cancelled) {
             setBackendPreview(result);
-            setPreviewError("");
+            previewErrorToastRef.current = "";
           }
         })
         .catch((error) => {
           if (!cancelled) {
             setBackendPreview(null);
-            setPreviewError(getApiErrorMessage(error, "Preview konnte nicht geladen werden."));
+            const message = getApiErrorMessage(error, "Preview konnte nicht geladen werden.");
+            if (previewErrorToastRef.current !== message) {
+              showToast(message);
+              previewErrorToastRef.current = message;
+            }
           }
         })
         .finally(() => {
@@ -573,7 +577,7 @@ export function AdminCommunicationPage() {
     if (!allowIndividualRecipients) {
       setRecipientSearchResults([]);
       setSearchingRecipients(false);
-      setRecipientSearchError("");
+      recipientSearchErrorToastRef.current = "";
       return;
     }
 
@@ -595,12 +599,16 @@ export function AdminCommunicationPage() {
             return;
           }
           setRecipientSearchResults(recipients);
-          setRecipientSearchError("");
+          recipientSearchErrorToastRef.current = "";
         })
         .catch((error) => {
           if (!cancelled) {
             setRecipientSearchResults([]);
-            setRecipientSearchError(getApiErrorMessage(error, "Fahrersuche fehlgeschlagen."));
+            const message = getApiErrorMessage(error, "Fahrersuche fehlgeschlagen.");
+            if (recipientSearchErrorToastRef.current !== message) {
+              showToast(message);
+              recipientSearchErrorToastRef.current = message;
+            }
           }
         })
         .finally(() => {
@@ -905,8 +913,6 @@ export function AdminCommunicationPage() {
                   <div className="px-3 py-2 text-xs text-slate-500">Deaktiviert.</div>
                 ) : searchingRecipients ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Suche läuft...</div>
-                ) : recipientSearchError ? (
-                  <div className="px-3 py-2 text-xs text-amber-700">{recipientSearchError}</div>
                 ) : recipientSearchResults.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
                 ) : (
@@ -1137,9 +1143,7 @@ export function AdminCommunicationPage() {
                 </div>
               </>
             ) : (
-              <div className="rounded-md border bg-white p-3 text-sm text-slate-500">
-                {previewError || "Keine Preview verfügbar."}
-              </div>
+              <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Keine Preview verfügbar.</div>
             )}
           </section>
 
