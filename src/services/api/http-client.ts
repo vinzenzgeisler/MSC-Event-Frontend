@@ -57,12 +57,20 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("application/json")) {
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  const raw = await response.text().catch(() => "");
+  const text = raw.trim();
+  if (!text) {
     return null;
   }
+
+  const looksLikeJson = text.startsWith("{") || text.startsWith("[");
+  if (!contentType.includes("json") && !looksLikeJson) {
+    return null;
+  }
+
   try {
-    return (await response.json()) as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
     return null;
   }
