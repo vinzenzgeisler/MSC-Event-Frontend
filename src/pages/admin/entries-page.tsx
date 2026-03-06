@@ -19,7 +19,7 @@ import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem,
 const PAGE_SIZE = 25;
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const CACHE_KEY = "admin.entries.page.cache.v4";
+const CACHE_KEY = "admin.entries.page.cache.v5";
 
 type EntriesScope = "active" | "deleted";
 
@@ -241,35 +241,6 @@ function mergeDeletedRowsById(existing: AdminDeletedEntryListItem[], incoming: A
   return merged;
 }
 
-function toTimestamp(value: string) {
-  if (!value) {
-    return 0;
-  }
-  const parsed = Number(new Date(value));
-  if (Number.isFinite(parsed)) {
-    return parsed;
-  }
-
-  const germanDateTimeMatch =
-    value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/) ??
-    value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if (germanDateTimeMatch) {
-    const [, dayRaw, monthRaw, yearRaw, hourRaw = "0", minuteRaw = "0", secondRaw = "0"] = germanDateTimeMatch;
-    const date = new Date(
-      Number(yearRaw),
-      Number(monthRaw) - 1,
-      Number(dayRaw),
-      Number(hourRaw),
-      Number(minuteRaw),
-      Number(secondRaw)
-    );
-    const fromGerman = Number(date);
-    return Number.isFinite(fromGerman) ? fromGerman : 0;
-  }
-
-  return 0;
-}
-
 function normalizeSearchValue(value: string) {
   return value
     .toLowerCase()
@@ -277,47 +248,6 @@ function normalizeSearchValue(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function compareText(a: string, b: string) {
-  return a.localeCompare(b, "de-DE", { sensitivity: "base", numeric: true });
-}
-
-function sortRowsByFilter(rows: AdminEntryListItem[], filter: AdminEntriesFilter) {
-  if (!rows.length) {
-    return rows;
-  }
-
-  const direction = filter.sortDir === "asc" ? 1 : -1;
-  const decorated = rows.map((row, index) => ({ row, index }));
-  decorated.sort((left, right) => {
-    let compare = 0;
-    if (filter.sortBy === "createdAt") {
-      compare = toTimestamp(left.row.createdAtRaw || left.row.createdAt) - toTimestamp(right.row.createdAtRaw || right.row.createdAt);
-    } else if (filter.sortBy === "updatedAt") {
-      compare = toTimestamp(left.row.updatedAtRaw || left.row.createdAtRaw || left.row.createdAt) - toTimestamp(right.row.updatedAtRaw || right.row.createdAtRaw || right.row.createdAt);
-    } else if (filter.sortBy === "driverLastName") {
-      compare = compareText(left.row.driverLastNameRaw || "", right.row.driverLastNameRaw || "");
-      if (compare === 0) {
-        compare = compareText(left.row.driverFirstNameRaw || "", right.row.driverFirstNameRaw || "");
-      }
-    } else if (filter.sortBy === "driverFirstName") {
-      compare = compareText(left.row.driverFirstNameRaw || "", right.row.driverFirstNameRaw || "");
-      if (compare === 0) {
-        compare = compareText(left.row.driverLastNameRaw || "", right.row.driverLastNameRaw || "");
-      }
-    } else if (filter.sortBy === "className") {
-      compare = compareText(left.row.classNameRaw || "", right.row.classNameRaw || "");
-    } else if (filter.sortBy === "startNumberNorm") {
-      compare = compareText(left.row.startNumberNormRaw || "", right.row.startNumberNormRaw || "");
-    }
-
-    if (compare === 0) {
-      compare = left.index - right.index;
-    }
-    return compare * direction;
-  });
-  return decorated.map((item) => item.row);
 }
 
 function rowMatchesFilter(row: AdminEntryListItem, filter: AdminEntriesFilter, classNameById: Map<string, string>) {
@@ -599,10 +529,9 @@ export function AdminEntriesPage() {
           return;
         }
 
-        const sortedRows = sortRowsByFilter(snapshot.rows, filter);
-        setRows(sortedRows);
+        setRows(snapshot.rows);
         setMeta(snapshot.meta);
-        writeEntriesCache(filter, sortedRows, snapshot.meta);
+        writeEntriesCache(filter, snapshot.rows, snapshot.meta);
       } catch (error) {
         if (!isRequestActive(requestId)) {
           return;
@@ -682,9 +611,8 @@ export function AdminEntriesPage() {
 
       setRows((prev) => {
         const merged = mergeRowsById(prev, page.entries);
-        const sorted = sortRowsByFilter(merged, appliedFilter);
-        writeEntriesCache(appliedFilter, sorted, page.meta);
-        return sorted;
+        writeEntriesCache(appliedFilter, merged, page.meta);
+        return merged;
       });
       setMeta(page.meta);
     } catch (error) {
@@ -778,7 +706,8 @@ export function AdminEntriesPage() {
     }
 
     hydratedFromCacheRef.current = true;
-    setRows(sortRowsByFilter(cached.rows, initialFilterRef.current));
+    rowsRef.current = cached.rows;
+    setRows(cached.rows);
     setMeta(cached.meta);
     if (viewScope === "active") {
       setLoadingInitial(false);
@@ -987,14 +916,11 @@ export function AdminEntriesPage() {
       }
 
       const updated = prev.map((item) => (item.id === entryId ? updatedRow : item));
-      return sortRowsByFilter(updated, appliedFilter);
+      return updated;
     });
   };
 
-  const visibleRows = useMemo(
-    () => sortRowsByFilter(rows.filter((row) => rowMatchesFilter(row, appliedFilter, classNameById)), appliedFilter),
-    [appliedFilter, classNameById, rows]
-  );
+  const visibleRows = useMemo(() => rows.filter((row) => rowMatchesFilter(row, appliedFilter, classNameById)), [appliedFilter, classNameById, rows]);
   const shownCount = viewScope === "deleted" ? deletedRows.length : visibleRows.length;
   const shownTotal = viewScope === "deleted" ? deletedMeta.total : meta.total;
   const pendingAcceptRow = pendingAcceptEntryId ? rows.find((item) => item.id === pendingAcceptEntryId) : null;
