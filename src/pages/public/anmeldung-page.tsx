@@ -198,6 +198,9 @@ function getConsentRequiredError(locale: string) {
   if (locale === "cz") {
     return "Pred odeslanim potvrdte podminky ucasti a ochranu osobnich udaju.";
   }
+  if (locale === "pl") {
+    return "Przed wysłaniem zaakceptuj warunki udziału i politykę prywatności.";
+  }
   return "Bitte Teilnahmebedingungen und Datenschutzhinweise vor dem Absenden akzeptieren.";
 }
 
@@ -207,6 +210,9 @@ function getConsentMetaError(locale: string) {
   }
   if (locale === "cz") {
     return "Metadata souhlasu nejsou uplna. Obnovte stranku a zkuste to znovu.";
+  }
+  if (locale === "pl") {
+    return "Metadane zgód są niepełne. Odśwież stronę i spróbuj ponownie.";
   }
   return "Consent-Metadaten sind unvollstaendig. Bitte Seite neu laden und erneut versuchen.";
 }
@@ -226,6 +232,14 @@ function getGuardianFieldMessages(locale: string) {
       invalidEmail: "Zadejte platny e-mail zakonneho zastupce.",
       invalidPhone: "Zadejte platne telefonni cislo zakonneho zastupce.",
       requiredConsent: "U nezletilych je povinne potvrzeni zakonneho zastupce."
+    };
+  }
+  if (locale === "pl") {
+    return {
+      requiredFullName: "W przypadku niepełnoletnich wymagane jest pełne imię i nazwisko opiekuna.",
+      invalidEmail: "Wprowadź poprawny e-mail opiekuna.",
+      invalidPhone: "Wprowadź poprawny numer telefonu opiekuna.",
+      requiredConsent: "W przypadku niepełnoletnich wymagana jest zgoda opiekuna."
     };
   }
   return {
@@ -325,6 +339,9 @@ function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, 
   }
   if (locale === "cz") {
     return `Bylo vytvořeno jen ${createdEntries} z ${attemptedEntries} přihlášek. Prosím neposílejte formulář znovu, aby nevznikly duplicity. Kontaktujte pořadatele.`;
+  }
+  if (locale === "pl") {
+    return `Utworzono tylko ${createdEntries} z ${attemptedEntries} zgłoszeń. Nie wysyłaj formularza ponownie, aby uniknąć duplikatów. Skontaktuj się z organizatorem.`;
   }
   return `Es wurden nur ${createdEntries} von ${attemptedEntries} Nennungen angelegt. Bitte nicht erneut absenden, um Duplikate zu vermeiden. Kontaktiere das Orga-Team.`;
 }
@@ -895,6 +912,9 @@ export function AnmeldungPage() {
     if (locale === "cz") {
       return `Cena za druhé vozidlo: ${amount}.`;
     }
+    if (locale === "pl") {
+      return `Cena za zgłoszenie drugiego pojazdu: ${amount}.`;
+    }
     return `Preis für ein zweites Fahrzeug: ${amount}.`;
   }, [eventOverview, locale]);
 
@@ -1356,24 +1376,30 @@ export function AnmeldungPage() {
 
   if (submissionComplete) {
     const successBadge =
-      locale === "en" ? "Registration complete" : locale === "cz" ? "Registrace uspesna" : "Anmeldung erfolgreich";
+      locale === "en" ? "Registration complete" : locale === "cz" ? "Registrace uspesna" : locale === "pl" ? "Rejestracja zakończona" : "Anmeldung erfolgreich";
     const successTitle =
       locale === "en"
         ? "Thank you. Your registration has been received."
         : locale === "cz"
           ? "Dekujeme. Vase registrace byla prijata."
+          : locale === "pl"
+            ? "Dziękujemy. Twoje zgłoszenie zostało przyjęte."
           : "Vielen Dank, deine Anmeldung ist eingegangen.";
     const successBody =
       locale === "en"
         ? "We sent the confirmation to"
         : locale === "cz"
           ? "Potvrzeni jsme odeslali na"
+          : locale === "pl"
+            ? "Potwierdzenie wysłaliśmy na"
           : "Wir haben die Unterlagen an";
     const successTail =
       locale === "en"
         ? ". Please verify the email to complete the registration process."
         : locale === "cz"
           ? ". Pro dokonceni registrace prosim potvrdte e-mail."
+          : locale === "pl"
+            ? ". Aby dokończyć rejestrację, potwierdź adres e-mail."
           : " gesendet. Bitte bestaetige die E-Mail-Verifizierung, damit die Anmeldung final verarbeitet werden kann.";
     return (
       <div className="space-y-6 pb-8 md:pb-0">

@@ -77,6 +77,7 @@ export function resolvePublicPricing(pricingRules: PublicPricingRules | null, re
 function toIntlLocale(locale: string) {
   if (locale === "cz") return "cs-CZ";
   if (locale === "en") return "en-US";
+  if (locale === "pl") return "pl-PL";
   return "de-DE";
 }
 
@@ -95,6 +96,9 @@ export function formatPriceRange(locale: string, range: PriceRange): string {
   const max = formatCurrency(locale, range.maxCents, range.currency);
   if (locale === "en") {
     return `${min} to ${max}`;
+  }
+  if (locale === "pl") {
+    return `${min} do ${max}`;
   }
   return `${min} bis ${max}`;
 }

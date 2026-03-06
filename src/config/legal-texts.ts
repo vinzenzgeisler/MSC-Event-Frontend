@@ -1,5 +1,5 @@
-export type LegalUiLocale = "de" | "en" | "cz";
-export type ConsentLocale = "de-DE" | "en-GB" | "cs-CZ";
+export type LegalUiLocale = "de" | "en" | "cz" | "pl";
+export type ConsentLocale = "de-DE" | "en-GB" | "cs-CZ" | "pl-PL";
 
 export const CONSENT_VERSION = "privacy-v1.0+terms-v1.0+media-v1.0";
 
@@ -30,7 +30,9 @@ type LegalTexts = {
   waiverDoc: LegalDoc;
 };
 
-const LEGAL_TEXTS: Record<LegalUiLocale, LegalTexts> = {
+type PersistedLegalTextsLocale = Exclude<LegalUiLocale, "pl">;
+
+const LEGAL_TEXTS: Record<PersistedLegalTextsLocale, LegalTexts> = {
   de: {
     shortInfo:
       "Mit Absenden der Anmeldung verarbeiten wir Ihre personenbezogenen Daten zur Anmeldung, Teilnehmerverwaltung, Kommunikation, Dokumentenerstellung und Abrechnung. Rechtsgrundlagen sind Art. 6 Abs. 1 lit. b DSGVO sowie bei gesetzlichen Pflichten Art. 6 Abs. 1 lit. c DSGVO. Optionale Medienverarbeitung erfolgt nur mit Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO. Empfaenger sind intern zustaendige Stellen sowie technische Auftragsverarbeiter in AWS eu-central-1. Ihre Rechte auf Auskunft, Berichtigung, Loeschung, Einschraenkung, Widerspruch und Datenuebertragbarkeit bleiben unberuehrt.",
@@ -247,9 +249,12 @@ const LEGAL_TEXTS: Record<LegalUiLocale, LegalTexts> = {
   }
 };
 
-function resolveLocale(locale: string): LegalUiLocale {
+function resolveLocale(locale: string): PersistedLegalTextsLocale {
   if (locale === "en" || locale === "cz" || locale === "de") {
     return locale;
+  }
+  if (locale === "pl") {
+    return "en";
   }
   return "de";
 }
@@ -268,6 +273,9 @@ export function mapUiLocaleToConsentLocale(locale: string): ConsentLocale {
   }
   if (locale === "cz") {
     return "cs-CZ";
+  }
+  if (locale === "pl") {
+    return "pl-PL";
   }
   return "de-DE";
 }

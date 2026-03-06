@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-export type AnmeldungLocale = "de" | "en" | "cz";
+export type AnmeldungLocale = "de" | "en" | "cz" | "pl";
 
 const STORAGE_KEY = "msc_anmeldung_locale";
 
-const messages = {
+const baseMessages = {
   de: {
     languageLabel: "Sprache",
-    languageNames: { de: "Deutsch", en: "English", cz: "Čeština" },
+    languageNames: { de: "Deutsch", en: "English", cz: "Čeština", pl: "Polski" },
     layout: {
       dateBadge: "12./13. September 2026",
       title: "12. Oberlausitzer Dreieck",
@@ -247,7 +247,7 @@ const messages = {
   },
   en: {
     languageLabel: "Language",
-    languageNames: { de: "Deutsch", en: "English", cz: "Čeština" },
+    languageNames: { de: "Deutsch", en: "English", cz: "Čeština", pl: "Polski" },
     layout: {
       dateBadge: "September 12/13, 2026",
       title: "12th Oberlausitzer Dreieck",
@@ -470,7 +470,7 @@ const messages = {
   },
   cz: {
     languageLabel: "Jazyk",
-    languageNames: { de: "Deutsch", en: "English", cz: "Čeština" },
+    languageNames: { de: "Deutsch", en: "English", cz: "Čeština", pl: "Polski" },
     layout: {
       dateBadge: "12./13. září 2026",
       title: "12. Oberlausitzer Dreieck",
@@ -692,6 +692,15 @@ const messages = {
   }
 } as const;
 
+const messages: Record<AnmeldungLocale, (typeof baseMessages)["de"]> = {
+  ...baseMessages,
+  pl: {
+    ...baseMessages.en,
+    languageLabel: "Język",
+    languageNames: { ...baseMessages.en.languageNames, pl: "Polski" }
+  }
+};
+
 type AnmeldungMessages = (typeof messages)[AnmeldungLocale];
 
 type AnmeldungI18nContextValue = {
@@ -707,7 +716,7 @@ export function AnmeldungI18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === "de" || saved === "en" || saved === "cz") {
+    if (saved === "de" || saved === "en" || saved === "cz" || saved === "pl") {
       setLocaleState(saved);
     }
   }, []);

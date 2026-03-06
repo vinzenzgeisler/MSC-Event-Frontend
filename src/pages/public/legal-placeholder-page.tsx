@@ -16,6 +16,9 @@ function getSectionLabel(locale: string) {
   if (locale === "cz") {
     return "Oddil";
   }
+  if (locale === "pl") {
+    return "Sekcja";
+  }
   return "Abschnitt";
 }
 
@@ -49,7 +52,8 @@ function parseParagraph(paragraph: string, index: number, locale: string): Parse
 export function LegalPlaceholderPage() {
   const { locale } = useAnmeldungI18n();
   const legalTexts = getLegalTexts(locale);
-  const backLabel = locale === "en" ? "Back to registration" : locale === "cz" ? "Zpet k registraci" : "Zurueck zur Anmeldung";
+  const backLabel =
+    locale === "en" ? "Back to registration" : locale === "cz" ? "Zpet k registraci" : locale === "pl" ? "Powrot do rejestracji" : "Zurueck zur Anmeldung";
   const navigate = useNavigate();
   const { docId = "" } = useParams();
 

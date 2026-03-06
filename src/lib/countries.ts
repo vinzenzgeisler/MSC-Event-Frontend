@@ -1,11 +1,11 @@
-type SupportedLocale = "de-DE" | "en-US" | "cs-CZ";
+type SupportedLocale = "de-DE" | "en-US" | "cs-CZ" | "pl-PL";
 
 type CountryOption = {
   code: string;
   label: string;
 };
 
-const SUPPORTED_LOCALES: SupportedLocale[] = ["de-DE", "en-US", "cs-CZ"];
+const SUPPORTED_LOCALES: SupportedLocale[] = ["de-DE", "en-US", "cs-CZ", "pl-PL"];
 
 const COUNTRY_CODES = [
   // EU
@@ -70,7 +70,8 @@ const LABEL_OVERRIDES: Partial<Record<(typeof COUNTRY_CODES)[number], Partial<Re
   GB: {
     "de-DE": "Vereinigtes Königreich (England, Wales, Schottland, Nordirland)",
     "en-US": "United Kingdom (England, Wales, Scotland, Northern Ireland)",
-    "cs-CZ": "Spojené království (Anglie, Wales, Skotsko, Severní Irsko)"
+    "cs-CZ": "Spojené království (Anglie, Wales, Skotsko, Severní Irsko)",
+    "pl-PL": "Wielka Brytania (Anglia, Walia, Szkocja, Irlandia Północna)"
   }
 };
 
@@ -117,6 +118,7 @@ let cachedCatalog: CountryCatalog | null = null;
 function toDisplayLocale(locale: string): SupportedLocale {
   if (locale === "de" || locale === "de-DE") return "de-DE";
   if (locale === "cz" || locale === "cs" || locale === "cs-CZ") return "cs-CZ";
+  if (locale === "pl" || locale === "pl-PL") return "pl-PL";
   return "en-US";
 }
 

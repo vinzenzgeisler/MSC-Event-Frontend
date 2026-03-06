@@ -19,12 +19,14 @@ type HeaderEvent = {
 function toIntlLocale(locale: AnmeldungLocale) {
   if (locale === "de") return "de-DE";
   if (locale === "cz") return "cs-CZ";
+  if (locale === "pl") return "pl-PL";
   return "en-US";
 }
 
 function eventDateTitle(locale: AnmeldungLocale) {
   if (locale === "en") return "Event date";
   if (locale === "cz") return "Datum akce";
+  if (locale === "pl") return "Data wydarzenia";
   return "Eventdatum";
 }
 
@@ -64,18 +66,21 @@ function formatDateRange(startsAt: string, endsAt: string, locale: AnmeldungLoca
 function latePhaseLabel(locale: AnmeldungLocale) {
   if (locale === "en") return "2nd registration phase";
   if (locale === "cz") return "2. faze registrace";
+  if (locale === "pl") return "2. faza rejestracji";
   return "2. Anmeldephase";
 }
 
 function priceTitle(locale: AnmeldungLocale) {
   if (locale === "en") return "Entry fee";
   if (locale === "cz") return "Startovné";
+  if (locale === "pl") return "Opłata startowa";
   return "Startgeld";
 }
 
 function priceFallback(locale: AnmeldungLocale) {
   if (locale === "en") return "Will be published with event data";
   if (locale === "cz") return "Bude zveřejněno s daty akce";
+  if (locale === "pl") return "Zostanie opublikowana z danymi wydarzenia";
   return "Wird mit den Eventdaten veröffentlicht";
 }
 
@@ -139,7 +144,7 @@ function PublicLayoutContent() {
       return priceFallback(locale);
     }
     const formatted = formatPriceRange(locale, pricingSnapshot.entryPrice);
-    const perVehicle = locale === "en" ? "per vehicle" : locale === "cz" ? "za vozidlo" : "pro Fahrzeug";
+    const perVehicle = locale === "en" ? "per vehicle" : locale === "cz" ? "za vozidlo" : locale === "pl" ? "za pojazd" : "pro Fahrzeug";
     if (pricingSnapshot.phase === "late") {
       return `${formatted} ${perVehicle} (${latePhaseLabel(locale)})`;
     }
@@ -166,7 +171,7 @@ function PublicLayoutContent() {
             <div className="rounded-full border border-white/35 bg-white/10 p-1">
               <div className="flex items-center gap-1">
                 <span className="px-2 text-xs font-semibold uppercase tracking-wide text-primary-foreground/90">{m.languageLabel}</span>
-                {(["de", "en", "cz"] as AnmeldungLocale[]).map((lang) => (
+                {(["de", "en", "cz", "pl"] as AnmeldungLocale[]).map((lang) => (
                   <button
                     key={lang}
                     type="button"
@@ -176,7 +181,7 @@ function PublicLayoutContent() {
                       locale === lang ? "bg-yellow-400 text-slate-900 shadow-sm" : "text-white hover:bg-white/20"
                     ].join(" ")}
                   >
-                    {lang === "de" ? "DE" : lang === "en" ? "EN" : "CZ"}
+                    {lang === "de" ? "DE" : lang === "en" ? "EN" : lang === "cz" ? "CZ" : "PL"}
                   </button>
                 ))}
               </div>
