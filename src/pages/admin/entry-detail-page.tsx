@@ -44,8 +44,16 @@ function brakeLabel(value: string) {
   return value;
 }
 
-function vehicleTypeLabel(value: "auto" | "moto") {
-  return value === "moto" ? "Motorrad" : "Auto";
+function formatTimestamp(value: string) {
+  const raw = (value ?? "").trim();
+  if (!raw) {
+    return "-";
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+  return parsed.toLocaleString("de-DE");
 }
 
 function VehiclePreview({ src, label, onOpen }: { src: string | null; label: string; onOpen: () => void }) {
@@ -313,25 +321,6 @@ export function AdminEntryDetailPage() {
     setIncludeDriverNoteOnReject(false);
   }, [hasDriverNote]);
 
-  useEffect(() => {
-    if (!detail?.backupVehicle.assigned) {
-      return;
-    }
-    if (detail.backupVehicle.type !== detail.vehicle.type) {
-      setClassChangeIncludeBackup(false);
-    }
-  }, [detail?.backupVehicle.assigned, detail?.backupVehicle.type, detail?.vehicle.type]);
-
-  useEffect(() => {
-    if (!detail || !classDraft) {
-      return;
-    }
-    const isStillValid = classOptions.some((option) => option.id === classDraft && option.vehicleType === detail.vehicle.type);
-    if (!isStillValid) {
-      setClassDraft("");
-    }
-  }, [classDraft, classOptions, detail]);
-
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
   }
@@ -343,9 +332,18 @@ export function AdminEntryDetailPage() {
   const paymentState = paid ? "paid" : "due";
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
+  const changedAt = detail.history.reduce((latest, item) => {
+    const latestMs = Number(new Date(latest));
+    const candidateMs = Number(new Date(item.timestamp));
+    if (!Number.isFinite(candidateMs)) {
+      return latest;
+    }
+    if (!Number.isFinite(latestMs) || candidateMs > latestMs) {
+      return item.timestamp;
+    }
+    return latest;
+  }, detail.createdAt);
   const anyActionInFlight = actionInFlight !== null;
-  const classOptionsForVehicle = classOptions.filter((option) => option.vehicleType === detail.vehicle.type);
-  const backupVehicleTypeMismatch = detail.backupVehicle.assigned && detail.backupVehicle.type !== detail.vehicle.type;
   const statusActionInFlight =
     actionInFlight === "status-shortlist" || actionInFlight === "status-accepted" || actionInFlight === "status-rejected";
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
@@ -374,10 +372,16 @@ export function AdminEntryDetailPage() {
           variant="outline"
           size="sm"
           onClick={() => {
-            const state = location.state as { fromEntriesList?: boolean; scrollY?: number } | null;
+            const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
             if (state?.fromEntriesList && typeof state.scrollY === "number") {
               navigate(`/admin/entries${location.search}`, {
-                state: { restoreEntriesScrollY: state.scrollY }
+                state: {
+                  restoreEntriesScrollY: state.scrollY,
+                  restoreEntriesMinimumRows:
+                    typeof state.loadedCount === "number" && Number.isFinite(state.loadedCount)
+                      ? Math.max(0, Math.floor(state.loadedCount))
+                      : undefined
+                }
               });
               return;
             }
@@ -392,6 +396,9 @@ export function AdminEntryDetailPage() {
           <h1 className="text-2xl font-semibold text-slate-900">{detail.headline}</h1>
           <p className="text-sm text-slate-600">
             {detail.classLabel} · Startnummer {detail.startNumber}
+          </p>
+          <p className="text-xs text-slate-500">
+            Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1085,16 +1092,13 @@ export function AdminEntryDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Klasse wählen</SelectItem>
-                    {classOptionsForVehicle.map((option) => (
+                    {classOptions.map((option) => (
                       <SelectItem key={option.id} value={option.id}>
                         {option.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-slate-500">
-                  Verfügbare Klassen für Fahrzeugtyp: {vehicleTypeLabel(detail.vehicle.type)}
-                </p>
               </div>
               {detail.backupVehicle.assigned && (
                 <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -1102,32 +1106,38 @@ export function AdminEntryDetailPage() {
                     type="checkbox"
                     checked={classChangeIncludeBackup}
                     onChange={(event) => setClassChangeIncludeBackup(event.target.checked)}
-                    disabled={!canChangeClass || anyActionInFlight || backupVehicleTypeMismatch}
+                    disabled={!canChangeClass || anyActionInFlight}
                   />
                   Auch Ersatzfahrzeug auf Zielklasse umstellen
                 </label>
-              )}
-              {backupVehicleTypeMismatch && (
-                <div className="text-xs text-amber-700">
-                  Ersatzfahrzeug hat den Typ {vehicleTypeLabel(detail.backupVehicle.type)} und wird beim Klassenwechsel nicht automatisch
-                  mit geändert.
-                </div>
               )}
               <Button
                 type="button"
                 variant="outline"
                 disabled={!canChangeClass || anyActionInFlight || !classDraft || classDraft === detail.classId}
                 onClick={async () => {
-                  await runAction(
-                    "class-change",
-                    () =>
-                      adminEntriesService.changeEntryClass(detail.id, {
-                        classId: classDraft,
-                        applyToBackupVehicle: detail.backupVehicle.assigned ? classChangeIncludeBackup : false
-                      }),
-                    "Klasse wurde aktualisiert.",
-                    "Klasse konnte nicht geändert werden. Falls der Endpoint noch fehlt, bitte Backend-Request umsetzen."
-                  );
+                  if (actionInFlight) {
+                    return;
+                  }
+                  setActionInFlight("class-change");
+                  try {
+                    const result = await adminEntriesService.changeEntryClass(detail.id, {
+                      classId: classDraft,
+                      applyToBackupVehicle: detail.backupVehicle.assigned ? classChangeIncludeBackup : false,
+                      allowVehicleTypeChange: true
+                    });
+                    const warnings = (result.warnings ?? []).map((item) => item.trim()).filter(Boolean);
+                    if (warnings.length > 0) {
+                      flashMessage(`Klasse wurde aktualisiert. Hinweise: ${warnings.join(" | ")}`, 4200);
+                    } else {
+                      flashMessage("Klasse wurde aktualisiert.");
+                    }
+                    loadDetail();
+                  } catch (error) {
+                    flashMessage(getLocalizedActionError(error, "Klasse konnte nicht geändert werden."), 3200);
+                  } finally {
+                    setActionInFlight((current) => (current === "class-change" ? null : current));
+                  }
                 }}
               >
                 {actionInFlight === "class-change" ? (

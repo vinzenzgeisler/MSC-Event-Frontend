@@ -137,6 +137,7 @@ type EntriesCachePayload = {
 
 type EntriesPageLocationState = {
   restoreEntriesScrollY?: number;
+  restoreEntriesMinimumRows?: number;
 } | null;
 
 function hasValue<T extends string>(value: string | null, values: readonly T[]): value is T {
@@ -407,6 +408,7 @@ export function AdminEntriesPage() {
 
   const rowsRef = useRef<AdminEntryListItem[]>([]);
   const deletedRowsRef = useRef<AdminDeletedEntryListItem[]>([]);
+  const pendingRestoreMinimumRowsRef = useRef<number | null>(null);
   const activeRequestRef = useRef(0);
   const hydratedFromCacheRef = useRef(false);
   const firstFilterLoadRef = useRef(true);
@@ -782,6 +784,9 @@ export function AdminEntriesPage() {
     }
     hasRestoredFromStateRef.current = true;
     setPendingScrollRestoreY(Math.max(0, state.restoreEntriesScrollY));
+    if (typeof state.restoreEntriesMinimumRows === "number" && Number.isFinite(state.restoreEntriesMinimumRows)) {
+      pendingRestoreMinimumRowsRef.current = Math.max(0, Math.floor(state.restoreEntriesMinimumRows));
+    }
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
   }, [location.pathname, location.search, location.state, navigate]);
 
@@ -801,6 +806,10 @@ export function AdminEntriesPage() {
 
     const keepCachedRows = firstFilterLoadRef.current && hydratedFromCacheRef.current;
     firstFilterLoadRef.current = false;
+    const restoreMinimumRows = pendingRestoreMinimumRowsRef.current;
+    pendingRestoreMinimumRowsRef.current = null;
+    const minimumRows =
+      typeof restoreMinimumRows === "number" ? Math.max(restoreMinimumRows, keepCachedRows ? rowsRef.current.length : 0) : keepCachedRows ? rowsRef.current.length : 0;
 
     if (!keepCachedRows) {
       setRows([]);
@@ -808,7 +817,7 @@ export function AdminEntriesPage() {
     }
 
     void replaceActiveRows(appliedFilter, {
-      minimumRows: keepCachedRows ? rowsRef.current.length : 0,
+      minimumRows,
       showLoader: true,
       showRefreshing: false,
       silentError: false

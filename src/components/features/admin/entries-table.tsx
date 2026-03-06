@@ -169,7 +169,7 @@ export function EntriesTable({
                 <Button asChild size="sm" variant="outline">
                   <Link
                     to={`/admin/entries/${row.id}${location.search}`}
-                    state={{ fromEntriesList: true, scrollY: window.scrollY }}
+                    state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length }}
                   >
                     Details
                   </Link>
@@ -324,7 +324,7 @@ export function EntriesTable({
                         <Button asChild size="sm" variant="outline" className="h-full w-full justify-center px-3.5 text-xs">
                           <Link
                             to={`/admin/entries/${row.id}${location.search}`}
-                            state={{ fromEntriesList: true, scrollY: window.scrollY }}
+                            state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length }}
                           >
                             Details
                           </Link>
