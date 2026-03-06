@@ -809,8 +809,8 @@ export function AdminEntriesPage() {
 
     void replaceActiveRows(appliedFilter, {
       minimumRows: keepCachedRows ? rowsRef.current.length : 0,
-      showLoader: !keepCachedRows,
-      showRefreshing: keepCachedRows,
+      showLoader: true,
+      showRefreshing: false,
       silentError: false
     });
   }, [appliedFilter, replaceActiveRows, replaceDeletedRows, viewScope]);
