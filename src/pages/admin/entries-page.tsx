@@ -20,6 +20,8 @@ const PAGE_SIZE = 25;
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_KEY = "admin.entries.page.cache.v5";
+const RETURN_SNAPSHOT_KEY = "admin.entries.return.v1";
+const RETURN_SNAPSHOT_TTL_MS = 5 * 60 * 1000;
 
 type EntriesScope = "active" | "deleted";
 
@@ -139,6 +141,13 @@ type EntriesPageLocationState = {
   restoreEntriesScrollY?: number;
   restoreEntriesMinimumRows?: number;
 } | null;
+
+type EntriesReturnSnapshot = {
+  search: string;
+  scrollY: number;
+  loadedCount: number;
+  savedAt: number;
+};
 
 function hasValue<T extends string>(value: string | null, values: readonly T[]): value is T {
   return value !== null && (values as readonly string[]).includes(value);
@@ -357,6 +366,41 @@ function writeEntriesCache(filter: AdminEntriesFilter, rows: AdminEntryListItem[
     meta
   };
   sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+}
+
+function readReturnSnapshot(search: string): EntriesReturnSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(RETURN_SNAPSHOT_KEY);
+    if (!raw) {
+      return null;
+    }
+    sessionStorage.removeItem(RETURN_SNAPSHOT_KEY);
+
+    const parsed = JSON.parse(raw) as Partial<EntriesReturnSnapshot>;
+    if (
+      !parsed ||
+      typeof parsed.search !== "string" ||
+      typeof parsed.scrollY !== "number" ||
+      typeof parsed.loadedCount !== "number" ||
+      typeof parsed.savedAt !== "number"
+    ) {
+      return null;
+    }
+    if (parsed.search !== search) {
+      return null;
+    }
+    if (Date.now() - parsed.savedAt > RETURN_SNAPSHOT_TTL_MS) {
+      return null;
+    }
+    return {
+      search: parsed.search,
+      scrollY: Math.max(0, Math.floor(parsed.scrollY)),
+      loadedCount: Math.max(0, Math.floor(parsed.loadedCount)),
+      savedAt: parsed.savedAt
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function AdminEntriesPage() {
@@ -789,6 +833,19 @@ export function AdminEntriesPage() {
     }
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
   }, [location.pathname, location.search, location.state, navigate]);
+
+  useEffect(() => {
+    if (hasRestoredFromStateRef.current) {
+      return;
+    }
+    const snapshot = readReturnSnapshot(location.search);
+    if (!snapshot) {
+      return;
+    }
+    hasRestoredFromStateRef.current = true;
+    setPendingScrollRestoreY(snapshot.scrollY);
+    pendingRestoreMinimumRowsRef.current = snapshot.loadedCount;
+  }, [location.search]);
 
   useEffect(() => {
     if (viewScope === "deleted") {

@@ -373,16 +373,8 @@ export function AdminEntryDetailPage() {
           size="sm"
           onClick={() => {
             const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
-            if (state?.fromEntriesList && typeof state.scrollY === "number") {
-              navigate(`/admin/entries${location.search}`, {
-                state: {
-                  restoreEntriesScrollY: state.scrollY,
-                  restoreEntriesMinimumRows:
-                    typeof state.loadedCount === "number" && Number.isFinite(state.loadedCount)
-                      ? Math.max(0, Math.floor(state.loadedCount))
-                      : undefined
-                }
-              });
+            if (state?.fromEntriesList) {
+              navigate(-1);
               return;
             }
             navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });

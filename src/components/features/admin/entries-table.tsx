@@ -14,6 +14,8 @@ import {
 } from "@/lib/admin-status";
 import type { AdminEntryListItem } from "@/types/admin";
 
+const RETURN_SNAPSHOT_KEY = "admin.entries.return.v1";
+
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
   canManageStatus: boolean;
@@ -95,6 +97,21 @@ export function EntriesTable({
   onSetRejected
 }: EntriesTableProps) {
   const location = useLocation();
+  const persistReturnSnapshot = () => {
+    try {
+      sessionStorage.setItem(
+        RETURN_SNAPSHOT_KEY,
+        JSON.stringify({
+          search: location.search,
+          scrollY: window.scrollY,
+          loadedCount: rows.length,
+          savedAt: Date.now()
+        })
+      );
+    } catch {
+      // no-op: restoration gracefully falls back when storage is unavailable
+    }
+  };
   const doppelstarterCounts = new Map<string, number>();
   rows.forEach((row) => {
     const key = doppelstarterKey(row);
@@ -169,6 +186,7 @@ export function EntriesTable({
                 <Button asChild size="sm" variant="outline">
                   <Link
                     to={`/admin/entries/${row.id}${location.search}`}
+                    onClick={persistReturnSnapshot}
                     state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length }}
                   >
                     Details
@@ -324,6 +342,7 @@ export function EntriesTable({
                         <Button asChild size="sm" variant="outline" className="h-full w-full justify-center px-3.5 text-xs">
                           <Link
                             to={`/admin/entries/${row.id}${location.search}`}
+                            onClick={persistReturnSnapshot}
                             state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length }}
                           >
                             Details
