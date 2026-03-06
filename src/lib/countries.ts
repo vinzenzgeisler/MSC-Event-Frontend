@@ -135,7 +135,8 @@ function buildCatalog(): CountryCatalog {
   const optionsByLocale: Record<SupportedLocale, CountryOption[]> = {
     "de-DE": [],
     "en-US": [],
-    "cs-CZ": []
+    "cs-CZ": [],
+    "pl-PL": []
   };
   const lookup = new Map<string, string>();
   const canonicalNameByCode = new Map<string, string>();
