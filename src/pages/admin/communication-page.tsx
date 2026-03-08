@@ -39,34 +39,7 @@ type StaticTemplateOption = { key: string; label: string };
 type RecipientTarget = { id: string; label: string; previewEntryId?: string };
 type RecipientSearchItem = MailRecipientSearchItem;
 type RecipientMode = "filter" | "individual" | "combined";
-
-const FALLBACK_CAMPAIGN_TEMPLATE_KEYS = new Set([
-  "newsletter",
-  "event_update",
-  "free_form",
-  "payment_reminder_followup",
-  "email_confirmation"
-]);
-
-const FALLBACK_TEMPLATE_OPTIONS: StaticTemplateOption[] = [
-  { key: "newsletter", label: "Newsletter" },
-  { key: "event_update", label: "Event-Update" },
-  { key: "free_form", label: "Freie Mail (Event-Design)" },
-  { key: "payment_reminder_followup", label: "Zahlungserinnerung Follow-up" },
-  { key: "email_confirmation", label: "E-Mail-Bestätigung" }
-];
-
-const TEMPLATE_DEFAULTS: Record<string, { subject: string; body: string }> = {
-  free_form: { subject: "", body: "" },
-  newsletter: { subject: "Newsletter {{eventName}}", body: "Hallo {{driverName}},\n\n" },
-  event_update: { subject: "Update zu {{eventName}}", body: "Hallo {{driverName}},\n\n" },
-  payment_reminder_followup: { subject: "Zahlungserinnerung {{eventName}}", body: "Hallo {{driverName}},\n\n" },
-  email_confirmation: { subject: "Bitte E-Mail bestätigen - {{eventName}}", body: "Hallo {{driverName}},\n\n" }
-};
-
-const TEMPLATE_LABEL_OVERRIDES: Record<string, string> = Object.fromEntries(
-  FALLBACK_TEMPLATE_OPTIONS.map((item) => [item.key, item.label])
-);
+type ToastTone = "success" | "error" | "info";
 
 function parseEmailList(value: string) {
   const parts = value
@@ -111,21 +84,10 @@ function bodyTextToHtml(value: string) {
     .join("");
 }
 
-function extractTemplateTokens(value: string) {
-  const tokens = new Set<string>();
-  value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_full, token: string) => {
-    tokens.add(token);
-    return "";
-  });
-  return Array.from(tokens.values());
-}
-
 function normalizeTemplateOption(template: MailTemplate): StaticTemplateOption {
-  const overrideLabel = TEMPLATE_LABEL_OVERRIDES[template.key];
-  const resolvedLabel = overrideLabel || template.label || template.key;
   return {
     key: template.key,
-    label: resolvedLabel
+    label: template.label || template.key
   };
 }
 
@@ -136,7 +98,14 @@ function isCampaignTemplate(template: MailTemplate) {
   if (Array.isArray(template.channels) && template.channels.includes("campaign")) {
     return true;
   }
-  return FALLBACK_CAMPAIGN_TEMPLATE_KEYS.has(template.key);
+  return false;
+}
+
+function getCommunicationErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim().toLowerCase() === "failed to fetch") {
+    return "API nicht erreichbar. Bitte Verbindung, CORS und API-Deployment prüfen.";
+  }
+  return getApiErrorMessage(error, fallback);
 }
 
 function readStringList(value: unknown): string[] {
@@ -221,13 +190,13 @@ export function AdminCommunicationPage() {
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [eventName, setEventName] = useState("");
-  const [templateOptions, setTemplateOptions] = useState<Array<{ key: string; label: string }>>(FALLBACK_TEMPLATE_OPTIONS);
+  const [templateOptions, setTemplateOptions] = useState<Array<{ key: string; label: string }>>([]);
   const [templatesByKey, setTemplatesByKey] = useState<Map<string, MailTemplate>>(new Map());
   const [templatePlaceholders, setTemplatePlaceholders] = useState<MailTemplatePlaceholder[]>([]);
   const [backendPreview, setBackendPreview] = useState<MailTemplatePreview | null>(null);
   const [resolvedRecipients, setResolvedRecipients] = useState<ResolveRecipientsResult | null>(null);
   const [outboxExpanded, setOutboxExpanded] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
   const [loadingOutbox, setLoadingOutbox] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingPlaceholders, setLoadingPlaceholders] = useState(false);
@@ -236,11 +205,27 @@ export function AdminCommunicationPage() {
   const [queueing, setQueueing] = useState(false);
   const previewErrorToastRef = useRef("");
   const recipientSearchErrorToastRef = useRef("");
+  const searchRequestRef = useRef(0);
+  const toastTimerRef = useRef<number | null>(null);
 
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    setTimeout(() => setToastMessage(""), 2600);
+  const showToast = (message: string, tone: ToastTone = "error") => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToast({ message, tone });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2600);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadOutbox = async (options?: { silentError?: boolean }) => {
     if (!options?.silentError) {
@@ -250,7 +235,7 @@ export function AdminCommunicationPage() {
       setOutbox(await communicationService.listOutbox());
     } catch (error) {
       if (!options?.silentError) {
-        showToast(getApiErrorMessage(error, "Postausgang konnte nicht geladen werden."));
+        showToast(getCommunicationErrorMessage(error, "Postausgang konnte nicht geladen werden."));
       }
     } finally {
       if (!options?.silentError) {
@@ -264,15 +249,18 @@ export function AdminCommunicationPage() {
     try {
       const templates = await communicationService.listTemplates();
       const campaignTemplates = templates.filter((item) => item.isActive !== false && isCampaignTemplate(item));
+      const nextTemplatesByKey = new Map(campaignTemplates.map((item) => [item.key, item]));
       const mappedOptions = campaignTemplates.map(normalizeTemplateOption);
-      const merged = new Map<string, StaticTemplateOption>();
-      FALLBACK_TEMPLATE_OPTIONS.forEach((option) => merged.set(option.key, option));
-      mappedOptions.forEach((option) => merged.set(option.key, option));
-      setTemplateOptions(Array.from(merged.values()));
-      setTemplatesByKey(new Map(campaignTemplates.map((item) => [item.key, item])));
+      setTemplateOptions(mappedOptions);
+      setTemplatesByKey(nextTemplatesByKey);
+      if (form.templateKey && !nextTemplatesByKey.has(form.templateKey)) {
+        setForm((prev) => ({ ...prev, templateKey: "", subjectOverride: "" }));
+        setTemplateBody("");
+        setTemplateDataDraft({});
+      }
     } catch (error) {
-      showToast(getApiErrorMessage(error, "Mail-Templates konnten nicht geladen werden."));
-      setTemplateOptions(FALLBACK_TEMPLATE_OPTIONS);
+      showToast(getCommunicationErrorMessage(error, "Mail-Templates konnten nicht geladen werden."));
+      setTemplateOptions([]);
       setTemplatesByKey(new Map());
     } finally {
       setLoadingTemplates(false);
@@ -306,23 +294,6 @@ export function AdminCommunicationPage() {
   );
   const sendBlockedByTemplateData = missingRequiredDynamicFields.length > 0;
 
-  const unresolvedTokens = useMemo(() => {
-    if (!form.templateKey) {
-      return [];
-    }
-    const allowed = new Set(
-      selectedTemplate?.composer?.allowedPlaceholders?.length
-        ? selectedTemplate.composer.allowedPlaceholders
-        : templatePlaceholders.map((item) => item.name)
-    );
-    if (allowed.size === 0) {
-      return [];
-    }
-    const tokens = [...extractTemplateTokens(form.subjectOverride), ...extractTemplateTokens(templateBody)];
-    const unique = Array.from(new Set(tokens));
-    return unique.filter((token) => !allowed.has(token));
-  }, [form.subjectOverride, form.templateKey, selectedTemplate, templateBody, templatePlaceholders]);
-
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
   const selectedDriverPersonIds = useMemo(() => selectedDriverTargets.map((target) => target.id), [selectedDriverTargets]);
   const subjectOverrideValue = useMemo(() => form.subjectOverride.trim() || undefined, [form.subjectOverride]);
@@ -347,22 +318,6 @@ export function AdminCommunicationPage() {
     }, {});
     return Object.keys(payload).length > 0 ? payload : undefined;
   }, [templateDataDraft]);
-  const previewSampleData = useMemo(() => {
-    const selectedDriverLabel = selectedDriverTargets[0]?.label ?? "";
-    const selectedDriverName = selectedDriverLabel.replace(/\s*\([^)]+\)\s*$/, "").trim();
-    const [firstName = "Max", ...restNames] = selectedDriverName.split(/\s+/).filter(Boolean);
-    const lastName = restNames.join(" ").trim() || "Mustermann";
-    return {
-      eventName: eventName.trim() || "MSC Event",
-      driverName: selectedDriverName || "Max Mustermann",
-      firstName,
-      lastName,
-      amountOpen: "0,00 EUR",
-      paymentDeadline: new Date().toISOString().slice(0, 10),
-      verificationUrl: "https://example.com/verify",
-      ...(templateDataValue ?? {})
-    };
-  }, [eventName, selectedDriverTargets, templateDataValue]);
   const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
   const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
   const previewEntryId = useMemo(() => {
@@ -378,21 +333,19 @@ export function AdminCommunicationPage() {
     return templatesByKey.has(form.templateKey);
   }, [form.templateKey, templatesByKey]);
   const availableCampaignTemplateKeys = useMemo(() => {
-    if (templatesByKey.size === 0) {
-      return FALLBACK_CAMPAIGN_TEMPLATE_KEYS;
-    }
     const fromBackend = new Set<string>();
     templatesByKey.forEach((template) => {
       if (isCampaignTemplate(template)) {
         fromBackend.add(template.key);
       }
     });
-    return fromBackend.size > 0 ? fromBackend : FALLBACK_CAMPAIGN_TEMPLATE_KEYS;
+    return fromBackend;
   }, [templatesByKey]);
   const sendBlockedByRecipientSelection = allowIndividualRecipients && !allowFilterRecipients && selectedDriverPersonIds.length === 0 && additionalRecipients.valid.length === 0;
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
+  const recipientSearchHasQuery = recipientSearchQuery.trim().length >= 2;
   const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
   const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
 
@@ -427,7 +380,7 @@ export function AdminCommunicationPage() {
     adminMetaService
       .listClassOptions()
       .then(setClassOptions)
-      .catch((error) => showToast(getApiErrorMessage(error, "Klassen konnten nicht geladen werden.")));
+      .catch((error) => showToast(getCommunicationErrorMessage(error, "Klassen konnten nicht geladen werden.")));
 
     return () => {
       window.clearInterval(refreshTimer);
@@ -481,7 +434,7 @@ export function AdminCommunicationPage() {
         .previewTemplate({
           templateKey: form.templateKey,
           entryId: previewEntryId,
-          templateData: previewSampleData,
+          templateData: templateDataValue,
           subjectOverride: subjectOverrideValue,
           bodyOverride: bodyOverrideValue,
           bodyHtmlOverride: bodyHtmlOverrideValue,
@@ -500,7 +453,7 @@ export function AdminCommunicationPage() {
         .catch((error) => {
           if (!cancelled) {
             setBackendPreview(null);
-            const message = getApiErrorMessage(error, "Preview konnte nicht geladen werden.");
+            const message = getCommunicationErrorMessage(error, "Preview konnte nicht geladen werden.");
             if (previewErrorToastRef.current !== message) {
               showToast(message);
               previewErrorToastRef.current = message;
@@ -518,7 +471,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, previewSampleData, subjectOverrideValue]);
+  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, subjectOverrideValue, templateDataValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -582,8 +535,13 @@ export function AdminCommunicationPage() {
     }
 
     const query = recipientSearchQuery.trim();
+    if (query.length < 2) {
+      setRecipientSearchResults([]);
+      setSearchingRecipients(false);
+      return;
+    }
 
-    let cancelled = false;
+    const requestId = ++searchRequestRef.current;
     const timer = window.setTimeout(() => {
       setSearchingRecipients(true);
       communicationService
@@ -595,31 +553,31 @@ export function AdminCommunicationPage() {
           limit: 20
         })
         .then((recipients) => {
-          if (cancelled) {
+          if (searchRequestRef.current !== requestId) {
             return;
           }
           setRecipientSearchResults(recipients);
           recipientSearchErrorToastRef.current = "";
         })
         .catch((error) => {
-          if (!cancelled) {
-            setRecipientSearchResults([]);
-            const message = getApiErrorMessage(error, "Fahrersuche fehlgeschlagen.");
-            if (recipientSearchErrorToastRef.current !== message) {
-              showToast(message);
-              recipientSearchErrorToastRef.current = message;
-            }
+          if (searchRequestRef.current !== requestId) {
+            return;
+          }
+          setRecipientSearchResults([]);
+          const message = getCommunicationErrorMessage(error, "Fahrersuche fehlgeschlagen.");
+          if (recipientSearchErrorToastRef.current !== message) {
+            showToast(message);
+            recipientSearchErrorToastRef.current = message;
           }
         })
         .finally(() => {
-          if (!cancelled) {
+          if (searchRequestRef.current === requestId) {
             setSearchingRecipients(false);
           }
         });
     }, 250);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timer);
     };
   }, [
@@ -663,9 +621,14 @@ export function AdminCommunicationPage() {
       return;
     }
 
+    const template = templatesByKey.get(nextTemplateKey);
+    if (!template) {
+      showToast("Template ist nicht verfügbar.");
+      return;
+    }
+
     const fromDraft = templateDraftsRef.current[nextTemplateKey];
     if (fromDraft) {
-      const template = templatesByKey.get(nextTemplateKey) ?? null;
       const defaults = defaultTemplateDataFromComposer(template);
       setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
       setTemplateBody(fromDraft.body);
@@ -673,15 +636,13 @@ export function AdminCommunicationPage() {
       return;
     }
 
-    const template = templatesByKey.get(nextTemplateKey);
-    const defaults = TEMPLATE_DEFAULTS[nextTemplateKey] ?? { subject: "", body: "" };
     setForm((prev) => ({
       ...prev,
       templateKey: nextTemplateKey,
-      subjectOverride: template?.subject ?? defaults.subject
+      subjectOverride: template.subject
     }));
-    setTemplateBody(template?.bodyText ?? defaults.body);
-    setTemplateDataDraft(defaultTemplateDataFromComposer(template ?? null));
+    setTemplateBody(template.bodyText);
+    setTemplateDataDraft(defaultTemplateDataFromComposer(template));
   };
 
   const resolveRecipients = async () => {
@@ -708,10 +669,10 @@ export function AdminCommunicationPage() {
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined
       });
       setResolvedRecipients(result);
-      showToast(`Empfänger aufgelöst: ${result.finalCount}`);
+      showToast(`Empfänger aufgelöst: ${result.finalCount}`, "info");
     } catch (error) {
       setResolvedRecipients(null);
-      showToast(getApiErrorMessage(error, "Empfänger konnten nicht aufgelöst werden."));
+      showToast(getCommunicationErrorMessage(error, "Empfänger konnten nicht aufgelöst werden."));
     } finally {
       setResolvingRecipients(false);
     }
@@ -773,7 +734,7 @@ export function AdminCommunicationPage() {
         }
       });
 
-      showToast(`Mailversand eingeplant (${result.queued} Empfänger).`);
+      showToast(`Mailversand eingeplant (${result.queued} Empfänger).`, "success");
       await loadOutbox();
       if (!resolvedRecipients) {
         await resolveRecipients();
@@ -791,7 +752,7 @@ export function AdminCommunicationPage() {
           return;
         }
       }
-      showToast(getApiErrorMessage(error, "Mailversand konnte nicht gestartet werden."));
+      showToast(getCommunicationErrorMessage(error, "Mailversand konnte nicht gestartet werden."));
     } finally {
       setQueueing(false);
     }
@@ -913,6 +874,8 @@ export function AdminCommunicationPage() {
                   <div className="px-3 py-2 text-xs text-slate-500">Deaktiviert.</div>
                 ) : searchingRecipients ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Suche läuft...</div>
+                ) : !recipientSearchHasQuery ? (
+                  <div className="px-3 py-2 text-xs text-slate-500">Suche...</div>
                 ) : recipientSearchResults.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
                 ) : (
@@ -986,7 +949,7 @@ export function AdminCommunicationPage() {
             <div className="space-y-1">
               <Label>Template</Label>
               <Select value={form.templateKey || "__none__"} onValueChange={(next) => applyTemplateSelection(next === "__none__" ? "" : next)}>
-                <SelectTrigger className="text-base md:text-sm">
+                <SelectTrigger className="text-base md:text-sm" disabled={loadingTemplates || templateOptions.length === 0}>
                   <SelectValue placeholder={loadingTemplates ? "Templates laden..." : "Template wählen"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -998,6 +961,7 @@ export function AdminCommunicationPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {!loadingTemplates && templateOptions.length === 0 && <p className="text-xs text-slate-500">Keine aktiven Kampagnen-Templates verfügbar.</p>}
             </div>
             {selectedTemplate && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-white px-3 py-2 text-xs text-slate-600">
@@ -1080,11 +1044,6 @@ export function AdminCommunicationPage() {
                 )}
               </div>
             )}
-            {unresolvedTokens.length > 0 && (
-              <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                Nicht bekannte Platzhalter: {unresolvedTokens.join(", ")}
-              </div>
-            )}
             <details className="rounded-md border bg-white p-3 text-sm text-slate-700">
               <summary className="cursor-pointer font-medium text-slate-900">Platzhalter-Hilfe</summary>
               <div className="mt-3 space-y-2">
@@ -1124,22 +1083,10 @@ export function AdminCommunicationPage() {
                     className="h-[520px] w-full rounded border-0"
                   />
                 </div>
-                {backendPreview.warnings.length > 0 && (
-                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                    Warnungen: {backendPreview.warnings.join(" | ")}
-                  </div>
-                )}
-                {backendPreview.missingPlaceholders.length > 0 && (
-                  <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-900">
-                    Pflicht-Platzhalter fehlen: {backendPreview.missingPlaceholders.join(", ")}. Versand ist blockiert.
-                  </div>
-                )}
-                <div className="rounded-md border bg-white p-3 text-xs text-slate-600">
-                  Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}
-                  <br />
-                  Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}
-                  <br />
-                  Unbekannt: {backendPreview.unknownPlaceholders.join(", ") || "-"}
+                <div className="space-y-1 text-xs text-slate-600">
+                  <p>Warnungen: {backendPreview.warnings.join(" | ") || "-"}</p>
+                  <p>Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}</p>
+                  <p>Unbekannt: {backendPreview.unknownPlaceholders.join(", ") || "-"}</p>
                 </div>
               </>
             ) : (
@@ -1206,10 +1153,10 @@ export function AdminCommunicationPage() {
                       onClick={async () => {
                         try {
                           await communicationService.retryOutbox(item.id);
-                          showToast("Outbox-Eintrag wurde erneut eingeplant.");
+                          showToast("Outbox-Eintrag wurde erneut eingeplant.", "success");
                           await loadOutbox();
                         } catch (error) {
-                          showToast(getApiErrorMessage(error, "Retry fehlgeschlagen."));
+                          showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
                         }
                       }}
                     >
@@ -1255,10 +1202,10 @@ export function AdminCommunicationPage() {
                           onClick={async () => {
                             try {
                               await communicationService.retryOutbox(item.id);
-                              showToast("Outbox-Eintrag wurde erneut eingeplant.");
+                              showToast("Outbox-Eintrag wurde erneut eingeplant.", "success");
                               await loadOutbox();
                             } catch (error) {
-                              showToast(getApiErrorMessage(error, "Retry fehlgeschlagen."));
+                              showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
                             }
                           }}
                         >
@@ -1286,9 +1233,18 @@ export function AdminCommunicationPage() {
         </CardContent>
       </Card>
 
-      {toastMessage && (
-        <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
-          {toastMessage}
+      {toast && (
+        <div
+          className={[
+            "fixed right-4 top-4 z-40 rounded-md border px-3 py-2 text-sm shadow-sm",
+            toast.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : toast.tone === "info"
+                ? "border-slate-200 bg-white text-slate-800"
+                : "border-red-200 bg-red-50 text-red-800"
+          ].join(" ")}
+        >
+          {toast.message}
         </div>
       )}
     </div>
