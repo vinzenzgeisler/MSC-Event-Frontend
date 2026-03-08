@@ -36,6 +36,8 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
   const { m, locale } = useAnmeldungI18n();
   const countryOptions = useMemo(() => getCountrySelectOptions(locale), [locale]);
   const legalTexts = getLegalTexts(locale);
+  const streetPlaceholder = locale === "en" ? "Main Street 12" : locale === "cz" ? "Hlavní 12" : locale === "pl" ? "ul. Główna 12" : "Musterstraße 12";
+  const cityPlaceholder = locale === "en" ? "Zittau" : locale === "cz" ? "Zittau" : locale === "pl" ? "Zittau" : "Zittau";
 
   return (
     <div className="space-y-6">
@@ -115,7 +117,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
         <h3 className="md:col-span-3 text-lg font-semibold text-slate-900">{m.driver.addressTitle}</h3>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-street">{m.driver.street}</Label>
-          <Input id="driver-street" value={value.street} onChange={(event) => onChange("street", event.target.value)} placeholder="Musterstraße 12" {...fieldAria(errors.street, "driver-street-error")} />
+          <Input id="driver-street" value={value.street} onChange={(event) => onChange("street", event.target.value)} placeholder={streetPlaceholder} {...fieldAria(errors.street, "driver-street-error")} />
           <FieldError id="driver-street-error" message={errors.street} />
         </div>
         <div className="space-y-2">
@@ -125,7 +127,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-city">{m.driver.city}</Label>
-          <Input id="driver-city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder="Zittau" {...fieldAria(errors.city, "driver-city-error")} />
+          <Input id="driver-city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder={cityPlaceholder} {...fieldAria(errors.city, "driver-city-error")} />
           <FieldError id="driver-city-error" message={errors.city} />
         </div>
       </section>

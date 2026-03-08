@@ -103,6 +103,26 @@ export function StartEntriesStep({
   const { m, locale } = useAnmeldungI18n();
   const countryOptions = getCountrySelectOptions(locale);
   const usedClassIds = new Set(starts.filter((item) => item.id !== editingId).map((item) => item.classId));
+  const ownerPlaceholder =
+    locale === "en"
+      ? "Team name / Owner name"
+      : locale === "cz"
+        ? "Název týmu / Jméno vlastníka"
+        : locale === "pl"
+          ? "Nazwa zespołu / Imię i nazwisko właściciela"
+          : "Teamname / Haltername";
+  const historyPlaceholder =
+    locale === "en"
+      ? "History, modifications, special technical features"
+      : locale === "cz"
+        ? "Historie, úpravy, zvláštní technické vlastnosti"
+        : locale === "pl"
+          ? "Historia, modyfikacje, szczególne cechy techniczne"
+          : "Historie, Umbauten, besondere technische Merkmale";
+  const uploadFileLabel = locale === "en" ? "File" : locale === "cz" ? "Soubor" : locale === "pl" ? "Plik" : "Datei";
+  const uploadRunning = locale === "en" ? "Upload in progress..." : locale === "cz" ? "Nahrávání probíhá..." : locale === "pl" ? "Trwa przesyłanie..." : "Upload läuft...";
+  const uploadDone = locale === "en" ? "Upload completed." : locale === "cz" ? "Nahrávání dokončeno." : locale === "pl" ? "Przesyłanie zakończone." : "Upload abgeschlossen.";
+  const uploadFailed = locale === "en" ? "Upload failed." : locale === "cz" ? "Nahrávání se nezdařilo." : locale === "pl" ? "Przesyłanie nie powiodło się." : "Upload fehlgeschlagen.";
 
   return (
     <div className="space-y-6">
@@ -284,7 +304,7 @@ export function StartEntriesStep({
           </div>
           <div className="space-y-2">
             <Label>{m.start.owner}</Label>
-            <Input value={draft.vehicle.ownerName} onChange={(event) => onVehicleFieldChange("ownerName", event.target.value)} placeholder="Teamname / Haltername" />
+            <Input value={draft.vehicle.ownerName} onChange={(event) => onVehicleFieldChange("ownerName", event.target.value)} placeholder={ownerPlaceholder} />
           </div>
           <div className="space-y-2 md:col-span-3">
             <Label>{m.start.history}</Label>
@@ -292,7 +312,7 @@ export function StartEntriesStep({
               className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={draft.vehicle.vehicleHistory}
               onChange={(event) => onVehicleFieldChange("vehicleHistory", event.target.value)}
-              placeholder="Historie, Umbauten, besondere technische Merkmale"
+              placeholder={historyPlaceholder}
             />
             <p className="text-xs text-slate-500">{m.start.historyHint}</p>
             <FieldError message={fieldErrors.vehicleHistory} />
@@ -308,11 +328,11 @@ export function StartEntriesStep({
               }}
               onChange={(event) => onVehicleImageSelect(event.target.files?.[0] ?? null)}
             />
-            {draft.vehicle.imageFileName && <p className="text-xs text-slate-600">Datei: {draft.vehicle.imageFileName}</p>}
-            {draft.vehicle.imageUploadState === "uploading" && <p className="text-xs text-slate-600">Upload läuft…</p>}
-            {draft.vehicle.imageUploadState === "uploaded" && <p className="text-xs text-emerald-700">Upload abgeschlossen.</p>}
+            {draft.vehicle.imageFileName && <p className="text-xs text-slate-600">{uploadFileLabel}: {draft.vehicle.imageFileName}</p>}
+            {draft.vehicle.imageUploadState === "uploading" && <p className="text-xs text-slate-600">{uploadRunning}</p>}
+            {draft.vehicle.imageUploadState === "uploaded" && <p className="text-xs text-emerald-700">{uploadDone}</p>}
             {draft.vehicle.imageUploadState === "error" && (
-              <p className="text-xs text-destructive">{draft.vehicle.imageUploadError || "Upload fehlgeschlagen."}</p>
+              <p className="text-xs text-destructive">{draft.vehicle.imageUploadError || uploadFailed}</p>
             )}
             <FieldError message={fieldErrors.vehicleImage} />
           </div>
@@ -478,7 +498,7 @@ export function StartEntriesStep({
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>{m.start.backupOwner}</Label>
-                  <Input value={draft.backupVehicle.ownerName} onChange={(event) => onBackupFieldChange("ownerName", event.target.value)} />
+                  <Input value={draft.backupVehicle.ownerName} onChange={(event) => onBackupFieldChange("ownerName", event.target.value)} placeholder={ownerPlaceholder} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>{m.start.backupHistory}</Label>
@@ -486,6 +506,7 @@ export function StartEntriesStep({
                     className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={draft.backupVehicle.vehicleHistory}
                     onChange={(event) => onBackupFieldChange("vehicleHistory", event.target.value)}
+                    placeholder={historyPlaceholder}
                   />
                   <p className="text-xs text-slate-500">{m.start.backupHistoryHint}</p>
                   <FieldError message={fieldErrors.backupVehicleHistory} />
@@ -501,11 +522,11 @@ export function StartEntriesStep({
                     }}
                     onChange={(event) => onBackupVehicleImageSelect(event.target.files?.[0] ?? null)}
                   />
-                  {draft.backupVehicle.imageFileName && <p className="text-xs text-slate-600">Datei: {draft.backupVehicle.imageFileName}</p>}
-                  {draft.backupVehicle.imageUploadState === "uploading" && <p className="text-xs text-slate-600">Upload läuft…</p>}
-                  {draft.backupVehicle.imageUploadState === "uploaded" && <p className="text-xs text-emerald-700">Upload abgeschlossen.</p>}
+                  {draft.backupVehicle.imageFileName && <p className="text-xs text-slate-600">{uploadFileLabel}: {draft.backupVehicle.imageFileName}</p>}
+                  {draft.backupVehicle.imageUploadState === "uploading" && <p className="text-xs text-slate-600">{uploadRunning}</p>}
+                  {draft.backupVehicle.imageUploadState === "uploaded" && <p className="text-xs text-emerald-700">{uploadDone}</p>}
                   {draft.backupVehicle.imageUploadState === "error" && (
-                    <p className="text-xs text-destructive">{draft.backupVehicle.imageUploadError || "Upload fehlgeschlagen."}</p>
+                    <p className="text-xs text-destructive">{draft.backupVehicle.imageUploadError || uploadFailed}</p>
                   )}
                   <FieldError message={fieldErrors.backupVehicleImage} />
                 </div>

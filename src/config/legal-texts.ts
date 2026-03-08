@@ -30,7 +30,7 @@ type LegalTexts = {
   waiverDoc: LegalDoc;
 };
 
-type PersistedLegalTextsLocale = Exclude<LegalUiLocale, "pl">;
+type PersistedLegalTextsLocale = LegalUiLocale;
 
 const LEGAL_TEXTS: Record<PersistedLegalTextsLocale, LegalTexts> = {
   de: {
@@ -246,15 +246,81 @@ const LEGAL_TEXTS: Record<PersistedLegalTextsLocale, LegalTexts> = {
         "9. Vyssi moc: Pri zruseni akce z duvodu vyssi moci (napr. pocasi nebo regulatorni omezeni) muze byt narok na vraceni startovneho vyloucen."
       ]
     }
+  },
+  pl: {
+    shortInfo:
+      "Wysyłając rejestrację, przetwarzamy Twoje dane osobowe w celu obsługi zgłoszenia, zarządzania uczestnikami, komunikacji, tworzenia dokumentów i rozliczeń. Podstawą prawną jest art. 6 ust. 1 lit. b RODO oraz, gdy jest to wymagane prawem, art. 6 ust. 1 lit. c RODO. Opcjonalne przetwarzanie materiałów medialnych odbywa się wyłącznie na podstawie zgody zgodnie z art. 6 ust. 1 lit. a RODO. Odbiorcami są wewnętrzne role organizacyjne oraz podmioty przetwarzające technicznie w AWS eu-central-1. Przysługują Ci prawa dostępu, sprostowania, usunięcia, ograniczenia, sprzeciwu i przenoszenia danych.",
+    waiverSignNotice: "Wiążące oświadczenie o zrzeczeniu odpowiedzialności jest podpisywane na miejscu podczas rejestracji.",
+    footerPrivacyLabel: "Prywatność",
+    footerImprintLabel: "Impressum",
+    footerTermsLabel: "Warunki udziału",
+    footerWaiverLabel: "Zrzeczenie odpowiedzialności",
+    termsAcceptanceLabel: "Akceptuję warunki udziału.",
+    privacyAcceptanceLabel: "Zapoznałem(-am) się z informacją o prywatności i akceptuję przetwarzanie danych na potrzeby realizacji wydarzenia.",
+    mediaAcceptanceLabel: "Wyrażam zgodę na wykorzystanie zdjęć/wideo do relacji z wydarzenia, strony klubu i klubowych kanałów social media.",
+    minorNotice: "Osoby niepełnoletnie mogą zostać zarejestrowane wyłącznie za wyraźną zgodą opiekuna prawnego.",
+    guardianSectionTitle: "Dane opiekuna prawnego (wymagane dla kierowców poniżej 18 lat)",
+    guardianFullNameLabel: "Imię i nazwisko opiekuna prawnego",
+    guardianEmailLabel: "E-mail opiekuna prawnego",
+    guardianPhoneLabel: "Telefon opiekuna prawnego",
+    guardianConsentLabel: "Jako opiekun prawny potwierdzam udział niepełnoletniego kierowcy.",
+    imprintDoc: {
+      title: "Impressum",
+      paragraphs: [
+        "Dane zgodnie z § 5 DDG: MSC Oberlausitzer Dreilaendereck e.V., Am Weiher 4, 02791 Oderwitz.",
+        "Reprezentacja: reprezentowany przez przewodniczącego Petera Lierscha.",
+        "Kontakt: info@msc-oberlausitzer-dreilaendereck.eu.",
+        "Rejestr: sąd rejestrowy w Dreźnie, VR 5907.",
+        "NIP UE: DE289954270.",
+        "Podmiot odpowiedzialny za treść: MSC Oberlausitzer Dreilaendereck e.V."
+      ]
+    },
+    privacyDoc: {
+      title: "Informacja o prywatności",
+      paragraphs: [
+        "1. Administrator: MSC Oberlausitzer Dreilaendereck e.V., Am Weiher 4, 02791 Oderwitz, e-mail info@msc-oberlausitzer-dreilaendereck.eu.",
+        "2. Inspektor ochrony danych: Stephan Jakab, kontakt przez info@msc-oberlausitzer-dreilaendereck.eu.",
+        "3. Cel i podstawa prawna: obsługa rejestracji, zarządzanie uczestnikami, realizacja wydarzenia (w tym check-in i odbiór techniczny), komunikacja, dokumenty i rozliczenia. Podstawą są art. 6 ust. 1 lit. b, c, f RODO; media opcjonalnie wyłącznie na podstawie art. 6 ust. 1 lit. a RODO.",
+        "4. Kategorie danych: dane identyfikacyjne i kontaktowe, dane uczestnika i pojazdu, kontakty awaryjne, dane statusowe/procesowe oraz potwierdzenia zgód (wersja, czas, hash, locale, źródło).",
+        "5. Odbiorcy/podmioty przetwarzające: wewnętrzne role organizacyjne oraz AWS jako podmiot przetwarzający (RDS, S3, SES, Cognito, CloudWatch, Lambda, EventBridge, API Gateway, Secrets Manager), region eu-central-1.",
+        "6. Okres przechowywania: dane operacyjne zwykle 3 lata po wydarzeniu; dane komunikacyjne/outbox 12 miesięcy; eksporty 90 dni; dane weryfikacyjne/idempotencyjne 30 dni; audyt 24 miesiące; dane księgowe/rozliczeniowe do 10 lat, jeśli wymagane prawem.",
+        "7. Twoje prawa: dostęp, sprostowanie, usunięcie, ograniczenie przetwarzania, sprzeciw, przenoszenie danych oraz wycofanie zgody ze skutkiem na przyszłość.",
+        "8. Prawo do skargi: możesz wnieść skargę do właściwego organu ochrony danych.",
+        "9. Bezpieczeństwo: transmisja danych odbywa się szyfrowanym połączeniem TLS/HTTPS; pełne bezpieczeństwo transmisji internetowej nie może być zagwarantowane.",
+        "10. Logi techniczne i niezbędne mechanizmy pamięci: aplikacja przetwarza techniczne logi połączeń i serwera; nie używa marketingowych ani analitycznych cookies; może używać niezbędnej pamięci przeglądarki (np. język i szkice formularza).",
+        "11. Obowiązek podania danych: bez wymaganych danych realizacja zgłoszenia nie jest możliwa.",
+        "12. Aktualizacje: niniejsza informacja o prywatności może być aktualizowana przy zmianach prawnych lub organizacyjnych."
+      ]
+    },
+    termsDoc: {
+      title: "Warunki udziału / Regulamin",
+      paragraphs: [
+        "1. Niepełnoletni: udział osób niepełnoletnich jest możliwy wyłącznie za wyraźną zgodą opiekuna prawnego. Wymagane są dane opiekuna (imię i nazwisko, e-mail, telefon) oraz potwierdzenie zgody.",
+        "2. Zgoda na media (opcjonalna): zdjęcia/wideo mogą być wykorzystane do relacji z wydarzenia, na stronie klubu i w klubowych kanałach social media.",
+        "3. Wycofanie zgody: zgoda jest dobrowolna i może zostać cofnięta w dowolnym momencie ze skutkiem na przyszłość pod adresem info@msc-oberlausitzer-dreilaendereck.eu.",
+        "4. Cookies/tracking: formularz nie używa marketingowych ani analitycznych cookies. Wykorzystywane są wyłącznie funkcje technicznie niezbędne."
+      ]
+    },
+    waiverDoc: {
+      title: "Oświadczenie o zrzeczeniu odpowiedzialności",
+      paragraphs: [
+        "1. Zakres: niniejsze oświadczenie dotyczy udziału w wydarzeniu i stanowi część dokumentacji zgłoszeniowej.",
+        "2. Odpowiedzialność własna: uczestnik bierze udział na własne ryzyko i ponosi odpowiedzialność cywilną oraz karną za szkody spowodowane przez siebie lub pojazd, o ile nie obowiązuje wyłączenie odpowiedzialności.",
+        "3. Zrzeczenie roszczeń: wraz ze zgłoszeniem uczestnik zrzeka się roszczeń odszkodowawczych związanych z wydarzeniem, w szczególności wobec DMV, DMSB, organizatora oraz osób i podmiotów zaangażowanych w organizację i przebieg wydarzenia.",
+        "4. Rozszerzony krąg: zrzeczenie obejmuje również innych uczestników, ich pomocników, właścicieli innych pojazdów oraz własnych pomocników.",
+        "5. Wyjątki: zrzeczenie nie obejmuje roszczeń z tytułu uszczerbku na życiu, zdrowiu i ciele oraz roszczeń wynikających z działania umyślnego lub rażącego niedbalstwa.",
+        "6. Oświadczenia uczestnika: uczestnik potwierdza poprawność i kompletność danych zgłoszenia oraz zgodność pojazdu z wymaganiami technicznymi.",
+        "7. Akceptacja zasad: uczestnik potwierdza znajomość i akceptację regulaminu wydarzenia, posiadanie ważnego prawa jazdy oraz powstrzymanie się od substancji/metod zabronionych.",
+        "8. Dane i własność: uczestnik wyraża zgodę na przetwarzanie danych przez organizatora i potwierdza, że jeśli nie jest właścicielem pojazdu, dostarczy odpowiednie oświadczenie właściciela.",
+        "9. Siła wyższa: w przypadku odwołania wydarzenia z przyczyn siły wyższej (np. pogoda, decyzje administracyjne) zwrot opłaty startowej może być wyłączony."
+      ]
+    }
   }
 };
 
 function resolveLocale(locale: string): PersistedLegalTextsLocale {
-  if (locale === "en" || locale === "cz" || locale === "de") {
+  if (locale === "en" || locale === "cz" || locale === "de" || locale === "pl") {
     return locale;
-  }
-  if (locale === "pl") {
-    return "en";
   }
   return "de";
 }
