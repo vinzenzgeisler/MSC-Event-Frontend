@@ -692,7 +692,17 @@ const baseMessages = {
   }
 } as const;
 
-const messages: Record<AnmeldungLocale, (typeof baseMessages)["de"]> = {
+type DeepWiden<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly DeepWiden<U>[]
+    : T extends object
+      ? { [K in keyof T]: DeepWiden<T[K]> }
+      : T;
+
+type AnmeldungMessages = DeepWiden<(typeof baseMessages)["de"]>;
+
+const messages: Record<AnmeldungLocale, AnmeldungMessages> = {
   ...baseMessages,
   pl: {
     ...baseMessages.en,
@@ -700,8 +710,6 @@ const messages: Record<AnmeldungLocale, (typeof baseMessages)["de"]> = {
     languageNames: { ...baseMessages.en.languageNames, pl: "Polski" }
   }
 };
-
-type AnmeldungMessages = (typeof messages)[AnmeldungLocale];
 
 type AnmeldungI18nContextValue = {
   locale: AnmeldungLocale;
