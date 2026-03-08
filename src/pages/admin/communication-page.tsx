@@ -345,7 +345,7 @@ export function AdminCommunicationPage() {
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
-  const recipientSearchHasQuery = recipientSearchQuery.trim().length >= 2;
+  const recipientSearchActive = recipientSearchQuery.trim().length >= 2;
   const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
   const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
 
@@ -759,15 +759,15 @@ export function AdminCommunicationPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <h1 className="text-2xl font-semibold text-slate-900">Kommunikation</h1>
 
       <Card>
         <CardHeader className="space-y-2">
           <CardTitle>Kampagne erstellen</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+        <CardContent className="space-y-3">
+          <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <div className="text-sm font-semibold text-slate-900">1. Empfänger definieren</div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -795,7 +795,7 @@ export function AdminCommunicationPage() {
                 Filter + Fahrerauswahl
               </Button>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-2 md:grid-cols-3">
               <div className="space-y-1">
                 <Label>Klasse</Label>
                 <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
@@ -850,7 +850,7 @@ export function AdminCommunicationPage() {
             <div className="space-y-1">
               <Label>Zusätzliche E-Mails (optional)</Label>
               <textarea
-                className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={additionalEmailsInput}
                 onChange={(event) => setAdditionalEmailsInput(event.target.value)}
                 placeholder="mail1@example.com, mail2@example.com"
@@ -863,23 +863,27 @@ export function AdminCommunicationPage() {
 
             <div className="space-y-2" aria-disabled={!allowIndividualRecipients}>
               <Label>Fahrer suchen und auswählen</Label>
-              <Input
-                value={recipientSearchQuery}
-                onChange={(event) => setRecipientSearchQuery(event.target.value)}
-                placeholder="Name oder E-Mail suchen"
-                disabled={!allowIndividualRecipients}
-              />
+              <div className="relative">
+                <Input
+                  value={recipientSearchQuery}
+                  onChange={(event) => setRecipientSearchQuery(event.target.value)}
+                  placeholder="Name oder E-Mail suchen"
+                  disabled={!allowIndividualRecipients}
+                  className="pr-9"
+                />
+                {searchingRecipients && allowIndividualRecipients && (
+                  <Loader2 className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 animate-spin text-slate-400" />
+                )}
+              </div>
               <div className="rounded-md border bg-white">
                 {!allowIndividualRecipients ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Deaktiviert.</div>
-                ) : searchingRecipients ? (
-                  <div className="px-3 py-2 text-xs text-slate-500">Suche läuft...</div>
-                ) : !recipientSearchHasQuery ? (
-                  <div className="px-3 py-2 text-xs text-slate-500">Suche...</div>
+                ) : !recipientSearchActive ? (
+                  <div className="px-3 py-2 text-xs text-slate-400"> </div>
                 ) : recipientSearchResults.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
                 ) : (
-                  <div className="max-h-56 overflow-y-auto">
+                  <div className="max-h-48 overflow-y-auto">
                     {recipientSearchResults.map((item) => {
                       const driverSelected = selectedDriverPersonIds.includes(item.driverPersonId);
                       return (
@@ -912,14 +916,14 @@ export function AdminCommunicationPage() {
 
             <div className="rounded-md border bg-white p-2">
               <div className="text-xs font-medium text-slate-700">Ausgewählte Fahrer ({selectedDriverTargets.length})</div>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {selectedDriverTargets.length === 0 && <span className="text-xs text-slate-500">Keine</span>}
                 {selectedDriverTargets.map((target) => (
                   <button
                     key={target.id}
                     type="button"
                     onClick={() => removeDriverTarget(target.id)}
-                    className="rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-xs text-slate-700 hover:bg-slate-100"
                     title="Entfernen"
                   >
                     {target.label}
@@ -944,7 +948,7 @@ export function AdminCommunicationPage() {
             )}
           </section>
 
-          <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+          <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <div className="text-sm font-semibold text-slate-900">2. Vorlage & Inhalt</div>
             <div className="space-y-1">
               <Label>Template</Label>
@@ -982,7 +986,7 @@ export function AdminCommunicationPage() {
             <div className="space-y-1">
               <Label>Text</Label>
               <textarea
-                className="min-h-44 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="min-h-36 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={templateBody}
                 onChange={(event) => setTemplateBody(event.target.value)}
                 placeholder="Mailinhalt"
@@ -1065,7 +1069,7 @@ export function AdminCommunicationPage() {
             </details>
           </section>
 
-          <section className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+          <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <div className="text-sm font-semibold text-slate-900">3. Preview prüfen (Backend-Rendering)</div>
             {loadingPreview ? (
               <div className="rounded-md border bg-white p-3 text-sm text-slate-500">Lade Preview...</div>
@@ -1080,7 +1084,7 @@ export function AdminCommunicationPage() {
                     title="Mail HTML Preview"
                     srcDoc={backendPreview.htmlDocument}
                     sandbox="allow-popups allow-popups-to-escape-sandbox"
-                    className="h-[520px] w-full rounded border-0"
+                    className="h-[460px] w-full rounded border-0"
                   />
                 </div>
                 <div className="space-y-1 text-xs text-slate-600">
@@ -1094,8 +1098,8 @@ export function AdminCommunicationPage() {
             )}
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-slate-900">
-            <div className="mb-3 text-sm font-semibold">4. Versand starten</div>
+          <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-slate-900">
+            <div className="mb-2 text-sm font-semibold">4. Versand starten</div>
             {canManageCommunication ? (
               <Button
                 className="w-full border border-slate-200 bg-white text-slate-900 hover:bg-yellow-300 md:w-auto"
