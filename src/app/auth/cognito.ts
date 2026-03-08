@@ -5,6 +5,14 @@ const COGNITO_VERIFIER_KEY = "msc_cognito_pkce_verifier";
 const COGNITO_RETURN_TO_KEY = "msc_cognito_return_to";
 const REQUIRED_SCOPES = ["openid", "email", "profile"] as const;
 
+type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
+
+declare global {
+  interface Window {
+    __MSC_RUNTIME_CONFIG__?: RuntimeConfig;
+  }
+}
+
 function base64UrlEncode(bytes: Uint8Array): string {
   const raw = String.fromCharCode(...bytes);
   return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -26,7 +34,7 @@ async function createCodeChallenge(verifier: string): Promise<string> {
 }
 
 export function isCognitoEnabled() {
-  return String(import.meta.env.VITE_COGNITO_ENABLED || "false").toLowerCase() === "true";
+  return readConfigValue("VITE_COGNITO_ENABLED", "cognitoEnabled", "false").toLowerCase() === "true";
 }
 
 function normalizeScopes(raw: string): string {
@@ -58,12 +66,27 @@ function resolveAuthUriFromRuntime(rawEnvValue: string, fallbackPath: string): s
   }
 }
 
+function readConfigValue(envKey: string, runtimeKey: string, fallback = ""): string {
+  const runtimeConfig = window.__MSC_RUNTIME_CONFIG__;
+  const runtimeValue = runtimeConfig?.[runtimeKey] ?? runtimeConfig?.[envKey];
+  if (runtimeValue !== undefined && runtimeValue !== null) {
+    return String(runtimeValue).trim();
+  }
+
+  const envValue = (import.meta.env as Record<string, unknown>)[envKey];
+  if (envValue !== undefined && envValue !== null) {
+    return String(envValue).trim();
+  }
+
+  return fallback;
+}
+
 export function getCognitoConfig() {
-  const domain = String(import.meta.env.VITE_COGNITO_DOMAIN || "").trim().replace(/\/$/, "");
-  const clientId = String(import.meta.env.VITE_COGNITO_CLIENT_ID || "").trim();
-  const redirectUri = resolveAuthUriFromRuntime(String(import.meta.env.VITE_COGNITO_REDIRECT_URI || ""), "/admin/login");
-  const logoutUri = resolveAuthUriFromRuntime(String(import.meta.env.VITE_COGNITO_LOGOUT_URI || ""), "/admin/login");
-  const scope = normalizeScopes(String(import.meta.env.VITE_COGNITO_SCOPES || "").trim() || "openid email profile");
+  const domain = readConfigValue("VITE_COGNITO_DOMAIN", "cognitoDomain").replace(/\/$/, "");
+  const clientId = readConfigValue("VITE_COGNITO_CLIENT_ID", "cognitoClientId");
+  const redirectUri = resolveAuthUriFromRuntime(readConfigValue("VITE_COGNITO_REDIRECT_URI", "cognitoRedirectUri"), "/admin/login");
+  const logoutUri = resolveAuthUriFromRuntime(readConfigValue("VITE_COGNITO_LOGOUT_URI", "cognitoLogoutUri"), "/admin/login");
+  const scope = normalizeScopes(readConfigValue("VITE_COGNITO_SCOPES", "cognitoScopes") || "openid email profile");
 
   return {
     domain,
@@ -83,7 +106,7 @@ export function isCognitoConfigured() {
 }
 
 export function shouldShowManualTokenLogin() {
-  const manualEnabled = String(import.meta.env.VITE_ADMIN_ENABLE_TOKEN_LOGIN || "false").toLowerCase() === "true";
+  const manualEnabled = readConfigValue("VITE_ADMIN_ENABLE_TOKEN_LOGIN", "adminEnableTokenLogin", "false").toLowerCase() === "true";
   if (!manualEnabled) {
     return false;
   }
@@ -95,7 +118,7 @@ export function shouldShowManualTokenLogin() {
 }
 
 export function shouldShowRolePreviewLogin() {
-  const enabled = String(import.meta.env.VITE_ADMIN_ENABLE_ROLE_PREVIEW || "false").toLowerCase() === "true";
+  const enabled = readConfigValue("VITE_ADMIN_ENABLE_ROLE_PREVIEW", "adminEnableRolePreview", "false").toLowerCase() === "true";
   if (!enabled) {
     return false;
   }

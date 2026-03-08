@@ -30,6 +30,7 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `VITE_COGNITO_REDIRECT_URI` OAuth Redirect (typisch `/admin/login`)
 - `VITE_COGNITO_LOGOUT_URI` Logout Redirect
 - `VITE_COGNITO_SCOPES` typischerweise `openid email profile`
+- Runtime-Override optional über `/runtime-config.js` (`window.__MSC_RUNTIME_CONFIG__`, siehe `docs/DEPLOY_ENV.md`)
 - `VITE_PUBLIC_VERIFY_RESEND_URL` optionaler Link für CTA „Neue Verifizierungs-Mail anfordern“ auf `/anmeldung/verify`
 - `VITE_PUBLIC_CONTACT_EMAIL` Kontaktadresse im öffentlichen Header (nicht aus Event-Settings)
 - `VITE_PUBLIC_WEBSITE_URL` Website-Link im öffentlichen Header/Footer (nicht aus Event-Settings)
