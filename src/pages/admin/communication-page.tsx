@@ -542,8 +542,8 @@ export function AdminCommunicationPage() {
     }
 
     const requestId = ++searchRequestRef.current;
+    setSearchingRecipients(true);
     const timer = window.setTimeout(() => {
-      setSearchingRecipients(true);
       communicationService
         .searchRecipients({
           query,
@@ -875,43 +875,40 @@ export function AdminCommunicationPage() {
                   <Loader2 className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 animate-spin text-slate-400" />
                 )}
               </div>
-              <div className="rounded-md border bg-white">
-                {!allowIndividualRecipients ? (
-                  <div className="px-3 py-2 text-xs text-slate-500">Deaktiviert.</div>
-                ) : !recipientSearchActive ? (
-                  <div className="px-3 py-2 text-xs text-slate-400"> </div>
-                ) : recipientSearchResults.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-slate-500">Keine Treffer.</div>
-                ) : (
-                  <div className="max-h-48 overflow-y-auto">
-                    {recipientSearchResults.map((item) => {
-                      const driverSelected = selectedDriverPersonIds.includes(item.driverPersonId);
-                      return (
-                        <div key={item.driverPersonId} className="border-t px-3 py-2 first:border-t-0">
-                          <div className="text-sm font-medium text-slate-900">
-                            {item.driverName}
-                            {item.driverEmail ? ` (${item.driverEmail})` : ""}
-                          </div>
-                          <div className="text-xs text-slate-600">
-                            {item.className} · #{item.startNumber}
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={driverSelected ? "default" : "outline"}
-                              disabled={driverSelected}
-                              onClick={() => addDriverTarget(item)}
-                            >
-                              {driverSelected ? "Fahrer gewählt" : "Fahrer wählen"}
-                            </Button>
-                          </div>
+              {!allowIndividualRecipients ? (
+                <p className="text-xs text-slate-500">Fahrersuche ist in diesem Modus deaktiviert.</p>
+              ) : recipientSearchActive && !searchingRecipients && recipientSearchResults.length === 0 ? (
+                <p className="text-xs text-slate-500">Keine Treffer.</p>
+              ) : null}
+              {allowIndividualRecipients && recipientSearchResults.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-md border bg-white">
+                  {recipientSearchResults.map((item) => {
+                    const driverSelected = selectedDriverPersonIds.includes(item.driverPersonId);
+                    return (
+                      <div key={item.driverPersonId} className="border-t px-3 py-2 first:border-t-0">
+                        <div className="text-sm font-medium text-slate-900">
+                          {item.driverName}
+                          {item.driverEmail ? ` (${item.driverEmail})` : ""}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                        <div className="text-xs text-slate-600">
+                          {item.className} · #{item.startNumber}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={driverSelected ? "default" : "outline"}
+                            disabled={driverSelected}
+                            onClick={() => addDriverTarget(item)}
+                          >
+                            {driverSelected ? "Fahrer gewählt" : "Fahrer wählen"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="rounded-md border bg-white p-2">
