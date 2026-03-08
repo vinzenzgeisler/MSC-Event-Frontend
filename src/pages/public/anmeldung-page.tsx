@@ -346,6 +346,81 @@ function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, 
   return `Es wurden nur ${createdEntries} von ${attemptedEntries} Nennungen angelegt. Bitte nicht erneut absenden, um Duplikate zu vermeiden. Kontaktiere das Orga-Team.`;
 }
 
+function registrationDateLocale(locale: string) {
+  if (locale === "en") {
+    return "en-US";
+  }
+  if (locale === "cz") {
+    return "cs-CZ";
+  }
+  if (locale === "pl") {
+    return "pl-PL";
+  }
+  return "de-DE";
+}
+
+function formatRegistrationOpenAt(value: string, locale: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(registrationDateLocale(locale), {
+    dateStyle: "long",
+    timeStyle: "short"
+  }).format(parsed);
+}
+
+function getRegistrationClosedContent(locale: string, openAt: string | null, opensInFuture: boolean) {
+  if (opensInFuture && openAt) {
+    const formattedOpenAt = formatRegistrationOpenAt(openAt, locale);
+    if (locale === "en") {
+      return {
+        title: "Registration is not open yet",
+        body: `Registration opens on ${formattedOpenAt}.`
+      };
+    }
+    if (locale === "cz") {
+      return {
+        title: "Registrace ještě není otevřena",
+        body: `Registrace se otevírá ${formattedOpenAt}.`
+      };
+    }
+    if (locale === "pl") {
+      return {
+        title: "Rejestracja nie jest jeszcze otwarta",
+        body: `Rejestracja otwiera się ${formattedOpenAt}.`
+      };
+    }
+    return {
+      title: "Anmeldung ist noch nicht geöffnet",
+      body: `Die Anmeldung öffnet am ${formattedOpenAt}.`
+    };
+  }
+
+  if (locale === "en") {
+    return {
+      title: "Registration is currently closed",
+      body: "Please try again later or contact the event team."
+    };
+  }
+  if (locale === "cz") {
+    return {
+      title: "Registrace je momentálně uzavřena",
+      body: "Zkuste to prosím později nebo kontaktujte pořadatele."
+    };
+  }
+  if (locale === "pl") {
+    return {
+      title: "Rejestracja jest obecnie zamknięta",
+      body: "Spróbuj ponownie później lub skontaktuj się z organizatorem."
+    };
+  }
+  return {
+    title: "Anmeldung ist aktuell geschlossen",
+    body: "Bitte später erneut versuchen oder das Orga-Team kontaktieren."
+  };
+}
+
 function buildSubmissionFingerprint(form: RegistrationWizardForm) {
   return JSON.stringify(form);
 }
@@ -918,6 +993,18 @@ export function AnmeldungPage() {
     return `Preis für ein zweites Fahrzeug: ${amount}.`;
   }, [eventOverview, locale]);
 
+  const registrationClosedContent = useMemo(() => {
+    if (!eventOverview) {
+      return null;
+    }
+    const openAt = eventOverview.registrationOpenAt;
+    const opensInFuture = Boolean(openAt && !Number.isNaN(new Date(openAt).getTime()) && new Date(openAt).getTime() > Date.now());
+    if (eventOverview.registrationOpen && !opensInFuture) {
+      return null;
+    }
+    return getRegistrationClosedContent(locale, openAt, opensInFuture);
+  }, [eventOverview, locale]);
+
   const handleDriverChange = <K extends keyof DriverForm>(field: K, value: DriverForm[K]) => {
     const normalizedValue =
       field === "phone" || field === "emergencyContactPhone" || field === "guardianPhone"
@@ -1368,6 +1455,23 @@ export function AnmeldungPage() {
         <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardContent className="space-y-2 p-5 md:p-8">
             <h3 className="text-lg font-semibold text-slate-900">{m.page.submitErrorGeneric}</h3>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (registrationClosedContent) {
+    return (
+      <div className="space-y-6 pb-8">
+        <div className="rounded-2xl bg-primary px-4 py-6 text-primary-foreground sm:px-5 sm:py-7 md:px-8">
+          <h2 className="mt-1 text-2xl font-semibold md:text-3xl">{m.page.title}</h2>
+          <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
+        </div>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+          <CardContent className="space-y-2 p-5 md:p-8">
+            <h3 className="text-lg font-semibold text-slate-900">{registrationClosedContent.title}</h3>
+            <p className="text-sm text-slate-600">{registrationClosedContent.body}</p>
           </CardContent>
         </Card>
       </div>
