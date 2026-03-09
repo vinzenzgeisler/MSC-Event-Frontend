@@ -12,13 +12,21 @@ import type {
 } from "@/types/admin";
 
 function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
+  const createdAtRaw = dto.createdAt;
   return {
     id: dto.id,
+    batchId: dto.batchId ?? null,
     recipient: dto.toEmail,
     subject: dto.subject,
     status: dto.status,
     error: dto.errorLast ?? "",
-    createdAt: new Date(dto.createdAt).toLocaleString("de-DE")
+    createdAt: new Date(dto.createdAt).toLocaleString("de-DE"),
+    createdAtRaw,
+    templateId: dto.templateId,
+    templateVersion: dto.templateVersion,
+    attemptCount: dto.attemptCount,
+    maxAttempts: dto.maxAttempts,
+    sendAfter: dto.sendAfter
   };
 }
 
@@ -205,22 +213,65 @@ export const communicationService = {
     limit?: number;
   }) {
     const eventId = await getAdminEventId();
-    const response = await requestJson<MailRecipientSearchResponse>("/admin/mail/recipients/search", {
-      query: {
-        eventId,
-        q: payload.query?.trim() || undefined,
-        classId: payload.classId || undefined,
-        acceptanceStatus: payload.acceptanceStatus || undefined,
-        paymentStatus: payload.paymentStatus || undefined,
-        limit: payload.limit || undefined
-      }
+    const rawQuery = (payload.query ?? "").trim();
+    const queryBase = {
+      eventId,
+      classId: payload.classId || undefined,
+      acceptanceStatus: payload.acceptanceStatus || undefined,
+      paymentStatus: payload.paymentStatus || undefined,
+      limit: payload.limit || undefined
+    };
+
+    const runSearch = async (q: string | undefined) => {
+      const response = await requestJson<MailRecipientSearchResponse>("/admin/mail/recipients/search", {
+        query: {
+          ...queryBase,
+          q
+        }
+      });
+      return response.recipients;
+    };
+
+    const primary = await runSearch(rawQuery ? rawQuery : undefined);
+    if (primary.length > 0 || rawQuery.length < 2) {
+      return primary;
+    }
+
+    // Backend search may still only match first names in some deployments.
+    // Fallback: search by the longest token, then filter results client-side by all tokens.
+    const tokens = rawQuery
+      .split(/[\s,;]+/)
+      .map((token) => token.trim())
+      .filter(Boolean);
+    if (tokens.length < 2) {
+      return primary;
+    }
+
+    const normalizedTokens = Array.from(new Set(tokens.map((t) => t.toLowerCase()))).filter((t) => t.length >= 2);
+    if (normalizedTokens.length < 2) {
+      return primary;
+    }
+
+    const tokenToSearch = [...normalizedTokens].sort((a, b) => b.length - a.length)[0];
+    const fallback = await runSearch(tokenToSearch);
+    if (fallback.length === 0) {
+      return primary;
+    }
+
+    const filtered = fallback.filter((item) => {
+      const hay = `${item.driverName} ${item.driverEmail}`.toLowerCase();
+      return normalizedTokens.every((token) => hay.includes(token));
     });
-    return response.recipients;
+
+    const deduped = new Map<string, MailRecipientSearchItem>();
+    [...filtered].forEach((item) => deduped.set(item.driverPersonId, item));
+    return [...deduped.values()];
   },
 
   async resolveBroadcastRecipients(payload: {
     classId?: string;
     acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+    registrationStatus?: "submitted_unverified" | "submitted_verified";
     paymentStatus?: "due" | "paid";
     additionalEmails?: string[];
     driverPersonIds?: string[];
@@ -233,6 +284,7 @@ export const communicationService = {
         eventId,
         classId: payload.classId || undefined,
         acceptanceStatus: payload.acceptanceStatus || undefined,
+        registrationStatus: payload.registrationStatus || undefined,
         paymentStatus: payload.paymentStatus || undefined,
         additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
         driverPersonIds: payload.driverPersonIds?.length ? payload.driverPersonIds : undefined,
@@ -254,6 +306,7 @@ export const communicationService = {
     filters?: {
       classId?: string;
       acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+      registrationStatus?: "submitted_unverified" | "submitted_verified";
       paymentStatus?: "due" | "paid";
     };
   }) {
@@ -273,10 +326,11 @@ export const communicationService = {
         entryIds: payload.entryIds?.length ? payload.entryIds : undefined,
         filters:
           payload.filters &&
-          (payload.filters.classId || payload.filters.acceptanceStatus || payload.filters.paymentStatus)
+          (payload.filters.classId || payload.filters.acceptanceStatus || payload.filters.registrationStatus || payload.filters.paymentStatus)
             ? {
                 classId: payload.filters.classId || undefined,
                 acceptanceStatus: payload.filters.acceptanceStatus || undefined,
+                registrationStatus: payload.filters.registrationStatus || undefined,
                 paymentStatus: payload.filters.paymentStatus || undefined
               }
             : undefined

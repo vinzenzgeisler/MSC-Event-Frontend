@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -26,6 +26,7 @@ import type {
 const initialForm: BroadcastForm = {
   classId: "all",
   acceptanceStatus: "all",
+  registrationStatus: "all",
   paymentStatus: "all",
   templateKey: "",
   subjectOverride: ""
@@ -33,6 +34,7 @@ const initialForm: BroadcastForm = {
 
 const OUTBOX_PREVIEW_LIMIT = 10;
 const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
+const OUTBOX_STATUS_ORDER = ["failed", "sending", "queued", "sent"] as const;
 
 type TemplateDrafts = Record<string, { subject: string; body: string; data?: Record<string, string> }>;
 type StaticTemplateOption = { key: string; label: string };
@@ -40,6 +42,40 @@ type RecipientTarget = { id: string; label: string; previewEntryId?: string };
 type RecipientSearchItem = MailRecipientSearchItem;
 type RecipientMode = "filter" | "individual" | "combined";
 type ToastTone = "success" | "error" | "info";
+
+type OutboxGroup = {
+  key: string;
+  subject: string;
+  createdAt: string;
+  createdAtRaw: string;
+  templateId?: string;
+  templateVersion?: number;
+  sendAfter?: string;
+  counts: Record<OutboxItem["status"], number>;
+  items: OutboxItem[];
+};
+
+function toMinuteBucket(value: string): number {
+  const parsed = new Date(value);
+  const ts = Number.isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+  return Math.floor(ts / 60000);
+}
+
+function outboxGroupKey(item: OutboxItem): string {
+  const batchId = (item.batchId ?? "").trim();
+  if (batchId) {
+    return `batch:${batchId}`;
+  }
+  const subject = item.subject ?? "";
+  const templateId = item.templateId ?? "";
+  const templateVersion = item.templateVersion ?? "";
+  const sendAfter = item.sendAfter ?? "";
+  return `heur:${templateId}:${templateVersion}:${subject}:${sendAfter}:${toMinuteBucket(item.createdAtRaw)}`;
+}
+
+function emptyOutboxCounts(): Record<OutboxItem["status"], number> {
+  return { queued: 0, sending: 0, sent: 0, failed: 0 };
+}
 
 function parseEmailList(value: string) {
   const parts = value
@@ -179,6 +215,7 @@ export function AdminCommunicationPage() {
   const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
+  const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
   const [templateBody, setTemplateBody] = useState("");
   const [templateDataDraft, setTemplateDataDraft] = useState<Record<string, string>>({});
   const templateDraftsRef = useRef<TemplateDrafts>({});
@@ -196,6 +233,7 @@ export function AdminCommunicationPage() {
   const [backendPreview, setBackendPreview] = useState<MailTemplatePreview | null>(null);
   const [resolvedRecipients, setResolvedRecipients] = useState<ResolveRecipientsResult | null>(null);
   const [outboxExpanded, setOutboxExpanded] = useState(false);
+  const [expandedOutboxGroups, setExpandedOutboxGroups] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
   const [loadingOutbox, setLoadingOutbox] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -296,6 +334,10 @@ export function AdminCommunicationPage() {
 
   const additionalRecipients = useMemo(() => parseEmailList(additionalEmailsInput), [additionalEmailsInput]);
   const selectedDriverPersonIds = useMemo(() => selectedDriverTargets.map((target) => target.id), [selectedDriverTargets]);
+  const selectedEntryIds = useMemo(
+    () => selectedDriverTargets.map((target) => target.previewEntryId).filter((id): id is string => Boolean(id)),
+    [selectedDriverTargets]
+  );
   const subjectOverrideValue = useMemo(() => form.subjectOverride.trim() || undefined, [form.subjectOverride]);
   const bodyOverrideValue = useMemo(() => templateBody.trim() || undefined, [templateBody]);
   const bodyHtmlOverrideValue = useMemo(() => {
@@ -346,8 +388,40 @@ export function AdminCommunicationPage() {
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
   const recipientSearchActive = recipientSearchQuery.trim().length >= 2;
-  const hiddenOutboxCount = Math.max(outbox.length - OUTBOX_PREVIEW_LIMIT, 0);
-  const visibleOutbox = outboxExpanded ? outbox : outbox.slice(0, OUTBOX_PREVIEW_LIMIT);
+  const outboxGroups = useMemo<OutboxGroup[]>(() => {
+    const groupsByKey = new Map<string, OutboxGroup>();
+    const order: string[] = [];
+
+    outbox.forEach((item) => {
+      const key = outboxGroupKey(item);
+      const existing = groupsByKey.get(key);
+      if (existing) {
+        existing.items.push(item);
+        existing.counts[item.status] += 1;
+        return;
+      }
+
+      const group: OutboxGroup = {
+        key,
+        subject: item.subject,
+        createdAt: item.createdAt,
+        createdAtRaw: item.createdAtRaw,
+        templateId: item.templateId,
+        templateVersion: item.templateVersion,
+        sendAfter: item.sendAfter,
+        counts: emptyOutboxCounts(),
+        items: [item]
+      };
+      group.counts[item.status] += 1;
+      groupsByKey.set(key, group);
+      order.push(key);
+    });
+
+    return order.map((key) => groupsByKey.get(key)!).filter(Boolean);
+  }, [outbox]);
+
+  const hiddenOutboxCount = Math.max(outboxGroups.length - OUTBOX_PREVIEW_LIMIT, 0);
+  const visibleOutboxGroups = outboxExpanded ? outboxGroups : outboxGroups.slice(0, OUTBOX_PREVIEW_LIMIT);
 
   useEffect(() => {
     try {
@@ -521,6 +595,7 @@ export function AdminCommunicationPage() {
     allowIndividualRecipients,
     form.acceptanceStatus,
     form.classId,
+    form.registrationStatus,
     form.paymentStatus,
     recipientMode,
     selectedDriverPersonIds
@@ -664,9 +739,11 @@ export function AdminCommunicationPage() {
       const result = await communicationService.resolveBroadcastRecipients({
         classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
         acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+        registrationStatus: allowFilterRecipients && form.registrationStatus !== "all" ? form.registrationStatus : undefined,
         paymentStatus: allowFilterRecipients && form.paymentStatus !== "all" ? form.paymentStatus : undefined,
         additionalEmails: additionalRecipients.valid,
-        driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined
+        driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
+        entryIds: allowIndividualRecipients ? selectedEntryIds : undefined
       });
       setResolvedRecipients(result);
       showToast(`Empfänger aufgelöst: ${result.finalCount}`, "info");
@@ -727,9 +804,11 @@ export function AdminCommunicationPage() {
         },
         additionalEmails: additionalRecipients.valid,
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
+        entryIds: allowIndividualRecipients ? selectedEntryIds : undefined,
         filters: {
           classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
           acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
+          registrationStatus: allowFilterRecipients && form.registrationStatus !== "all" ? form.registrationStatus : undefined,
           paymentStatus: allowFilterRecipients && form.paymentStatus !== "all" ? form.paymentStatus : undefined
         }
       });
@@ -758,6 +837,102 @@ export function AdminCommunicationPage() {
     }
   };
 
+  const runQuickAction = async (kind: "verification" | "payment") => {
+    if (!canManageCommunication) {
+      showToast("Nur Admin-Rollen dürfen Mails senden.");
+      return;
+    }
+    if (quickActionBusy) {
+      return;
+    }
+
+    const templateKey = kind === "verification" ? "email_confirmation" : "payment_reminder_followup";
+    if (!availableCampaignTemplateKeys.has(templateKey)) {
+      showToast(`Template '${templateKey}' ist im Backend nicht verfügbar oder nicht aktiv.`);
+      return;
+    }
+
+    const classId = allowFilterRecipients && form.classId !== "all" ? form.classId : undefined;
+    const resolvePayload =
+      kind === "verification"
+        ? {
+            classId,
+            registrationStatus: "submitted_unverified" as const
+          }
+        : {
+            classId,
+            acceptanceStatus: "accepted" as const,
+            registrationStatus: "submitted_verified" as const,
+            paymentStatus: "due" as const
+          };
+
+    setQuickActionBusy(kind);
+    try {
+      const resolved = await communicationService.resolveBroadcastRecipients(resolvePayload);
+      if (resolved.finalCount < 1) {
+        showToast("Keine passenden Empfänger gefunden.", "info");
+        return;
+      }
+
+      const label = kind === "verification" ? "Verifizierungs-Erinnerung" : "Zahlungs-Followup";
+      const confirmed = window.confirm(`${label} an ${resolved.finalCount} Empfänger senden?`);
+      if (!confirmed) {
+        return;
+      }
+
+      const result = await communicationService.sendMail({
+        templateKey,
+        renderOptions: { showBadge: false, mailLabel: null },
+        filters:
+          kind === "verification"
+            ? {
+                classId,
+                registrationStatus: "submitted_unverified"
+              }
+            : {
+                classId,
+                acceptanceStatus: "accepted",
+                registrationStatus: "submitted_verified",
+                paymentStatus: "due"
+              }
+      });
+
+      showToast(`Mailversand eingeplant (${result.queued} Empfänger).`, "success");
+      await loadOutbox();
+    } catch (error) {
+      showToast(getCommunicationErrorMessage(error, "Quick-Aktion fehlgeschlagen."));
+    } finally {
+      setQuickActionBusy(null);
+    }
+  };
+
+  const toggleOutboxGroup = (key: string) => {
+    setExpandedOutboxGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const retryFailedOutboxItems = async (items: OutboxItem[]) => {
+    const failed = items.filter((item) => item.status === "failed");
+    if (failed.length === 0) {
+      showToast("Keine fehlgeschlagenen Einträge in dieser Gruppe.", "info");
+      return;
+    }
+
+    const confirmed = window.confirm(`Fehlgeschlagene Einträge erneut senden (${failed.length})?`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      for (const item of failed) {
+        await communicationService.retryOutbox(item.id);
+      }
+      showToast("Fehlgeschlagene Outbox-Einträge wurden erneut eingeplant.", "success");
+      await loadOutbox();
+    } catch (error) {
+      showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
+    }
+  };
+
   return (
     <div className="space-y-3">
       <h1 className="text-2xl font-semibold text-slate-900">Kommunikation</h1>
@@ -767,6 +942,33 @@ export function AdminCommunicationPage() {
           <CardTitle>Kampagne erstellen</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+            <div className="text-sm font-semibold text-slate-900">Quick-Aktionen</div>
+            <div className="text-xs text-slate-600">
+              Für Massenaktionen ohne Textanpassung. Empfänger werden automatisch gefiltert und vor dem Versand bestätigt.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!canManageCommunication || loadingTemplates || Boolean(quickActionBusy)}
+                onClick={() => void runQuickAction("verification")}
+              >
+                {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Verifizierung erinnern (unverifiziert)"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!canManageCommunication || loadingTemplates || Boolean(quickActionBusy)}
+                onClick={() => void runQuickAction("payment")}
+              >
+                {quickActionBusy === "payment" ? "Wird vorbereitet..." : "Zahlung-Followup (offen)"}
+              </Button>
+            </div>
+          </section>
+
           <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <div className="text-sm font-semibold text-slate-900">1. Empfänger definieren</div>
             <div className="flex flex-wrap gap-2">
@@ -795,7 +997,7 @@ export function AdminCommunicationPage() {
                 Filter + Fahrerauswahl
               </Button>
             </div>
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-2 md:grid-cols-4">
               <div className="space-y-1">
                 <Label>Klasse</Label>
                 <Select value={form.classId} onValueChange={(next) => setForm((prev) => ({ ...prev, classId: next }))}>
@@ -826,6 +1028,25 @@ export function AdminCommunicationPage() {
                     <SelectItem value="pending">Offen</SelectItem>
                     <SelectItem value="shortlist">Vorauswahl</SelectItem>
                     <SelectItem value="accepted">Zugelassen</SelectItem>
+                    <SelectItem value="rejected">Abgelehnt</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Verifizierung</Label>
+                <Select
+                  value={form.registrationStatus}
+                  onValueChange={(next) =>
+                    setForm((prev) => ({ ...prev, registrationStatus: next as BroadcastForm["registrationStatus"] }))
+                  }
+                >
+                  <SelectTrigger className="text-base md:text-sm" disabled={!allowFilterRecipients}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="submitted_unverified">Unverifiziert</SelectItem>
+                    <SelectItem value="submitted_verified">Verifiziert</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1138,38 +1359,76 @@ export function AdminCommunicationPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2 md:hidden">
-            {visibleOutbox.map((item) => (
-              <div key={item.id} className="rounded-lg border p-3">
-                <div className="font-medium text-slate-900">{resolveSubject(item.subject)}</div>
-                <div className="text-xs text-slate-600">{item.recipient}</div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <Badge className={outboxStatusClasses(item.status)} variant="outline">
-                    {outboxStatusLabel(item.status)}
-                  </Badge>
-                  {item.status === "failed" && canManageCommunication ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        try {
-                          await communicationService.retryOutbox(item.id);
-                          showToast("Outbox-Eintrag wurde erneut eingeplant.", "success");
-                          await loadOutbox();
-                        } catch (error) {
-                          showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
-                        }
-                      }}
-                    >
-                      Erneut senden
+            {visibleOutboxGroups.map((group) => {
+              const expanded = Boolean(expandedOutboxGroups[group.key]);
+              const total = group.items.length;
+              const badges = OUTBOX_STATUS_ORDER.filter((status) => group.counts[status] > 0).map((status) => (
+                <Badge key={status} className={outboxStatusClasses(status)} variant="outline">
+                  {outboxStatusLabel(status)}: {group.counts[status]}
+                </Badge>
+              ));
+
+              return (
+                <div key={group.key} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-900">{resolveSubject(group.subject)}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">
+                        {group.createdAt} · {total} Empfänger
+                      </div>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => toggleOutboxGroup(group.key)}>
+                      {expanded ? "Zuklappen" : "Details"}
                     </Button>
-                  ) : (
-                    <span className="text-xs text-slate-500">{item.createdAt}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>
+
+                  {group.counts.failed > 0 && canManageCommunication && (
+                    <div className="mt-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => void retryFailedOutboxItems(group.items)}>
+                        Fehlgeschlagene erneut senden
+                      </Button>
+                    </div>
+                  )}
+
+                  {expanded && (
+                    <div className="mt-3 max-h-64 overflow-y-auto rounded-md border bg-white">
+                      {group.items.map((item) => (
+                        <div key={item.id} className="border-t px-3 py-2 first:border-t-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 truncate text-xs text-slate-700">{item.recipient}</div>
+                            <Badge className={outboxStatusClasses(item.status)} variant="outline">
+                              {outboxStatusLabel(item.status)}
+                            </Badge>
+                          </div>
+                          {item.error ? <div className="mt-1 text-xs text-destructive">{item.error}</div> : null}
+                          {item.status === "failed" && canManageCommunication && (
+                            <div className="mt-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    await communicationService.retryOutbox(item.id);
+                                    showToast("Outbox-Eintrag wurde erneut eingeplant.", "success");
+                                    await loadOutbox();
+                                  } catch (error) {
+                                    showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
+                                  }
+                                }}
+                              >
+                                Erneut senden
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-                {item.error && <div className="mt-2 text-xs text-destructive">{item.error}</div>}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="hidden overflow-x-auto md:block">
@@ -1184,40 +1443,97 @@ export function AdminCommunicationPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleOutbox.map((item) => (
-                  <tr key={item.id} className="border-t">
-                    <td className="px-3 py-2">{item.recipient}</td>
-                    <td className="px-3 py-2">{resolveSubject(item.subject)}</td>
-                    <td className="px-3 py-2">
-                      <Badge className={outboxStatusClasses(item.status)} variant="outline">
-                        {outboxStatusLabel(item.status)}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2">{item.createdAt}</td>
-                    <td className="px-3 py-2">
-                      {item.status === "failed" && canManageCommunication ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              await communicationService.retryOutbox(item.id);
-                              showToast("Outbox-Eintrag wurde erneut eingeplant.", "success");
-                              await loadOutbox();
-                            } catch (error) {
-                              showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
-                            }
-                          }}
-                        >
-                          Erneut senden
-                        </Button>
-                      ) : (
-                        "-"
+                {visibleOutboxGroups.map((group) => {
+                  const expanded = Boolean(expandedOutboxGroups[group.key]);
+                  const total = group.items.length;
+                  const badges = OUTBOX_STATUS_ORDER.filter((status) => group.counts[status] > 0).map((status) => (
+                    <Badge key={status} className={outboxStatusClasses(status)} variant="outline">
+                      {outboxStatusLabel(status)}: {group.counts[status]}
+                    </Badge>
+                  ));
+
+                  return (
+                    <Fragment key={group.key}>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-slate-900">{total} Empfänger</div>
+                          <div className="mt-0.5 text-xs text-slate-500">{group.items[0]?.recipient ?? ""}</div>
+                        </td>
+                        <td className="px-3 py-2">{resolveSubject(group.subject)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1.5">{badges}</div>
+                        </td>
+                        <td className="px-3 py-2">{group.createdAt}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" size="sm" variant="outline" onClick={() => toggleOutboxGroup(group.key)}>
+                              {expanded ? "Zuklappen" : "Details"}
+                            </Button>
+                            {group.counts.failed > 0 && canManageCommunication ? (
+                              <Button type="button" size="sm" variant="outline" onClick={() => void retryFailedOutboxItems(group.items)}>
+                                Fehlgeschlagene erneut senden
+                              </Button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr className="border-t">
+                          <td colSpan={5} className="px-3 py-3">
+                            <div className="max-h-72 overflow-y-auto rounded-md border bg-white">
+                              <table className="min-w-full text-sm">
+                                <thead className="bg-slate-50 text-left text-slate-600">
+                                  <tr>
+                                    <th className="px-3 py-2">Empfänger</th>
+                                    <th className="px-3 py-2">Status</th>
+                                    <th className="px-3 py-2">Erstellt</th>
+                                    <th className="px-3 py-2">Aktion</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {group.items.map((item) => (
+                                    <tr key={item.id} className="border-t">
+                                      <td className="px-3 py-2">{item.recipient}</td>
+                                      <td className="px-3 py-2">
+                                        <Badge className={outboxStatusClasses(item.status)} variant="outline">
+                                          {outboxStatusLabel(item.status)}
+                                        </Badge>
+                                        {item.error ? <div className="mt-1 text-xs text-destructive">{item.error}</div> : null}
+                                      </td>
+                                      <td className="px-3 py-2">{item.createdAt}</td>
+                                      <td className="px-3 py-2">
+                                        {item.status === "failed" && canManageCommunication ? (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={async () => {
+                                              try {
+                                                await communicationService.retryOutbox(item.id);
+                                                showToast("Outbox-Eintrag wurde erneut eingeplant.", "success");
+                                                await loadOutbox();
+                                              } catch (error) {
+                                                showToast(getCommunicationErrorMessage(error, "Retry fehlgeschlagen."));
+                                              }
+                                            }}
+                                          >
+                                            Erneut senden
+                                          </Button>
+                                        ) : (
+                                          "-"
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1226,7 +1542,7 @@ export function AdminCommunicationPage() {
               Weitere {hiddenOutboxCount} Einträge anzeigen
             </Button>
           )}
-          {outboxExpanded && outbox.length > OUTBOX_PREVIEW_LIMIT && (
+          {outboxExpanded && outboxGroups.length > OUTBOX_PREVIEW_LIMIT && (
             <Button type="button" variant="outline" onClick={() => setOutboxExpanded(false)}>
               Auf letzte {OUTBOX_PREVIEW_LIMIT} Einträge reduzieren
             </Button>

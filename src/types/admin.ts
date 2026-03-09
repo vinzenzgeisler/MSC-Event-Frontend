@@ -336,6 +336,7 @@ export type AdminEntryDetailViewModel = {
 export type BroadcastForm = {
   classId: string;
   acceptanceStatus: "all" | AcceptanceStatus;
+  registrationStatus: "all" | "submitted_unverified" | "submitted_verified";
   paymentStatus: "all" | PaymentStatus;
   templateKey: string;
   subjectOverride: string;
@@ -429,6 +430,7 @@ export type MailRecipientSearchItem = {
 export type OutboxItemDto = {
   id: Id;
   eventId?: Id | null;
+  batchId?: string | null;
   toEmail: string;
   subject: string;
   status: OutboxStatus;
@@ -444,11 +446,18 @@ export type OutboxItemDto = {
 
 export type OutboxItem = {
   id: Id;
+  batchId?: string | null;
   recipient: string;
   subject: string;
   status: OutboxStatus;
   error: string;
   createdAt: string;
+  createdAtRaw: string;
+  templateId?: string;
+  templateVersion?: number;
+  attemptCount?: number;
+  maxAttempts?: number;
+  sendAfter?: string;
 };
 
 export type EntryMailAction = "payment_reminder" | "registration_confirmation";
