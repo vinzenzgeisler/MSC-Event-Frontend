@@ -252,20 +252,31 @@ export const communicationService = {
       return primary;
     }
 
-    const tokenToSearch = [...normalizedTokens].sort((a, b) => b.length - a.length)[0];
-    const fallback = await runSearch(tokenToSearch);
-    if (fallback.length === 0) {
-      return primary;
+    const tokenByLength = [...normalizedTokens].sort((a, b) => b.length - a.length)[0];
+    const tokenFirst = normalizedTokens[0];
+    const tokenLast = normalizedTokens[normalizedTokens.length - 1];
+    const tokensToTry = Array.from(new Set([tokenByLength, tokenFirst, tokenLast])).filter(Boolean);
+
+    for (const token of tokensToTry) {
+      const candidates = await runSearch(token);
+      if (candidates.length === 0) {
+        continue;
+      }
+
+      const filtered = candidates.filter((item) => {
+        const hay = `${item.driverName} ${item.driverEmail}`.toLowerCase();
+        return normalizedTokens.every((t) => hay.includes(t));
+      });
+      if (filtered.length === 0) {
+        continue;
+      }
+
+      const deduped = new Map<string, MailRecipientSearchItem>();
+      filtered.forEach((item) => deduped.set(item.driverPersonId, item));
+      return [...deduped.values()];
     }
 
-    const filtered = fallback.filter((item) => {
-      const hay = `${item.driverName} ${item.driverEmail}`.toLowerCase();
-      return normalizedTokens.every((token) => hay.includes(token));
-    });
-
-    const deduped = new Map<string, MailRecipientSearchItem>();
-    [...filtered].forEach((item) => deduped.set(item.driverPersonId, item));
-    return [...deduped.values()];
+    return primary;
   },
 
   async resolveBroadcastRecipients(payload: {
