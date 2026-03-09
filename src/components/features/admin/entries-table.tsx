@@ -77,8 +77,12 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
   }
   const isMoto = label.toLowerCase().includes("yamaha") || label.toLowerCase().includes("moto");
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-md border bg-slate-100 text-slate-500 md:h-20 md:w-20">
+    <div
+      className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-md border bg-slate-100 text-slate-500 md:h-20 md:w-20"
+      title="Bild nicht verfügbar (Backend liefert keine URL)"
+    >
       {isMoto ? <Bike className="h-7 w-7" /> : <Car className="h-7 w-7" />}
+      <span className="hidden text-[10px] leading-tight md:block">Bild fehlt</span>
     </div>
   );
 }

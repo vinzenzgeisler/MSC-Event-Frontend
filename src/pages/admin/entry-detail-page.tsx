@@ -69,8 +69,12 @@ function VehiclePreview({ src, label, onOpen }: { src: string | null; label: str
   }
   const isMoto = label.toLowerCase().includes("yamaha") || label.toLowerCase().includes("moto");
   return (
-    <div className="flex h-56 w-full items-center justify-center rounded-md border bg-slate-100 text-slate-500 md:h-[22rem]">
+    <div
+      className="flex h-56 w-full flex-col items-center justify-center gap-2 rounded-md border bg-slate-100 text-slate-500 md:h-[22rem]"
+      title="Bild nicht verfügbar (Backend liefert keine URL)"
+    >
       {isMoto ? <Bike className="h-10 w-10" /> : <Car className="h-10 w-10" />}
+      <div className="text-xs text-slate-600">Bild nicht verfügbar</div>
     </div>
   );
 }
