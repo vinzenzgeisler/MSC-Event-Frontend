@@ -6,6 +6,7 @@ import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminEntriesService } from "@/services/admin-entries.service";
+import { communicationService } from "@/services/communication.service";
 import { getAdminEventId } from "@/services/api/event-context";
 import { getApiErrorMessage, requestJson } from "@/services/api/http-client";
 
@@ -247,8 +248,61 @@ export function AdminDashboardPage() {
   const [advancedError, setAdvancedError] = useState("");
   const [brandDistribution, setBrandDistribution] = useState<BrandDistributionItem[] | null>(null);
   const [error, setError] = useState("");
+  const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
+  const [quickActionMessage, setQuickActionMessage] = useState("");
 
   const canReadOutbox = hasPermission(roles, "communication.read");
+  const canManageCommunication = hasPermission(roles, "communication.write");
+
+  const runQuickAction = useCallback(
+    async (kind: "verification" | "payment") => {
+      if (!canManageCommunication) {
+        setQuickActionMessage("Nur Admin-Rollen dürfen Mails senden.");
+        return;
+      }
+      if (quickActionBusy) {
+        return;
+      }
+
+      setQuickActionMessage("");
+      setQuickActionBusy(kind);
+      try {
+        const label = kind === "verification" ? "Verifizierungs-Erinnerung" : "Zahlungs-Followup";
+        const templateKey = kind === "verification" ? "email_confirmation" : "payment_reminder_followup";
+        const resolved = await communicationService.resolveBroadcastRecipients(
+          kind === "verification"
+            ? { registrationStatus: "submitted_unverified" }
+            : { acceptanceStatus: "accepted", registrationStatus: "submitted_verified", paymentStatus: "due" }
+        );
+
+        if (resolved.finalCount < 1) {
+          setQuickActionMessage("Keine passenden Empfänger gefunden.");
+          return;
+        }
+
+        const confirmed = window.confirm(`${label} an ${resolved.finalCount} Empfänger senden?`);
+        if (!confirmed) {
+          return;
+        }
+
+        const result = await communicationService.sendMail({
+          templateKey,
+          renderOptions: { showBadge: false, mailLabel: null },
+          filters:
+            kind === "verification"
+              ? { registrationStatus: "submitted_unverified" }
+              : { acceptanceStatus: "accepted", registrationStatus: "submitted_verified", paymentStatus: "due" }
+        });
+
+        setQuickActionMessage(`Mailversand eingeplant (${result.queued} Empfänger).`);
+      } catch (err) {
+        setQuickActionMessage(getApiErrorMessage(err, "Quick-Aktion fehlgeschlagen."));
+      } finally {
+        setQuickActionBusy(null);
+      }
+    },
+    [canManageCommunication, quickActionBusy]
+  );
 
   const loadDashboard = useCallback(async (options?: { refresh?: boolean }) => {
     const isRefresh = options?.refresh === true;
@@ -671,6 +725,35 @@ export function AdminDashboardPage() {
                 </Button>
               );
             })}
+
+            {canReadOutbox && (
+              <div className="pt-2">
+                <div className="rounded-md border bg-white p-3">
+                  <div className="text-xs font-semibold text-slate-700">Quick-Aktionen</div>
+                  <div className="mt-2 flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!canManageCommunication || Boolean(quickActionBusy)}
+                      onClick={() => void runQuickAction("verification")}
+                    >
+                      {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Verifizierung erinnern (unverifiziert)"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!canManageCommunication || Boolean(quickActionBusy)}
+                      onClick={() => void runQuickAction("payment")}
+                    >
+                      {quickActionBusy === "payment" ? "Wird vorbereitet..." : "Zahlung-Followup (offen)"}
+                    </Button>
+                  </div>
+                  {quickActionMessage ? <div className="mt-2 text-xs text-slate-600">{quickActionMessage}</div> : null}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
