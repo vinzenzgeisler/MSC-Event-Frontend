@@ -35,8 +35,8 @@ type PersistedLegalTextsLocale = LegalUiLocale;
 const LEGAL_TEXTS: Record<PersistedLegalTextsLocale, LegalTexts> = {
   de: {
     shortInfo:
-      "Mit Absenden der Anmeldung verarbeiten wir Ihre personenbezogenen Daten zur Anmeldung, Teilnehmerverwaltung, Kommunikation, Dokumentenerstellung und Abrechnung. Rechtsgrundlagen sind Art. 6 Abs. 1 lit. b DSGVO sowie bei gesetzlichen Pflichten Art. 6 Abs. 1 lit. c DSGVO. Optionale Medienverarbeitung erfolgt nur mit Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO. Empfaenger sind intern zustaendige Stellen sowie technische Auftragsverarbeiter in AWS eu-central-1. Ihre Rechte auf Auskunft, Berichtigung, Loeschung, Einschraenkung, Widerspruch und Datenuebertragbarkeit bleiben unberuehrt.",
-    waiverSignNotice: "Die verbindliche Haftverzichtserklaerung wird vor Ort bei der Anmeldung in Schriftform unterschrieben.",
+      "Mit Absenden der Anmeldung verarbeiten wir Ihre personenbezogenen Daten zur Anmeldung, Teilnehmerverwaltung, Kommunikation, Dokumentenerstellung und Abrechnung. Rechtsgrundlagen sind Art. 6 Abs. 1 lit. b DSGVO sowie bei gesetzlichen Pflichten Art. 6 Abs. 1 lit. c DSGVO. Optionale Medienverarbeitung erfolgt nur mit Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO. Empfänger sind intern zuständige Stellen sowie technische Auftragsverarbeiter in AWS eu-central-1. Ihre Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit bleiben unberührt.",
+    waiverSignNotice: "Die verbindliche Haftverzichtserklärung wird vor Ort bei der Anmeldung in Schriftform unterschrieben.",
     footerPrivacyLabel: "Datenschutz",
     footerImprintLabel: "Impressum",
     footerTermsLabel: "Teilnahmebedingungen",
@@ -44,64 +44,64 @@ const LEGAL_TEXTS: Record<PersistedLegalTextsLocale, LegalTexts> = {
     termsAcceptanceLabel: "Ich akzeptiere die Teilnahmebedingungen.",
     privacyAcceptanceLabel: "Ich habe die Datenschutzhinweise gelesen und akzeptiere die Datenverarbeitung zur Veranstaltungsabwicklung.",
     mediaAcceptanceLabel:
-      "Ich willige in die Nutzung von Foto-/Videomaterial fuer Veranstaltungsbericht, Vereinswebsite und Vereins-Social-Media-Kanaele ein.",
-    minorNotice: "Minderjaehrige koennen nur mit ausdruecklicher Zustimmung eines Sorgeberechtigten angemeldet werden.",
+      "Ich willige in die Nutzung von Foto-/Videomaterial für Veranstaltungsbericht, Vereinswebsite und Vereins-Social-Media-Kanäle ein.",
+    minorNotice: "Minderjährige können nur mit ausdrücklicher Zustimmung eines Sorgeberechtigten angemeldet werden.",
     guardianSectionTitle: "Angaben Sorgeberechtigter (bei Fahrern unter 18)",
-    guardianFullNameLabel: "Vollstaendiger Name Sorgeberechtigter",
+    guardianFullNameLabel: "Vollständiger Name Sorgeberechtigter",
     guardianEmailLabel: "E-Mail Sorgeberechtigter",
     guardianPhoneLabel: "Telefon Sorgeberechtigter",
-    guardianConsentLabel: "Ich bestaetige als Sorgeberechtigter die Teilnahme des minderjaehrigen Fahrers.",
+    guardianConsentLabel: "Ich bestätige als Sorgeberechtigter die Teilnahme des minderjährigen Fahrers.",
     imprintDoc: {
       title: "Impressum",
       paragraphs: [
-        "Angaben gemaess § 5 DDG: MSC Oberlausitzer Dreilaendereck e.V., Am Weiher 4, 02791 Oderwitz.",
+        "Angaben gemäß § 5 DDG: MSC Oberlausitzer Dreilaendereck e.V., Am Weiher 4, 02791 Oderwitz.",
         "Vertretungsberechtigung: Vertreten durch den 1. Vorsitzenden Herrn Peter Liersch.",
         "Kontakt: E-Mail info@msc-oberlausitzer-dreilaendereck.eu.",
         "Registereintrag: Registergericht Dresden, Vereinsregister VR 5907.",
         "Umsatzsteuer: USt-IdNr. DE289954270.",
-        "Verantwortlich fuer Inhalte: MSC Oberlausitzer Dreilaendereck e.V."
+        "Verantwortlich für Inhalte: MSC Oberlausitzer Dreilaendereck e.V."
       ]
     },
     privacyDoc: {
       title: "Datenschutzhinweise",
       paragraphs: [
         "1. Verantwortlicher: MSC Oberlausitzer Dreilaendereck e.V., Am Weiher 4, 02791 Oderwitz, E-Mail info@msc-oberlausitzer-dreilaendereck.eu.",
-        "2. Datenschutzbeauftragter: Stephan Jakab, Kontakt ueber info@msc-oberlausitzer-dreilaendereck.eu.",
-        "3. Zweck und Rechtsgrundlagen: Entgegennahme/Bearbeitung der Anmeldung, Teilnehmerverwaltung, Veranstaltungsdurchfuehrung inkl. Check-in/technische Abnahme, Kommunikation, Dokumentenerstellung und Abrechnung. Rechtsgrundlagen sind Art. 6 Abs. 1 lit. b, lit. c, lit. f DSGVO; optionale Medienverarbeitung nur nach Art. 6 Abs. 1 lit. a DSGVO. Ergaenzend gelten die einschlaegigen Vorschriften des BDSG.",
+        "2. Datenschutzbeauftragter: Stephan Jakab, Kontakt über info@msc-oberlausitzer-dreilaendereck.eu.",
+        "3. Zweck und Rechtsgrundlagen: Entgegennahme/Bearbeitung der Anmeldung, Teilnehmerverwaltung, Veranstaltungsdurchführung inkl. Check-in/technische Abnahme, Kommunikation, Dokumentenerstellung und Abrechnung. Rechtsgrundlagen sind Art. 6 Abs. 1 lit. b, lit. c, lit. f DSGVO; optionale Medienverarbeitung nur nach Art. 6 Abs. 1 lit. a DSGVO. Ergänzend gelten die einschlägigen Vorschriften des BDSG.",
         "4. Datenkategorien: Identifikations- und Kontaktdaten, Teilnehmer- und Fahrzeugdaten, Notfallkontaktdaten, Status-/Prozessdaten sowie Consent-Nachweise (Version, Zeitstempel, Hash, Locale, Quelle).",
-        "5. Empfaenger/Auftragsverarbeiter: Intern zustaendige Vereins-/Orga-Stellen sowie AWS als Auftragsverarbeiter (RDS, S3, SES, Cognito, CloudWatch, Lambda, EventBridge, API Gateway, Secrets Manager), Region eu-central-1. Eine Weitergabe an sonstige Dritte erfolgt nur bei rechtlicher Verpflichtung oder ausdruecklicher Einwilligung.",
-        "6. Speicherdauer und Loeschung: Operative Anmeldedaten in der Regel 3 Jahre nach Veranstaltungsende; Kommunikations-/Outboxdaten 12 Monate; Exportdaten 90 Tage; Verifikations-/Idempotenzdaten 30 Tage; Auditdaten 24 Monate; Rechnungs-/Zahlungsdaten 10 Jahre soweit gesetzlich erforderlich. Nach Zweckwegfall bzw. Fristablauf werden Daten geloescht oder gesperrt.",
-        "7. Betroffenenrechte: Auskunft, Berichtigung, Loeschung, Einschraenkung, Widerspruch und Datenuebertragbarkeit sowie Widerruf erteilter Einwilligungen mit Wirkung fuer die Zukunft.",
-        "8. Beschwerderecht: Beschwerde bei einer Datenschutzaufsichtsbehoerde (z. B. BfDI oder landeszustaendige Aufsicht) ist moeglich.",
-        "9. Technische Sicherheit: Die Uebertragung erfolgt verschluesselt via TLS/HTTPS. Absolute Sicherheit der Datenuebertragung im Internet kann dennoch nicht garantiert werden.",
-        "10. Technische Protokolle und notwendige Speichermechanismen: Beim Aufruf der Anwendung fallen technisch notwendige Verbindungs- und Serverprotokolle an. Es werden keine Marketing- oder Analytics-Cookies aktiviert. Fuer die Funktion des Formulars koennen technisch notwendige Browser-Speicher verwendet werden (z. B. Spracheinstellung und Formularentwuerfe).",
+        "5. Empfänger/Auftragsverarbeiter: Intern zuständige Vereins-/Orga-Stellen sowie AWS als Auftragsverarbeiter (RDS, S3, SES, Cognito, CloudWatch, Lambda, EventBridge, API Gateway, Secrets Manager), Region eu-central-1. Eine Weitergabe an sonstige Dritte erfolgt nur bei rechtlicher Verpflichtung oder ausdrücklicher Einwilligung.",
+        "6. Speicherdauer und Löschung: Operative Anmeldedaten in der Regel 3 Jahre nach Veranstaltungsende; Kommunikations-/Outboxdaten 12 Monate; Exportdaten 90 Tage; Verifikations-/Idempotenzdaten 30 Tage; Auditdaten 24 Monate; Rechnungs-/Zahlungsdaten 10 Jahre soweit gesetzlich erforderlich. Nach Zweckwegfall bzw. Fristablauf werden Daten gelöscht oder gesperrt.",
+        "7. Betroffenenrechte: Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit sowie Widerruf erteilter Einwilligungen mit Wirkung für die Zukunft.",
+        "8. Beschwerderecht: Beschwerde bei einer Datenschutzaufsichtsbehörde (z. B. BfDI oder landeszuständige Aufsicht) ist möglich.",
+        "9. Technische Sicherheit: Die Übertragung erfolgt verschlüsselt via TLS/HTTPS. Absolute Sicherheit der Datenübertragung im Internet kann dennoch nicht garantiert werden.",
+        "10. Technische Protokolle und notwendige Speichermechanismen: Beim Aufruf der Anwendung fallen technisch notwendige Verbindungs- und Serverprotokolle an. Es werden keine Marketing- oder Analytics-Cookies aktiviert. Für die Funktion des Formulars können technisch notwendige Browser-Speicher verwendet werden (z. B. Spracheinstellung und Formularentwürfe).",
         "11. Datensicherheit: Zugriff auf personenbezogene Daten erfolgt nach dem Need-to-know-Prinzip; technische und organisatorische Massnahmen (u. a. Zugriffsrechte, Protokollierung, Aktualisierung der Systeme) werden umgesetzt.",
-        "12. Pflicht zur Bereitstellung: Ohne die als erforderlich gekennzeichneten Angaben ist eine Teilnahmeabwicklung nicht moeglich.",
-        "13. Kontaktanfragen: Bei Kontaktaufnahme per E-Mail oder Kontaktformular (Vereinswebsite) werden die Angaben zur Bearbeitung der Anfrage und fuer Anschlussfragen verarbeitet.",
-        "14. Aktualisierung: Diese Datenschutzhinweise koennen angepasst werden, wenn sich rechtliche oder organisatorische Anforderungen aendern."
+        "12. Pflicht zur Bereitstellung: Ohne die als erforderlich gekennzeichneten Angaben ist eine Teilnahmeabwicklung nicht möglich.",
+        "13. Kontaktanfragen: Bei Kontaktaufnahme per E-Mail oder Kontaktformular (Vereinswebsite) werden die Angaben zur Bearbeitung der Anfrage und für Anschlussfragen verarbeitet.",
+        "14. Aktualisierung: Diese Datenschutzhinweise können angepasst werden, wenn sich rechtliche oder organisatorische Anforderungen ändern."
       ]
     },
     termsDoc: {
       title: "Teilnahmebedingungen / AGB und Einwilligungen",
       paragraphs: [
-        "1. Teilnahmevoraussetzung Minderjaehrige: Minderjaehrige Teilnehmer koennen angemeldet werden, wenn ein Sorgeberechtigter der Anmeldung ausdruecklich zustimmt. Bei minderjaehrigen Teilnehmern sind Name, E-Mail, Telefon und bestaetigende Zustimmung des Sorgeberechtigten verpflichtend anzugeben.",
-        "2. Medien-Einwilligung (optional): Foto- und/oder Videoaufnahmen duerfen fuer Veranstaltungsbericht, Vereinswebsite und vereinseigene Social-Media-Kanaele genutzt werden.",
-        "3. Widerruf Medien-Einwilligung: Die Einwilligung ist freiwillig und jederzeit mit Wirkung fuer die Zukunft per E-Mail an info@msc-oberlausitzer-dreilaendereck.eu widerrufbar. Die Rechtmaessigkeit der bis zum Widerruf erfolgten Verarbeitung bleibt unberuehrt.",
-        "4. Cookie-/Tracking-Hinweis: Dieses Formular verwendet keine Tracking- oder Marketing-Cookies. Es werden ausschliesslich technisch notwendige Funktionen eingesetzt. Optionale Tracking-Dienste wuerden nur nach vorheriger ausdruecklicher Einwilligung aktiviert."
+        "1. Teilnahmevoraussetzung Minderjährige: Minderjährige Teilnehmer können angemeldet werden, wenn ein Sorgeberechtigter der Anmeldung ausdrücklich zustimmt. Bei minderjährigen Teilnehmern sind Name, E-Mail, Telefon und bestätigende Zustimmung des Sorgeberechtigten verpflichtend anzugeben.",
+        "2. Medien-Einwilligung (optional): Foto- und/oder Videoaufnahmen dürfen für Veranstaltungsbericht, Vereinswebsite und vereinseigene Social-Media-Kanäle genutzt werden.",
+        "3. Widerruf Medien-Einwilligung: Die Einwilligung ist freiwillig und jederzeit mit Wirkung für die Zukunft per E-Mail an info@msc-oberlausitzer-dreilaendereck.eu widerrufbar. Die Rechtmäßigkeit der bis zum Widerruf erfolgten Verarbeitung bleibt unberührt.",
+        "4. Cookie-/Tracking-Hinweis: Dieses Formular verwendet keine Tracking- oder Marketing-Cookies. Es werden ausschließlich technisch notwendige Funktionen eingesetzt. Optionale Tracking-Dienste würden nur nach vorheriger ausdrücklicher Einwilligung aktiviert."
       ]
     },
     waiverDoc: {
-      title: "Haftverzichtserklaerung",
+      title: "Haftverzichtserklärung",
       paragraphs: [
-        "1. Geltung: Diese Haftverzichtserklaerung gilt fuer die Teilnahme an der Veranstaltung und ist Bestandteil der Anmeldeunterlagen.",
-        "2. Eigenverantwortung: Der Teilnehmer nimmt auf eigene Gefahr teil und traegt die zivil- und strafrechtliche Verantwortung fuer durch ihn oder sein Fahrzeug verursachte Schaeden, soweit kein Haftungsausschluss vereinbart wurde.",
-        "3. Verzicht auf Ansprueche: Mit Abgabe der Nennung wird auf Ansprueche jeder Art fuer Schaeden im Zusammenhang mit der Veranstaltung verzichtet, insbesondere gegen den DMV, den DMSB, deren Mitgliedsorganisationen, den Veranstalter sowie alle mit Organisation und Durchfuehrung befassten Personen und Erfuellungs-/Verrichtungsgehilfen.",
-        "4. Weiterer Personenkreis: Der Verzicht gilt ebenfalls gegenueber anderen Teilnehmern, deren Helfern sowie Eigentuemern/Fahrzeugeigentuemern anderer Fahrzeuge und gegenueber eigenen Helfern.",
-        "5. Ausnahmen: Ausgenommen vom Haftungsverzicht bleiben Ansprueche wegen Verletzung von Leben, Koerper oder Gesundheit sowie Ansprueche aus vorsaetzlicher oder grob fahrlaessiger Pflichtverletzung (auch gesetzlicher Vertreter oder Erfuellungsgehilfen).",
-        "6. Erklaerungen des Teilnehmers: Der Teilnehmer bestaetigt, dass die Angaben in der Nennung richtig und vollstaendig sind, das Fahrzeug den technischen Bestimmungen entspricht und in technisch sowie optisch einwandfreiem Zustand eingesetzt wird.",
-        "7. Regelakzeptanz: Der Teilnehmer bestaetigt die Kenntnis und Anerkennung der Ausschreibungsbedingungen, die Beachtung der Veranstaltungsregeln, den Besitz eines gueltigen Fuehrerscheins sowie den Verzicht auf verbotene Substanzen/Methoden.",
-        "8. Daten- und Eigentumserklaerung: Der Teilnehmer erklaert sich mit Speicherung und Verarbeitung der Daten durch den Veranstalter einverstanden und bestaetigt, dass bei fehlendem Fahrzeugeigentum eine entsprechende Verzichtserklaerung des Eigentuemers vorgelegt wird.",
-        "9. Hoehere Gewalt: Bei Absage der Veranstaltung aus hoeherer Gewalt (z. B. Unwetter, behoerdliche Auflagen) kann ein Anspruch auf Rueckerstattung des Nenngeldes ausgeschlossen sein."
+        "1. Geltung: Diese Haftverzichtserklärung gilt für die Teilnahme an der Veranstaltung und ist Bestandteil der Anmeldeunterlagen.",
+        "2. Eigenverantwortung: Der Teilnehmer nimmt auf eigene Gefahr teil und trägt die zivil- und strafrechtliche Verantwortung für durch ihn oder sein Fahrzeug verursachte Schäden, soweit kein Haftungsausschluss vereinbart wurde.",
+        "3. Verzicht auf Ansprüche: Mit Abgabe der Nennung wird auf Ansprüche jeder Art für Schäden im Zusammenhang mit der Veranstaltung verzichtet, insbesondere gegen den DMV, den DMSB, deren Mitgliedsorganisationen, den Veranstalter sowie alle mit Organisation und Durchführung befassten Personen und Erfüllungs-/Verrichtungsgehilfen.",
+        "4. Weiterer Personenkreis: Der Verzicht gilt ebenfalls gegenüber anderen Teilnehmern, deren Helfern sowie Eigentümern/Fahrzeugeigentümern anderer Fahrzeuge und gegenüber eigenen Helfern.",
+        "5. Ausnahmen: Ausgenommen vom Haftungsverzicht bleiben Ansprüche wegen Verletzung von Leben, Körper oder Gesundheit sowie Ansprüche aus vorsätzlicher oder grob fahrlässiger Pflichtverletzung (auch gesetzlicher Vertreter oder Erfüllungsgehilfen).",
+        "6. Erklärungen des Teilnehmers: Der Teilnehmer bestätigt, dass die Angaben in der Nennung richtig und vollständig sind, das Fahrzeug den technischen Bestimmungen entspricht und in technisch sowie optisch einwandfreiem Zustand eingesetzt wird.",
+        "7. Regelakzeptanz: Der Teilnehmer bestätigt die Kenntnis und Anerkennung der Ausschreibungsbedingungen, die Beachtung der Veranstaltungsregeln, den Besitz eines gültigen Führerscheins sowie den Verzicht auf verbotene Substanzen/Methoden.",
+        "8. Daten- und Eigentumserklärung: Der Teilnehmer erklärt sich mit Speicherung und Verarbeitung der Daten durch den Veranstalter einverstanden und bestätigt, dass bei fehlendem Fahrzeugeigentum eine entsprechende Verzichtserklärung des Eigentümers vorgelegt wird.",
+        "9. Höhere Gewalt: Bei Absage der Veranstaltung aus höherer Gewalt (z. B. Unwetter, behördliche Auflagen) kann ein Anspruch auf Rückerstattung des Nenngeldes ausgeschlossen sein."
       ]
     }
   },

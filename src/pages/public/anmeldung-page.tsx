@@ -214,7 +214,7 @@ function getConsentMetaError(locale: string) {
   if (locale === "pl") {
     return "Metadane zgód są niepełne. Odśwież stronę i spróbuj ponownie.";
   }
-  return "Consent-Metadaten sind unvollstaendig. Bitte Seite neu laden und erneut versuchen.";
+  return "Consent-Metadaten sind unvollständig. Bitte Seite neu laden und erneut versuchen.";
 }
 
 function getGuardianFieldMessages(locale: string) {
@@ -243,10 +243,10 @@ function getGuardianFieldMessages(locale: string) {
     };
   }
   return {
-    requiredFullName: "Bei Minderjaehrigen ist der vollstaendige Name des Sorgeberechtigten erforderlich.",
-    invalidEmail: "Bitte gueltige E-Mail des Sorgeberechtigten eingeben.",
-    invalidPhone: "Bitte gueltige Telefonnummer des Sorgeberechtigten eingeben.",
-    requiredConsent: "Bei Minderjaehrigen ist die Zustimmung des Sorgeberechtigten erforderlich."
+    requiredFullName: "Bei Minderjährigen ist der vollständige Name des Sorgeberechtigten erforderlich.",
+    invalidEmail: "Bitte gültige E-Mail des Sorgeberechtigten eingeben.",
+    invalidPhone: "Bitte gültige Telefonnummer des Sorgeberechtigten eingeben.",
+    requiredConsent: "Bei Minderjährigen ist die Zustimmung des Sorgeberechtigten erforderlich."
   };
 }
 
@@ -1386,7 +1386,7 @@ export function AnmeldungPage() {
         setSubmitError(m.errors.startTaken);
         setStep(2);
       } else if (isImageUploadInvalidError(error)) {
-        setSubmitError("Bild-Upload ist ungueltig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
+        setSubmitError("Bild-Upload ist ungültig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
         setStep(2);
       } else {
         setSubmitError(m.page.submitErrorGeneric);
@@ -1519,7 +1519,7 @@ export function AnmeldungPage() {
           ? ". Pro dokonceni registrace prosim potvrdte e-mail."
           : locale === "pl"
             ? ". Aby dokończyć rejestrację, potwierdź adres e-mail."
-          : " gesendet. Bitte bestaetige die E-Mail-Verifizierung, damit die Anmeldung final verarbeitet werden kann.";
+          : " gesendet. Bitte bestätige die E-Mail-Verifizierung, damit die Anmeldung final verarbeitet werden kann.";
     return (
       <div className="space-y-6 pb-8 md:pb-0">
         <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6 shadow-sm md:p-8">
