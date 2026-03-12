@@ -216,6 +216,7 @@ export function AdminCommunicationPage() {
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
+  const [includeEntryContext, setIncludeEntryContext] = useState(true);
   const [templateBody, setTemplateBody] = useState("");
   const [templateDataDraft, setTemplateDataDraft] = useState<Record<string, string>>({});
   const templateDraftsRef = useRef<TemplateDrafts>({});
@@ -514,7 +515,8 @@ export function AdminCommunicationPage() {
           bodyHtmlOverride: bodyHtmlOverrideValue,
           renderOptions: {
             showBadge: false,
-            mailLabel: null
+            mailLabel: null,
+            includeEntryContext
           },
           previewMode: "draft"
         })
@@ -545,7 +547,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, previewEntryId, subjectOverrideValue, templateDataValue]);
+  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, includeEntryContext, previewEntryId, subjectOverrideValue, templateDataValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -693,6 +695,7 @@ export function AdminCommunicationPage() {
       setForm((prev) => ({ ...prev, templateKey: "", subjectOverride: "" }));
       setTemplateBody("");
       setTemplateDataDraft({});
+      setIncludeEntryContext(true);
       return;
     }
 
@@ -708,6 +711,7 @@ export function AdminCommunicationPage() {
       setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
       setTemplateBody(fromDraft.body);
       setTemplateDataDraft({ ...defaults, ...(fromDraft.data ?? {}) });
+      setIncludeEntryContext(template.renderOptions?.includeEntryContextDefault ?? true);
       return;
     }
 
@@ -718,6 +722,7 @@ export function AdminCommunicationPage() {
     }));
     setTemplateBody(template.bodyText);
     setTemplateDataDraft(defaultTemplateDataFromComposer(template));
+    setIncludeEntryContext(template.renderOptions?.includeEntryContextDefault ?? true);
   };
 
   const resolveRecipients = async () => {
@@ -800,7 +805,8 @@ export function AdminCommunicationPage() {
         templateData: templateDataValue,
         renderOptions: {
           showBadge: false,
-          mailLabel: null
+          mailLabel: null,
+          includeEntryContext
         },
         additionalEmails: additionalRecipients.valid,
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
@@ -1192,6 +1198,19 @@ export function AdminCommunicationPage() {
                 <span>Version {selectedTemplate.version}</span>
               </div>
             )}
+            <label className="flex items-start gap-2 rounded-md border bg-white px-3 py-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={includeEntryContext}
+                onChange={(event) => setIncludeEntryContext(event.target.checked)}
+                disabled={!form.templateKey}
+              />
+              <span>
+                Entry-Kontext anzeigen (Klasse/Startnummer/Fahrzeug/Nenngeld), sofern verfügbar.
+                <span className="mt-0.5 block text-xs text-slate-500">Schaltet den kompakten Erinnerungsblock im Mail-Header an/aus.</span>
+              </span>
+            </label>
             <div className="space-y-1">
               <Label>Betreff</Label>
               <Input

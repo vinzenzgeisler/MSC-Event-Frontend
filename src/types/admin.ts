@@ -366,11 +366,13 @@ export type MailTemplateComposer = {
 export type MailTemplateRenderOptions = {
   showBadgeDefault: boolean;
   defaultMailLabel: string | null;
+  includeEntryContextDefault?: boolean;
 };
 
 export type MailRenderOptionsInput = {
   showBadge?: boolean;
   mailLabel?: string | null;
+  includeEntryContext?: boolean;
 };
 
 export type MailTemplate = {
