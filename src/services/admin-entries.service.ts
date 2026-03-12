@@ -12,7 +12,7 @@ import type {
   AdminEntryListItemDto,
   ListMeta
 } from "@/types/admin";
-import type { AcceptanceStatus, PaymentStatus } from "@/types/common";
+import type { AcceptanceStatus, PaymentStatus, VehicleType } from "@/types/common";
 
 type EntryContext = {
   eventId: string;
@@ -142,7 +142,13 @@ function resolveImageUrl(value: string | null | undefined): string | null {
   }
 
   // Accept only browser-loadable URL forms. Raw S3 object keys are not valid image URLs.
-  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("/")) {
+  if (
+    raw.startsWith("http://") ||
+    raw.startsWith("https://") ||
+    raw.startsWith("data:") ||
+    raw.startsWith("blob:") ||
+    raw.startsWith("/")
+  ) {
     return raw;
   }
 
@@ -402,6 +408,16 @@ type AdminEntryPaymentAmountsResponse = {
   totalCents: number;
   paidAmountCents: number;
   amountOpenCents: number;
+};
+
+type AdminEntryClassChangeResponse = {
+  ok: boolean;
+  entryId: string;
+  classId: string;
+  vehicleTypeBefore?: VehicleType;
+  vehicleTypeAfter?: VehicleType;
+  backupVehicleUpdated?: boolean;
+  warnings?: string[];
 };
 
 async function resolveEntryContext(entryId: string): Promise<EntryContext> {
@@ -729,12 +745,16 @@ export const adminEntriesService = {
     });
   },
 
-  async changeEntryClass(entryId: string, payload: { classId: string; applyToBackupVehicle?: boolean }) {
-    return requestJson<{ ok: boolean; entryId: string; classId: string }>(`/admin/entries/${entryId}/class`, {
+  async changeEntryClass(
+    entryId: string,
+    payload: { classId: string; applyToBackupVehicle?: boolean; allowVehicleTypeChange?: boolean }
+  ) {
+    return requestJson<AdminEntryClassChangeResponse>(`/admin/entries/${entryId}/class`, {
       method: "PATCH",
       body: {
         classId: payload.classId,
-        applyToBackupVehicle: payload.applyToBackupVehicle === true ? true : undefined
+        applyToBackupVehicle: payload.applyToBackupVehicle === true ? true : undefined,
+        allowVehicleTypeChange: payload.allowVehicleTypeChange !== false ? true : undefined
       }
     });
   },
