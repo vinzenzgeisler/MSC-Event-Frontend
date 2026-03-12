@@ -244,6 +244,7 @@ export function AdminCommunicationPage() {
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
+  const [quickActionHintOpen, setQuickActionHintOpen] = useState(false);
   const [quickActionConfirm, setQuickActionConfirm] = useState<null | {
     kind: "verification" | "payment";
     label: string;
@@ -287,6 +288,7 @@ export function AdminCommunicationPage() {
   const recipientSearchErrorToastRef = useRef("");
   const searchRequestRef = useRef(0);
   const toastTimerRef = useRef<number | null>(null);
+  const quickActionHintRef = useRef<HTMLDivElement | null>(null);
 
   const showToast = (message: string, tone: ToastTone = "error") => {
     if (toastTimerRef.current) {
@@ -306,6 +308,36 @@ export function AdminCommunicationPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!quickActionHintOpen) {
+      return;
+    }
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!quickActionHintRef.current) {
+        return;
+      }
+      const target = event.target as Node | null;
+      if (target && quickActionHintRef.current.contains(target)) {
+        return;
+      }
+      setQuickActionHintOpen(false);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setQuickActionHintOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [quickActionHintOpen]);
 
   const loadOutbox = async (options?: { silentError?: boolean }) => {
     if (!options?.silentError) {
@@ -995,13 +1027,22 @@ export function AdminCommunicationPage() {
           <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
               <span>Quick-Aktionen</span>
-              <span
-                className="inline-flex cursor-help text-slate-500"
-                title="Für Massenaktionen ohne Textanpassung. Empfänger werden automatisch gefiltert und vor dem Versand bestätigt."
-                aria-label="Info zu Quick-Aktionen"
-              >
-                <Info className="h-4 w-4" />
-              </span>
+              <div className="relative" ref={quickActionHintRef}>
+                <button
+                  type="button"
+                  className="inline-flex rounded text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  aria-label="Info zu Quick-Aktionen anzeigen"
+                  aria-expanded={quickActionHintOpen}
+                  onClick={() => setQuickActionHintOpen((prev) => !prev)}
+                >
+                  <Info className="h-4 w-4" />
+                </button>
+                {quickActionHintOpen ? (
+                  <div className="absolute left-0 top-6 z-10 w-72 rounded-md border border-slate-200 bg-white p-2 text-xs font-normal text-slate-700 shadow-lg">
+                    Für Massenaktionen ohne Textanpassung. Empfänger werden automatisch gefiltert und vor dem Versand bestätigt.
+                  </div>
+                ) : null}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
