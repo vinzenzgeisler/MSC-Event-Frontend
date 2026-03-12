@@ -822,7 +822,7 @@ export function AdminEntryDetailPage() {
                     setSendingVerificationMail(true);
                     try {
                       const result = await communicationService.queueVerificationMailForEntry(detail.id, {
-                        allowDuplicate: confirmationMailSent ? true : undefined,
+                        allowDuplicate: true,
                         eventId: detail.eventId
                       });
                       if (result.queued < 1) {
