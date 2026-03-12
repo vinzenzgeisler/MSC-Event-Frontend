@@ -39,6 +39,7 @@ const baseMessages = {
       step2BlockedReason: "Bitte zuerst mindestens eine Startmeldung hinzufügen.",
       submitErrorConsent: "Bitte alle Einwilligungen bestätigen.",
       submitErrorGeneric: "Anmeldung konnte nicht gespeichert werden.",
+      submitErrorUnavailable: "Anmeldung ist aktuell nicht verfügbar.",
       submitErrorEmailInUse:
         "Diese E-Mail ist bereits in einer aktiven Nennung hinterlegt. Bitte nutze eine andere E-Mail oder kontaktiere das Orga-Team.",
       noCurrentEventTitle: "Aktuell keine Anmeldung verfügbar",
@@ -278,6 +279,7 @@ const baseMessages = {
       step2BlockedReason: "Please add at least one start entry first.",
       submitErrorConsent: "Please confirm all consent checkboxes.",
       submitErrorGeneric: "Registration could not be saved.",
+      submitErrorUnavailable: "Registration is currently unavailable.",
       submitErrorEmailInUse:
         "This email is already used in an active entry. Please use a different email or contact the event team.",
       noCurrentEventTitle: "Registration currently unavailable",
@@ -500,6 +502,7 @@ const baseMessages = {
       step2BlockedReason: "Nejprve přidejte alespoň jeden start.",
       submitErrorConsent: "Potvrďte prosím všechny souhlasy.",
       submitErrorGeneric: "Registraci se nepodařilo uložit.",
+      submitErrorUnavailable: "Registrace nyní není dostupná.",
       submitErrorEmailInUse:
         "Tento e-mail je již použit v aktivní přihlášce. Použijte jiný e-mail nebo kontaktujte pořadatele.",
       noCurrentEventTitle: "Registrace nyní není dostupná",
@@ -737,6 +740,7 @@ const messages: Record<AnmeldungLocale, AnmeldungMessages> = {
       step2BlockedReason: "Najpierw dodaj co najmniej jedno zgłoszenie startowe.",
       submitErrorConsent: "Potwierdź wszystkie zgody.",
       submitErrorGeneric: "Nie udało się zapisać rejestracji.",
+      submitErrorUnavailable: "Rejestracja jest obecnie niedostępna.",
       submitErrorEmailInUse:
         "Ten adres e-mail jest już używany w aktywnym zgłoszeniu. Użyj innego adresu lub skontaktuj się z organizatorem.",
       noCurrentEventTitle: "Rejestracja jest obecnie niedostępna",

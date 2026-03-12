@@ -159,6 +159,32 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Entity (code: IMAGE_UPLOAD_INVALID)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "image_upload_invalid": {
+                    "value": {
+                      "ok": false,
+                      "code": "IMAGE_UPLOAD_INVALID",
+                      "message": "Image upload invalid or not finalized",
+                      "fieldErrors": [
+                        {
+                          "field": "vehicle.imageUploadId|backupVehicle.imageUploadId",
+                          "code": "invalid_or_not_finalized",
+                          "message": "Image upload is invalid or not finalized"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Error",
             "content": {
@@ -253,6 +279,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity (code: IMAGE_UPLOAD_INVALID)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "image_upload_invalid": {
+                    "value": {
+                      "ok": false,
+                      "code": "IMAGE_UPLOAD_INVALID",
+                      "message": "Image upload invalid or not finalized",
+                      "fieldErrors": [
+                        {
+                          "field": "entries[].vehicle.imageUploadId|entries[].backupVehicle.imageUploadId",
+                          "code": "invalid_or_not_finalized",
+                          "message": "Image upload is invalid or not finalized"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -7959,12 +8011,10 @@
           "startNumberRaw": {
             "type": "string"
           },
-          "imageS3Key": {
-            "type": "string"
-          },
           "imageUploadId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Upload id returned by /public/uploads/vehicle-image/finalize. Direct imageS3Key input is not accepted."
           }
         },
         "required": [

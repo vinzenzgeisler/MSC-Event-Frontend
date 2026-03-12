@@ -347,6 +347,22 @@ function isRegistrationConfirmationQueueFailedError(error: unknown) {
   return (error.code ?? "").trim().toUpperCase() === "REGISTRATION_CONFIRMATION_QUEUE_FAILED";
 }
 
+function isServiceUnavailableError(error: unknown) {
+  if (error instanceof ApiError) {
+    return false;
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed")
+  );
+}
+
 function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, attemptedEntries: number) {
   if (locale === "en") {
     return `Only ${createdEntries} of ${attemptedEntries} entries were created. Please do not resubmit to avoid duplicates. Contact the event team.`;
@@ -893,7 +909,7 @@ export function AnmeldungPage() {
           return;
         }
         setEventLoadState("error");
-        setSubmitError(m.page.submitErrorGeneric);
+        setSubmitError(isServiceUnavailableError(error) ? m.page.submitErrorUnavailable : m.page.submitErrorGeneric);
       });
 
     return () => {
@@ -1397,6 +1413,8 @@ export function AnmeldungPage() {
         setStep(2);
       } else if (isRegistrationConfirmationQueueFailedError(error)) {
         setSubmitError("Anmeldung gespeichert, aber die Bestätigungs-Mail konnte nicht eingeplant werden. Bitte Support kontaktieren.");
+      } else if (isServiceUnavailableError(error)) {
+        setSubmitError(m.page.submitErrorUnavailable);
       } else {
         setSubmitError(m.page.submitErrorGeneric);
       }
@@ -1478,7 +1496,7 @@ export function AnmeldungPage() {
         </div>
         <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardContent className="space-y-2 p-5 md:p-8">
-            <h3 className="text-lg font-semibold text-slate-900">{m.page.submitErrorGeneric}</h3>
+            <h3 className="text-lg font-semibold text-slate-900">{submitError || m.page.submitErrorUnavailable}</h3>
           </CardContent>
         </Card>
       </div>
