@@ -434,7 +434,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
         <div className="order-2 space-y-4 lg:order-1">
           <Card>
             <CardHeader>
@@ -728,7 +728,7 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-4 lg:w-[300px] lg:justify-self-end lg:self-start">
+        <div className="order-1 w-full space-y-4 lg:order-2 lg:sticky lg:top-4 lg:w-[340px] lg:justify-self-end lg:self-start">
           <Card>
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
@@ -1177,11 +1177,12 @@ export function AdminEntryDetailPage() {
                 }
               />
             </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "status-accepted"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={() => setPendingAcceptConfirm(false)}
               >
                 Abbrechen
@@ -1189,6 +1190,7 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 disabled={actionInFlight === "status-accepted"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={async () => {
                   setPendingAcceptConfirm(false);
                   await runAction(
@@ -1227,11 +1229,12 @@ export function AdminEntryDetailPage() {
               <li>Bei Ü70 ärztliches Attest geprüft</li>
               <li>Technische Abnahme durchgeführt und dokumentiert</li>
             </ul>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "checkin-confirm"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={() => setPendingCheckinConfirm(false)}
               >
                 Abbrechen
@@ -1239,6 +1242,7 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 disabled={actionInFlight === "checkin-confirm"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={async () => {
                   const success = await runAction(
                     "checkin-confirm",
@@ -1283,11 +1287,12 @@ export function AdminEntryDetailPage() {
                 }
               />
             </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "status-rejected"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={() => setPendingRejectConfirm(false)}
               >
                 Abbrechen
@@ -1296,6 +1301,7 @@ export function AdminEntryDetailPage() {
                 type="button"
                 variant="destructive"
                 disabled={actionInFlight === "status-rejected"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={async () => {
                   setPendingRejectConfirm(false);
                   await runAction(
@@ -1330,11 +1336,12 @@ export function AdminEntryDetailPage() {
             <p className="mt-2 text-sm text-slate-600">
               Diese Aktion bestätigt den Zahlungseingang für diese Nennung.
             </p>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "payment-mark"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={() => setPendingPaymentConfirm(false)}
               >
                 Abbrechen
@@ -1342,6 +1349,7 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 disabled={actionInFlight === "payment-mark"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={async () => {
                   const success = await runAction(
                     "payment-mark",
@@ -1391,11 +1399,12 @@ export function AdminEntryDetailPage() {
                 />
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "payment-adjust"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={() => setPaymentEditorOpen(false)}
               >
                 Abbrechen
@@ -1403,6 +1412,7 @@ export function AdminEntryDetailPage() {
               <Button
                 type="button"
                 disabled={actionInFlight === "payment-adjust"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={async () => {
                   const success = await runAction(
                     "payment-adjust",
@@ -1450,11 +1460,12 @@ export function AdminEntryDetailPage() {
                 onChange={(event) => setDeleteReasonDraft(event.target.value)}
               />
             </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 disabled={actionInFlight === "entry-delete"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={() => {
                   setPendingDeleteConfirm(false);
                   setDeleteReasonDraft("");
@@ -1466,6 +1477,7 @@ export function AdminEntryDetailPage() {
                 type="button"
                 variant="destructive"
                 disabled={actionInFlight === "entry-delete"}
+                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
                 onClick={async () => {
                   if (anyActionInFlight) {
                     return;
