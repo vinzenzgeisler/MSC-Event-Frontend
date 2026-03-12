@@ -284,7 +284,7 @@ export function AdminDashboardPage() {
         const resolved = await communicationService.resolveBroadcastRecipients(
           kind === "verification"
             ? { registrationStatus: "submitted_unverified" }
-            : { acceptanceStatus: "accepted", registrationStatus: "submitted_verified", paymentStatus: "due" }
+            : { acceptanceStatus: "accepted", paymentStatus: "due" }
         );
 
         if (resolved.finalCount < 1) {
@@ -299,7 +299,7 @@ export function AdminDashboardPage() {
           filters:
             kind === "verification"
               ? { registrationStatus: "submitted_unverified" }
-              : { acceptanceStatus: "accepted", registrationStatus: "submitted_verified", paymentStatus: "due" }
+              : { acceptanceStatus: "accepted", paymentStatus: "due" }
         });
       } catch (err) {
         setQuickActionMessage(getApiErrorMessage(err, "Quick-Aktion fehlgeschlagen."));

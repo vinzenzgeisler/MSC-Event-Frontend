@@ -919,17 +919,13 @@ export function AdminCommunicationPage() {
       return;
     }
 
-    const classId = allowFilterRecipients && form.classId !== "all" ? form.classId : undefined;
     const resolvePayload =
       kind === "verification"
         ? {
-            classId,
             registrationStatus: "submitted_unverified" as const
           }
         : {
-            classId,
             acceptanceStatus: "accepted" as const,
-            registrationStatus: "submitted_verified" as const,
             paymentStatus: "due" as const
           };
 
@@ -950,8 +946,8 @@ export function AdminCommunicationPage() {
         finalCount: resolved.finalCount,
         filters:
           kind === "verification"
-            ? { classId, registrationStatus: "submitted_unverified" }
-            : { classId, acceptanceStatus: "accepted", registrationStatus: "submitted_verified", paymentStatus: "due" }
+            ? { registrationStatus: "submitted_unverified" }
+            : { acceptanceStatus: "accepted", paymentStatus: "due" }
       });
     } catch (error) {
       showToast(getCommunicationErrorMessage(error, "Quick-Aktion fehlgeschlagen."));
