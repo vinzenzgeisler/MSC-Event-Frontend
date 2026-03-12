@@ -210,6 +210,34 @@ function fieldInputType(field: MailTemplateComposerField): "text" | "url" | "dat
   return field.type === "url" ? "url" : "text";
 }
 
+function extractPlaceholderNames(value: string): Set<string> {
+  const source = (value ?? "").trim();
+  if (!source) {
+    return new Set<string>();
+  }
+  const names = new Set<string>();
+  const pattern = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(source))) {
+    if (!match[1]) continue;
+    names.add(match[1].trim().toLowerCase());
+  }
+  return names;
+}
+
+function uniqueRecipientsPreview(items: OutboxItem[], limit: number) {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const email = (item.recipient ?? "").trim();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    unique.push(email);
+    if (unique.length >= limit) break;
+  }
+  return unique;
+}
+
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
@@ -339,6 +367,26 @@ export function AdminCommunicationPage() {
     }
     return Array.isArray(selectedTemplate.composer.fields) ? selectedTemplate.composer.fields : [];
   }, [selectedTemplate]);
+  const placeholderDrivenKeys = useMemo(() => {
+    const allowed = selectedTemplate?.composer?.allowedPlaceholders ?? [];
+    const required = selectedTemplate?.composer?.requiredPlaceholders ?? [];
+    return new Set<string>([...allowed, ...required].map((key) => (key ?? "").trim().toLowerCase()).filter(Boolean));
+  }, [selectedTemplate]);
+  const placeholderUsedInDraftText = useMemo(
+    () => extractPlaceholderNames(`${form.subjectOverride}\n${templateBody}`),
+    [form.subjectOverride, templateBody]
+  );
+  const placeholderDrivenComposerFields = useMemo(
+    () => composerFields.filter((field) => placeholderDrivenKeys.has((field.key ?? "").trim().toLowerCase())),
+    [composerFields, placeholderDrivenKeys]
+  );
+  const unusedPlaceholderDrivenComposerFields = useMemo(() => {
+    return placeholderDrivenComposerFields.filter((field) => {
+      const value = (templateDataDraft[field.key] ?? "").trim();
+      if (!value) return false;
+      return !placeholderUsedInDraftText.has(field.key.toLowerCase());
+    });
+  }, [placeholderDrivenComposerFields, placeholderUsedInDraftText, templateDataDraft]);
   const requiredDynamicFields = useMemo(() => composerFields.filter((field) => field.required).map((field) => field.key), [composerFields]);
   const missingRequiredDynamicFields = useMemo(
     () => requiredDynamicFields.filter((fieldKey) => !(templateDataDraft[fieldKey] ?? "").trim()),
@@ -1233,12 +1281,26 @@ export function AdminCommunicationPage() {
             {form.templateKey && (
               <div className="space-y-2 rounded-md border bg-white p-3">
                 <div className="text-sm font-medium text-slate-900">Dynamische Inhalte</div>
+                <div className="text-xs text-slate-600">
+                  Diese Felder werden vom Backend-Template gerendert. Manche Felder wirken über Platzhalter im Text (z.B.{" "}
+                  <span className="font-mono">{`{{paymentDeadline}}`}</span>), andere steuern eigene Bereiche (Hero/Highlights/CTA).
+                </div>
+                {unusedPlaceholderDrivenComposerFields.length > 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Hinweis: Du hast Werte gesetzt, aber die zugehörigen Platzhalter kommen im Text/Betreff nicht vor:{" "}
+                    {unusedPlaceholderDrivenComposerFields
+                      .map((field) => `{{${field.key}}}`)
+                      .join(", ")}
+                    .
+                  </div>
+                )}
                 {composerFields.length === 0 ? (
                   <div className="text-xs text-slate-500">Für dieses Template sind keine Composer-Felder hinterlegt.</div>
                 ) : (
                   <div className="grid gap-3 md:grid-cols-2">
                     {composerFields.map((field) => {
                       const value = templateDataDraft[field.key] ?? "";
+                      const placeholderDriven = placeholderDrivenKeys.has(field.key.toLowerCase());
                       return (
                         <div key={field.key} className={field.multiline ? "space-y-1 md:col-span-2" : "space-y-1"}>
                           <Label>
@@ -1272,7 +1334,10 @@ export function AdminCommunicationPage() {
                               disabled={!form.templateKey}
                             />
                           )}
-                          {field.helpText ? <p className="text-xs text-slate-500">{field.helpText}</p> : null}
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                            <span>{field.helpText}</span>
+                            {placeholderDriven ? <span className="font-mono">{`{{${field.key}}}`}</span> : null}
+                          </div>
                         </div>
                       );
                     })}
@@ -1326,6 +1391,7 @@ export function AdminCommunicationPage() {
                 </div>
                 <div className="space-y-1 text-xs text-slate-600">
                   <p>Warnungen: {backendPreview.warnings.join(" | ") || "-"}</p>
+                  <p>Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}</p>
                   <p>Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}</p>
                   <p>Unbekannt: {backendPreview.unknownPlaceholders.join(", ") || "-"}</p>
                 </div>
@@ -1378,28 +1444,34 @@ export function AdminCommunicationPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2 md:hidden">
-            {visibleOutboxGroups.map((group) => {
-              const expanded = Boolean(expandedOutboxGroups[group.key]);
-              const total = group.items.length;
-              const badges = OUTBOX_STATUS_ORDER.filter((status) => group.counts[status] > 0).map((status) => (
-                <Badge key={status} className={outboxStatusClasses(status)} variant="outline">
-                  {outboxStatusLabel(status)}: {group.counts[status]}
-                </Badge>
-              ));
+                {visibleOutboxGroups.map((group) => {
+                  const expanded = Boolean(expandedOutboxGroups[group.key]);
+                  const total = group.items.length;
+                  const recipientSample = uniqueRecipientsPreview(group.items, 2);
+                  const recipientLine =
+                    total === 1
+                      ? recipientSample[0] ?? "-"
+                      : `${recipientSample.join(", ")}${group.items.length > recipientSample.length ? ", ..." : ""}`;
+                  const badges = OUTBOX_STATUS_ORDER.filter((status) => group.counts[status] > 0).map((status) => (
+                    <Badge key={status} className={outboxStatusClasses(status)} variant="outline">
+                      {outboxStatusLabel(status)}: {group.counts[status]}
+                    </Badge>
+                  ));
 
-              return (
-                <div key={group.key} className="rounded-lg border p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium text-slate-900">{resolveSubject(group.subject)}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">
-                        {group.createdAt} · {total} Empfänger
+                  return (
+                    <div key={group.key} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-slate-900">{resolveSubject(group.subject)}</div>
+                          <div className="mt-0.5 text-xs text-slate-500">
+                            {group.createdAt} · {total} Empfänger
+                          </div>
+                          <div className="mt-0.5 truncate text-xs text-slate-700">{recipientLine}</div>
+                        </div>
+                        <Button type="button" size="sm" variant="outline" onClick={() => toggleOutboxGroup(group.key)}>
+                          {expanded ? "Zuklappen" : "Details"}
+                        </Button>
                       </div>
-                    </div>
-                    <Button type="button" size="sm" variant="outline" onClick={() => toggleOutboxGroup(group.key)}>
-                      {expanded ? "Zuklappen" : "Details"}
-                    </Button>
-                  </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">{badges}</div>
 
                   {group.counts.failed > 0 && canManageCommunication && (
@@ -1465,6 +1537,11 @@ export function AdminCommunicationPage() {
                 {visibleOutboxGroups.map((group) => {
                   const expanded = Boolean(expandedOutboxGroups[group.key]);
                   const total = group.items.length;
+                  const recipientSample = uniqueRecipientsPreview(group.items, 2);
+                  const recipientLine =
+                    total === 1
+                      ? recipientSample[0] ?? "-"
+                      : `${recipientSample.join(", ")}${group.items.length > recipientSample.length ? ", ..." : ""}`;
                   const badges = OUTBOX_STATUS_ORDER.filter((status) => group.counts[status] > 0).map((status) => (
                     <Badge key={status} className={outboxStatusClasses(status)} variant="outline">
                       {outboxStatusLabel(status)}: {group.counts[status]}
@@ -1475,8 +1552,14 @@ export function AdminCommunicationPage() {
                     <Fragment key={group.key}>
                       <tr className="border-t">
                         <td className="px-3 py-2">
-                          <div className="font-medium text-slate-900">{total} Empfänger</div>
-                          <div className="mt-0.5 text-xs text-slate-500">{group.items[0]?.recipient ?? ""}</div>
+                          {total === 1 ? (
+                            <div className="font-medium text-slate-900">{recipientLine}</div>
+                          ) : (
+                            <>
+                              <div className="font-medium text-slate-900">{total} Empfänger</div>
+                              <div className="mt-0.5 text-xs text-slate-500">{recipientLine}</div>
+                            </>
+                          )}
                         </td>
                         <td className="px-3 py-2">{resolveSubject(group.subject)}</td>
                         <td className="px-3 py-2">
