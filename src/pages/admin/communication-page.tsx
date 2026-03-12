@@ -216,6 +216,19 @@ export function AdminCommunicationPage() {
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
+  const [quickActionConfirm, setQuickActionConfirm] = useState<null | {
+    kind: "verification" | "payment";
+    label: string;
+    templateKey: string;
+    finalCount: number;
+    filters: {
+      classId?: string;
+      acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+      registrationStatus?: "submitted_unverified" | "submitted_verified";
+      paymentStatus?: "due" | "paid";
+    };
+  }>(null);
+  const [confirmingQuickAction, setConfirmingQuickAction] = useState(false);
   const [includeEntryContext, setIncludeEntryContext] = useState(true);
   const [templateBody, setTemplateBody] = useState("");
   const [templateDataDraft, setTemplateDataDraft] = useState<Record<string, string>>({});
@@ -874,6 +887,7 @@ export function AdminCommunicationPage() {
 
     setQuickActionBusy(kind);
     try {
+      setQuickActionConfirm(null);
       const resolved = await communicationService.resolveBroadcastRecipients(resolvePayload);
       if (resolved.finalCount < 1) {
         showToast("Keine passenden Empfänger gefunden.", "info");
@@ -881,30 +895,16 @@ export function AdminCommunicationPage() {
       }
 
       const label = kind === "verification" ? "Verifizierungs-Erinnerung" : "Zahlungs-Followup";
-      const confirmed = window.confirm(`${label} an ${resolved.finalCount} Empfänger senden?`);
-      if (!confirmed) {
-        return;
-      }
-
-      const result = await communicationService.sendMail({
+      setQuickActionConfirm({
+        kind,
+        label,
         templateKey,
-        renderOptions: { showBadge: false, mailLabel: null },
+        finalCount: resolved.finalCount,
         filters:
           kind === "verification"
-            ? {
-                classId,
-                registrationStatus: "submitted_unverified"
-              }
-            : {
-                classId,
-                acceptanceStatus: "accepted",
-                registrationStatus: "submitted_verified",
-                paymentStatus: "due"
-              }
+            ? { classId, registrationStatus: "submitted_unverified" }
+            : { classId, acceptanceStatus: "accepted", registrationStatus: "submitted_verified", paymentStatus: "due" }
       });
-
-      showToast(`Mailversand eingeplant (${result.queued} Empfänger).`, "success");
-      await loadOutbox();
     } catch (error) {
       showToast(getCommunicationErrorMessage(error, "Quick-Aktion fehlgeschlagen."));
     } finally {
@@ -1581,6 +1581,65 @@ export function AdminCommunicationPage() {
           ].join(" ")}
         >
           {toast.message}
+        </div>
+      )}
+
+      {quickActionConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">{quickActionConfirm.label} senden?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Diese Aktion plant den Versand an <span className="font-semibold text-slate-900">{quickActionConfirm.finalCount}</span>{" "}
+              Empfänger ein.
+            </p>
+            <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div>Template: {quickActionConfirm.templateKey}</div>
+              {quickActionConfirm.filters.classId ? <div>Klasse: {quickActionConfirm.filters.classId}</div> : <div>Klasse: Alle</div>}
+              {quickActionConfirm.filters.registrationStatus ? <div>Verifizierung: {quickActionConfirm.filters.registrationStatus}</div> : null}
+              {quickActionConfirm.filters.acceptanceStatus ? <div>Status: {quickActionConfirm.filters.acceptanceStatus}</div> : null}
+              {quickActionConfirm.filters.paymentStatus ? <div>Zahlung: {quickActionConfirm.filters.paymentStatus}</div> : null}
+            </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={confirmingQuickAction}
+                onClick={() => setQuickActionConfirm(null)}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                disabled={confirmingQuickAction}
+                onClick={async () => {
+                  setConfirmingQuickAction(true);
+                  try {
+                    const result = await communicationService.sendMail({
+                      templateKey: quickActionConfirm.templateKey,
+                      renderOptions: { showBadge: false, mailLabel: null },
+                      filters: quickActionConfirm.filters
+                    });
+                    showToast(`Mailversand eingeplant (${result.queued} Empfänger).`, "success");
+                    setQuickActionConfirm(null);
+                    await loadOutbox();
+                  } catch (error) {
+                    showToast(getCommunicationErrorMessage(error, "Quick-Aktion fehlgeschlagen."));
+                  } finally {
+                    setConfirmingQuickAction(false);
+                  }
+                }}
+              >
+                {confirmingQuickAction ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Wird eingeplant…
+                  </>
+                ) : (
+                  "Ja, senden"
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
