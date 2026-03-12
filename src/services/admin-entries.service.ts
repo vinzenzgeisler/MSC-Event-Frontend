@@ -141,13 +141,13 @@ function resolveImageUrl(value: string | null | undefined): string | null {
     return null;
   }
 
-  // Accept only browser-loadable URL forms. Raw S3 object keys are not valid image URLs.
+  // Accept only browser-loadable URL forms. Raw S3 object keys (or relative paths) are not valid image URLs
+  // in our current backend contract (backend returns presigned https:// URLs for private images).
   if (
     raw.startsWith("http://") ||
     raw.startsWith("https://") ||
     raw.startsWith("data:") ||
-    raw.startsWith("blob:") ||
-    raw.startsWith("/")
+    raw.startsWith("blob:")
   ) {
     return raw;
   }
@@ -295,7 +295,7 @@ function fromAdminEntryDetailDto(
     },
     vehicle: {
       label: dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug"),
-      thumbUrl: resolveImageUrl(dto.vehicleThumbUrl) ?? resolveImageUrl(dto.vehicle.imageS3Key),
+      thumbUrl: resolveImageUrl(dto.vehicleThumbUrl),
       type: dto.vehicle.vehicleType,
       make: dto.vehicle.make ?? "-",
       model: dto.vehicle.model ?? "-",
@@ -310,7 +310,7 @@ function fromAdminEntryDetailDto(
     backupVehicle: {
       assigned: Boolean(backupVehicle),
       label: backupVehicleLabel,
-      thumbUrl: resolveImageUrl(dto.backupVehicleThumbUrl) ?? resolveImageUrl(backupVehicle?.imageS3Key ?? null),
+      thumbUrl: resolveImageUrl(dto.backupVehicleThumbUrl),
       type: backupVehicle?.vehicleType ?? dto.vehicle.vehicleType,
       make: backupVehicle?.make ?? "-",
       model: backupVehicle?.model ?? "-",

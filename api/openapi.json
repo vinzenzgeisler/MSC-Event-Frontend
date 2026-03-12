@@ -8457,6 +8457,30 @@
                     "type": "null"
                   }
                 ]
+              },
+              "vehicleThumbUrl": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Absolute short-lived presigned URL for vehicle thumbnail."
+              },
+              "backupVehicleThumbUrl": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Absolute short-lived presigned URL for backup vehicle thumbnail."
               }
             }
           },
@@ -8548,6 +8572,18 @@
                 "type": "null"
               }
             ]
+          },
+          "vehicleThumbUrl": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Absolute short-lived presigned URL for vehicle thumbnail."
           },
           "createdAt": {
             "type": "string",
