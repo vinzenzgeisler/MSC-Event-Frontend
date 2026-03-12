@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { AnmeldungI18nProvider, type AnmeldungLocale, useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { DocumentMeta } from "@/app/document-meta";
 import { getLegalTexts } from "@/config/legal-texts";
 import { publicContactEmail, publicWebsiteUrl } from "@/config/public-info";
 import { ApiError } from "@/services/api/http-client";
@@ -160,6 +161,7 @@ function PublicLayoutContent() {
 
   return (
     <div className="flex min-h-screen min-h-[100dvh] flex-col bg-slate-50">
+      <DocumentMeta />
       <section className="bg-primary text-primary-foreground">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 md:px-6 md:py-12">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

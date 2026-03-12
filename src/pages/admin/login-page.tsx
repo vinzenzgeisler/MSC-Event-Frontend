@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { consumeCognitoReturnTo, getCognitoConfig, handleCognitoCallbackIfPresent, isCognitoConfigured, startCognitoLogin } from "@/app/auth/cognito";
+import { DocumentMeta } from "@/app/document-meta";
 import { consumeAuthLogoutReason } from "@/app/auth/auth-store";
 import { useAuth } from "@/app/auth/auth-context";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export function AdminLoginPage() {
 
   return (
     <div className="mx-auto mt-16 max-w-md px-4">
+      <DocumentMeta />
       <Card className="rounded-xl border bg-white shadow-sm">
         <CardHeader>
           <div className="text-xs uppercase tracking-[0.2em] text-slate-500">MSC</div>

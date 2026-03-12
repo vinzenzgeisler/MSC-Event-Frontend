@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
+import { DocumentMeta } from "@/app/document-meta";
 import { AdminNav } from "@/components/navigation/admin-nav";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +17,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-slate-100">
+      <DocumentMeta />
       <div className="border-b bg-white lg:hidden">
         <div className="flex w-full items-center justify-between px-4 py-3">
           <div className="text-base font-semibold text-slate-900">MSC Event Verwaltung</div>
