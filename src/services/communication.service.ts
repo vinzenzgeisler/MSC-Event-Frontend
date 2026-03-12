@@ -1,6 +1,8 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
 import type {
+  MailAttachmentUploadFinalizeResponse,
+  MailAttachmentUploadInitResponse,
   MailRenderOptionsInput,
   MailRecipientSearchItem,
   MailTemplate,
@@ -183,6 +185,7 @@ export const communicationService = {
     bodyHtmlOverride?: string;
     renderOptions?: MailRenderOptionsInput;
     previewMode?: "stored" | "draft";
+    attachmentUploadIds?: string[];
   }) {
     return requestJson<MailTemplatePreview>("/admin/mail/templates/preview", {
       method: "POST",
@@ -195,7 +198,8 @@ export const communicationService = {
         bodyOverride: payload.bodyOverride || undefined,
         bodyHtmlOverride: payload.bodyHtmlOverride || undefined,
         renderOptions: payload.renderOptions || undefined,
-        previewMode: payload.previewMode || undefined
+        previewMode: payload.previewMode || undefined,
+        attachmentUploadIds: payload.attachmentUploadIds?.length ? payload.attachmentUploadIds : undefined
       }
     });
   },
@@ -320,6 +324,7 @@ export const communicationService = {
       registrationStatus?: "submitted_unverified" | "submitted_verified";
       paymentStatus?: "due" | "paid";
     };
+    attachmentUploadIds?: string[];
   }) {
     const eventId = await getAdminEventId();
     return requestJson<MailSendResponse>("/admin/mail/send", {
@@ -344,7 +349,42 @@ export const communicationService = {
                 registrationStatus: payload.filters.registrationStatus || undefined,
                 paymentStatus: payload.filters.paymentStatus || undefined
               }
-            : undefined
+            : undefined,
+        attachmentUploadIds: payload.attachmentUploadIds?.length ? payload.attachmentUploadIds : undefined
+      }
+    });
+  },
+
+  async initAttachmentUpload(file: { name: string; size: number; contentType: "application/pdf" }) {
+    const eventId = await getAdminEventId();
+    return requestJson<MailAttachmentUploadInitResponse>("/admin/mail/attachments/init", {
+      method: "POST",
+      body: {
+        eventId,
+        fileName: file.name,
+        contentType: file.contentType,
+        fileSizeBytes: file.size
+      }
+    });
+  },
+
+  async uploadAttachmentBinary(uploadUrl: string, requiredHeaders: Record<string, string>, file: File) {
+    const response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: requiredHeaders,
+      body: file
+    });
+    if (!response.ok) {
+      throw new Error(`Upload fehlgeschlagen (${response.status})`);
+    }
+  },
+
+  async finalizeAttachmentUpload(uploadId: string, eventId: string) {
+    return requestJson<MailAttachmentUploadFinalizeResponse>("/admin/mail/attachments/finalize", {
+      method: "POST",
+      body: {
+        uploadId,
+        eventId
       }
     });
   },

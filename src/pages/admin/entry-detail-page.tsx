@@ -796,12 +796,12 @@ export function AdminEntryDetailPage() {
                 <HintButton
                   label={
                     sendingVerificationMail
-                      ? "Verifizierungs-Mail wird gesendet…"
+                      ? "Verifizierungsprozess wird gesendet…"
                       : confirmationMailVerified
                       ? "E-Mail bereits verifiziert"
                       : confirmationMailSent
-                        ? "Verifizierungs-Mail erneut senden"
-                        : "Verifizierungs-Mail senden"
+                        ? "Erneute Verifizierung senden"
+                        : "Verifizierung senden"
                   }
                   icon={sendingVerificationMail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                   variant={!confirmationMailSent ? "default" : "outline"}
@@ -841,7 +841,7 @@ export function AdminEntryDetailPage() {
                         );
                         return;
                       }
-                      flashMessage(`Verifizierungs-Mail eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
+                      flashMessage(`Verifizierungsmail eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
                       loadDetail();
                     } catch (error) {
                       flashMessage(getLocalizedActionError(error, "Verifizierungs-Mail konnte nicht versendet werden."), 3200);

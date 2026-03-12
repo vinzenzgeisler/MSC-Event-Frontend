@@ -14,6 +14,7 @@ import { ForbiddenPage } from "@/pages/admin/forbidden-page";
 import { AdminLoginPage } from "@/pages/admin/login-page";
 import { AdminCommunicationPage } from "@/pages/admin/communication-page";
 import { AdminSettingsPage } from "@/pages/admin/settings-page";
+import { AdminMailDesignLabPage } from "@/pages/admin/mail-design-lab-page";
 
 export const router = createBrowserRouter([
   {
@@ -57,6 +58,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminCommunicationPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "communication/design-lab",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminMailDesignLabPage />
               </ProtectedRoute>
             )
           },

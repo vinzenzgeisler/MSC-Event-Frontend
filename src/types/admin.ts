@@ -410,6 +410,35 @@ export type MailTemplatePreview = {
   missingPlaceholders: string[];
   unknownPlaceholders: string[];
   warnings: string[];
+  attachments: MailAttachmentDescriptor[];
+};
+
+export type MailAttachmentDescriptor = {
+  fileName: string;
+  contentType: "application/pdf";
+  fileSizeBytes: number | null;
+};
+
+export type MailAttachmentUploadInitResponse = {
+  ok: true;
+  uploadId: string;
+  eventId: string;
+  fileName: string;
+  contentType: "application/pdf";
+  fileSizeBytes: number;
+  uploadUrl: string;
+  requiredHeaders: Record<string, string>;
+  expiresAt: string;
+};
+
+export type MailAttachmentUploadFinalizeResponse = {
+  ok: true;
+  uploadId: string;
+  eventId: string;
+  fileName: string;
+  contentType: "application/pdf";
+  fileSizeBytes: number;
+  status: "finalized";
 };
 
 export type ResolveRecipientsResult = {

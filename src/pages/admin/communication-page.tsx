@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Info, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { outboxStatusClasses, outboxStatusLabel, paymentStatusLabel } from "@/lib/admin-status";
+import { adminEntriesService } from "@/services/admin-entries.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import type {
+  AdminEntriesFilter,
   BroadcastForm,
   MailRecipientSearchItem,
   MailTemplate,
@@ -35,6 +38,10 @@ const initialForm: BroadcastForm = {
 const OUTBOX_PREVIEW_LIMIT = 10;
 const TEMPLATE_DRAFTS_STORAGE_KEY = "msc.communication.template-drafts.v1";
 const OUTBOX_STATUS_ORDER = ["failed", "sending", "queued", "sent"] as const;
+const ATTACHMENT_MAX_FILES = 3;
+const ATTACHMENT_MAX_FILE_BYTES = 5 * 1024 * 1024;
+const ATTACHMENT_MAX_TOTAL_BYTES = 15 * 1024 * 1024;
+const QUICK_ACTION_PAGE_LIMIT = 100;
 
 type TemplateDrafts = Record<string, { subject: string; body: string; data?: Record<string, string> }>;
 type StaticTemplateOption = { key: string; label: string };
@@ -202,27 +209,19 @@ function defaultTemplateDataFromComposer(template: MailTemplate | null | undefin
   }, {});
 }
 
+function hasStructuredComposer(template: MailTemplate | null | undefined) {
+  if (!template?.composer?.enabled) {
+    return false;
+  }
+  return Array.isArray(template.composer.fields) && template.composer.fields.length > 0;
+}
+
 function fieldInputType(field: MailTemplateComposerField): "text" | "url" | "date" {
   const key = (field.key || "").toLowerCase();
   if (key.includes("date") || key.includes("deadline")) {
     return "date";
   }
   return field.type === "url" ? "url" : "text";
-}
-
-function extractPlaceholderNames(value: string): Set<string> {
-  const source = (value ?? "").trim();
-  if (!source) {
-    return new Set<string>();
-  }
-  const names = new Set<string>();
-  const pattern = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(source))) {
-    if (!match[1]) continue;
-    names.add(match[1].trim().toLowerCase());
-  }
-  return names;
 }
 
 function uniqueRecipientsPreview(items: OutboxItem[], limit: number) {
@@ -238,24 +237,21 @@ function uniqueRecipientsPreview(items: OutboxItem[], limit: number) {
   return unique;
 }
 
+function normalizeOverrideComparison(value: string) {
+  return value.replace(/\r\n/g, "\n").trim();
+}
+
 export function AdminCommunicationPage() {
   const { roles } = useAuth();
   const canManageCommunication = hasPermission(roles, "communication.write");
   const [form, setForm] = useState<BroadcastForm>(initialForm);
   const [recipientMode, setRecipientMode] = useState<RecipientMode>("combined");
   const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
-  const [quickActionHintOpen, setQuickActionHintOpen] = useState(false);
   const [quickActionConfirm, setQuickActionConfirm] = useState<null | {
     kind: "verification" | "payment";
     label: string;
-    templateKey: string;
+    entryIds: string[];
     finalCount: number;
-    filters: {
-      classId?: string;
-      acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
-      registrationStatus?: "submitted_unverified" | "submitted_verified";
-      paymentStatus?: "due" | "paid";
-    };
   }>(null);
   const [confirmingQuickAction, setConfirmingQuickAction] = useState(false);
   const [includeEntryContext, setIncludeEntryContext] = useState(true);
@@ -284,11 +280,13 @@ export function AdminCommunicationPage() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [resolvingRecipients, setResolvingRecipients] = useState(false);
   const [queueing, setQueueing] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentUploadIds, setAttachmentUploadIds] = useState<string[]>([]);
+  const [attachmentDrafts, setAttachmentDrafts] = useState<Array<{ uploadId: string; fileName: string; fileSizeBytes: number }>>([]);
   const previewErrorToastRef = useRef("");
   const recipientSearchErrorToastRef = useRef("");
   const searchRequestRef = useRef(0);
   const toastTimerRef = useRef<number | null>(null);
-  const quickActionHintRef = useRef<HTMLDivElement | null>(null);
 
   const showToast = (message: string, tone: ToastTone = "error") => {
     if (toastTimerRef.current) {
@@ -308,36 +306,6 @@ export function AdminCommunicationPage() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    if (!quickActionHintOpen) {
-      return;
-    }
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!quickActionHintRef.current) {
-        return;
-      }
-      const target = event.target as Node | null;
-      if (target && quickActionHintRef.current.contains(target)) {
-        return;
-      }
-      setQuickActionHintOpen(false);
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setQuickActionHintOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [quickActionHintOpen]);
 
   const loadOutbox = async (options?: { silentError?: boolean }) => {
     if (!options?.silentError) {
@@ -399,26 +367,12 @@ export function AdminCommunicationPage() {
     }
     return Array.isArray(selectedTemplate.composer.fields) ? selectedTemplate.composer.fields : [];
   }, [selectedTemplate]);
+  const structuredComposerTemplate = useMemo(() => hasStructuredComposer(selectedTemplate), [selectedTemplate]);
   const placeholderDrivenKeys = useMemo(() => {
     const allowed = selectedTemplate?.composer?.allowedPlaceholders ?? [];
     const required = selectedTemplate?.composer?.requiredPlaceholders ?? [];
     return new Set<string>([...allowed, ...required].map((key) => (key ?? "").trim().toLowerCase()).filter(Boolean));
   }, [selectedTemplate]);
-  const placeholderUsedInDraftText = useMemo(
-    () => extractPlaceholderNames(`${form.subjectOverride}\n${templateBody}`),
-    [form.subjectOverride, templateBody]
-  );
-  const placeholderDrivenComposerFields = useMemo(
-    () => composerFields.filter((field) => placeholderDrivenKeys.has((field.key ?? "").trim().toLowerCase())),
-    [composerFields, placeholderDrivenKeys]
-  );
-  const unusedPlaceholderDrivenComposerFields = useMemo(() => {
-    return placeholderDrivenComposerFields.filter((field) => {
-      const value = (templateDataDraft[field.key] ?? "").trim();
-      if (!value) return false;
-      return !placeholderUsedInDraftText.has(field.key.toLowerCase());
-    });
-  }, [placeholderDrivenComposerFields, placeholderUsedInDraftText, templateDataDraft]);
   const requiredDynamicFields = useMemo(() => composerFields.filter((field) => field.required).map((field) => field.key), [composerFields]);
   const missingRequiredDynamicFields = useMemo(
     () => requiredDynamicFields.filter((fieldKey) => !(templateDataDraft[fieldKey] ?? "").trim()),
@@ -432,8 +386,31 @@ export function AdminCommunicationPage() {
     () => selectedDriverTargets.map((target) => target.previewEntryId).filter((id): id is string => Boolean(id)),
     [selectedDriverTargets]
   );
-  const subjectOverrideValue = useMemo(() => form.subjectOverride.trim() || undefined, [form.subjectOverride]);
-  const bodyOverrideValue = useMemo(() => templateBody.trim() || undefined, [templateBody]);
+  const subjectOverrideValue = useMemo(() => {
+    const current = normalizeOverrideComparison(form.subjectOverride);
+    if (!current) {
+      return undefined;
+    }
+    if (!selectedTemplate) {
+      return current;
+    }
+    const templateDefault = normalizeOverrideComparison(selectedTemplate.subject ?? "");
+    return current === templateDefault ? undefined : current;
+  }, [form.subjectOverride, selectedTemplate]);
+  const bodyOverrideValue = useMemo(() => {
+    if (structuredComposerTemplate) {
+      return undefined;
+    }
+    const current = normalizeOverrideComparison(templateBody);
+    if (!current) {
+      return undefined;
+    }
+    if (!selectedTemplate) {
+      return current;
+    }
+    const templateDefault = normalizeOverrideComparison(selectedTemplate.bodyText ?? "");
+    return current === templateDefault ? undefined : current;
+  }, [selectedTemplate, structuredComposerTemplate, templateBody]);
   const bodyHtmlOverrideValue = useMemo(() => {
     if (!bodyOverrideValue) {
       return undefined;
@@ -480,6 +457,10 @@ export function AdminCommunicationPage() {
   const sendBlockedByRecipientSelection = allowIndividualRecipients && !allowFilterRecipients && selectedDriverPersonIds.length === 0 && additionalRecipients.valid.length === 0;
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
+  );
+  const attachmentTotalBytes = useMemo(
+    () => attachmentDrafts.reduce((sum, item) => sum + item.fileSizeBytes, 0),
+    [attachmentDrafts]
   );
   const recipientSearchActive = recipientSearchQuery.trim().length >= 2;
   const outboxGroups = useMemo<OutboxGroup[]>(() => {
@@ -611,7 +592,8 @@ export function AdminCommunicationPage() {
             mailLabel: null,
             includeEntryContext
           },
-          previewMode: "draft"
+          previewMode: "draft",
+          attachmentUploadIds
         })
         .then((result) => {
           if (!cancelled) {
@@ -640,7 +622,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, includeEntryContext, previewEntryId, subjectOverrideValue, templateDataValue]);
+  }, [attachmentUploadIds, bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, includeEntryContext, previewEntryId, subjectOverrideValue, templateDataValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -789,6 +771,8 @@ export function AdminCommunicationPage() {
       setTemplateBody("");
       setTemplateDataDraft({});
       setIncludeEntryContext(true);
+      setAttachmentUploadIds([]);
+      setAttachmentDrafts([]);
       return;
     }
 
@@ -801,8 +785,9 @@ export function AdminCommunicationPage() {
     const fromDraft = templateDraftsRef.current[nextTemplateKey];
     if (fromDraft) {
       const defaults = defaultTemplateDataFromComposer(template);
+      const isStructured = hasStructuredComposer(template);
       setForm((prev) => ({ ...prev, templateKey: nextTemplateKey, subjectOverride: fromDraft.subject }));
-      setTemplateBody(fromDraft.body);
+      setTemplateBody(isStructured ? template.bodyText : fromDraft.body);
       setTemplateDataDraft({ ...defaults, ...(fromDraft.data ?? {}) });
       setIncludeEntryContext(template.renderOptions?.includeEntryContextDefault ?? true);
       return;
@@ -816,6 +801,8 @@ export function AdminCommunicationPage() {
     setTemplateBody(template.bodyText);
     setTemplateDataDraft(defaultTemplateDataFromComposer(template));
     setIncludeEntryContext(template.renderOptions?.includeEntryContextDefault ?? true);
+    setAttachmentUploadIds([]);
+    setAttachmentDrafts([]);
   };
 
   const resolveRecipients = async () => {
@@ -909,7 +896,8 @@ export function AdminCommunicationPage() {
           acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
           registrationStatus: allowFilterRecipients && form.registrationStatus !== "all" ? form.registrationStatus : undefined,
           paymentStatus: allowFilterRecipients && form.paymentStatus !== "all" ? form.paymentStatus : undefined
-        }
+        },
+        attachmentUploadIds
       });
 
       showToast(`Mailversand eingeplant (${result.queued} Empfänger).`, "success");
@@ -936,6 +924,55 @@ export function AdminCommunicationPage() {
     }
   };
 
+  const collectQuickActionEntryIds = async (kind: "verification" | "payment") => {
+    const filter: AdminEntriesFilter =
+      kind === "payment"
+        ? {
+            query: "",
+            classId: "all",
+            acceptanceStatus: "accepted",
+            paymentStatus: "due",
+            checkinIdVerified: "all",
+            sortBy: "createdAt",
+            sortDir: "desc"
+          }
+        : {
+            query: "",
+            classId: "all",
+            acceptanceStatus: "all",
+            paymentStatus: "all",
+            checkinIdVerified: "all",
+            sortBy: "createdAt",
+            sortDir: "desc"
+          };
+
+    const entryIds: string[] = [];
+    let cursor: string | undefined;
+    let safety = 0;
+
+    while (safety < 80) {
+      safety += 1;
+      const page = await adminEntriesService.listEntriesPage(filter, {
+        cursor,
+        limit: QUICK_ACTION_PAGE_LIMIT
+      });
+
+      for (const row of page.entries) {
+        if (kind === "verification" && row.confirmationMailVerified) {
+          continue;
+        }
+        entryIds.push(row.id);
+      }
+
+      if (!page.meta.hasMore || !page.meta.nextCursor) {
+        break;
+      }
+      cursor = page.meta.nextCursor;
+    }
+
+    return Array.from(new Set(entryIds));
+  };
+
   const runQuickAction = async (kind: "verification" | "payment") => {
     if (!canManageCommunication) {
       showToast("Nur Admin-Rollen dürfen Mails senden.");
@@ -945,47 +982,92 @@ export function AdminCommunicationPage() {
       return;
     }
 
-    const templateKey = kind === "verification" ? "email_confirmation" : "payment_reminder_followup";
-    if (!availableCampaignTemplateKeys.has(templateKey)) {
-      showToast(`Template '${templateKey}' ist im Backend nicht verfügbar oder nicht aktiv.`);
-      return;
-    }
-
-    const resolvePayload =
-      kind === "verification"
-        ? {
-            registrationStatus: "submitted_unverified" as const
-          }
-        : {
-            acceptanceStatus: "accepted" as const,
-            paymentStatus: "due" as const
-          };
-
     setQuickActionBusy(kind);
     try {
       setQuickActionConfirm(null);
-      const resolved = await communicationService.resolveBroadcastRecipients(resolvePayload);
-      if (resolved.finalCount < 1) {
+      const entryIds = await collectQuickActionEntryIds(kind);
+      if (entryIds.length < 1) {
         showToast("Keine passenden Empfänger gefunden.", "info");
         return;
       }
 
-      const label = kind === "verification" ? "Verifizierungs-Erinnerung" : "Zahlungs-Followup";
+      const label = kind === "verification" ? "Erneute Verifizierung" : "Zahlungserinnerung";
       setQuickActionConfirm({
         kind,
         label,
-        templateKey,
-        finalCount: resolved.finalCount,
-        filters:
-          kind === "verification"
-            ? { registrationStatus: "submitted_unverified" }
-            : { acceptanceStatus: "accepted", paymentStatus: "due" }
+        entryIds,
+        finalCount: entryIds.length
       });
     } catch (error) {
       showToast(getCommunicationErrorMessage(error, "Quick-Aktion fehlgeschlagen."));
     } finally {
       setQuickActionBusy(null);
     }
+  };
+
+  const uploadAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+    if (!form.templateKey) {
+      showToast("Bitte zuerst ein Kampagnen-Template auswählen.");
+      return;
+    }
+
+    const nextFiles = Array.from(files);
+    if (attachmentDrafts.length + nextFiles.length > ATTACHMENT_MAX_FILES) {
+      showToast(`Maximal ${ATTACHMENT_MAX_FILES} PDF-Dateien erlaubt.`);
+      return;
+    }
+
+    const invalidType = nextFiles.find((file) => file.type !== "application/pdf");
+    if (invalidType) {
+      showToast(`Nur PDF erlaubt: ${invalidType.name}`);
+      return;
+    }
+
+    const tooLarge = nextFiles.find((file) => file.size > ATTACHMENT_MAX_FILE_BYTES);
+    if (tooLarge) {
+      showToast(`Datei zu groß (max 5 MB): ${tooLarge.name}`);
+      return;
+    }
+
+    const incomingTotal = nextFiles.reduce((sum, file) => sum + file.size, 0);
+    if (attachmentTotalBytes + incomingTotal > ATTACHMENT_MAX_TOTAL_BYTES) {
+      showToast("Gesamtgröße der Anhänge darf 15 MB nicht überschreiten.");
+      return;
+    }
+
+    setUploadingAttachment(true);
+    try {
+      const uploaded: Array<{ uploadId: string; fileName: string; fileSizeBytes: number }> = [];
+      for (const file of nextFiles) {
+        const init = await communicationService.initAttachmentUpload({
+          name: file.name,
+          size: file.size,
+          contentType: "application/pdf"
+        });
+        await communicationService.uploadAttachmentBinary(init.uploadUrl, init.requiredHeaders, file);
+        const finalized = await communicationService.finalizeAttachmentUpload(init.uploadId, init.eventId);
+        uploaded.push({
+          uploadId: finalized.uploadId,
+          fileName: finalized.fileName,
+          fileSizeBytes: finalized.fileSizeBytes
+        });
+      }
+      setAttachmentDrafts((prev) => [...prev, ...uploaded]);
+      setAttachmentUploadIds((prev) => [...prev, ...uploaded.map((item) => item.uploadId)]);
+      showToast(`Anhänge hochgeladen: ${uploaded.length}`, "success");
+    } catch (error) {
+      showToast(getCommunicationErrorMessage(error, "Anhang konnte nicht hochgeladen werden."));
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const removeAttachment = (uploadId: string) => {
+    setAttachmentDrafts((prev) => prev.filter((item) => item.uploadId !== uploadId));
+    setAttachmentUploadIds((prev) => prev.filter((item) => item !== uploadId));
   };
 
   const toggleOutboxGroup = (key: string) => {
@@ -1017,7 +1099,12 @@ export function AdminCommunicationPage() {
 
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-semibold text-slate-900">Kommunikation</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-slate-900">Kommunikation</h1>
+        <Button asChild type="button" size="sm" variant="outline">
+          <Link to="/admin/communication/design-lab">Mail-Design-Lab öffnen</Link>
+        </Button>
+      </div>
 
       <Card>
         <CardHeader className="space-y-2">
@@ -1025,25 +1112,7 @@ export function AdminCommunicationPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-              <span>Quick-Aktionen</span>
-              <div className="relative" ref={quickActionHintRef}>
-                <button
-                  type="button"
-                  className="inline-flex rounded text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-                  aria-label="Info zu Quick-Aktionen anzeigen"
-                  aria-expanded={quickActionHintOpen}
-                  onClick={() => setQuickActionHintOpen((prev) => !prev)}
-                >
-                  <Info className="h-4 w-4" />
-                </button>
-                {quickActionHintOpen ? (
-                  <div className="absolute left-0 top-6 z-10 w-72 rounded-md border border-slate-200 bg-white p-2 text-xs font-normal text-slate-700 shadow-lg">
-                    Für Massenaktionen ohne Textanpassung. Empfänger werden automatisch gefiltert und vor dem Versand bestätigt.
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            <div className="text-sm font-semibold text-slate-900">Quick-Aktionen</div>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -1052,7 +1121,7 @@ export function AdminCommunicationPage() {
                 disabled={!canManageCommunication || loadingTemplates || Boolean(quickActionBusy)}
                 onClick={() => void runQuickAction("verification")}
               >
-                {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Unverifizierte erinnern"}
+                {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Erneute Verifizierung senden"}
               </Button>
               <Button
                 type="button"
@@ -1311,32 +1380,24 @@ export function AdminCommunicationPage() {
                 disabled={!form.templateKey}
               />
             </div>
-            <div className="space-y-1">
-              <Label>Text</Label>
-              <textarea
-                className="min-h-36 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={templateBody}
-                onChange={(event) => setTemplateBody(event.target.value)}
-                placeholder="Mailinhalt"
-                disabled={!form.templateKey}
-              />
-            </div>
+            {!structuredComposerTemplate && (
+              <div className="space-y-1">
+                <Label>Text</Label>
+                <textarea
+                  className="min-h-36 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={templateBody}
+                  onChange={(event) => setTemplateBody(event.target.value)}
+                  placeholder="Mailinhalt"
+                  disabled={!form.templateKey}
+                />
+              </div>
+            )}
             {form.templateKey && (
               <div className="space-y-2 rounded-md border bg-white p-3">
                 <div className="text-sm font-medium text-slate-900">Dynamische Inhalte</div>
                 <div className="text-xs text-slate-600">
-                  Diese Felder werden vom Backend-Template gerendert. Manche Felder wirken über Platzhalter im Text (z.B.{" "}
-                  <span className="font-mono">{`{{paymentDeadline}}`}</span>), andere steuern eigene Bereiche (Hero/Highlights/CTA).
+                  Diese Felder werden direkt vom Backend-Template gerendert. Für strukturierte Templates ist dies die zentrale Inhaltsquelle.
                 </div>
-                {unusedPlaceholderDrivenComposerFields.length > 0 && (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    Hinweis: Du hast Werte gesetzt, aber die zugehörigen Platzhalter kommen im Text/Betreff nicht vor:{" "}
-                    {unusedPlaceholderDrivenComposerFields
-                      .map((field) => `{{${field.key}}}`)
-                      .join(", ")}
-                    .
-                  </div>
-                )}
                 {composerFields.length === 0 ? (
                   <div className="text-xs text-slate-500">Für dieses Template sind keine Composer-Felder hinterlegt.</div>
                 ) : (
@@ -1393,6 +1454,43 @@ export function AdminCommunicationPage() {
                 )}
               </div>
             )}
+            <div className="space-y-2 rounded-md border bg-white p-3">
+              <div className="text-sm font-medium text-slate-900">Anhänge (PDF)</div>
+              <div className="text-xs text-slate-600">Max. 3 Dateien, max. 5 MB pro Datei, max. 15 MB gesamt.</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="file"
+                  accept="application/pdf"
+                  multiple
+                  disabled={!form.templateKey || uploadingAttachment || attachmentDrafts.length >= ATTACHMENT_MAX_FILES}
+                  onChange={(event) => {
+                    const files = event.target.files;
+                    void uploadAttachments(files);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </div>
+              <div className="text-xs text-slate-600">
+                Dateien: {attachmentDrafts.length}/{ATTACHMENT_MAX_FILES} · Gesamt: {(attachmentTotalBytes / (1024 * 1024)).toFixed(2)} MB
+              </div>
+              {attachmentDrafts.length > 0 ? (
+                <div className="space-y-1">
+                  {attachmentDrafts.map((item) => (
+                    <div key={item.uploadId} className="flex items-center justify-between gap-2 rounded border bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{item.fileName}</div>
+                        <div>{(item.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</div>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" onClick={() => removeAttachment(item.uploadId)}>
+                        Entfernen
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500">Keine Anhänge ausgewählt.</div>
+              )}
+            </div>
             <details className="rounded-md border bg-white p-3 text-sm text-slate-700">
               <summary className="cursor-pointer font-medium text-slate-900">Platzhalter-Hilfe</summary>
               <div className="mt-3 space-y-2">
@@ -1433,6 +1531,12 @@ export function AdminCommunicationPage() {
                   />
                 </div>
                 <div className="space-y-1 text-xs text-slate-600">
+                  <p>
+                    Anhänge:{" "}
+                    {Array.isArray(backendPreview.attachments) && backendPreview.attachments.length > 0
+                      ? backendPreview.attachments.map((item) => item.fileName).join(", ")
+                      : "-"}
+                  </p>
                   <p>Warnungen: {backendPreview.warnings.join(" | ") || "-"}</p>
                   <p>Verwendet: {backendPreview.usedPlaceholders.join(", ") || "-"}</p>
                   <p>Fehlend: {backendPreview.missingPlaceholders.join(", ") || "-"}</p>
@@ -1450,7 +1554,15 @@ export function AdminCommunicationPage() {
               <Button
                 className="w-full border border-slate-200 bg-white text-slate-900 hover:bg-yellow-300 md:w-auto"
                 type="button"
-                disabled={queueing || !form.templateKey || !templateExistsInBackend || sendBlockedByRecipientSelection || sendBlockedByMissingPlaceholders || sendBlockedByTemplateData}
+                disabled={
+                  queueing ||
+                  uploadingAttachment ||
+                  !form.templateKey ||
+                  !templateExistsInBackend ||
+                  sendBlockedByRecipientSelection ||
+                  sendBlockedByMissingPlaceholders ||
+                  sendBlockedByTemplateData
+                }
                 onClick={() => void queueBroadcast()}
               >
                 {queueing ? (
@@ -1719,11 +1831,8 @@ export function AdminCommunicationPage() {
               Empfänger ein.
             </p>
             <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2 text-xs text-slate-700">
-              <div>Template: {quickActionConfirm.templateKey}</div>
-              {quickActionConfirm.filters.classId ? <div>Klasse: {quickActionConfirm.filters.classId}</div> : <div>Klasse: Alle</div>}
-              {quickActionConfirm.filters.registrationStatus ? <div>Verifizierung: {quickActionConfirm.filters.registrationStatus}</div> : null}
-              {quickActionConfirm.filters.acceptanceStatus ? <div>Status: {quickActionConfirm.filters.acceptanceStatus}</div> : null}
-              {quickActionConfirm.filters.paymentStatus ? <div>Zahlung: {quickActionConfirm.filters.paymentStatus}</div> : null}
+              <div>Typ: {quickActionConfirm.kind === "verification" ? "Erneute Verifizierung (Prozessmail)" : "Zahlungserinnerung"}</div>
+              <div>Einträge: {quickActionConfirm.entryIds.length}</div>
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button
@@ -1740,12 +1849,20 @@ export function AdminCommunicationPage() {
                 onClick={async () => {
                   setConfirmingQuickAction(true);
                   try {
-                    const result = await communicationService.sendMail({
-                      templateKey: quickActionConfirm.templateKey,
-                      renderOptions: { showBadge: false, mailLabel: null },
-                      filters: quickActionConfirm.filters
-                    });
-                    showToast(`Mailversand eingeplant (${result.queued} Empfänger).`, "success");
+                    let queuedTotal = 0;
+                    let skippedTotal = 0;
+                    for (const entryId of quickActionConfirm.entryIds) {
+                      const result =
+                        quickActionConfirm.kind === "verification"
+                          ? await communicationService.queueVerificationMailForEntry(entryId, { allowDuplicate: true })
+                          : await communicationService.queuePaymentReminderForEntry(entryId, { allowDuplicate: true });
+                      queuedTotal += result.queued;
+                      skippedTotal += result.skipped;
+                    }
+                    showToast(
+                      `Quick-Aktion eingeplant: ${queuedTotal} gesendet${skippedTotal > 0 ? `, ${skippedTotal} übersprungen` : ""}.`,
+                      "success"
+                    );
                     setQuickActionConfirm(null);
                     await loadOutbox();
                   } catch (error) {

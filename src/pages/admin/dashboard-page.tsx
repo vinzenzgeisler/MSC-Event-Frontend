@@ -9,6 +9,7 @@ import { adminEntriesService } from "@/services/admin-entries.service";
 import { communicationService } from "@/services/communication.service";
 import { getAdminEventId } from "@/services/api/event-context";
 import { getApiErrorMessage, requestJson } from "@/services/api/http-client";
+import type { AdminEntriesFilter } from "@/types/admin";
 
 type DashboardSummary = {
   entriesTotal: number;
@@ -66,6 +67,7 @@ const RECENT_CHANGES_LIMIT = 4;
 const ACTIVITY_WINDOW_DAYS = 7;
 const CLASS_COLORS = ["#0f766e", "#2563eb", "#f59e0b", "#db2777", "#7c3aed", "#64748b"];
 const BRAND_STATS_LIMIT = 8;
+const QUICK_ACTION_PAGE_LIMIT = 100;
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -251,20 +253,62 @@ export function AdminDashboardPage() {
   const [quickActionBusy, setQuickActionBusy] = useState<null | "verification" | "payment">(null);
   const [quickActionMessage, setQuickActionMessage] = useState("");
   const [quickActionConfirm, setQuickActionConfirm] = useState<null | {
+    kind: "verification" | "payment";
     label: string;
-    templateKey: string;
+    entryIds: string[];
     finalCount: number;
-    filters: {
-      acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
-      registrationStatus?: "submitted_unverified" | "submitted_verified";
-      paymentStatus?: "due" | "paid";
-      classId?: string;
-    };
   }>(null);
   const [confirmingQuickAction, setConfirmingQuickAction] = useState(false);
 
   const canReadOutbox = hasPermission(roles, "communication.read");
   const canManageCommunication = hasPermission(roles, "communication.write");
+
+  const collectQuickActionEntryIds = useCallback(async (kind: "verification" | "payment") => {
+    const filter: AdminEntriesFilter =
+      kind === "payment"
+        ? {
+            query: "",
+            classId: "all",
+            acceptanceStatus: "accepted",
+            paymentStatus: "due",
+            checkinIdVerified: "all",
+            sortBy: "createdAt",
+            sortDir: "desc"
+          }
+        : {
+            query: "",
+            classId: "all",
+            acceptanceStatus: "all",
+            paymentStatus: "all",
+            checkinIdVerified: "all",
+            sortBy: "createdAt",
+            sortDir: "desc"
+          };
+
+    const entryIds: string[] = [];
+    let cursor: string | undefined;
+    let safety = 0;
+
+    while (safety < 80) {
+      safety += 1;
+      const page = await adminEntriesService.listEntriesPage(filter, {
+        cursor,
+        limit: QUICK_ACTION_PAGE_LIMIT
+      });
+      for (const row of page.entries) {
+        if (kind === "verification" && row.confirmationMailVerified) {
+          continue;
+        }
+        entryIds.push(row.id);
+      }
+      if (!page.meta.hasMore || !page.meta.nextCursor) {
+        break;
+      }
+      cursor = page.meta.nextCursor;
+    }
+
+    return Array.from(new Set(entryIds));
+  }, []);
 
   const runQuickAction = useCallback(
     async (kind: "verification" | "payment") => {
@@ -279,27 +323,18 @@ export function AdminDashboardPage() {
       setQuickActionMessage("");
       setQuickActionBusy(kind);
       try {
-        const label = kind === "verification" ? "Verifizierungs-Erinnerung" : "Zahlungs-Followup";
-        const templateKey = kind === "verification" ? "email_confirmation" : "payment_reminder_followup";
-        const resolved = await communicationService.resolveBroadcastRecipients(
-          kind === "verification"
-            ? { registrationStatus: "submitted_unverified" }
-            : { acceptanceStatus: "accepted", paymentStatus: "due" }
-        );
-
-        if (resolved.finalCount < 1) {
+        const label = kind === "verification" ? "Erneute Verifizierung" : "Zahlungserinnerung";
+        const entryIds = await collectQuickActionEntryIds(kind);
+        if (entryIds.length < 1) {
           setQuickActionMessage("Keine passenden Empfänger gefunden.");
           return;
         }
 
         setQuickActionConfirm({
+          kind,
           label,
-          templateKey,
-          finalCount: resolved.finalCount,
-          filters:
-            kind === "verification"
-              ? { registrationStatus: "submitted_unverified" }
-              : { acceptanceStatus: "accepted", paymentStatus: "due" }
+          entryIds,
+          finalCount: entryIds.length
         });
       } catch (err) {
         setQuickActionMessage(getApiErrorMessage(err, "Quick-Aktion fehlgeschlagen."));
@@ -307,7 +342,7 @@ export function AdminDashboardPage() {
         setQuickActionBusy(null);
       }
     },
-    [canManageCommunication, quickActionBusy]
+    [canManageCommunication, collectQuickActionEntryIds, quickActionBusy]
   );
 
   const loadDashboard = useCallback(async (options?: { refresh?: boolean }) => {
@@ -744,7 +779,7 @@ export function AdminDashboardPage() {
                       disabled={!canManageCommunication || Boolean(quickActionBusy)}
                       onClick={() => void runQuickAction("verification")}
                     >
-                      {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Verifizierung erinnern (unverifiziert)"}
+                      {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Erneute Verifizierung senden"}
                     </Button>
                     <Button
                       type="button"
@@ -753,7 +788,7 @@ export function AdminDashboardPage() {
                       disabled={!canManageCommunication || Boolean(quickActionBusy)}
                       onClick={() => void runQuickAction("payment")}
                     >
-                      {quickActionBusy === "payment" ? "Wird vorbereitet..." : "Zahlung-Followup (offen)"}
+                      {quickActionBusy === "payment" ? "Wird vorbereitet..." : "Offene Zahlungen erinnern"}
                     </Button>
                   </div>
                   {quickActionMessage ? <div className="mt-2 text-xs text-slate-600">{quickActionMessage}</div> : null}
@@ -830,10 +865,8 @@ export function AdminDashboardPage() {
               Empfänger ein.
             </p>
             <div className="mt-3 rounded-md border bg-slate-50 px-3 py-2 text-xs text-slate-700">
-              <div>Template: {quickActionConfirm.templateKey}</div>
-              {quickActionConfirm.filters.registrationStatus ? <div>Verifizierung: {quickActionConfirm.filters.registrationStatus}</div> : null}
-              {quickActionConfirm.filters.acceptanceStatus ? <div>Status: {quickActionConfirm.filters.acceptanceStatus}</div> : null}
-              {quickActionConfirm.filters.paymentStatus ? <div>Zahlung: {quickActionConfirm.filters.paymentStatus}</div> : null}
+              <div>Typ: {quickActionConfirm.kind === "verification" ? "Erneute Verifizierung (Prozessmail)" : "Zahlungserinnerung"}</div>
+              <div>Einträge: {quickActionConfirm.entryIds.length}</div>
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button
@@ -850,12 +883,19 @@ export function AdminDashboardPage() {
                 onClick={async () => {
                   setConfirmingQuickAction(true);
                   try {
-                    const result = await communicationService.sendMail({
-                      templateKey: quickActionConfirm.templateKey,
-                      renderOptions: { showBadge: false, mailLabel: null },
-                      filters: quickActionConfirm.filters
-                    });
-                    setQuickActionMessage(`Mailversand eingeplant (${result.queued} Empfänger).`);
+                    let queuedTotal = 0;
+                    let skippedTotal = 0;
+                    for (const entryId of quickActionConfirm.entryIds) {
+                      const result =
+                        quickActionConfirm.kind === "verification"
+                          ? await communicationService.queueVerificationMailForEntry(entryId, { allowDuplicate: true })
+                          : await communicationService.queuePaymentReminderForEntry(entryId, { allowDuplicate: true });
+                      queuedTotal += result.queued;
+                      skippedTotal += result.skipped;
+                    }
+                    setQuickActionMessage(
+                      `Quick-Aktion eingeplant: ${queuedTotal} gesendet${skippedTotal > 0 ? `, ${skippedTotal} übersprungen` : ""}.`
+                    );
                     setQuickActionConfirm(null);
                   } catch (err) {
                     setQuickActionMessage(getApiErrorMessage(err, "Quick-Aktion fehlgeschlagen."));
