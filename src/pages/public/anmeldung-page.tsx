@@ -340,6 +340,13 @@ function isImageUploadInvalidError(error: unknown) {
   return (error.code ?? "").trim().toUpperCase() === "IMAGE_UPLOAD_INVALID";
 }
 
+function isRegistrationConfirmationQueueFailedError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+  return (error.code ?? "").trim().toUpperCase() === "REGISTRATION_CONFIRMATION_QUEUE_FAILED";
+}
+
 function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, attemptedEntries: number) {
   if (locale === "en") {
     return `Only ${createdEntries} of ${attemptedEntries} entries were created. Please do not resubmit to avoid duplicates. Contact the event team.`;
@@ -1388,6 +1395,8 @@ export function AnmeldungPage() {
       } else if (isImageUploadInvalidError(error)) {
         setSubmitError("Bild-Upload ist ungültig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
         setStep(2);
+      } else if (isRegistrationConfirmationQueueFailedError(error)) {
+        setSubmitError("Anmeldung gespeichert, aber die Bestätigungs-Mail konnte nicht eingeplant werden. Bitte Support kontaktieren.");
       } else {
         setSubmitError(m.page.submitErrorGeneric);
       }
