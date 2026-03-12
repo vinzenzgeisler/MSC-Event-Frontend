@@ -44,7 +44,7 @@ export type VehicleForm = {
   vehicleHistory: string;
   ownerName: string;
   imageFileName: string;
-  imageS3Key: string;
+  imageUploadId: string;
   imageUploadState: "idle" | "uploading" | "uploaded" | "error";
   imageUploadError: string;
 };
@@ -166,7 +166,7 @@ export type PublicCreateEntryRequestDto = {
     vehicleHistory: string;
     ownerName: string;
     startNumberRaw?: string;
-    imageS3Key?: string;
+    imageUploadId?: string;
   };
   backupVehicle?: {
     vehicleType: VehicleType;
@@ -179,7 +179,7 @@ export type PublicCreateEntryRequestDto = {
     brakes: string;
     vehicleHistory: string;
     ownerName: string;
-    imageS3Key?: string;
+    imageUploadId?: string;
   };
   startNumber: string;
   isBackupVehicle?: boolean;

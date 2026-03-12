@@ -133,7 +133,7 @@ function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicle
     brakes: value.brakes,
     vehicleHistory: value.vehicleHistory,
     ownerName: value.ownerName,
-    imageS3Key: value.imageS3Key || undefined
+    imageUploadId: value.imageUploadId || undefined
   };
 }
 
@@ -243,7 +243,7 @@ type PublicVehicleImageUploadInitResponse = {
 type PublicVehicleImageUploadFinalizeResponse = {
   ok: boolean;
   uploadId: string;
-  imageS3Key: string;
+  imageUploadId?: string;
   finalizedAt: string | null;
 };
 
@@ -559,7 +559,7 @@ export const registrationService = {
     });
 
     return {
-      imageS3Key: finalizeResponse.imageS3Key,
+      imageUploadId: (finalizeResponse.imageUploadId ?? finalizeResponse.uploadId).trim(),
       fileName: file.name
     };
   },

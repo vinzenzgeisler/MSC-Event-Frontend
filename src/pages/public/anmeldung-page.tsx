@@ -36,7 +36,7 @@ function createEmptyVehicle(): VehicleForm {
     vehicleHistory: "",
     ownerName: "",
     imageFileName: "",
-    imageS3Key: "",
+    imageUploadId: "",
     imageUploadState: "idle",
     imageUploadError: ""
   };
@@ -333,6 +333,13 @@ function isStartNumberTakenError(error: unknown) {
   );
 }
 
+function isImageUploadInvalidError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+  return (error.code ?? "").trim().toUpperCase() === "IMAGE_UPLOAD_INVALID";
+}
+
 function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, attemptedEntries: number) {
   if (locale === "en") {
     return `Only ${createdEntries} of ${attemptedEntries} entries were created. Please do not resubmit to avoid duplicates. Contact the event team.`;
@@ -607,17 +614,22 @@ function createInitialConsent(uiLocale: string): RegistrationWizardForm["consent
   };
 }
 
-function hydrateVehicleForm(value: Partial<VehicleForm> | undefined): VehicleForm {
+function hydrateVehicleForm(value: (Partial<VehicleForm> & { imageS3Key?: string }) | undefined): VehicleForm {
   const base = createEmptyVehicle();
+  const legacyImageKey = typeof value?.imageS3Key === "string" ? value.imageS3Key.trim() : "";
   const next = {
     ...base,
-    ...(value ?? {})
+    ...(value ?? {}),
+    imageUploadId: typeof value?.imageUploadId === "string" ? value.imageUploadId : ""
   };
-  if (!next.imageS3Key && next.imageUploadState === "uploaded") {
+  if (!next.imageUploadId && next.imageUploadState === "uploaded") {
     next.imageUploadState = "idle";
   }
-  if (next.imageS3Key && next.imageUploadState === "idle") {
+  if (next.imageUploadId && next.imageUploadState === "idle") {
     next.imageUploadState = "uploaded";
+  }
+  if (legacyImageKey && !next.imageUploadId) {
+    next.imageUploadState = "idle";
   }
   if (!isSupportedBrakeType(next.brakes.trim())) {
     next.brakes = "";
@@ -661,7 +673,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.vehicle.vehicleHistory.trim()) ||
     Boolean(draftStart.vehicle.ownerName.trim()) ||
     Boolean(draftStart.vehicle.imageFileName.trim()) ||
-    Boolean(draftStart.vehicle.imageS3Key.trim()) ||
+    Boolean(draftStart.vehicle.imageUploadId.trim()) ||
     draftStart.codriverEnabled ||
     Boolean(draftStart.codriver.firstName.trim()) ||
     Boolean(draftStart.codriver.lastName.trim()) ||
@@ -683,7 +695,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.backupVehicle.ownerName.trim()) ||
     Boolean(draftStart.backupVehicle.vehicleHistory.trim()) ||
     Boolean(draftStart.backupVehicle.imageFileName.trim()) ||
-    Boolean(draftStart.backupVehicle.imageS3Key.trim())
+    Boolean(draftStart.backupVehicle.imageUploadId.trim())
   );
 }
 
@@ -746,7 +758,7 @@ function validateStartFields(
     errors.vehicleHistory = m.errors.requiredVehicleHistory;
   }
 
-  if (!start.vehicle.imageS3Key.trim()) {
+  if (!start.vehicle.imageUploadId.trim()) {
     errors.vehicleImage = m.errors.requiredVehicleImage;
   }
 
@@ -817,7 +829,7 @@ function validateStartFields(
     if (!start.backupVehicle.vehicleHistory.trim()) {
       errors.backupVehicleHistory = m.errors.requiredBackupVehicleHistory;
     }
-    if (!start.backupVehicle.imageS3Key.trim()) {
+    if (!start.backupVehicle.imageUploadId.trim()) {
       errors.backupVehicleImage = m.errors.requiredBackupVehicleImage;
     }
   }
@@ -1101,7 +1113,7 @@ export function AnmeldungPage() {
         [target]: {
           ...prev[target],
           imageFileName: "",
-          imageS3Key: "",
+          imageUploadId: "",
           imageUploadState: "idle",
           imageUploadError: ""
         }
@@ -1114,7 +1126,7 @@ export function AnmeldungPage() {
       [target]: {
         ...prev[target],
         imageFileName: file.name,
-        imageS3Key: "",
+        imageUploadId: "",
         imageUploadState: "uploading",
         imageUploadError: ""
       }
@@ -1130,7 +1142,7 @@ export function AnmeldungPage() {
         [target]: {
           ...prev[target],
           imageFileName: uploaded.fileName,
-          imageS3Key: uploaded.imageS3Key,
+          imageUploadId: uploaded.imageUploadId,
           imageUploadState: "uploaded",
           imageUploadError: ""
         }
@@ -1145,7 +1157,7 @@ export function AnmeldungPage() {
         ...prev,
         [target]: {
           ...prev[target],
-          imageS3Key: "",
+          imageUploadId: "",
           imageUploadState: "error",
           imageUploadError: message
         }
@@ -1372,6 +1384,9 @@ export function AnmeldungPage() {
       } else if (isStartNumberTakenError(error)) {
         setStartError(m.errors.startTaken);
         setSubmitError(m.errors.startTaken);
+        setStep(2);
+      } else if (isImageUploadInvalidError(error)) {
+        setSubmitError("Bild-Upload ist ungueltig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
         setStep(2);
       } else {
         setSubmitError(m.page.submitErrorGeneric);
