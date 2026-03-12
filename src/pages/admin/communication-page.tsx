@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
@@ -993,9 +993,15 @@ export function AdminCommunicationPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
-            <div className="text-sm font-semibold text-slate-900">Quick-Aktionen</div>
-            <div className="text-xs text-slate-600">
-              Für Massenaktionen ohne Textanpassung. Empfänger werden automatisch gefiltert und vor dem Versand bestätigt.
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+              <span>Quick-Aktionen</span>
+              <span
+                className="inline-flex cursor-help text-slate-500"
+                title="Für Massenaktionen ohne Textanpassung. Empfänger werden automatisch gefiltert und vor dem Versand bestätigt."
+                aria-label="Info zu Quick-Aktionen"
+              >
+                <Info className="h-4 w-4" />
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1005,7 +1011,7 @@ export function AdminCommunicationPage() {
                 disabled={!canManageCommunication || loadingTemplates || Boolean(quickActionBusy)}
                 onClick={() => void runQuickAction("verification")}
               >
-                {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Verifizierung erinnern (unverifiziert)"}
+                {quickActionBusy === "verification" ? "Wird vorbereitet..." : "Unverifizierte erinnern"}
               </Button>
               <Button
                 type="button"
@@ -1014,7 +1020,7 @@ export function AdminCommunicationPage() {
                 disabled={!canManageCommunication || loadingTemplates || Boolean(quickActionBusy)}
                 onClick={() => void runQuickAction("payment")}
               >
-                {quickActionBusy === "payment" ? "Wird vorbereitet..." : "Zahlung-Followup (offen)"}
+                {quickActionBusy === "payment" ? "Wird vorbereitet..." : "Offene Zahlungen erinnern"}
               </Button>
             </div>
           </section>
