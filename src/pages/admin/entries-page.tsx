@@ -875,7 +875,7 @@ export function AdminEntriesPage() {
 
     void replaceActiveRows(appliedFilter, {
       minimumRows,
-      showLoader: true,
+      showLoader: !keepCachedRows,
       showRefreshing: false,
       silentError: false
     });
