@@ -369,7 +369,7 @@ export function AdminEntryDetailPage() {
   };
 
   return (
-    <div className="w-full max-w-[1120px] space-y-4">
+    <div className="w-full max-w-[1120px] space-y-4 overflow-x-hidden">
       <div>
         <Button
           type="button"
@@ -388,16 +388,16 @@ export function AdminEntryDetailPage() {
         </Button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{detail.headline}</h1>
-          <p className="text-sm text-slate-600">
+        <div className="min-w-0">
+          <h1 className="break-words text-2xl font-semibold text-slate-900">{detail.headline}</h1>
+          <p className="break-words text-sm text-slate-600">
             {detail.classLabel} · Startnummer {detail.startNumber}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="break-words text-xs text-slate-500">
             Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Badge
             className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
             variant="outline"
@@ -435,12 +435,12 @@ export function AdminEntryDetailPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
-        <div className="order-2 space-y-4 lg:order-1">
-          <Card>
+        <div className="order-2 min-w-0 space-y-4 lg:order-1">
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Fahrerdaten</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+            <CardContent className="grid min-w-0 gap-3 break-words text-sm text-slate-700 sm:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-slate-500">Name</div>
                 <div>{detail.driver.name}</div>
@@ -483,7 +483,7 @@ export function AdminEntryDetailPage() {
                 <div className="text-xs uppercase text-slate-500">Beifahrer</div>
                 {detail.codriver.assigned ? (
                   <details className="mt-1 rounded-md border bg-slate-50 p-3">
-                    <summary className="cursor-pointer font-medium text-slate-900">{detail.codriver.label}</summary>
+                    <summary className="cursor-pointer break-words font-medium text-slate-900">{detail.codriver.label}</summary>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div>
                         <div className="text-xs uppercase text-slate-500">Name</div>
@@ -524,11 +524,11 @@ export function AdminEntryDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Fahrzeugdetails</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm text-slate-700">
+            <CardContent className="min-w-0 space-y-4 break-words text-sm text-slate-700">
               <VehiclePreview
                 src={detail.vehicle.thumbUrl}
                 label={detail.vehicle.label}
@@ -640,14 +640,14 @@ export function AdminEntryDetailPage() {
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
                 <CardTitle>Zahlung</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm text-slate-700">
+              <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
                 <div
                   className={cn(
-                    "flex items-center gap-4 rounded-xl border p-4",
+                    "flex flex-wrap items-center gap-3 rounded-xl border p-4",
                     paymentState === "paid"
                       ? "border-emerald-200 bg-emerald-50/70"
                       : "border-amber-200 bg-amber-50/70"
@@ -672,18 +672,18 @@ export function AdminEntryDetailPage() {
                         : "Zahlungseingang wurde noch nicht bestätigt."}
                     </div>
                   </div>
-                  <Badge className={`${paymentStatusClasses(paymentState)} h-7 px-2.5 text-xs`} variant="outline">
+                  <Badge className={`${paymentStatusClasses(paymentState)} h-7 shrink-0 px-2.5 text-xs`} variant="outline">
                     {paymentStatusLabel(paymentState)}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="min-w-0">
               <CardHeader>
                 <CardTitle>Dokumente & Einwilligung</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm text-slate-700">
+              <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
                 <div className="space-y-2">
                   {detail.documents.map((doc) => (
                     <div key={doc.id} className="rounded border p-2 text-xs">
@@ -700,15 +700,15 @@ export function AdminEntryDetailPage() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Historie</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-slate-700">
+            <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
               {historyItems.map((item) => (
                 <div key={item.id} className="rounded border p-3">
                   <div className="mb-1 font-medium">{item.action}</div>
-                  <div>{item.details}</div>
+                  <div className="break-words">{item.details}</div>
                   <div className="mt-1 text-xs text-slate-500">
                     {new Date(item.timestamp).toLocaleString("de-DE")} · {item.actor}
                   </div>
@@ -728,12 +728,12 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-1 w-full space-y-4 lg:order-2 lg:sticky lg:top-4 lg:w-[340px] lg:justify-self-end lg:self-start">
-          <Card>
+        <div className="order-1 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-4 lg:w-[340px] lg:justify-self-end lg:self-start">
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="min-w-0 space-y-4">
               <div className="grid gap-2">
                 <HintButton
                   label={actionInFlight === "status-shortlist" ? "Status wird gesetzt…" : "Auf Vorauswahl setzen"}
@@ -1026,11 +1026,11 @@ export function AdminEntryDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Notizen</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="min-w-0 space-y-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-900">Intern</label>
                 <textarea
@@ -1075,11 +1075,11 @@ export function AdminEntryDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Klasse ändern</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="min-w-0 space-y-3 break-words">
               <div className="space-y-1">
                 <div className="text-sm font-medium text-slate-900">Zielklasse</div>
                 <Select value={classDraft || "__none__"} onValueChange={(next) => setClassDraft(next === "__none__" ? "" : next)}>
