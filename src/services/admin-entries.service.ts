@@ -577,13 +577,17 @@ export const adminEntriesService = {
   ) {
     const statusMap: Record<typeof transition, { status: AcceptanceStatus; lifecycleEventType: string; sendLifecycleMail: boolean }> = {
       to_shortlist: { status: "shortlist", lifecycleEventType: "preselection", sendLifecycleMail: false },
-      to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment", sendLifecycleMail: true },
+      // Accepted mails are queued explicitly after status change to support intentional resends.
+      to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment", sendLifecycleMail: false },
       to_rejected: { status: "rejected", lifecycleEventType: "rejected", sendLifecycleMail: true }
     };
 
     const mapped = statusMap[transition];
-    const enqueueLifecycleMailIfNeeded = async (options?: { allowDuplicate?: boolean }) => {
-      if (!mapped.sendLifecycleMail) {
+    const shouldQueueAcceptedLifecycleManually =
+      transition === "to_accepted" && mapped.lifecycleEventType === "accepted_open_payment";
+
+    const enqueueLifecycleMailIfNeeded = async (options?: { allowDuplicate?: boolean; force?: boolean }) => {
+      if (!options?.force && !mapped.sendLifecycleMail) {
         return;
       }
       if (mapped.lifecycleEventType !== "accepted_open_payment" && mapped.lifecycleEventType !== "rejected") {
@@ -626,16 +630,22 @@ export const adminEntriesService = {
         method: "PATCH",
         body: statusPayload
       });
+      if (shouldQueueAcceptedLifecycleManually) {
+        await enqueueLifecycleMailIfNeeded({ force: true, allowDuplicate: true });
+      }
       return { ok: true };
     } catch (error) {
       const allowDuplicateResend =
-        transition === "to_accepted" &&
+        shouldQueueAcceptedLifecycleManually &&
         mapped.lifecycleEventType === "accepted_open_payment" &&
         isDuplicateRequestError(error);
 
       if (!isTransitionNotAllowedError(error)) {
         if (await waitForTargetStatus()) {
-          await enqueueLifecycleMailIfNeeded({ allowDuplicate: allowDuplicateResend });
+          await enqueueLifecycleMailIfNeeded({
+            force: shouldQueueAcceptedLifecycleManually,
+            allowDuplicate: allowDuplicateResend || shouldQueueAcceptedLifecycleManually
+          });
           return { ok: true, eventuallyConsistent: true };
         }
         throw error;
@@ -643,7 +653,10 @@ export const adminEntriesService = {
     }
 
     if (await waitForTargetStatus()) {
-      await enqueueLifecycleMailIfNeeded();
+      await enqueueLifecycleMailIfNeeded({
+        force: shouldQueueAcceptedLifecycleManually,
+        allowDuplicate: shouldQueueAcceptedLifecycleManually
+      });
       return { ok: true, alreadyInTargetStatus: true };
     }
 
@@ -666,15 +679,21 @@ export const adminEntriesService = {
         body: statusPayload
       });
 
+      if (shouldQueueAcceptedLifecycleManually) {
+        await enqueueLifecycleMailIfNeeded({ force: true, allowDuplicate: true });
+      }
       return { ok: true, viaShortlist: true };
     } catch (error) {
       const allowDuplicateResend =
-        transition === "to_accepted" &&
+        shouldQueueAcceptedLifecycleManually &&
         mapped.lifecycleEventType === "accepted_open_payment" &&
         isDuplicateRequestError(error);
 
       if (await waitForTargetStatus()) {
-        await enqueueLifecycleMailIfNeeded({ allowDuplicate: allowDuplicateResend });
+        await enqueueLifecycleMailIfNeeded({
+          force: shouldQueueAcceptedLifecycleManually,
+          allowDuplicate: allowDuplicateResend || shouldQueueAcceptedLifecycleManually
+        });
         return { ok: true, alreadyInTargetStatus: true };
       }
       throw error;
