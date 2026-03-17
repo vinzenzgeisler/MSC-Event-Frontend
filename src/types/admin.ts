@@ -221,7 +221,9 @@ export type AdminEntryDetailDto = {
   consent: {
     termsAccepted: boolean;
     privacyAccepted: boolean;
+    waiverAccepted?: boolean;
     mediaAccepted: boolean;
+    clubInfoAccepted?: boolean;
     consentVersion: string | null;
     consentCapturedAt: string | null;
   };
@@ -315,7 +317,9 @@ export type AdminEntryDetailViewModel = {
   consent: {
     termsAccepted: boolean;
     privacyAccepted: boolean;
+    waiverAccepted: boolean;
     mediaAccepted: boolean;
+    clubInfoAccepted: boolean;
     consentVersion: string | null;
     consentCapturedAt: string | null;
   };

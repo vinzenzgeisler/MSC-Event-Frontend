@@ -1,0 +1,270 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MSC Event Frontend Contract - Entry Confirmation Defaults and Event Overrides",
+    "version": "2.1.0",
+    "description": "API contract for admin UI support of global entry confirmation defaults plus optional per-event overrides."
+  },
+  "paths": {
+    "/admin/config/entry-confirmation-defaults": {
+      "get": {
+        "summary": "Load global defaults for entry confirmation PDF/mail data",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "config"],
+                  "properties": {
+                    "ok": { "type": "boolean", "const": true },
+                    "config": { "$ref": "#/components/schemas/EntryConfirmationConfig" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update global defaults for entry confirmation PDF/mail data",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["config"],
+                "properties": {
+                  "config": { "$ref": "#/components/schemas/EntryConfirmationConfig" }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "config"],
+                  "properties": {
+                    "ok": { "type": "boolean", "const": true },
+                    "config": { "$ref": "#/components/schemas/EntryConfirmationConfig" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/events": {
+      "get": {
+        "summary": "List events",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AdminEvent" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create event",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdminEventCreateInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminEvent" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/events/{id}": {
+      "patch": {
+        "summary": "Update event including optional entry confirmation overrides",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdminEventPatchInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminEvent" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/events/current": {
+      "get": {
+        "summary": "Get current event",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminEvent" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EntryConfirmationScheduleItem": {
+        "type": "object",
+        "required": ["label"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "startsAt": { "type": ["string", "null"], "format": "date-time" },
+          "endsAt": { "type": ["string", "null"], "format": "date-time" },
+          "note": { "type": ["string", "null"], "maxLength": 160 }
+        },
+        "additionalProperties": false
+      },
+      "EntryConfirmationConfig": {
+        "type": "object",
+        "properties": {
+          "organizerName": { "type": ["string", "null"], "maxLength": 500 },
+          "organizerAddressLine": { "type": ["string", "null"], "maxLength": 500 },
+          "organizerContactEmail": { "type": ["string", "null"], "format": "email" },
+          "organizerContactPhone": { "type": ["string", "null"], "maxLength": 500 },
+          "websiteUrl": { "type": ["string", "null"], "format": "uri" },
+          "gateHeadline": { "type": ["string", "null"], "maxLength": 500 },
+          "venueName": { "type": ["string", "null"], "maxLength": 500 },
+          "venueStreet": { "type": ["string", "null"], "maxLength": 500 },
+          "venueZip": { "type": ["string", "null"], "maxLength": 500 },
+          "venueCity": { "type": ["string", "null"], "maxLength": 500 },
+          "paddockInfo": { "type": ["string", "null"], "maxLength": 500 },
+          "arrivalNotes": { "type": ["string", "null"], "maxLength": 500 },
+          "accessNotes": { "type": ["string", "null"], "maxLength": 500 },
+          "importantNotes": {
+            "type": ["array", "null"],
+            "maxItems": 12,
+            "items": { "type": "string", "minLength": 1, "maxLength": 240 }
+          },
+          "scheduleItems": {
+            "type": ["array", "null"],
+            "maxItems": 12,
+            "items": { "$ref": "#/components/schemas/EntryConfirmationScheduleItem" }
+          },
+          "paymentRecipient": { "type": ["string", "null"], "maxLength": 500 },
+          "paymentIban": { "type": ["string", "null"], "maxLength": 500 },
+          "paymentBic": { "type": ["string", "null"], "maxLength": 500 },
+          "paymentBankName": { "type": ["string", "null"], "maxLength": 500 },
+          "paymentReferencePrefix": { "type": ["string", "null"], "maxLength": 500 }
+        },
+        "additionalProperties": false
+      },
+      "AdminEvent": {
+        "type": "object",
+        "required": ["id", "name", "startsAt", "endsAt", "status", "isCurrent", "entryConfirmationConfig"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "startsAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "endsAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "status": { "type": "string", "enum": ["draft", "open", "closed", "archived"] },
+          "isCurrent": { "type": "boolean" },
+          "registrationOpenAt": { "type": ["string", "null"], "format": "date-time" },
+          "registrationCloseAt": { "type": ["string", "null"], "format": "date-time" },
+          "contactEmail": { "type": ["string", "null"], "format": "email" },
+          "websiteUrl": { "type": ["string", "null"], "format": "uri" },
+          "entryConfirmationConfig": {
+            "description": "Optional event-specific overrides. Empty object means global defaults apply unchanged.",
+            "$ref": "#/components/schemas/EntryConfirmationConfig"
+          },
+          "openedAt": { "type": ["string", "null"], "format": "date-time" },
+          "closedAt": { "type": ["string", "null"], "format": "date-time" },
+          "archivedAt": { "type": ["string", "null"], "format": "date-time" },
+          "createdAt": { "type": ["string", "null"], "format": "date-time" },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "AdminEventCreateInput": {
+        "type": "object",
+        "required": ["name", "startsAt", "endsAt"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "startsAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "endsAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "registrationOpenAt": { "type": "string", "format": "date-time" },
+          "registrationCloseAt": { "type": "string", "format": "date-time" },
+          "contactEmail": { "type": "string", "format": "email" },
+          "websiteUrl": { "type": "string", "format": "uri" },
+          "entryConfirmationConfig": {
+            "description": "Optional event-specific overrides only. Usually empty on create.",
+            "$ref": "#/components/schemas/EntryConfirmationConfig"
+          },
+          "status": { "type": "string", "enum": ["draft", "open", "closed", "archived"], "default": "draft" }
+        },
+        "additionalProperties": false
+      },
+      "AdminEventPatchInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "startsAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "endsAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "registrationOpenAt": { "type": ["string", "null"], "format": "date-time" },
+          "registrationCloseAt": { "type": ["string", "null"], "format": "date-time" },
+          "contactEmail": { "type": ["string", "null"], "format": "email" },
+          "websiteUrl": { "type": ["string", "null"], "format": "uri" },
+          "entryConfirmationConfig": {
+            "description": "Optional event-specific overrides. Send only deviations from global defaults if the UI supports that model.",
+            "$ref": "#/components/schemas/EntryConfirmationConfig"
+          }
+        },
+        "minProperties": 1,
+        "additionalProperties": false
+      }
+    }
+  }
+}
+

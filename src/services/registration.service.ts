@@ -98,7 +98,7 @@ function isMinorBirthdate(value: string): boolean {
 }
 
 function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: string): PublicCreateEntryRequestDto["consent"] {
-  if (!form.consent.termsAccepted || !form.consent.privacyAccepted) {
+  if (!form.consent.termsAccepted || !form.consent.privacyAccepted || !form.consent.waiverAccepted) {
     throw new Error("CONSENT_REQUIRED_MISSING");
   }
   const consentTextHash = form.consent.consentTextHash.trim().toLowerCase();
@@ -112,7 +112,9 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
   return {
     termsAccepted: true,
     privacyAccepted: true,
+    waiverAccepted: true,
     mediaAccepted: Boolean(form.consent.mediaAccepted),
+    clubInfoAccepted: Boolean(form.consent.clubInfoAccepted),
     consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
     consentTextHash,
     locale: consentLocale,

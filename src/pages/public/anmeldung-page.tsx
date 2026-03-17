@@ -629,7 +629,9 @@ function createInitialConsent(uiLocale: string): RegistrationWizardForm["consent
   return {
     termsAccepted: false,
     privacyAccepted: false,
+    waiverAccepted: false,
     mediaAccepted: false,
+    clubInfoAccepted: false,
     consentVersion: CONSENT_VERSION,
     consentTextHash: "",
     locale: mapUiLocaleToConsentLocale(uiLocale),
@@ -940,7 +942,9 @@ export function AnmeldungPage() {
         ...baseConsent,
         termsAccepted: Boolean(parsedConsent?.termsAccepted),
         privacyAccepted: Boolean(parsedConsent?.privacyAccepted),
+        waiverAccepted: Boolean(parsedConsent?.waiverAccepted),
         mediaAccepted: Boolean(parsedConsent?.mediaAccepted),
+        clubInfoAccepted: Boolean(parsedConsent?.clubInfoAccepted),
         consentVersion: typeof parsedConsent?.consentVersion === "string" ? parsedConsent.consentVersion : baseConsent.consentVersion,
         consentTextHash: typeof parsedConsent?.consentTextHash === "string" ? parsedConsent.consentTextHash : baseConsent.consentTextHash,
         locale: typeof parsedConsent?.locale === "string" ? parsedConsent.locale : baseConsent.locale,
@@ -1334,7 +1338,7 @@ export function AnmeldungPage() {
       return;
     }
     setConsentError("");
-    if (!consent.termsAccepted || !consent.privacyAccepted) {
+    if (!consent.termsAccepted || !consent.privacyAccepted || !consent.waiverAccepted) {
       setConsentError(getConsentRequiredError(locale));
       setSubmitError("");
       return;

@@ -65,7 +65,9 @@ export type StartRegistrationForm = {
 export type ConsentForm = {
   termsAccepted: boolean;
   privacyAccepted: boolean;
+  waiverAccepted: boolean;
   mediaAccepted: boolean;
+  clubInfoAccepted: boolean;
   consentVersion: string;
   consentTextHash: string;
   locale: string;
@@ -188,7 +190,9 @@ export type PublicCreateEntryRequestDto = {
   consent: {
     termsAccepted: true;
     privacyAccepted: true;
+    waiverAccepted: true;
     mediaAccepted: boolean;
+    clubInfoAccepted: boolean;
     consentVersion: string;
     consentTextHash: string;
     locale: string;

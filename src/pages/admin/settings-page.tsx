@@ -15,6 +15,8 @@ import type { IamAccount, IamOverview, IamRole } from "@/types/admin-iam";
 import type {
   AdminSettingsClass,
   AdminSettingsClassDraft,
+  AdminSettingsEntryConfirmationConfig,
+  AdminSettingsEntryConfirmationScheduleItem,
   AdminSettingsEvent,
   AdminSettingsEventForm,
   AdminSettingsPricingForm
@@ -22,6 +24,9 @@ import type {
 import type { VehicleType } from "@/types/common";
 
 const PRICING_DRAFT_PREFIX = "msc_settings_pricing_draft_";
+const ENTRY_CONFIRMATION_LIST_LIMIT = 12;
+const TEXTAREA_CLASS_NAME =
+  "min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
 
 function toDatetimeLocal(value: string | null) {
   if (!value) {
@@ -41,8 +46,555 @@ function eventToForm(event: AdminSettingsEvent): AdminSettingsEventForm {
     startsAt: event.startsAt,
     endsAt: event.endsAt,
     registrationOpenAt: toDatetimeLocal(event.registrationOpenAt),
-    registrationCloseAt: toDatetimeLocal(event.registrationCloseAt)
+    registrationCloseAt: toDatetimeLocal(event.registrationCloseAt),
+    entryConfirmationConfig: {
+      ...event.entryConfirmationConfig,
+      importantNotes: [...event.entryConfirmationConfig.importantNotes],
+      scheduleItems: event.entryConfirmationConfig.scheduleItems.map((item) => ({
+        ...item,
+        startsAt: toDatetimeLocal(item.startsAt || null),
+        endsAt: toDatetimeLocal(item.endsAt || null)
+      }))
+    }
   };
+}
+
+function createEmptyEntryConfirmationScheduleItem(): AdminSettingsEntryConfirmationScheduleItem {
+  return {
+    label: "",
+    startsAt: "",
+    endsAt: "",
+    note: ""
+  };
+}
+
+function createEmptyEntryConfirmationConfig(): AdminSettingsEntryConfirmationConfig {
+  return {
+    organizerName: "",
+    organizerAddressLine: "",
+    organizerContactEmail: "",
+    organizerContactPhone: "",
+    websiteUrl: "",
+    gateHeadline: "",
+    venueName: "",
+    venueStreet: "",
+    venueZip: "",
+    venueCity: "",
+    paddockInfo: "",
+    arrivalNotes: "",
+    accessNotes: "",
+    importantNotes: [],
+    scheduleItems: [],
+    paymentRecipient: "",
+    paymentIban: "",
+    paymentBic: "",
+    paymentBankName: "",
+    paymentReferencePrefix: ""
+  };
+}
+
+function normalizeEntryConfirmationText(value: string) {
+  return value.trim();
+}
+
+function normalizeImportantNotes(notes: string[]) {
+  return notes.map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeScheduleItems(items: AdminSettingsEntryConfirmationScheduleItem[]) {
+  return items
+    .filter((item) => item.label.trim() || item.startsAt || item.endsAt || item.note.trim())
+    .map((item) => ({
+      label: item.label.trim(),
+      startsAt: item.startsAt,
+      endsAt: item.endsAt,
+      note: item.note.trim()
+    }))
+    .filter((item) => item.label);
+}
+
+function scheduleItemsEqual(
+  left: AdminSettingsEntryConfirmationScheduleItem[],
+  right: AdminSettingsEntryConfirmationScheduleItem[]
+) {
+  const normalizedLeft = normalizeScheduleItems(left);
+  const normalizedRight = normalizeScheduleItems(right);
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+  return normalizedLeft.every((item, index) => {
+    const other = normalizedRight[index];
+    return (
+      item.label === other.label &&
+      item.startsAt === other.startsAt &&
+      item.endsAt === other.endsAt &&
+      item.note === other.note
+    );
+  });
+}
+
+function buildEventOverrideConfig(
+  config: AdminSettingsEntryConfirmationConfig,
+  defaults: AdminSettingsEntryConfirmationConfig
+): AdminSettingsEntryConfirmationConfig {
+  return {
+    organizerName:
+      normalizeEntryConfirmationText(config.organizerName) &&
+      normalizeEntryConfirmationText(config.organizerName) !== normalizeEntryConfirmationText(defaults.organizerName)
+        ? normalizeEntryConfirmationText(config.organizerName)
+        : "",
+    organizerAddressLine:
+      normalizeEntryConfirmationText(config.organizerAddressLine) &&
+      normalizeEntryConfirmationText(config.organizerAddressLine) !== normalizeEntryConfirmationText(defaults.organizerAddressLine)
+        ? normalizeEntryConfirmationText(config.organizerAddressLine)
+        : "",
+    organizerContactEmail:
+      normalizeEntryConfirmationText(config.organizerContactEmail) &&
+      normalizeEntryConfirmationText(config.organizerContactEmail) !== normalizeEntryConfirmationText(defaults.organizerContactEmail)
+        ? normalizeEntryConfirmationText(config.organizerContactEmail)
+        : "",
+    organizerContactPhone:
+      normalizeEntryConfirmationText(config.organizerContactPhone) &&
+      normalizeEntryConfirmationText(config.organizerContactPhone) !== normalizeEntryConfirmationText(defaults.organizerContactPhone)
+        ? normalizeEntryConfirmationText(config.organizerContactPhone)
+        : "",
+    websiteUrl:
+      normalizeEntryConfirmationText(config.websiteUrl) &&
+      normalizeEntryConfirmationText(config.websiteUrl) !== normalizeEntryConfirmationText(defaults.websiteUrl)
+        ? normalizeEntryConfirmationText(config.websiteUrl)
+        : "",
+    gateHeadline:
+      normalizeEntryConfirmationText(config.gateHeadline) &&
+      normalizeEntryConfirmationText(config.gateHeadline) !== normalizeEntryConfirmationText(defaults.gateHeadline)
+        ? normalizeEntryConfirmationText(config.gateHeadline)
+        : "",
+    venueName:
+      normalizeEntryConfirmationText(config.venueName) &&
+      normalizeEntryConfirmationText(config.venueName) !== normalizeEntryConfirmationText(defaults.venueName)
+        ? normalizeEntryConfirmationText(config.venueName)
+        : "",
+    venueStreet:
+      normalizeEntryConfirmationText(config.venueStreet) &&
+      normalizeEntryConfirmationText(config.venueStreet) !== normalizeEntryConfirmationText(defaults.venueStreet)
+        ? normalizeEntryConfirmationText(config.venueStreet)
+        : "",
+    venueZip:
+      normalizeEntryConfirmationText(config.venueZip) &&
+      normalizeEntryConfirmationText(config.venueZip) !== normalizeEntryConfirmationText(defaults.venueZip)
+        ? normalizeEntryConfirmationText(config.venueZip)
+        : "",
+    venueCity:
+      normalizeEntryConfirmationText(config.venueCity) &&
+      normalizeEntryConfirmationText(config.venueCity) !== normalizeEntryConfirmationText(defaults.venueCity)
+        ? normalizeEntryConfirmationText(config.venueCity)
+        : "",
+    paddockInfo:
+      normalizeEntryConfirmationText(config.paddockInfo) &&
+      normalizeEntryConfirmationText(config.paddockInfo) !== normalizeEntryConfirmationText(defaults.paddockInfo)
+        ? normalizeEntryConfirmationText(config.paddockInfo)
+        : "",
+    arrivalNotes:
+      normalizeEntryConfirmationText(config.arrivalNotes) &&
+      normalizeEntryConfirmationText(config.arrivalNotes) !== normalizeEntryConfirmationText(defaults.arrivalNotes)
+        ? normalizeEntryConfirmationText(config.arrivalNotes)
+        : "",
+    accessNotes:
+      normalizeEntryConfirmationText(config.accessNotes) &&
+      normalizeEntryConfirmationText(config.accessNotes) !== normalizeEntryConfirmationText(defaults.accessNotes)
+        ? normalizeEntryConfirmationText(config.accessNotes)
+        : "",
+    importantNotes: (() => {
+      const current = normalizeImportantNotes(config.importantNotes);
+      const base = normalizeImportantNotes(defaults.importantNotes);
+      return current.join("|") === base.join("|") ? [] : current;
+    })(),
+    scheduleItems: scheduleItemsEqual(config.scheduleItems, defaults.scheduleItems) ? [] : normalizeScheduleItems(config.scheduleItems),
+    paymentRecipient:
+      normalizeEntryConfirmationText(config.paymentRecipient) &&
+      normalizeEntryConfirmationText(config.paymentRecipient) !== normalizeEntryConfirmationText(defaults.paymentRecipient)
+        ? normalizeEntryConfirmationText(config.paymentRecipient)
+        : "",
+    paymentIban:
+      normalizeEntryConfirmationText(config.paymentIban) &&
+      normalizeEntryConfirmationText(config.paymentIban) !== normalizeEntryConfirmationText(defaults.paymentIban)
+        ? normalizeEntryConfirmationText(config.paymentIban)
+        : "",
+    paymentBic:
+      normalizeEntryConfirmationText(config.paymentBic) &&
+      normalizeEntryConfirmationText(config.paymentBic) !== normalizeEntryConfirmationText(defaults.paymentBic)
+        ? normalizeEntryConfirmationText(config.paymentBic)
+        : "",
+    paymentBankName:
+      normalizeEntryConfirmationText(config.paymentBankName) &&
+      normalizeEntryConfirmationText(config.paymentBankName) !== normalizeEntryConfirmationText(defaults.paymentBankName)
+        ? normalizeEntryConfirmationText(config.paymentBankName)
+        : "",
+    paymentReferencePrefix:
+      normalizeEntryConfirmationText(config.paymentReferencePrefix) &&
+      normalizeEntryConfirmationText(config.paymentReferencePrefix) !== normalizeEntryConfirmationText(defaults.paymentReferencePrefix)
+        ? normalizeEntryConfirmationText(config.paymentReferencePrefix)
+        : ""
+  };
+}
+
+function findInvalidScheduleItem(config: AdminSettingsEntryConfirmationConfig) {
+  return config.scheduleItems.find((item) => {
+    const hasAnyValue = Boolean(item.label.trim() || item.startsAt || item.endsAt || item.note.trim());
+    if (!hasAnyValue) {
+      return false;
+    }
+    if (!item.label.trim()) {
+      return true;
+    }
+    if (item.startsAt && !parseDateTime(item.startsAt)) {
+      return true;
+    }
+    if (item.endsAt && !parseDateTime(item.endsAt)) {
+      return true;
+    }
+    if (item.startsAt && item.endsAt) {
+      const startsAt = parseDateTime(item.startsAt);
+      const endsAt = parseDateTime(item.endsAt);
+      if (!startsAt || !endsAt || startsAt > endsAt) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+type EntryConfirmationEditorProps = {
+  mode: "defaults" | "overrides";
+  config: AdminSettingsEntryConfirmationConfig;
+  disabled: boolean;
+  defaults?: AdminSettingsEntryConfirmationConfig;
+  onFieldChange: <K extends keyof AdminSettingsEntryConfirmationConfig>(
+    key: K,
+    value: AdminSettingsEntryConfirmationConfig[K]
+  ) => void;
+  onImportantNoteChange: (index: number, value: string) => void;
+  onAddImportantNote: () => void;
+  onRemoveImportantNote: (index: number) => void;
+  onScheduleItemChange: (
+    index: number,
+    key: keyof AdminSettingsEntryConfirmationScheduleItem,
+    value: string
+  ) => void;
+  onAddScheduleItem: () => void;
+  onRemoveScheduleItem: (index: number) => void;
+};
+
+function EntryConfirmationConfigEditor({
+  mode,
+  config,
+  disabled,
+  defaults,
+  onFieldChange,
+  onImportantNoteChange,
+  onAddImportantNote,
+  onRemoveImportantNote,
+  onScheduleItemChange,
+  onAddScheduleItem,
+  onRemoveScheduleItem
+}: EntryConfirmationEditorProps) {
+  const isOverride = mode === "overrides";
+  const placeholderFor = <K extends keyof AdminSettingsEntryConfirmationConfig>(key: K) =>
+    isOverride ? defaults?.[key] ?? "" : "";
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+        <div className="text-sm font-semibold text-slate-900">Veranstalter & Kontakt</div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Veranstalter</Label>
+            <Input
+              value={config.organizerName}
+              placeholder={placeholderFor("organizerName")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("organizerName", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Anschrift</Label>
+            <Input
+              value={config.organizerAddressLine}
+              placeholder={placeholderFor("organizerAddressLine")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("organizerAddressLine", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Kontakt E-Mail</Label>
+            <Input
+              type="email"
+              value={config.organizerContactEmail}
+              placeholder={placeholderFor("organizerContactEmail")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("organizerContactEmail", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Kontakt Telefon</Label>
+            <Input
+              value={config.organizerContactPhone}
+              placeholder={placeholderFor("organizerContactPhone")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("organizerContactPhone", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label>Website</Label>
+            <Input
+              type="url"
+              value={config.websiteUrl}
+              placeholder={placeholderFor("websiteUrl")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("websiteUrl", event.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+        <div className="text-sm font-semibold text-slate-900">Veranstaltungsort & Fahrerlager</div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Überschrift Anreise</Label>
+            <Input
+              value={config.gateHeadline}
+              placeholder={placeholderFor("gateHeadline")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("gateHeadline", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Veranstaltungsort</Label>
+            <Input
+              value={config.venueName}
+              placeholder={placeholderFor("venueName")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("venueName", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Straße</Label>
+            <Input
+              value={config.venueStreet}
+              placeholder={placeholderFor("venueStreet")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("venueStreet", event.target.value)}
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label>PLZ</Label>
+              <Input
+                value={config.venueZip}
+                placeholder={placeholderFor("venueZip")}
+                disabled={disabled}
+                onChange={(event) => onFieldChange("venueZip", event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Ort</Label>
+              <Input
+                value={config.venueCity}
+                placeholder={placeholderFor("venueCity")}
+                disabled={disabled}
+                onChange={(event) => onFieldChange("venueCity", event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label>Hinweise Fahrerlager</Label>
+            <textarea
+              className={TEXTAREA_CLASS_NAME}
+              value={config.paddockInfo}
+              placeholder={placeholderFor("paddockInfo")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("paddockInfo", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Hinweise Anreise</Label>
+            <textarea
+              className={TEXTAREA_CLASS_NAME}
+              value={config.arrivalNotes}
+              placeholder={placeholderFor("arrivalNotes")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("arrivalNotes", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Zugang / Zufahrt</Label>
+            <textarea
+              className={TEXTAREA_CLASS_NAME}
+              value={config.accessNotes}
+              placeholder={placeholderFor("accessNotes")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("accessNotes", event.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-slate-900">Termine</div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled || config.scheduleItems.length >= ENTRY_CONFIRMATION_LIST_LIMIT}
+            onClick={onAddScheduleItem}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Termin hinzufügen
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {config.scheduleItems.length === 0 ? (
+            <div className="rounded-md border border-dashed px-3 py-4 text-sm text-slate-500">
+              {isOverride
+                ? "Keine Event-Overrides für Termine gepflegt. Es gelten die globalen Standardtermine."
+                : "Noch keine Standardtermine gepflegt."}
+            </div>
+          ) : (
+            config.scheduleItems.map((item, index) => (
+              <div key={`schedule-${index}`} className="space-y-3 rounded-md border p-3">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Bezeichnung</Label>
+                    <Input
+                      value={item.label}
+                      disabled={disabled}
+                      onChange={(event) => onScheduleItemChange(index, "label", event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Hinweis</Label>
+                    <Input
+                      value={item.note}
+                      disabled={disabled}
+                      onChange={(event) => onScheduleItemChange(index, "note", event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Beginn</Label>
+                    <Input
+                      type="datetime-local"
+                      value={item.startsAt}
+                      disabled={disabled}
+                      onChange={(event) => onScheduleItemChange(index, "startsAt", event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Ende</Label>
+                    <Input
+                      type="datetime-local"
+                      value={item.endsAt}
+                      disabled={disabled}
+                      onChange={(event) => onScheduleItemChange(index, "endsAt", event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button type="button" variant="ghost" disabled={disabled} onClick={() => onRemoveScheduleItem(index)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Termin löschen
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-slate-900">Wichtige Hinweise</div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled || config.importantNotes.length >= ENTRY_CONFIRMATION_LIST_LIMIT}
+            onClick={onAddImportantNote}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Hinweis hinzufügen
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {config.importantNotes.length === 0 ? (
+            <div className="rounded-md border border-dashed px-3 py-4 text-sm text-slate-500">
+              {isOverride
+                ? "Keine Event-Overrides für wichtige Hinweise gepflegt. Es gelten die globalen Standardhinweise."
+                : "Noch keine Standardhinweise gepflegt."}
+            </div>
+          ) : (
+            config.importantNotes.map((note, index) => (
+              <div key={`note-${index}`} className="flex gap-3">
+                <Input value={note} disabled={disabled} onChange={(event) => onImportantNoteChange(index, event.target.value)} />
+                <Button type="button" variant="ghost" disabled={disabled} onClick={() => onRemoveImportantNote(index)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+        <div className="text-sm font-semibold text-slate-900">Zahlungsdaten</div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Zahlungsempfänger</Label>
+            <Input
+              value={config.paymentRecipient}
+              placeholder={placeholderFor("paymentRecipient")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("paymentRecipient", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Bank</Label>
+            <Input
+              value={config.paymentBankName}
+              placeholder={placeholderFor("paymentBankName")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("paymentBankName", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>IBAN</Label>
+            <Input
+              value={config.paymentIban}
+              placeholder={placeholderFor("paymentIban")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("paymentIban", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>BIC</Label>
+            <Input
+              value={config.paymentBic}
+              placeholder={placeholderFor("paymentBic")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("paymentBic", event.target.value)}
+            />
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label>Verwendungszweck-Präfix</Label>
+            <Input
+              value={config.paymentReferencePrefix}
+              placeholder={placeholderFor("paymentReferencePrefix")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("paymentReferencePrefix", event.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type PricingRulesSnapshot = {
@@ -172,12 +724,15 @@ export function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [noCurrentEvent, setNoCurrentEvent] = useState(false);
   const [eventState, setEventState] = useState<AdminSettingsEvent | null>(null);
+  const [entryConfirmationDefaults, setEntryConfirmationDefaults] =
+    useState<AdminSettingsEntryConfirmationConfig>(createEmptyEntryConfirmationConfig());
   const [eventForm, setEventForm] = useState<AdminSettingsEventForm>({
     name: "",
     startsAt: "",
     endsAt: "",
     registrationOpenAt: "",
-    registrationCloseAt: ""
+    registrationCloseAt: "",
+    entryConfirmationConfig: createEmptyEntryConfirmationConfig()
   });
   const [classes, setClasses] = useState<AdminSettingsClass[]>([]);
   const [classDrafts, setClassDrafts] = useState<Record<string, AdminSettingsClassDraft>>({});
@@ -186,12 +741,14 @@ export function AdminSettingsPage() {
   const [iamOverview, setIamOverview] = useState<IamOverview | null>(null);
 
   const [savingEvent, setSavingEvent] = useState(false);
+  const [savingEntryConfirmationDefaults, setSavingEntryConfirmationDefaults] = useState(false);
   const [creatingInitialEvent, setCreatingInitialEvent] = useState(false);
   const [savingClassId, setSavingClassId] = useState<string | null>(null);
   const [creatingClass, setCreatingClass] = useState(false);
   const [operationBusy, setOperationBusy] = useState<string | null>(null);
 
   const [eventError, setEventError] = useState("");
+  const [entryConfirmationDefaultsError, setEntryConfirmationDefaultsError] = useState("");
   const [classError, setClassError] = useState("");
   const [pricingError, setPricingError] = useState("");
   const [operationsError, setOperationsError] = useState("");
@@ -253,44 +810,71 @@ export function AdminSettingsPage() {
     setLoading(true);
     setNoCurrentEvent(false);
     setEventError("");
+    setEntryConfirmationDefaultsError("");
     setClassError("");
     setPricingError("");
     setOperationsError("");
     setIamError("");
 
     try {
-      const [event, iam] = await Promise.all([adminSettingsService.getCurrentEvent(), adminIamService.getOverview()]);
-      const [classList, pricingRules] = await Promise.all([
-        adminSettingsService.listClasses(event.id),
-        adminSettingsService.getPricingRules(event.id).catch(() => null)
+      const [defaultsResult, iamResult, eventResult] = await Promise.allSettled([
+        adminSettingsService.getEntryConfirmationDefaults(),
+        adminIamService.getOverview(),
+        adminSettingsService.getCurrentEvent()
       ]);
 
-      setEventState(event);
-      setEventForm(eventToForm(event));
-      setClasses(classList);
-      setClassDrafts(
-        Object.fromEntries(
-          classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }])
-        )
-      );
-      setIamOverview(iam);
-      syncIamRoleDrafts(iam.accounts);
+      if (defaultsResult.status === "fulfilled") {
+        setEntryConfirmationDefaults(defaultsResult.value);
+      } else {
+        setEntryConfirmationDefaults(createEmptyEntryConfirmationConfig());
+        setEntryConfirmationDefaultsError(
+          getApiErrorMessage(defaultsResult.reason, "Standarddaten der Nennbestätigung konnten nicht geladen werden.")
+        );
+      }
 
-      const key = storageKeyForEvent(event.id);
-      const storedDraft = window.localStorage.getItem(key);
-      if (storedDraft) {
-        try {
-          const parsed = JSON.parse(storedDraft) as AdminSettingsPricingForm;
-          setPricingForm(mergePricingWithClasses(parsed, classList));
-        } catch {
+      if (iamResult.status === "fulfilled") {
+        setIamOverview(iamResult.value);
+        syncIamRoleDrafts(iamResult.value.accounts);
+      } else {
+        setIamOverview(null);
+        setIamRoleDrafts({});
+        setIamError(getApiErrorMessage(iamResult.reason, "IAM-Übersicht konnte nicht geladen werden."));
+      }
+
+      if (eventResult.status === "fulfilled") {
+        const event = eventResult.value;
+        const [classList, pricingRules] = await Promise.all([
+          adminSettingsService.listClasses(event.id),
+          adminSettingsService.getPricingRules(event.id).catch(() => null)
+        ]);
+
+        setEventState(event);
+        setEventForm(eventToForm(event));
+        setClasses(classList);
+        setClassDrafts(
+          Object.fromEntries(
+            classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }])
+          )
+        );
+
+        const key = storageKeyForEvent(event.id);
+        const storedDraft = window.localStorage.getItem(key);
+        if (storedDraft) {
+          try {
+            const parsed = JSON.parse(storedDraft) as AdminSettingsPricingForm;
+            setPricingForm(mergePricingWithClasses(parsed, classList));
+          } catch {
+            setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
+          }
+        } else {
           setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
         }
-      } else {
-        setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
-      }
-      setPricingInitializedForEventId(event.id);
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404 && error.code === "NOT_FOUND") {
+        setPricingInitializedForEventId(event.id);
+      } else if (
+        eventResult.reason instanceof ApiError &&
+        eventResult.reason.status === 404 &&
+        eventResult.reason.code === "NOT_FOUND"
+      ) {
         resetEventScopedState();
         setNoCurrentEvent(true);
         setEventForm({
@@ -298,18 +882,11 @@ export function AdminSettingsPage() {
           startsAt: "",
           endsAt: "",
           registrationOpenAt: "",
-          registrationCloseAt: ""
+          registrationCloseAt: "",
+          entryConfirmationConfig: createEmptyEntryConfirmationConfig()
         });
-        try {
-          const iam = await adminIamService.getOverview();
-          setIamOverview(iam);
-          syncIamRoleDrafts(iam.accounts);
-        } catch {
-          setIamOverview(null);
-          setIamRoleDrafts({});
-        }
       } else {
-        setEventError(getApiErrorMessage(error, "Einstellungen konnten nicht geladen werden."));
+        setEventError(getApiErrorMessage(eventResult.reason, "Einstellungen konnten nicht geladen werden."));
       }
     } finally {
       setLoading(false);
@@ -345,6 +922,136 @@ export function AdminSettingsPage() {
       </Badge>
     );
   }, [eventState]);
+
+  const updateDefaultEntryConfirmationField = <K extends keyof AdminSettingsEntryConfirmationConfig>(
+    key: K,
+    value: AdminSettingsEntryConfirmationConfig[K]
+  ) => {
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const updateEventEntryConfirmationField = <K extends keyof AdminSettingsEntryConfirmationConfig>(
+    key: K,
+    value: AdminSettingsEntryConfirmationConfig[K]
+  ) => {
+    setEventForm((prev) => ({
+      ...prev,
+      entryConfirmationConfig: {
+        ...prev.entryConfirmationConfig,
+        [key]: value
+      }
+    }));
+  };
+
+  const updateDefaultImportantNote = (index: number, value: string) => {
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      importantNotes: prev.importantNotes.map((item, currentIndex) => (currentIndex === index ? value : item))
+    }));
+  };
+
+  const updateEventImportantNote = (index: number, value: string) => {
+    updateEventEntryConfirmationField(
+      "importantNotes",
+      eventForm.entryConfirmationConfig.importantNotes.map((item, currentIndex) =>
+        currentIndex === index ? value : item
+      )
+    );
+  };
+
+  const addDefaultImportantNote = () => {
+    if (entryConfirmationDefaults.importantNotes.length >= ENTRY_CONFIRMATION_LIST_LIMIT) {
+      return;
+    }
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      importantNotes: [...prev.importantNotes, ""]
+    }));
+  };
+
+  const addEventImportantNote = () => {
+    if (eventForm.entryConfirmationConfig.importantNotes.length >= ENTRY_CONFIRMATION_LIST_LIMIT) {
+      return;
+    }
+    updateEventEntryConfirmationField("importantNotes", [...eventForm.entryConfirmationConfig.importantNotes, ""]);
+  };
+
+  const removeDefaultImportantNote = (index: number) => {
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      importantNotes: prev.importantNotes.filter((_, currentIndex) => currentIndex !== index)
+    }));
+  };
+
+  const removeEventImportantNote = (index: number) => {
+    updateEventEntryConfirmationField(
+      "importantNotes",
+      eventForm.entryConfirmationConfig.importantNotes.filter((_, currentIndex) => currentIndex !== index)
+    );
+  };
+
+  const updateDefaultScheduleItem = (
+    index: number,
+    key: keyof AdminSettingsEntryConfirmationScheduleItem,
+    value: string
+  ) => {
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      scheduleItems: prev.scheduleItems.map((item, currentIndex) =>
+        currentIndex === index ? { ...item, [key]: value } : item
+      )
+    }));
+  };
+
+  const updateEventScheduleItem = (
+    index: number,
+    key: keyof AdminSettingsEntryConfirmationScheduleItem,
+    value: string
+  ) => {
+    updateEventEntryConfirmationField(
+      "scheduleItems",
+      eventForm.entryConfirmationConfig.scheduleItems.map((item, currentIndex) =>
+        currentIndex === index ? { ...item, [key]: value } : item
+      )
+    );
+  };
+
+  const addDefaultScheduleItem = () => {
+    if (entryConfirmationDefaults.scheduleItems.length >= ENTRY_CONFIRMATION_LIST_LIMIT) {
+      return;
+    }
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      scheduleItems: [...prev.scheduleItems, createEmptyEntryConfirmationScheduleItem()]
+    }));
+  };
+
+  const addEventScheduleItem = () => {
+    if (eventForm.entryConfirmationConfig.scheduleItems.length >= ENTRY_CONFIRMATION_LIST_LIMIT) {
+      return;
+    }
+    updateEventEntryConfirmationField("scheduleItems", [
+      ...eventForm.entryConfirmationConfig.scheduleItems,
+      createEmptyEntryConfirmationScheduleItem()
+    ]);
+  };
+
+  const removeDefaultScheduleItem = (index: number) => {
+    setEntryConfirmationDefaults((prev) => ({
+      ...prev,
+      scheduleItems: prev.scheduleItems.filter((_, currentIndex) => currentIndex !== index)
+    }));
+  };
+
+  const removeEventScheduleItem = (index: number) => {
+    updateEventEntryConfirmationField(
+      "scheduleItems",
+      eventForm.entryConfirmationConfig.scheduleItems.filter((_, currentIndex) => currentIndex !== index)
+    );
+  };
 
   const createInitialEvent = async () => {
     setEventError("");
@@ -388,7 +1095,8 @@ export function AdminSettingsPage() {
         startsAt: eventForm.startsAt,
         endsAt: eventForm.endsAt,
         registrationOpenAt: eventForm.registrationOpenAt,
-        registrationCloseAt: eventForm.registrationCloseAt
+        registrationCloseAt: eventForm.registrationCloseAt,
+        entryConfirmationConfig: eventForm.entryConfirmationConfig
       });
       setNoCurrentEvent(false);
       setEventState(created);
@@ -402,6 +1110,31 @@ export function AdminSettingsPage() {
       setEventError(getApiErrorMessage(error, "Event konnte nicht angelegt werden."));
     } finally {
       setCreatingInitialEvent(false);
+    }
+  };
+
+  const saveEntryConfirmationDefaults = async () => {
+    setEntryConfirmationDefaultsError("");
+
+    if (findInvalidScheduleItem(entryConfirmationDefaults)) {
+      setEntryConfirmationDefaultsError(
+        "Bitte prüfe die Standardtermine. Jede Terminzeile braucht mindestens eine Bezeichnung, und Ende darf nicht vor Beginn liegen."
+      );
+      return;
+    }
+
+    setSavingEntryConfirmationDefaults(true);
+
+    try {
+      const updated = await adminSettingsService.updateEntryConfirmationDefaults(entryConfirmationDefaults);
+      setEntryConfirmationDefaults(updated);
+      showToast("Standarddaten der Nennbestätigung gespeichert.");
+    } catch (error) {
+      setEntryConfirmationDefaultsError(
+        getApiErrorMessage(error, "Standarddaten der Nennbestätigung konnten nicht gespeichert werden.")
+      );
+    } finally {
+      setSavingEntryConfirmationDefaults(false);
     }
   };
 
@@ -479,10 +1212,20 @@ export function AdminSettingsPage() {
       return;
     }
 
+    if (findInvalidScheduleItem(eventForm.entryConfirmationConfig)) {
+      setEventError(
+        "Bitte prüfe die Event-Overrides der Nennbestätigung. Jede Terminzeile braucht mindestens eine Bezeichnung, und Ende darf nicht vor Beginn liegen."
+      );
+      return;
+    }
+
     setSavingEvent(true);
 
     try {
-      const updated = await adminSettingsService.updateEvent(eventState.id, eventForm);
+      const updated = await adminSettingsService.updateEvent(eventState.id, {
+        ...eventForm,
+        entryConfirmationConfig: buildEventOverrideConfig(eventForm.entryConfirmationConfig, entryConfirmationDefaults)
+      });
       await adminSettingsService.savePricingRules(eventState.id, pricingForm);
       const recalculateResult = await adminSettingsService.recalculateInvoices(eventState.id);
       setEventState(updated);
@@ -742,6 +1485,44 @@ export function AdminSettingsPage() {
 
       {!loading && (
         <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Standarddaten für Nennbestätigung</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-sm text-slate-600">
+                Diese Standarddaten gelten für alle Veranstaltungen. Im Event können bei Bedarf nur einzelne Abweichungen
+                als Override gepflegt werden.
+              </div>
+
+              <EntryConfirmationConfigEditor
+                mode="defaults"
+                config={entryConfirmationDefaults}
+                disabled={!canManage}
+                onFieldChange={updateDefaultEntryConfirmationField}
+                onImportantNoteChange={updateDefaultImportantNote}
+                onAddImportantNote={addDefaultImportantNote}
+                onRemoveImportantNote={removeDefaultImportantNote}
+                onScheduleItemChange={updateDefaultScheduleItem}
+                onAddScheduleItem={addDefaultScheduleItem}
+                onRemoveScheduleItem={removeDefaultScheduleItem}
+              />
+
+              {entryConfirmationDefaultsError && (
+                <div className="text-sm text-destructive">{entryConfirmationDefaultsError}</div>
+              )}
+
+              <Button
+                type="button"
+                disabled={!canManage || savingEntryConfirmationDefaults}
+                onClick={() => void saveEntryConfirmationDefaults()}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {savingEntryConfirmationDefaults ? "Speichert…" : "Standarddaten speichern"}
+              </Button>
+            </CardContent>
+          </Card>
+
           {noCurrentEvent ? (
             <Card>
               <CardHeader>
@@ -858,6 +1639,30 @@ export function AdminSettingsPage() {
                         onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-4 border-t pt-4">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Event-Overrides für Nennbestätigung</div>
+                      <div className="text-sm text-slate-600">
+                        Leere Felder übernehmen automatisch die globalen Standarddaten. Trage hier nur abweichende Werte
+                        für diese Veranstaltung ein.
+                      </div>
+                    </div>
+
+                    <EntryConfirmationConfigEditor
+                      mode="overrides"
+                      config={eventForm.entryConfirmationConfig}
+                      defaults={entryConfirmationDefaults}
+                      disabled={!canManage || !eventState}
+                      onFieldChange={updateEventEntryConfirmationField}
+                      onImportantNoteChange={updateEventImportantNote}
+                      onAddImportantNote={addEventImportantNote}
+                      onRemoveImportantNote={removeEventImportantNote}
+                      onScheduleItemChange={updateEventScheduleItem}
+                      onAddScheduleItem={addEventScheduleItem}
+                      onRemoveScheduleItem={removeEventScheduleItem}
+                    />
                   </div>
 
                   <div className="space-y-4 border-t pt-4">

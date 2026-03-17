@@ -1,0 +1,135 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Frontend Agent Prompt - Admin Event Entry Confirmation Fields",
+    "version": "1.0.0",
+    "description": "Implement support in the admin event UI for the new backend field event.entryConfirmationConfig. Goal: allow admins to maintain all data needed for the modern entry confirmation PDF and admission mail attachment."
+  },
+  "paths": {
+    "/admin/events": {
+      "get": {
+        "summary": "Existing endpoint already returns event.entryConfirmationConfig",
+        "description": "Consume the new field in event list/detail loading if your client typing currently strips unknown properties."
+      },
+      "post": {
+        "summary": "Existing endpoint accepts event.entryConfirmationConfig",
+        "description": "Ensure create-event flow can submit the new nested object, even if the UI initially only exposes it on edit."
+      }
+    },
+    "/admin/events/{id}": {
+      "patch": {
+        "summary": "Existing endpoint accepts partial updates including entryConfirmationConfig",
+        "description": "Primary frontend task: extend the event edit form and PATCH payload mapping for the nested config object."
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EntryConfirmationScheduleItem": {
+        "type": "object",
+        "required": ["label"],
+        "properties": {
+          "label": { "type": "string", "maxLength": 80, "example": "Technische Abnahme" },
+          "startsAt": { "type": ["string", "null"], "format": "date-time", "example": "2026-05-01T09:00:00.000Z" },
+          "endsAt": { "type": ["string", "null"], "format": "date-time", "example": "2026-05-01T10:00:00.000Z" },
+          "note": { "type": ["string", "null"], "maxLength": 160, "example": "nur Gruppe A" }
+        }
+      },
+      "EntryConfirmationConfig": {
+        "type": "object",
+        "properties": {
+          "organizerName": { "type": ["string", "null"] },
+          "organizerAddressLine": { "type": ["string", "null"] },
+          "organizerContactEmail": { "type": ["string", "null"], "format": "email" },
+          "organizerContactPhone": { "type": ["string", "null"] },
+          "websiteUrl": { "type": ["string", "null"], "format": "uri" },
+          "gateHeadline": { "type": ["string", "null"] },
+          "venueName": { "type": ["string", "null"] },
+          "venueStreet": { "type": ["string", "null"] },
+          "venueZip": { "type": ["string", "null"] },
+          "venueCity": { "type": ["string", "null"] },
+          "paddockInfo": { "type": ["string", "null"] },
+          "arrivalNotes": { "type": ["string", "null"] },
+          "accessNotes": { "type": ["string", "null"] },
+          "importantNotes": {
+            "type": ["array", "null"],
+            "items": { "type": "string", "maxLength": 240 }
+          },
+          "scheduleItems": {
+            "type": ["array", "null"],
+            "items": { "$ref": "#/components/schemas/EntryConfirmationScheduleItem" }
+          },
+          "paymentRecipient": { "type": ["string", "null"] },
+          "paymentIban": { "type": ["string", "null"] },
+          "paymentBic": { "type": ["string", "null"] },
+          "paymentBankName": { "type": ["string", "null"] },
+          "paymentReferencePrefix": { "type": ["string", "null"] }
+        }
+      },
+      "FrontendTask": {
+        "type": "object",
+        "description": "Implementation brief for the frontend agent.",
+        "properties": {
+          "goal": {
+            "type": "string",
+            "example": "Add editable event fields in Admin UI for the entry confirmation PDF configuration."
+          },
+          "uiSections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "Veranstalter & Kontakt",
+              "Veranstaltungsort & Fahrerlager",
+              "Termine",
+              "Wichtige Hinweise",
+              "Zahlungsdaten"
+            ]
+          },
+          "requirements": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": [
+              "Use the existing event create/edit API payloads; do not invent new endpoints.",
+              "Preserve unknown existing entryConfirmationConfig fields when editing.",
+              "Allow empty optional fields and submit null or omit empty values consistently with existing form conventions.",
+              "Provide repeatable UI controls for importantNotes and scheduleItems.",
+              "Use datetime inputs for schedule item startsAt/endsAt.",
+              "Add lightweight inline help text explaining these fields feed the admission PDF/mail attachment.",
+              "Keep the UI practical and admin-oriented, not overly decorative."
+            ]
+          },
+          "acceptanceCriteria": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": [
+              "Existing event edit screen loads and displays entryConfirmationConfig.",
+              "Admin can add/remove notes and schedule items.",
+              "PATCH sends nested entryConfirmationConfig correctly.",
+              "Reload after save shows persisted values.",
+              "Empty events without the config still render without crashes."
+            ]
+          }
+        }
+      }
+    }
+  },
+  "x-agent-instructions": {
+    "summary": "Implement the admin UI for the new event.entryConfirmationConfig fields used by the backend entry confirmation PDF.",
+    "preferredPlacement": "Place this as a dedicated collapsible card/section inside the event edit form. If create flow already supports advanced event metadata, it may also appear there; edit form is the minimum required.",
+    "fieldGrouping": [
+      "Veranstalter & Kontakt",
+      "Veranstaltungsort & Fahrerlager",
+      "Termine",
+      "Wichtige Hinweise",
+      "Zahlungsdaten"
+    ],
+    "notes": [
+      "Do not expose technical PDF internals or revision hashes.",
+      "Do not show legacy wording like entry_confirmation or system fallback labels.",
+      "Use German admin copy.",
+      "The backend already generates the PDF automatically for accepted_open_payment mails; frontend only needs data maintenance UI."
+    ]
+  }
+}

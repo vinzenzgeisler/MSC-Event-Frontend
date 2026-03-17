@@ -3,6 +3,8 @@ import { requestJson } from "@/services/api/http-client";
 import type {
   AdminSettingsClass,
   AdminSettingsClassDraft,
+  AdminSettingsEntryConfirmationConfig,
+  AdminSettingsEntryConfirmationScheduleItem,
   AdminSettingsEvent,
   AdminSettingsEventForm,
   AdminSettingsPricingForm
@@ -11,12 +13,17 @@ import type { VehicleType } from "@/types/common";
 
 type AdminCurrentEventResponse = {
   ok: boolean;
-  event: AdminSettingsEvent;
+  event: Record<string, unknown>;
 };
 
 type AdminEventResponse = {
   ok: boolean;
-  event: AdminSettingsEvent;
+  event: Record<string, unknown>;
+};
+
+type AdminEntryConfirmationDefaultsResponse = {
+  ok: boolean;
+  config: Record<string, unknown>;
 };
 
 type AdminClassResponse = {
@@ -71,6 +78,166 @@ function asVehicleType(value: unknown): VehicleType {
   return value === "moto" ? "moto" : "auto";
 }
 
+function asNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function asRequiredString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function normalizeScheduleItem(item: unknown): AdminSettingsEntryConfirmationScheduleItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const value = item as Record<string, unknown>;
+  const label = asRequiredString(value.label).trim();
+  if (!label) {
+    return null;
+  }
+  return {
+    label,
+    startsAt: asNullableString(value.startsAt) ?? "",
+    endsAt: asNullableString(value.endsAt) ?? "",
+    note: asNullableString(value.note) ?? ""
+  };
+}
+
+function emptyEntryConfirmationConfig(): AdminSettingsEntryConfirmationConfig {
+  return {
+    organizerName: "",
+    organizerAddressLine: "",
+    organizerContactEmail: "",
+    organizerContactPhone: "",
+    websiteUrl: "",
+    gateHeadline: "",
+    venueName: "",
+    venueStreet: "",
+    venueZip: "",
+    venueCity: "",
+    paddockInfo: "",
+    arrivalNotes: "",
+    accessNotes: "",
+    importantNotes: [],
+    scheduleItems: [],
+    paymentRecipient: "",
+    paymentIban: "",
+    paymentBic: "",
+    paymentBankName: "",
+    paymentReferencePrefix: ""
+  };
+}
+
+function normalizeEntryConfirmationConfig(value: unknown): AdminSettingsEntryConfirmationConfig {
+  const fallback = emptyEntryConfirmationConfig();
+  if (!value || typeof value !== "object") {
+    return fallback;
+  }
+  const source = value as Record<string, unknown>;
+  return {
+    organizerName: asNullableString(source.organizerName) ?? "",
+    organizerAddressLine: asNullableString(source.organizerAddressLine) ?? "",
+    organizerContactEmail: asNullableString(source.organizerContactEmail) ?? "",
+    organizerContactPhone: asNullableString(source.organizerContactPhone) ?? "",
+    websiteUrl: asNullableString(source.websiteUrl) ?? "",
+    gateHeadline: asNullableString(source.gateHeadline) ?? "",
+    venueName: asNullableString(source.venueName) ?? "",
+    venueStreet: asNullableString(source.venueStreet) ?? "",
+    venueZip: asNullableString(source.venueZip) ?? "",
+    venueCity: asNullableString(source.venueCity) ?? "",
+    paddockInfo: asNullableString(source.paddockInfo) ?? "",
+    arrivalNotes: asNullableString(source.arrivalNotes) ?? "",
+    accessNotes: asNullableString(source.accessNotes) ?? "",
+    importantNotes: Array.isArray(source.importantNotes)
+      ? source.importantNotes.filter((item): item is string => typeof item === "string")
+      : [],
+    scheduleItems: Array.isArray(source.scheduleItems)
+      ? source.scheduleItems
+          .map((item) => normalizeScheduleItem(item))
+          .filter((item): item is AdminSettingsEntryConfirmationScheduleItem => item !== null)
+      : [],
+    paymentRecipient: asNullableString(source.paymentRecipient) ?? "",
+    paymentIban: asNullableString(source.paymentIban) ?? "",
+    paymentBic: asNullableString(source.paymentBic) ?? "",
+    paymentBankName: asNullableString(source.paymentBankName) ?? "",
+    paymentReferencePrefix: asNullableString(source.paymentReferencePrefix) ?? ""
+  };
+}
+
+function mapEvent(event: Record<string, unknown>): AdminSettingsEvent {
+  return {
+    id: asRequiredString(event.id),
+    name: asRequiredString(event.name),
+    startsAt: asRequiredString(event.startsAt),
+    endsAt: asRequiredString(event.endsAt),
+    contactEmail: asNullableString(event.contactEmail),
+    websiteUrl: asNullableString(event.websiteUrl),
+    status: event.status === "open" || event.status === "closed" || event.status === "archived" ? event.status : "draft",
+    isCurrent: Boolean(event.isCurrent),
+    registrationOpenAt: asNullableString(event.registrationOpenAt),
+    registrationCloseAt: asNullableString(event.registrationCloseAt),
+    openedAt: asNullableString(event.openedAt),
+    closedAt: asNullableString(event.closedAt),
+    archivedAt: asNullableString(event.archivedAt),
+    createdAt: asRequiredString(event.createdAt),
+    updatedAt: asRequiredString(event.updatedAt),
+    entryConfirmationConfig: normalizeEntryConfirmationConfig(event.entryConfirmationConfig)
+  };
+}
+
+function toNullableText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toEntryConfirmationPayload(
+  config: AdminSettingsEntryConfirmationConfig,
+  mode: "full" | "compact" = "full"
+) {
+  const normalized = {
+    organizerName: toNullableText(config.organizerName),
+    organizerAddressLine: toNullableText(config.organizerAddressLine),
+    organizerContactEmail: toNullableText(config.organizerContactEmail),
+    organizerContactPhone: toNullableText(config.organizerContactPhone),
+    websiteUrl: toNullableText(config.websiteUrl),
+    gateHeadline: toNullableText(config.gateHeadline),
+    venueName: toNullableText(config.venueName),
+    venueStreet: toNullableText(config.venueStreet),
+    venueZip: toNullableText(config.venueZip),
+    venueCity: toNullableText(config.venueCity),
+    paddockInfo: toNullableText(config.paddockInfo),
+    arrivalNotes: toNullableText(config.arrivalNotes),
+    accessNotes: toNullableText(config.accessNotes),
+    importantNotes: config.importantNotes.map((item) => item.trim()).filter(Boolean),
+    scheduleItems: config.scheduleItems
+      .map((item) => ({
+        label: item.label.trim(),
+        startsAt: item.startsAt ? new Date(item.startsAt).toISOString() : null,
+        endsAt: item.endsAt ? new Date(item.endsAt).toISOString() : null,
+        note: toNullableText(item.note)
+      }))
+      .filter((item) => item.label),
+    paymentRecipient: toNullableText(config.paymentRecipient),
+    paymentIban: toNullableText(config.paymentIban),
+    paymentBic: toNullableText(config.paymentBic),
+    paymentBankName: toNullableText(config.paymentBankName),
+    paymentReferencePrefix: toNullableText(config.paymentReferencePrefix)
+  };
+
+  if (mode === "full") {
+    return normalized;
+  }
+
+  return Object.fromEntries(
+    Object.entries(normalized).filter(([, value]) => {
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      return value !== null;
+    })
+  );
+}
+
 function mapClass(item: AdminClassesListResponse["classes"][number], eventId: string): AdminSettingsClass | null {
   if (!item?.id || !item?.name) {
     return null;
@@ -86,16 +253,34 @@ function mapClass(item: AdminClassesListResponse["classes"][number], eventId: st
 }
 
 export const adminSettingsService = {
+  async getEntryConfirmationDefaults(): Promise<AdminSettingsEntryConfirmationConfig> {
+    const response = await requestJson<AdminEntryConfirmationDefaultsResponse>("/admin/config/entry-confirmation-defaults");
+    return normalizeEntryConfirmationConfig(response.config);
+  },
+
+  async updateEntryConfirmationDefaults(
+    config: AdminSettingsEntryConfirmationConfig
+  ): Promise<AdminSettingsEntryConfirmationConfig> {
+    const response = await requestJson<AdminEntryConfirmationDefaultsResponse>("/admin/config/entry-confirmation-defaults", {
+      method: "PATCH",
+      body: {
+        config: toEntryConfirmationPayload(config, "full")
+      }
+    });
+    return normalizeEntryConfirmationConfig(response.config);
+  },
+
   async getCurrentEvent(): Promise<AdminSettingsEvent> {
     const response = await requestJson<AdminCurrentEventResponse>("/admin/events/current");
-    return response.event;
+    return mapEvent(response.event);
   },
 
   async createEvent(payload: AdminSettingsEventForm): Promise<AdminSettingsEvent> {
     const body: Record<string, unknown> = {
       name: payload.name,
       startsAt: payload.startsAt,
-      endsAt: payload.endsAt
+      endsAt: payload.endsAt,
+      entryConfirmationConfig: toEntryConfirmationPayload(payload.entryConfirmationConfig, "compact")
     };
 
     if (payload.registrationOpenAt) {
@@ -112,7 +297,7 @@ export const adminSettingsService = {
     });
 
     resetEventContextCache();
-    return response.event;
+    return mapEvent(response.event);
   },
 
   async updateEvent(eventId: string, payload: AdminSettingsEventForm): Promise<AdminSettingsEvent> {
@@ -123,12 +308,13 @@ export const adminSettingsService = {
         startsAt: payload.startsAt,
         endsAt: payload.endsAt,
         registrationOpenAt: payload.registrationOpenAt ? new Date(payload.registrationOpenAt).toISOString() : null,
-        registrationCloseAt: payload.registrationCloseAt ? new Date(payload.registrationCloseAt).toISOString() : null
+        registrationCloseAt: payload.registrationCloseAt ? new Date(payload.registrationCloseAt).toISOString() : null,
+        entryConfirmationConfig: toEntryConfirmationPayload(payload.entryConfirmationConfig, "compact")
       }
     });
 
     resetEventContextCache();
-    return response.event;
+    return mapEvent(response.event);
   },
 
   async listClasses(eventId: string): Promise<AdminSettingsClass[]> {
@@ -188,19 +374,19 @@ export const adminSettingsService = {
   async activateEvent(eventId: string): Promise<AdminSettingsEvent> {
     const response = await requestJson<AdminEventResponse>(`/admin/events/${eventId}/activate`, { method: "POST" });
     resetEventContextCache();
-    return response.event;
+    return mapEvent(response.event);
   },
 
   async closeEvent(eventId: string): Promise<AdminSettingsEvent> {
     const response = await requestJson<AdminEventResponse>(`/admin/events/${eventId}/close`, { method: "POST" });
     resetEventContextCache();
-    return response.event;
+    return mapEvent(response.event);
   },
 
   async archiveEvent(eventId: string): Promise<AdminSettingsEvent> {
     const response = await requestJson<AdminEventResponse>(`/admin/events/${eventId}/archive`, { method: "POST" });
     resetEventContextCache();
-    return response.event;
+    return mapEvent(response.event);
   },
 
   async recalculateInvoices(eventId: string): Promise<AdminInvoiceRecalculateResponse> {

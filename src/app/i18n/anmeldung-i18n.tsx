@@ -37,7 +37,7 @@ const baseMessages = {
       back: "Zurück",
       next: "Weiter",
       step2BlockedReason: "Bitte zuerst mindestens eine Startmeldung hinzufügen.",
-      submitErrorConsent: "Bitte alle Einwilligungen bestätigen.",
+      submitErrorConsent: "Bitte alle erforderlichen Bestätigungen vor dem Absenden aktivieren.",
       submitErrorGeneric: "Anmeldung konnte nicht gespeichert werden.",
       submitErrorUnavailable: "Anmeldung ist aktuell nicht verfügbar.",
       submitErrorEmailInUse:
@@ -277,7 +277,7 @@ const baseMessages = {
       back: "Back",
       next: "Next",
       step2BlockedReason: "Please add at least one start entry first.",
-      submitErrorConsent: "Please confirm all consent checkboxes.",
+      submitErrorConsent: "Please confirm all required confirmations before submitting.",
       submitErrorGeneric: "Registration could not be saved.",
       submitErrorUnavailable: "Registration is currently unavailable.",
       submitErrorEmailInUse:
@@ -500,7 +500,7 @@ const baseMessages = {
       back: "Zpět",
       next: "Další",
       step2BlockedReason: "Nejprve přidejte alespoň jeden start.",
-      submitErrorConsent: "Potvrďte prosím všechny souhlasy.",
+      submitErrorConsent: "Před odesláním potvrďte všechna povinná potvrzení.",
       submitErrorGeneric: "Registraci se nepodařilo uložit.",
       submitErrorUnavailable: "Registrace nyní není dostupná.",
       submitErrorEmailInUse:
@@ -738,7 +738,7 @@ const messages: Record<AnmeldungLocale, AnmeldungMessages> = {
       back: "Wstecz",
       next: "Dalej",
       step2BlockedReason: "Najpierw dodaj co najmniej jedno zgłoszenie startowe.",
-      submitErrorConsent: "Potwierdź wszystkie zgody.",
+      submitErrorConsent: "Przed wysłaniem potwierdź wszystkie wymagane potwierdzenia.",
       submitErrorGeneric: "Nie udało się zapisać rejestracji.",
       submitErrorUnavailable: "Rejestracja jest obecnie niedostępna.",
       submitErrorEmailInUse:

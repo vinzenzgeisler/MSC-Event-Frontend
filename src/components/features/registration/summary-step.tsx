@@ -6,7 +6,7 @@ import { getCountryLabel } from "@/lib/countries";
 import { Button } from "@/components/ui/button";
 import type { RegistrationWizardForm } from "@/types/registration";
 
-type ConsentToggleField = "termsAccepted" | "privacyAccepted" | "mediaAccepted";
+type ConsentToggleField = "termsAccepted" | "privacyAccepted" | "waiverAccepted" | "mediaAccepted" | "clubInfoAccepted";
 
 type SummaryStepProps = {
   form: RegistrationWizardForm;
@@ -71,59 +71,75 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
         ))}
       </div>
 
-      <div className="space-y-3 rounded-xl border p-4">
-        <h3 className="font-semibold text-slate-900">{m.summary.consentTitle}</h3>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{legalTexts.shortInfo}</div>
-        <div className="text-sm text-slate-700">
-          <Link className="text-primary hover:underline" to="/anmeldung/rechtliches/datenschutz" target="_blank" rel="noreferrer">
-            {legalTexts.privacyDoc.title}
-          </Link>
-          {" · "}
-          <Link className="text-primary hover:underline" to="/anmeldung/rechtliches/teilnahmebedingungen" target="_blank" rel="noreferrer">
-            {legalTexts.termsDoc.title}
-          </Link>
-          {" · "}
-          <Link className="text-primary hover:underline" to="/anmeldung/rechtliches/haftverzicht" target="_blank" rel="noreferrer">
-            {legalTexts.waiverDoc.title}
-          </Link>
+      <div className="space-y-5 rounded-xl border p-4 md:p-5">
+        <div className="space-y-2">
+          <h3 className="font-semibold text-slate-900">{legalTexts.summary.title}</h3>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">{legalTexts.summary.introTitle}</p>
+            <div className="mt-2 space-y-3 text-sm leading-6 text-slate-700">
+              {legalTexts.summary.introBody.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
+            {(["datenschutz", "teilnahmebedingungen", "haftverzicht", "impressum"] as const).map((docId) => (
+              <Link key={docId} className="font-medium text-primary hover:underline" to={`/anmeldung/rechtliches/${docId}`} target="_blank" rel="noreferrer">
+                {legalTexts.docs[docId].summaryLinkLabel}
+              </Link>
+            ))}
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-950">{legalTexts.summary.waiverNoticeTitle}</p>
+            <p className="mt-1 text-sm leading-6 text-amber-900">{legalTexts.summary.waiverNoticeBody}</p>
+          </div>
         </div>
-        <p className="text-sm leading-6 text-slate-700">{legalTexts.waiverSignNotice}</p>
 
-        <fieldset className="space-y-3" aria-describedby={hasConsentError ? "summary-consent-error" : undefined}>
+        <fieldset className="space-y-4" aria-describedby={hasConsentError ? "summary-consent-error" : undefined}>
           <legend className="sr-only">{m.summary.consentTitle}</legend>
-          <label className="flex items-start gap-2 text-sm text-slate-800">
-            <input
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">{legalTexts.summary.requiredTitle}</p>
+            <ConsentCheckbox
               id="summary-consent-terms"
-              type="checkbox"
               checked={form.consent.termsAccepted}
-              onChange={(event) => onConsentChange("termsAccepted", event.target.checked)}
-              className="mt-0.5 h-4 w-4"
-              aria-invalid={hasConsentError ? "true" : "false"}
+              invalid={hasConsentError}
+              onChange={(value) => onConsentChange("termsAccepted", value)}
+              label={legalTexts.summary.termsAcceptanceLabel}
             />
-            <span>{legalTexts.termsAcceptanceLabel}</span>
-          </label>
-          <label className="flex items-start gap-2 text-sm text-slate-800">
-            <input
+            <ConsentCheckbox
               id="summary-consent-privacy"
-              type="checkbox"
               checked={form.consent.privacyAccepted}
-              onChange={(event) => onConsentChange("privacyAccepted", event.target.checked)}
-              className="mt-0.5 h-4 w-4"
-              aria-invalid={hasConsentError ? "true" : "false"}
+              invalid={hasConsentError}
+              onChange={(value) => onConsentChange("privacyAccepted", value)}
+              label={legalTexts.summary.privacyAcceptanceLabel}
             />
-            <span>{legalTexts.privacyAcceptanceLabel}</span>
-          </label>
-          <label className="flex items-start gap-2 text-sm text-slate-800">
-            <input
+            <ConsentCheckbox
+              id="summary-consent-waiver"
+              checked={form.consent.waiverAccepted}
+              invalid={hasConsentError}
+              onChange={(value) => onConsentChange("waiverAccepted", value)}
+              label={legalTexts.summary.waiverAcceptanceLabel}
+            />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-slate-900">{legalTexts.summary.optionalTitle}</p>
+            <p className="text-sm leading-6 text-slate-700">{legalTexts.summary.voluntaryBody}</p>
+            <ConsentCheckbox
               id="summary-consent-media"
-              type="checkbox"
               checked={form.consent.mediaAccepted}
-              onChange={(event) => onConsentChange("mediaAccepted", event.target.checked)}
-              className="mt-0.5 h-4 w-4"
+              onChange={(value) => onConsentChange("mediaAccepted", value)}
+              label={legalTexts.summary.mediaAcceptanceLabel}
             />
-            <span>{legalTexts.mediaAcceptanceLabel}</span>
-          </label>
-          <p className="text-xs text-slate-600">{legalTexts.minorNotice}</p>
+            <ConsentCheckbox
+              id="summary-consent-club-info"
+              checked={form.consent.clubInfoAccepted}
+              onChange={(value) => onConsentChange("clubInfoAccepted", value)}
+              label={legalTexts.summary.clubInfoAcceptanceLabel}
+            />
+          </div>
+
+          <p className="text-xs leading-5 text-slate-600">{legalTexts.summary.minorNotice}</p>
           {consentError && (
             <p ref={errorRef} tabIndex={-1} id="summary-consent-error" className="text-sm text-destructive" role="alert" aria-live="assertive">
               {consentError}
@@ -143,5 +159,29 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
         {m.summary.submit}
       </Button>
     </div>
+  );
+}
+
+type ConsentCheckboxProps = {
+  id: string;
+  checked: boolean;
+  label: string;
+  invalid?: boolean;
+  onChange: (value: boolean) => void;
+};
+
+function ConsentCheckbox({ id, checked, label, invalid = false, onChange }: ConsentCheckboxProps) {
+  return (
+    <label className="flex items-start gap-3 text-sm text-slate-800">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0"
+        aria-invalid={invalid ? "true" : "false"}
+      />
+      <span className="min-w-0 leading-6">{label}</span>
+    </label>
   );
 }

@@ -341,7 +341,9 @@ function fromAdminEntryDetailDto(
     consent: {
       termsAccepted: dto.consent.termsAccepted,
       privacyAccepted: dto.consent.privacyAccepted,
+      waiverAccepted: Boolean(dto.consent.waiverAccepted),
       mediaAccepted: dto.consent.mediaAccepted,
+      clubInfoAccepted: Boolean(dto.consent.clubInfoAccepted),
       consentVersion: dto.consent.consentVersion,
       consentCapturedAt: dto.consent.consentCapturedAt
     },

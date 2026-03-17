@@ -117,6 +117,8 @@ function MailNoteSwitch(props: {
   title: string;
   description: string;
 }) {
+  const effectiveChecked = props.disabled ? false : props.checked;
+
   return (
     <div className="rounded-md border bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -127,19 +129,24 @@ function MailNoteSwitch(props: {
         <button
           type="button"
           role="switch"
-          aria-checked={props.checked}
+          aria-checked={effectiveChecked}
           disabled={props.disabled}
-          onClick={() => props.onChange(!props.checked)}
+          onClick={() => {
+            if (props.disabled) {
+              return;
+            }
+            props.onChange(!effectiveChecked);
+          }}
           className={cn(
             "relative inline-flex h-6 w-11 items-center rounded-full border transition",
-            props.checked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-slate-200",
+            effectiveChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-slate-200",
             props.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
           )}
         >
           <span
             className={cn(
               "inline-block h-5 w-5 transform rounded-full bg-white shadow transition",
-              props.checked ? "translate-x-5" : "translate-x-0.5"
+              effectiveChecked ? "translate-x-5" : "translate-x-0.5"
             )}
           />
         </button>
@@ -692,9 +699,11 @@ export function AdminEntryDetailPage() {
                   ))}
                 </div>
                 <div className="rounded border bg-slate-50 p-3 text-xs">
-                  <div>Haftung: {detail.consent.termsAccepted ? "Ja" : "Nein"}</div>
+                  <div>Teilnahmebedingungen: {detail.consent.termsAccepted ? "Ja" : "Nein"}</div>
                   <div>Datenschutz: {detail.consent.privacyAccepted ? "Ja" : "Nein"}</div>
+                  <div>Haftverzicht: {detail.consent.waiverAccepted ? "Ja" : "Nein"}</div>
                   <div>Medien: {detail.consent.mediaAccepted ? "Ja" : "Nein"}</div>
+                  <div>Vereinsinfos: {detail.consent.clubInfoAccepted ? "Ja" : "Nein"}</div>
                 </div>
               </CardContent>
             </Card>

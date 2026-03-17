@@ -99,6 +99,8 @@ function MailNoteSwitch(props: {
   title: string;
   description: string;
 }) {
+  const effectiveChecked = props.disabled ? false : props.checked;
+
   return (
     <div className="rounded-md border bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -109,19 +111,24 @@ function MailNoteSwitch(props: {
         <button
           type="button"
           role="switch"
-          aria-checked={props.checked}
+          aria-checked={effectiveChecked}
           disabled={props.disabled}
-          onClick={() => props.onChange(!props.checked)}
+          onClick={() => {
+            if (props.disabled) {
+              return;
+            }
+            props.onChange(!effectiveChecked);
+          }}
           className={cn(
             "relative inline-flex h-6 w-11 items-center rounded-full border transition",
-            props.checked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-slate-200",
+            effectiveChecked ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-slate-200",
             props.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
           )}
         >
           <span
             className={cn(
               "inline-block h-5 w-5 transform rounded-full bg-white shadow transition",
-              props.checked ? "translate-x-5" : "translate-x-0.5"
+              effectiveChecked ? "translate-x-5" : "translate-x-0.5"
             )}
           />
         </button>
@@ -1178,7 +1185,7 @@ export function AdminEntriesPage() {
               showToast("Nennung ist bereits zugelassen.");
               return;
             }
-            setIncludeDriverNoteOnAccept(true);
+            setIncludeDriverNoteOnAccept(Boolean(row?.driverNote?.trim()));
             setPendingAcceptEntryId(entryId);
           }}
           onSetRejected={async (entryId) => {
@@ -1194,7 +1201,7 @@ export function AdminEntriesPage() {
               showToast("Nennung ist bereits abgelehnt.");
               return;
             }
-            setIncludeDriverNoteOnReject(true);
+            setIncludeDriverNoteOnReject(Boolean(row?.driverNote?.trim()));
             setPendingRejectEntryId(entryId);
           }}
         />
@@ -1213,7 +1220,7 @@ export function AdminEntriesPage() {
             <p className="mt-2 text-sm text-slate-600">Nach der Bestätigung wird automatisch die Zulassungs-Mail an den Fahrer angestoßen.</p>
             <div className="mt-3">
               <MailNoteSwitch
-                checked={includeDriverNoteOnAccept}
+                checked={hasAcceptDriverNote ? includeDriverNoteOnAccept : false}
                 disabled={!hasAcceptDriverNote}
                 onChange={setIncludeDriverNoteOnAccept}
                 title="Fahrer-Notiz in Mail mitsenden"
@@ -1239,7 +1246,7 @@ export function AdminEntriesPage() {
                   setStatusActionBusy({ entryId, action: "accepted" });
                   try {
                     await adminEntriesService.setEntryStatus(entryId, "to_accepted", {
-                      includeDriverNoteInLifecycleMail: includeDriverNoteOnAccept
+                      includeDriverNoteInLifecycleMail: hasAcceptDriverNote ? includeDriverNoteOnAccept : false
                     });
                     applyLocalStatusUpdate(entryId, "accepted");
                     showToast(`${formatEntryHeadline(pendingAcceptRow)} wurde zugelassen.`);
@@ -1272,7 +1279,7 @@ export function AdminEntriesPage() {
             <p className="mt-2 text-sm text-slate-600">Die Nennung wird auf den Status „Abgelehnt“ gesetzt. Das kann später wieder geändert werden.</p>
             <div className="mt-3">
               <MailNoteSwitch
-                checked={includeDriverNoteOnReject}
+                checked={hasRejectDriverNote ? includeDriverNoteOnReject : false}
                 disabled={!hasRejectDriverNote}
                 onChange={setIncludeDriverNoteOnReject}
                 title="Fahrer-Notiz in Mail mitsenden"
@@ -1299,7 +1306,7 @@ export function AdminEntriesPage() {
                   setStatusActionBusy({ entryId, action: "rejected" });
                   try {
                     await adminEntriesService.setEntryStatus(entryId, "to_rejected", {
-                      includeDriverNoteInLifecycleMail: includeDriverNoteOnReject
+                      includeDriverNoteInLifecycleMail: hasRejectDriverNote ? includeDriverNoteOnReject : false
                     });
                     applyLocalStatusUpdate(entryId, "rejected");
                     showToast(`${formatEntryHeadline(pendingRejectRow)} wurde abgelehnt.`);
