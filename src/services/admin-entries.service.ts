@@ -588,7 +588,7 @@ export const adminEntriesService = {
     const shouldQueueAcceptedLifecycleManually =
       transition === "to_accepted" && mapped.lifecycleEventType === "accepted_open_payment";
 
-    const enqueueLifecycleMailIfNeeded = async (options?: { allowDuplicate?: boolean; force?: boolean }) => {
+    const enqueueLifecycleMailIfNeeded = async (options?: { allowDuplicate?: boolean; force?: boolean; includeDriverNoteInLifecycleMail?: boolean }) => {
       if (!options?.force && !mapped.sendLifecycleMail) {
         return;
       }
