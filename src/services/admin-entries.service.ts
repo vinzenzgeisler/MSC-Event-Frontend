@@ -600,6 +600,9 @@ export const adminEntriesService = {
         allowDuplicate: options?.allowDuplicate === true ? true : undefined
       });
     };
+    const queueLifecycleMailInBackground = (options?: { allowDuplicate?: boolean; force?: boolean; includeDriverNoteInLifecycleMail?: boolean }) => {
+      void enqueueLifecycleMailIfNeeded(options).catch(() => undefined);
+    };
     const waitForTargetStatus = async () => {
       const attempts = 8;
       const delayMs = 350;
@@ -633,7 +636,11 @@ export const adminEntriesService = {
         body: statusPayload
       });
       if (shouldQueueAcceptedLifecycleManually) {
-        await enqueueLifecycleMailIfNeeded({ force: true, allowDuplicate: true });
+        queueLifecycleMailInBackground({
+          force: true,
+          allowDuplicate: true,
+          includeDriverNoteInLifecycleMail: options?.includeDriverNoteInLifecycleMail
+        });
       }
       return { ok: true };
     } catch (error) {
@@ -644,10 +651,13 @@ export const adminEntriesService = {
 
       if (!isTransitionNotAllowedError(error)) {
         if (await waitForTargetStatus()) {
-          await enqueueLifecycleMailIfNeeded({
-            force: shouldQueueAcceptedLifecycleManually,
-            allowDuplicate: allowDuplicateResend || shouldQueueAcceptedLifecycleManually
-          });
+          if (shouldQueueAcceptedLifecycleManually) {
+            queueLifecycleMailInBackground({
+              force: true,
+              allowDuplicate: allowDuplicateResend || shouldQueueAcceptedLifecycleManually,
+              includeDriverNoteInLifecycleMail: options?.includeDriverNoteInLifecycleMail
+            });
+          }
           return { ok: true, eventuallyConsistent: true };
         }
         throw error;
@@ -655,10 +665,13 @@ export const adminEntriesService = {
     }
 
     if (await waitForTargetStatus()) {
-      await enqueueLifecycleMailIfNeeded({
-        force: shouldQueueAcceptedLifecycleManually,
-        allowDuplicate: shouldQueueAcceptedLifecycleManually
-      });
+      if (shouldQueueAcceptedLifecycleManually) {
+        queueLifecycleMailInBackground({
+          force: true,
+          allowDuplicate: true,
+          includeDriverNoteInLifecycleMail: options?.includeDriverNoteInLifecycleMail
+        });
+      }
       return { ok: true, alreadyInTargetStatus: true };
     }
 
@@ -692,10 +705,13 @@ export const adminEntriesService = {
         isDuplicateRequestError(error);
 
       if (await waitForTargetStatus()) {
-        await enqueueLifecycleMailIfNeeded({
-          force: shouldQueueAcceptedLifecycleManually,
-          allowDuplicate: allowDuplicateResend || shouldQueueAcceptedLifecycleManually
-        });
+        if (shouldQueueAcceptedLifecycleManually) {
+          queueLifecycleMailInBackground({
+            force: true,
+            allowDuplicate: allowDuplicateResend || shouldQueueAcceptedLifecycleManually,
+            includeDriverNoteInLifecycleMail: options?.includeDriverNoteInLifecycleMail
+          });
+        }
         return { ok: true, alreadyInTargetStatus: true };
       }
       throw error;
