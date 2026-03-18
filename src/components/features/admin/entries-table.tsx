@@ -178,6 +178,7 @@ export function EntriesTable({
                   <div className="text-xs text-slate-600">
                     {row.classLabel} · #{row.startNumber}
                   </div>
+                  {row.orgaCode ? <div className="text-xs text-slate-500">Orga-Code: {row.orgaCode}</div> : null}
                   <div className="text-xs text-slate-500">{row.vehicleLabel}</div>
                   {isDoppelstarter(row) && (
                     <Badge className="mt-1 h-5 border-amber-300 bg-amber-50 px-1.5 text-[10px] text-amber-800" variant="outline">
@@ -261,17 +262,19 @@ export function EntriesTable({
               <col className="w-[26%]" />
               <col className="w-[10%]" />
               <col className="w-[7%]" />
-              <col className="w-[11%]" />
               <col className="w-[10%]" />
               <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[9%]" />
               <col className="w-[8%]" />
-              <col className="w-[17%]" />
+              <col className="w-[19%]" />
             </colgroup>
             <thead className="bg-slate-100 text-left text-slate-700">
               <tr className="border-l-4 border-l-slate-100">
                 <th className="px-4 py-3 font-semibold">Nennung</th>
                 <th className="px-3 py-3 font-semibold">Klasse</th>
                 <th className="px-3 py-3 font-semibold">St.-Nr.</th>
+                <th className="px-3 py-3 font-semibold">Orga-Code</th>
                 <th className="px-3 py-3 font-semibold">Status</th>
                 <th className="px-3 py-3 font-semibold">Zahlung</th>
                 <th className="px-3 py-3 font-semibold">Check-in</th>
@@ -311,6 +314,9 @@ export function EntriesTable({
                   </td>
                   <td className="px-3 py-3.5 font-medium text-slate-900">
                     <span className="block truncate">{row.startNumber}</span>
+                  </td>
+                  <td className="px-3 py-3.5 text-slate-700">
+                    <span className="block truncate">{row.orgaCode || "—"}</span>
                   </td>
                   <td className="px-3 py-3">
                     <Badge className={`${acceptanceStatusClasses(row.status)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">

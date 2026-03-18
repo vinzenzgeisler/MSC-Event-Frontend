@@ -10,6 +10,7 @@ export type AdminSettingsEntryConfirmationScheduleItem = {
 };
 
 export type AdminSettingsEntryConfirmationConfig = {
+  orgaCodePrefix: string;
   organizerName: string;
   organizerAddressLine: string;
   organizerContactEmail: string;

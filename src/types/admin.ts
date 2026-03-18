@@ -24,6 +24,7 @@ export type AdminEntryListItemDto = {
   driverFirstName?: string | null;
   driverLastName?: string | null;
   driverEmail?: string | null;
+  orgaCode?: string | null;
   vehicleLabel: string;
   vehicleThumbUrl: string | null;
   acceptanceStatus: AcceptanceStatus;
@@ -60,6 +61,7 @@ export type AdminEntryListItem = {
   id: Id;
   classId?: Id;
   name: string;
+  orgaCode: string;
   driverPersonIdRaw: string;
   driverEmailRaw: string;
   groupIdRaw: string;
@@ -131,6 +133,7 @@ export type AdminEntryDetailDto = {
   className: string;
   registrationStatus: RegistrationStatus;
   acceptanceStatus: AcceptanceStatus;
+  orgaCode?: string | null;
   startNumberNorm: string | null;
   isBackupVehicle: boolean;
   relatedEntryIds: Id[];
@@ -246,6 +249,7 @@ export type AdminEntryDetailViewModel = {
   headline: string;
   classLabel: string;
   startNumber: string;
+  orgaCode: string;
   status: AcceptanceStatus;
   paymentStatus: PaymentStatus;
   registrationStatus: RegistrationStatus;

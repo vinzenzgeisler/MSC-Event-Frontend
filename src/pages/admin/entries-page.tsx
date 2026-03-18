@@ -302,10 +302,13 @@ function rowMatchesFilter(row: AdminEntryListItem, filter: AdminEntriesFilter, c
 
   const firstName = normalizeSearchValue(row.driverFirstNameRaw || "");
   const lastName = normalizeSearchValue(row.driverLastNameRaw || "");
+  const orgaCode = normalizeSearchValue(row.orgaCode || "");
   const startNumber = normalizeSearchValue(row.startNumber || "");
   const startNumberNorm = normalizeSearchValue(row.startNumberNormRaw || "");
   const email = normalizeSearchValue(row.driverEmailRaw || "");
-  const anyHaystack = normalizeSearchValue([row.name, row.vehicleLabel, firstName, lastName, startNumber, startNumberNorm, email].join(" "));
+  const anyHaystack = normalizeSearchValue(
+    [row.name, row.vehicleLabel, firstName, lastName, orgaCode, startNumber, startNumberNorm, email].join(" ")
+  );
 
   return tokens.every((token) => anyHaystack.includes(token.value));
 }

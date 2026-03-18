@@ -105,6 +105,7 @@ function normalizeScheduleItem(item: unknown): AdminSettingsEntryConfirmationSch
 
 function emptyEntryConfirmationConfig(): AdminSettingsEntryConfirmationConfig {
   return {
+    orgaCodePrefix: "",
     organizerName: "",
     organizerAddressLine: "",
     organizerContactEmail: "",
@@ -135,6 +136,7 @@ function normalizeEntryConfirmationConfig(value: unknown): AdminSettingsEntryCon
   }
   const source = value as Record<string, unknown>;
   return {
+    orgaCodePrefix: asNullableString(source.orgaCodePrefix) ?? "",
     organizerName: asNullableString(source.organizerName) ?? "",
     organizerAddressLine: asNullableString(source.organizerAddressLine) ?? "",
     organizerContactEmail: asNullableString(source.organizerContactEmail) ?? "",
@@ -195,6 +197,7 @@ function toEntryConfirmationPayload(
   mode: "full" | "compact" = "full"
 ) {
   const normalized = {
+    orgaCodePrefix: toNullableText(config.orgaCodePrefix),
     organizerName: toNullableText(config.organizerName),
     organizerAddressLine: toNullableText(config.organizerAddressLine),
     organizerContactEmail: toNullableText(config.organizerContactEmail),

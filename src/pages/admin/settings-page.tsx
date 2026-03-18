@@ -40,6 +40,20 @@ function toDatetimeLocal(value: string | null) {
   return new Date(parsed.getTime() - tzOffsetMs).toISOString().slice(0, 16);
 }
 
+function entryConfirmationConfigToForm(
+  config: AdminSettingsEntryConfirmationConfig
+): AdminSettingsEntryConfirmationConfig {
+  return {
+    ...config,
+    importantNotes: [...config.importantNotes],
+    scheduleItems: config.scheduleItems.map((item) => ({
+      ...item,
+      startsAt: toDatetimeLocal(item.startsAt || null),
+      endsAt: toDatetimeLocal(item.endsAt || null)
+    }))
+  };
+}
+
 function eventToForm(event: AdminSettingsEvent): AdminSettingsEventForm {
   return {
     name: event.name,
@@ -47,15 +61,7 @@ function eventToForm(event: AdminSettingsEvent): AdminSettingsEventForm {
     endsAt: event.endsAt,
     registrationOpenAt: toDatetimeLocal(event.registrationOpenAt),
     registrationCloseAt: toDatetimeLocal(event.registrationCloseAt),
-    entryConfirmationConfig: {
-      ...event.entryConfirmationConfig,
-      importantNotes: [...event.entryConfirmationConfig.importantNotes],
-      scheduleItems: event.entryConfirmationConfig.scheduleItems.map((item) => ({
-        ...item,
-        startsAt: toDatetimeLocal(item.startsAt || null),
-        endsAt: toDatetimeLocal(item.endsAt || null)
-      }))
-    }
+    entryConfirmationConfig: entryConfirmationConfigToForm(event.entryConfirmationConfig)
   };
 }
 
@@ -70,6 +76,7 @@ function createEmptyEntryConfirmationScheduleItem(): AdminSettingsEntryConfirmat
 
 function createEmptyEntryConfirmationConfig(): AdminSettingsEntryConfirmationConfig {
   return {
+    orgaCodePrefix: "",
     organizerName: "",
     organizerAddressLine: "",
     organizerContactEmail: "",
@@ -138,6 +145,11 @@ function buildEventOverrideConfig(
   defaults: AdminSettingsEntryConfirmationConfig
 ): AdminSettingsEntryConfirmationConfig {
   return {
+    orgaCodePrefix:
+      normalizeEntryConfirmationText(config.orgaCodePrefix) &&
+      normalizeEntryConfirmationText(config.orgaCodePrefix) !== normalizeEntryConfirmationText(defaults.orgaCodePrefix)
+        ? normalizeEntryConfirmationText(config.orgaCodePrefix)
+        : "",
     organizerName:
       normalizeEntryConfirmationText(config.organizerName) &&
       normalizeEntryConfirmationText(config.organizerName) !== normalizeEntryConfirmationText(defaults.organizerName)
@@ -263,6 +275,58 @@ function findInvalidScheduleItem(config: AdminSettingsEntryConfirmationConfig) {
   });
 }
 
+function getEntryConfirmationOverrideSections(config: AdminSettingsEntryConfirmationConfig) {
+  const sections: string[] = [];
+
+  if (
+    config.organizerName.trim() ||
+    config.organizerAddressLine.trim() ||
+    config.organizerContactEmail.trim() ||
+    config.organizerContactPhone.trim() ||
+    config.websiteUrl.trim()
+  ) {
+    sections.push("Veranstalter & Kontakt");
+  }
+
+  if (
+    config.gateHeadline.trim() ||
+    config.venueName.trim() ||
+    config.venueStreet.trim() ||
+    config.venueZip.trim() ||
+    config.venueCity.trim() ||
+    config.paddockInfo.trim() ||
+    config.arrivalNotes.trim() ||
+    config.accessNotes.trim()
+  ) {
+    sections.push("Veranstaltungsort & Fahrerlager");
+  }
+
+  if (config.scheduleItems.length > 0) {
+    sections.push("Termine");
+  }
+
+  if (config.importantNotes.some((item) => item.trim())) {
+    sections.push("Wichtige Hinweise");
+  }
+
+  if (
+    config.orgaCodePrefix.trim() ||
+    config.paymentRecipient.trim() ||
+    config.paymentIban.trim() ||
+    config.paymentBic.trim() ||
+    config.paymentBankName.trim() ||
+    config.paymentReferencePrefix.trim()
+  ) {
+    sections.push("Zahlungsdaten");
+  }
+
+  return sections;
+}
+
+function hasEntryConfirmationOverrides(config: AdminSettingsEntryConfirmationConfig) {
+  return getEntryConfirmationOverrideSections(config).length > 0;
+}
+
 type EntryConfirmationEditorProps = {
   mode: "defaults" | "overrides";
   config: AdminSettingsEntryConfirmationConfig;
@@ -369,7 +433,7 @@ function EntryConfirmationConfigEditor({
             />
           </div>
           <div className="space-y-1">
-            <Label>Veranstaltungsort</Label>
+            <Label>Veranstaltungsstätte</Label>
             <Input
               value={config.venueName}
               placeholder={placeholderFor("venueName")}
@@ -546,6 +610,15 @@ function EntryConfirmationConfigEditor({
       <div className="space-y-4 rounded-lg border border-slate-200 p-4">
         <div className="text-sm font-semibold text-slate-900">Zahlungsdaten</div>
         <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Orga-Code-Präfix</Label>
+            <Input
+              value={config.orgaCodePrefix}
+              placeholder={placeholderFor("orgaCodePrefix")}
+              disabled={disabled}
+              onChange={(event) => onFieldChange("orgaCodePrefix", event.target.value)}
+            />
+          </div>
           <div className="space-y-1">
             <Label>Zahlungsempfänger</Label>
             <Input
@@ -765,6 +838,7 @@ export function AdminSettingsPage() {
   });
 
   const [pricingInitializedForEventId, setPricingInitializedForEventId] = useState<string | null>(null);
+  const [eventOverridesExpanded, setEventOverridesExpanded] = useState(false);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -804,6 +878,7 @@ export function AdminSettingsPage() {
     setNewClassDraft({ name: "", vehicleType: "auto" });
     setPricingForm(buildDefaultPricingForm([]));
     setPricingInitializedForEventId(null);
+    setEventOverridesExpanded(false);
   };
 
   const loadData = async () => {
@@ -824,7 +899,7 @@ export function AdminSettingsPage() {
       ]);
 
       if (defaultsResult.status === "fulfilled") {
-        setEntryConfirmationDefaults(defaultsResult.value);
+        setEntryConfirmationDefaults(entryConfirmationConfigToForm(defaultsResult.value));
       } else {
         setEntryConfirmationDefaults(createEmptyEntryConfirmationConfig());
         setEntryConfirmationDefaultsError(
@@ -848,8 +923,10 @@ export function AdminSettingsPage() {
           adminSettingsService.getPricingRules(event.id).catch(() => null)
         ]);
 
+        const nextEventForm = eventToForm(event);
         setEventState(event);
-        setEventForm(eventToForm(event));
+        setEventForm(nextEventForm);
+        setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
         setClasses(classList);
         setClassDrafts(
           Object.fromEntries(
@@ -1098,9 +1175,11 @@ export function AdminSettingsPage() {
         registrationCloseAt: eventForm.registrationCloseAt,
         entryConfirmationConfig: eventForm.entryConfirmationConfig
       });
+      const nextEventForm = eventToForm(created);
       setNoCurrentEvent(false);
       setEventState(created);
-      setEventForm(eventToForm(created));
+      setEventForm(nextEventForm);
+      setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
       setClasses([]);
       setClassDrafts({});
       setPricingForm(buildDefaultPricingForm([]));
@@ -1127,7 +1206,7 @@ export function AdminSettingsPage() {
 
     try {
       const updated = await adminSettingsService.updateEntryConfirmationDefaults(entryConfirmationDefaults);
-      setEntryConfirmationDefaults(updated);
+      setEntryConfirmationDefaults(entryConfirmationConfigToForm(updated));
       showToast("Standarddaten der Nennbestätigung gespeichert.");
     } catch (error) {
       setEntryConfirmationDefaultsError(
@@ -1228,8 +1307,10 @@ export function AdminSettingsPage() {
       });
       await adminSettingsService.savePricingRules(eventState.id, pricingForm);
       const recalculateResult = await adminSettingsService.recalculateInvoices(eventState.id);
+      const nextEventForm = eventToForm(updated);
       setEventState(updated);
-      setEventForm(eventToForm(updated));
+      setEventForm(nextEventForm);
+      setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
       showToast(`Event-Konfiguration gespeichert (${recalculateResult.recalculated} Nennungen neu berechnet).`);
     } catch (error) {
       setEventError(getApiErrorMessage(error, "Event-Konfiguration konnte nicht gespeichert werden."));
@@ -1642,27 +1723,71 @@ export function AdminSettingsPage() {
                   </div>
 
                   <div className="space-y-4 border-t pt-4">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Event-Overrides für Nennbestätigung</div>
-                      <div className="text-sm text-slate-600">
-                        Leere Felder übernehmen automatisch die globalen Standarddaten. Trage hier nur abweichende Werte
-                        für diese Veranstaltung ein.
+                    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <div className="space-y-2">
+                        <div className="text-sm font-semibold text-slate-900">Abweichungen für dieses Event</div>
+                        <div className="text-sm text-slate-600">
+                          Standarddaten gelten automatisch. Öffne diesen Bereich nur, wenn dieses Event an einzelnen Stellen
+                          andere Angaben braucht.
+                        </div>
+                        {hasEntryConfirmationOverrides(eventForm.entryConfirmationConfig) ? (
+                          <div className="flex flex-wrap gap-2">
+                            {getEntryConfirmationOverrideSections(eventForm.entryConfirmationConfig).map((label) => (
+                              <span
+                                key={label}
+                                className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"
+                              >
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs font-medium text-emerald-700">Aktuell verwendet dieses Event nur die Standarddaten.</div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {hasEntryConfirmationOverrides(eventForm.entryConfirmationConfig) ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!canManage || !eventState}
+                            onClick={() => {
+                              setEventForm((prev) => ({
+                                ...prev,
+                                entryConfirmationConfig: createEmptyEntryConfirmationConfig()
+                              }));
+                              setEventOverridesExpanded(false);
+                            }}
+                          >
+                            Overrides zurücksetzen
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!canManage || !eventState}
+                          onClick={() => setEventOverridesExpanded((prev) => !prev)}
+                        >
+                          {eventOverridesExpanded ? "Overrides ausblenden" : "Overrides bearbeiten"}
+                        </Button>
                       </div>
                     </div>
 
-                    <EntryConfirmationConfigEditor
-                      mode="overrides"
-                      config={eventForm.entryConfirmationConfig}
-                      defaults={entryConfirmationDefaults}
-                      disabled={!canManage || !eventState}
-                      onFieldChange={updateEventEntryConfirmationField}
-                      onImportantNoteChange={updateEventImportantNote}
-                      onAddImportantNote={addEventImportantNote}
-                      onRemoveImportantNote={removeEventImportantNote}
-                      onScheduleItemChange={updateEventScheduleItem}
-                      onAddScheduleItem={addEventScheduleItem}
-                      onRemoveScheduleItem={removeEventScheduleItem}
-                    />
+                    {eventOverridesExpanded ? (
+                      <EntryConfirmationConfigEditor
+                        mode="overrides"
+                        config={eventForm.entryConfirmationConfig}
+                        defaults={entryConfirmationDefaults}
+                        disabled={!canManage || !eventState}
+                        onFieldChange={updateEventEntryConfirmationField}
+                        onImportantNoteChange={updateEventImportantNote}
+                        onAddImportantNote={addEventImportantNote}
+                        onRemoveImportantNote={removeEventImportantNote}
+                        onScheduleItemChange={updateEventScheduleItem}
+                        onAddScheduleItem={addEventScheduleItem}
+                        onRemoveScheduleItem={removeEventScheduleItem}
+                      />
+                    ) : null}
                   </div>
 
                   <div className="space-y-4 border-t pt-4">

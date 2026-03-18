@@ -1,0 +1,152 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MSC Event Backend - Entry Orga Code Contract",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/admin/entries": {
+      "get": {
+        "summary": "List entries",
+        "parameters": [
+          { "name": "eventId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "q", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Freitextsuche. Sucht jetzt auch in orgaCode." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entry list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AdminEntryListItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/entries/{entryId}": {
+      "get": {
+        "summary": "Get entry detail",
+        "parameters": [
+          { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entry detail",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminEntryDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/events/{eventId}": {
+      "get": {
+        "summary": "Get admin event",
+        "parameters": [
+          { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin event",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminEvent" }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch admin event",
+        "parameters": [
+          { "name": "eventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entryConfirmationConfig": { "$ref": "#/components/schemas/EntryConfirmationConfig" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patched event",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AdminEvent" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminEntryListItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "className": { "type": "string" },
+          "driverFirstName": { "type": ["string", "null"] },
+          "driverLastName": { "type": ["string", "null"] },
+          "startNumberNorm": { "type": ["string", "null"] },
+          "orgaCode": { "type": ["string", "null"], "description": "Kurzer Orga-Code pro Fahrer/Event, auf Entry mitgeführt und in der Suche enthalten." }
+        },
+        "required": ["id", "className", "orgaCode"]
+      },
+      "AdminEntryDetail": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "className": { "type": "string" },
+          "startNumberNorm": { "type": ["string", "null"] },
+          "orgaCode": { "type": ["string", "null"] },
+          "driverFirstName": { "type": ["string", "null"] },
+          "driverLastName": { "type": ["string", "null"] }
+        },
+        "required": ["id", "className", "orgaCode"]
+      },
+      "AdminEvent": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "entryConfirmationConfig": { "$ref": "#/components/schemas/EntryConfirmationConfig" }
+        },
+        "required": ["id", "name", "entryConfirmationConfig"]
+      },
+      "EntryConfirmationConfig": {
+        "type": "object",
+        "properties": {
+          "orgaCodePrefix": {
+            "type": ["string", "null"],
+            "description": "Optionaler Event-Präfix für den Orga-Code, z. B. 11OLD oder 12OLD. Der finale Code wird serverseitig als <prefix>-<suffix> generiert."
+          },
+          "paymentReferencePrefix": {
+            "type": ["string", "null"],
+            "deprecated": true,
+            "description": "Bestehendes Feld, für den Verwendungszweck nicht mehr führend. Neuer Standard läuft über orgaCodePrefix + Orga-Code."
+          }
+        }
+      }
+    }
+  }
+}

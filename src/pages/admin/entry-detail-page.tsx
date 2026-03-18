@@ -399,6 +399,7 @@ export function AdminEntryDetailPage() {
           <h1 className="break-words text-2xl font-semibold text-slate-900">{detail.headline}</h1>
           <p className="break-words text-sm text-slate-600">
             {detail.classLabel} · Startnummer {detail.startNumber}
+            {detail.orgaCode ? ` · Orga-Code ${detail.orgaCode}` : ""}
           </p>
           <p className="break-words text-xs text-slate-500">
             Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
@@ -552,6 +553,10 @@ export function AdminEntryDetailPage() {
                 <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Startnummer</div>
                   <div className="font-medium text-slate-900">{detail.startNumber}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs uppercase text-slate-500">Orga-Code</div>
+                  <div className="font-medium text-slate-900">{detail.orgaCode || "—"}</div>
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Fahrzeugtyp</div>
