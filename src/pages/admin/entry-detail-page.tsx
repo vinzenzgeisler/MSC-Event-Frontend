@@ -396,10 +396,12 @@ export function AdminEntryDetailPage() {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="break-words text-2xl font-semibold text-slate-900">{detail.headline}</h1>
+          <h1 className="break-words text-2xl font-semibold text-slate-900">
+            {detail.headline}
+            {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
+          </h1>
           <p className="break-words text-sm text-slate-600">
             {detail.classLabel} · Startnummer {detail.startNumber}
-            {detail.orgaCode ? ` · Orga-Code ${detail.orgaCode}` : ""}
           </p>
           <p className="break-words text-xs text-slate-500">
             Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}

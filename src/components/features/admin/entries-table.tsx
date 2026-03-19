@@ -178,8 +178,8 @@ export function EntriesTable({
                   <div className="text-xs text-slate-600">
                     {row.classLabel} · #{row.startNumber}
                   </div>
-                  {row.orgaCode ? <div className="text-xs text-slate-500">Orga-Code: {row.orgaCode}</div> : null}
                   <div className="text-xs text-slate-500">{row.vehicleLabel}</div>
+                  {row.orgaCode ? <div className="text-xs text-slate-500">Orga-Code: {row.orgaCode}</div> : null}
                   {isDoppelstarter(row) && (
                     <Badge className="mt-1 h-5 border-amber-300 bg-amber-50 px-1.5 text-[10px] text-amber-800" variant="outline">
                       Doppelstarter
@@ -259,10 +259,9 @@ export function EntriesTable({
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[26%]" />
+              <col className="w-[32%]" />
               <col className="w-[10%]" />
               <col className="w-[7%]" />
-              <col className="w-[10%]" />
               <col className="w-[11%]" />
               <col className="w-[10%]" />
               <col className="w-[9%]" />
@@ -274,7 +273,6 @@ export function EntriesTable({
                 <th className="px-4 py-3 font-semibold">Nennung</th>
                 <th className="px-3 py-3 font-semibold">Klasse</th>
                 <th className="px-3 py-3 font-semibold">St.-Nr.</th>
-                <th className="px-3 py-3 font-semibold">Orga-Code</th>
                 <th className="px-3 py-3 font-semibold">Status</th>
                 <th className="px-3 py-3 font-semibold">Zahlung</th>
                 <th className="px-3 py-3 font-semibold">Check-in</th>
@@ -301,6 +299,7 @@ export function EntriesTable({
                           )}
                         </div>
                         <div className="mt-1 truncate text-xs text-slate-600">{row.vehicleLabel}</div>
+                        {row.orgaCode ? <div className="truncate text-xs text-slate-500">Orga-Code: {row.orgaCode}</div> : null}
                         {isDoppelstarter(row) && (
                           <Badge className="mt-1 h-5 border-amber-300 bg-amber-50 px-1.5 text-[10px] text-amber-800" variant="outline">
                             Doppelstarter
@@ -314,9 +313,6 @@ export function EntriesTable({
                   </td>
                   <td className="px-3 py-3.5 font-medium text-slate-900">
                     <span className="block truncate">{row.startNumber}</span>
-                  </td>
-                  <td className="px-3 py-3.5 text-slate-700">
-                    <span className="block truncate">{row.orgaCode || "—"}</span>
                   </td>
                   <td className="px-3 py-3">
                     <Badge className={`${acceptanceStatusClasses(row.status)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">

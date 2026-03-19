@@ -25,7 +25,7 @@ function isAlreadyVerifiedConflict(error: ApiError) {
 }
 
 export function AnmeldungVerifyPage() {
-  const { locale } = useAnmeldungI18n();
+  const { m } = useAnmeldungI18n();
   const [searchParams] = useSearchParams();
   const [state, setState] = useState<VerifyViewState>("loading");
 
@@ -95,74 +95,7 @@ export function AnmeldungVerifyPage() {
     };
   }, [entryId, token]);
 
-  const copy =
-    locale === "en"
-      ? {
-          title: "Email Verification",
-          loadingTitle: "Checking verification...",
-          loadingText: "Please wait a moment.",
-          successTitle: "Email verified, registration confirmed.",
-          successText: "Thank you, your entry has been verified successfully.",
-          alreadyTitle: "Link already used.",
-          alreadyText: "This email has already been verified.",
-          invalidTitle: "The verification link is invalid or expired.",
-          invalidText: "Please request a new verification email.",
-          conflictTitle: "This email is already used in an active entry.",
-          conflictText: "Please use a different email or contact the event team.",
-          errorTitle: "Verification is currently unavailable.",
-          errorText: "Please try again later.",
-          resendButton: "Request new verification email"
-        }
-      : locale === "cz"
-        ? {
-            title: "Ověření e-mailu",
-            loadingTitle: "Ověření probíhá...",
-            loadingText: "Počkejte prosím chvíli.",
-            successTitle: "E-mail ověřen, registrace potvrzena.",
-            successText: "Děkujeme, vaše přihláška byla úspěšně ověřena.",
-            alreadyTitle: "Odkaz už byl použit.",
-            alreadyText: "Tento e-mail už byl ověřen.",
-            invalidTitle: "Ověřovací odkaz je neplatný nebo vypršel.",
-            invalidText: "Požádejte prosím o nový ověřovací e-mail.",
-            conflictTitle: "Tento e-mail už je použit v aktivní přihlášce.",
-            conflictText: "Použijte jiný e-mail nebo kontaktujte pořadatele.",
-            errorTitle: "Ověření nyní není možné.",
-            errorText: "Zkuste to prosím později.",
-            resendButton: "Vyžádat nový ověřovací e-mail"
-          }
-        : locale === "pl"
-          ? {
-              title: "Weryfikacja e-maila",
-              loadingTitle: "Sprawdzanie weryfikacji...",
-              loadingText: "Poczekaj chwilę.",
-              successTitle: "E-mail zweryfikowany, rejestracja potwierdzona.",
-              successText: "Dziękujemy, Twoje zgłoszenie zostało poprawnie zweryfikowane.",
-              alreadyTitle: "Link został już użyty.",
-              alreadyText: "Ten adres e-mail został już zweryfikowany.",
-              invalidTitle: "Link weryfikacyjny jest nieprawidłowy lub wygasł.",
-              invalidText: "Poproś o nowy e-mail weryfikacyjny.",
-              conflictTitle: "Ten adres e-mail jest już używany w aktywnym zgłoszeniu.",
-              conflictText: "Użyj innego adresu e-mail lub skontaktuj się z organizatorem.",
-              errorTitle: "Weryfikacja jest obecnie niedostępna.",
-              errorText: "Spróbuj ponownie później.",
-              resendButton: "Poproś o nowy e-mail weryfikacyjny"
-            }
-          : {
-              title: "E-Mail-Verifizierung",
-              loadingTitle: "Verifizierung wird geprüft…",
-              loadingText: "Bitte einen Moment warten.",
-              successTitle: "E-Mail verifiziert, Anmeldung bestätigt.",
-              successText: "Danke, deine Nennung wurde erfolgreich verifiziert.",
-              alreadyTitle: "Link wurde bereits verwendet.",
-              alreadyText: "Die E-Mail war schon verifiziert.",
-              invalidTitle: "Der Verifizierungslink ist ungültig oder abgelaufen.",
-              invalidText: "Bitte fordere eine neue Verifizierungs-Mail an.",
-              conflictTitle: "Diese E-Mail ist bereits in einer aktiven Nennung verwendet.",
-              conflictText: "Bitte verwende eine andere E-Mail oder kontaktiere das Orga-Team.",
-              errorTitle: "Verifizierung derzeit nicht möglich.",
-              errorText: "Bitte versuche es später erneut.",
-              resendButton: "Neue Verifizierungs-Mail anfordern"
-            };
+  const copy = m.verify;
 
   return (
     <Card className="mx-auto max-w-xl rounded-2xl border-slate-200 bg-white shadow-sm">
@@ -238,6 +171,11 @@ export function AnmeldungVerifyPage() {
               <a href={verificationResendUrl}>{copy.resendButton}</a>
             </Button>
           )}
+        </div>
+
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
+          <p className="font-medium text-blue-900">{copy.spamReminderTitle}</p>
+          <p className="mt-1 text-xs text-blue-800">{copy.spamReminderText}</p>
         </div>
       </CardContent>
     </Card>

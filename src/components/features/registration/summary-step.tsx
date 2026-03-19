@@ -93,6 +93,9 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
             <p className="text-sm font-semibold text-amber-950">{legalTexts.summary.waiverNoticeTitle}</p>
             <p className="mt-1 text-sm leading-6 text-amber-900">{legalTexts.summary.waiverNoticeBody}</p>
           </div>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm leading-6 text-blue-900">{m.summary.spamHint}</p>
+          </div>
         </div>
 
         <fieldset className="space-y-4" aria-describedby={hasConsentError ? "summary-consent-error" : undefined}>
