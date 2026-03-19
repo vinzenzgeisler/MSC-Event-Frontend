@@ -8194,14 +8194,8 @@
           "displacementCcm": {
             "type": "integer"
           },
-          "engineType": {
-            "type": "string"
-          },
           "cylinders": {
             "type": "integer"
-          },
-          "brakes": {
-            "type": "string"
           },
           "vehicleHistory": {
             "type": "string"
@@ -8222,9 +8216,7 @@
           "make",
           "model",
           "displacementCcm",
-          "engineType",
           "cylinders",
-          "brakes",
           "vehicleHistory"
         ]
       },

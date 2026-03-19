@@ -990,15 +990,15 @@ export function AnmeldungPage() {
 
     const amount = formatPriceRange(locale, pricing.secondVehiclePrice);
     if (locale === "en") {
-      return `Price for a second vehicle entry: ${amount}.`;
+      return `Additional start entry / double starter: ${amount}.`;
     }
     if (locale === "cz") {
-      return `Cena za druhé vozidlo: ${amount}.`;
+      return `Další start / dvojitý start: ${amount}.`;
     }
     if (locale === "pl") {
-      return `Cena za zgłoszenie drugiego pojazdu: ${amount}.`;
+      return `Dodatkowe zgłoszenie / podwójny start: ${amount}.`;
     }
-    return `Preis für ein zweites Fahrzeug: ${amount}.`;
+    return `Weitere Startmeldung / Doppelstarter: ${amount}.`;
   }, [eventOverview, locale]);
 
   const registrationClosedContent = useMemo(() => {
@@ -1531,7 +1531,7 @@ export function AnmeldungPage() {
             {successBody} <span className="font-semibold">{driver.email || "-"}</span>
             {successTail}
           </p>
-          <p className="mt-2 text-sm text-slate-600">{successMessage}</p>
+          <p className="mt-2 text-sm text-slate-600">{m.summary.spamHint}</p>
         </div>
       </div>
     );

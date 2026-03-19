@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { getCountrySelectOptions } from "@/lib/countries";
@@ -98,6 +99,13 @@ export function StartEntriesStep({
 }: StartEntriesStepProps) {
   const { m, locale } = useAnmeldungI18n();
   const countryOptions = getCountrySelectOptions(locale);
+  const sortedClasses = useMemo(() => {
+    const collator = new Intl.Collator(locale === "cz" ? "cs" : locale === "pl" ? "pl" : locale === "en" ? "en" : "de", {
+      numeric: true,
+      sensitivity: "base"
+    });
+    return [...classes].sort((left, right) => collator.compare(left.name, right.name));
+  }, [classes, locale]);
   const usedClassIds = new Set(starts.filter((item) => item.id !== editingId).map((item) => item.classId));
   const ownerPlaceholder =
     locale === "en"
@@ -168,14 +176,17 @@ export function StartEntriesStep({
       </div>
 
       {starts.length > 0 && !editingId && (
-        <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
-          <input
-            type="checkbox"
-            checked={addAnotherStart}
-            onChange={(event) => onAddAnotherStartChange(event.target.checked)}
-          />
-          {m.start.addAnotherToggle}
-        </label>
+        <div className="space-y-1">
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+            <input
+              type="checkbox"
+              checked={addAnotherStart}
+              onChange={(event) => onAddAnotherStartChange(event.target.checked)}
+            />
+            {m.start.addAnotherToggle}
+          </label>
+          {secondVehiclePriceHint && <p className="text-xs text-slate-600">{secondVehiclePriceHint}</p>}
+        </div>
       )}
 
       {showDraftForm && (
@@ -209,7 +220,7 @@ export function StartEntriesStep({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
-                {classes.map((item) => (
+                {sortedClasses.map((item) => (
                   <SelectItem key={item.id} value={item.id} disabled={usedClassIds.has(item.id)}>
                     {item.name}
                   </SelectItem>
@@ -405,7 +416,6 @@ export function StartEntriesStep({
         <details className="rounded-lg border p-4">
           <summary className="cursor-pointer text-sm font-medium text-slate-900">{m.start.backupSummary}</summary>
           <div className="mt-4 space-y-3">
-            {secondVehiclePriceHint && <p className="text-xs text-slate-600">{secondVehiclePriceHint}</p>}
             <label className="flex items-center gap-2 text-sm text-slate-800">
               <input
                 type="checkbox"
