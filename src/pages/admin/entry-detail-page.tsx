@@ -34,16 +34,6 @@ function euroInputFromCents(value: number): string {
   return (value / 100).toFixed(2).replace(".", ",");
 }
 
-function brakeLabel(value: string) {
-  if (value === "steel") {
-    return "Stahlbremsen";
-  }
-  if (value === "ceramic") {
-    return "Keramikbremsen";
-  }
-  return value;
-}
-
 function formatTimestamp(value: string) {
   const raw = (value ?? "").trim();
   if (!raw) {
@@ -579,16 +569,8 @@ export function AdminEntryDetailPage() {
                   <div className="font-medium text-slate-900">{detail.vehicle.displacementCcm}</div>
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2">
-                  <div className="text-xs uppercase text-slate-500">Motor</div>
-                  <div className="font-medium text-slate-900">{detail.vehicle.engineType}</div>
-                </div>
-                <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Zylinder</div>
                   <div className="font-medium text-slate-900">{detail.vehicle.cylinders}</div>
-                </div>
-                <div className="rounded-md border bg-slate-50 p-2">
-                  <div className="text-xs uppercase text-slate-500">Bremsen</div>
-                  <div className="font-medium text-slate-900">{brakeLabel(detail.vehicle.brakes)}</div>
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Besitzer</div>
@@ -628,14 +610,8 @@ export function AdminEntryDetailPage() {
                       <div className="font-medium text-slate-900">{detail.backupVehicle.displacementCcm}</div>
                     </div>
                     <div className="rounded-md border bg-white p-2">
-                      <div className="text-xs uppercase text-slate-500">Motor / Zylinder</div>
-                      <div className="font-medium text-slate-900">
-                        {detail.backupVehicle.engineType} · {detail.backupVehicle.cylinders}
-                      </div>
-                    </div>
-                    <div className="rounded-md border bg-white p-2">
-                      <div className="text-xs uppercase text-slate-500">Bremsen</div>
-                      <div className="font-medium text-slate-900">{brakeLabel(detail.backupVehicle.brakes)}</div>
+                      <div className="text-xs uppercase text-slate-500">Zylinder</div>
+                      <div className="font-medium text-slate-900">{detail.backupVehicle.cylinders}</div>
                     </div>
                     <div className="rounded-md border bg-white p-2">
                       <div className="text-xs uppercase text-slate-500">Besitzer</div>

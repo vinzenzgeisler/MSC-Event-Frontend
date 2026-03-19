@@ -12,7 +12,7 @@ const baseMessages = {
       dateBadge: "12./13. September 2026",
       title: "12. Oberlausitzer Dreieck",
       subtitle:
-        "Fahreranmeldung für Demo-Läufe und historische Klassen. Bitte alle Angaben vollständig erfassen, damit Zulassung und Kommunikation schnell laufen.",
+        "Schön, dass du beim Oberlausitzer Dreieck dabei sein möchtest. Erfasse hier deine Nennung Schritt für Schritt und prüfe am Ende alles in Ruhe.",
       chips: ["Ort: Großschönau / Zittauer Gebirge", "Streckenlänge: 5,9 km", "Anmeldung Schritt-für-Schritt"],
       websiteButton: "Zur Vereinswebsite",
       infoDeadlineTitle: "Meldeschluss",
@@ -31,7 +31,7 @@ const baseMessages = {
       openBadge: "Anmeldung geöffnet",
       title: "Teilnehmer-Anmeldung",
       subtitle:
-        "Schritt für Schritt zur vollständigen Nennung. Du kannst mehrere Startmeldungen je Fahrer erfassen und am Ende alles prüfen.",
+        "Lege hier deine Nennung für das Event an. Mehrere Starts pro Fahrer sind möglich und vor dem Absenden kannst du alle Angaben noch einmal prüfen.",
       nextToStarts: "Weiter zu Startmeldungen",
       nextToSummary: "Weiter zur Zusammenfassung",
       back: "Zurück",
@@ -76,7 +76,7 @@ const baseMessages = {
     },
     start: {
       title: "Startmeldungen",
-      intro: "Ein Fahrer kann mehrere Startmeldungen erfassen. Jede Meldung enthält Klasse, Startnummer und Fahrzeugdaten.",
+      intro: "Hier legst du deine Starts für das Event an. Für jeden Start erfasst du Klasse, Startnummer und die wichtigsten Fahrzeugangaben.",
       empty: "Noch keine Startmeldung erfasst.",
       codriverBadge: "Beifahrer",
       backupBadge: "Ersatzfahrzeug",
@@ -272,7 +272,7 @@ const baseMessages = {
       dateBadge: "September 12/13, 2026",
       title: "12th Oberlausitzer Dreieck",
       subtitle:
-        "Driver registration for demo runs and historic classes. Please provide complete data for a fast approval and communication flow.",
+        "Great to have you join the Oberlausitzer Dreieck. Use this form to complete your entry step by step and review everything before submitting.",
       chips: ["Location: Großschönau / Zittauer Gebirge", "Track length: 5.9 km", "Step-by-step registration"],
       websiteButton: "Go to club website",
       infoDeadlineTitle: "Registration deadline",
@@ -290,7 +290,7 @@ const baseMessages = {
     page: {
       openBadge: "Registration open",
       title: "Participant Registration",
-      subtitle: "Complete your entry step-by-step. You can submit multiple start entries per driver and review everything at the end.",
+      subtitle: "Create your event entry here. Multiple starts per driver are possible, and you can review all details before submitting.",
       nextToStarts: "Continue to start entries",
       nextToSummary: "Continue to summary",
       back: "Back",
@@ -335,7 +335,7 @@ const baseMessages = {
     },
     start: {
       title: "Start Entries",
-      intro: "A driver can submit multiple start entries. Each entry includes class, start number and vehicle data.",
+      intro: "Create your starts for the event here. For each start, enter the class, start number and the key vehicle details.",
       empty: "No start entry added yet.",
       codriverBadge: "Co-driver",
       backupBadge: "Backup vehicle",
@@ -514,7 +514,7 @@ const baseMessages = {
     layout: {
       dateBadge: "12./13. září 2026",
       title: "12. Oberlausitzer Dreieck",
-      subtitle: "Registrace jezdců pro demo jízdy a historické třídy. Vyplňte prosím všechny údaje pro rychlé schválení a komunikaci.",
+      subtitle: "Jsme rádi, že se chcete zúčastnit Oberlausitzer Dreieck. Zde svou přihlášku vyplníte krok za krokem a před odesláním vše v klidu zkontrolujete.",
       chips: ["Místo: Großschönau / Zittauer Gebirge", "Délka tratě: 5,9 km", "Registrace krok za krokem"],
       websiteButton: "Na klubový web",
       infoDeadlineTitle: "Uzávěrka registrace",
@@ -532,7 +532,7 @@ const baseMessages = {
     page: {
       openBadge: "Registrace otevřena",
       title: "Registrace účastníka",
-      subtitle: "Vyplňte přihlášku krok za krokem. Na jednoho jezdce můžete zadat více startů a vše na konci zkontrolovat.",
+      subtitle: "Zde vytvoříte svou přihlášku na závod. Pro jednoho jezdce lze zadat více startů a před odesláním vše ještě zkontrolovat.",
       nextToStarts: "Pokračovat na starty",
       nextToSummary: "Pokračovat na souhrn",
       back: "Zpět",
@@ -577,7 +577,7 @@ const baseMessages = {
     },
     start: {
       title: "Starty",
-      intro: "Jeden jezdec může zadat více startů. Každý start obsahuje třídu, startovní číslo a údaje o vozidle.",
+      intro: "Zde zadáte své starty pro tento podnik. U každého startu vyplníte třídu, startovní číslo a základní údaje o vozidle.",
       empty: "Zatím nebyl přidán žádný start.",
       codriverBadge: "Spolujezdec",
       backupBadge: "Náhradní vozidlo",
@@ -771,7 +771,7 @@ const messages: Record<AnmeldungLocale, AnmeldungMessages> = {
       dateBadge: "12/13 września 2026",
       title: "12. Oberlausitzer Dreieck",
       subtitle:
-        "Rejestracja kierowców do przejazdów pokazowych i klas historycznych. Wypełnij wszystkie dane, aby ułatwić dopuszczenie i komunikację.",
+        "Cieszymy się, że chcesz wystartować w Oberlausitzer Dreieck. Tutaj uzupełnisz swoje zgłoszenie krok po kroku i spokojnie sprawdzisz wszystko przed wysłaniem.",
       chips: ["Miejsce: Großschönau / Góry Żytawskie", "Długość trasy: 5,9 km", "Rejestracja krok po kroku"],
       websiteButton: "Przejdź na stronę klubu",
       infoDeadlineTitle: "Termin zgłoszeń",
@@ -789,7 +789,7 @@ const messages: Record<AnmeldungLocale, AnmeldungMessages> = {
     page: {
       openBadge: "Rejestracja otwarta",
       title: "Rejestracja uczestnika",
-      subtitle: "Uzupełnij zgłoszenie krok po kroku. Dla jednego kierowcy możesz dodać wiele zgłoszeń i wszystko sprawdzić na końcu.",
+      subtitle: "Tutaj przygotujesz swoje zgłoszenie na wydarzenie. Dla jednego kierowcy możesz dodać kilka startów i sprawdzić wszystkie dane przed wysłaniem.",
       nextToStarts: "Dalej do zgłoszeń startowych",
       nextToSummary: "Dalej do podsumowania",
       back: "Wstecz",
@@ -834,7 +834,7 @@ const messages: Record<AnmeldungLocale, AnmeldungMessages> = {
     },
     start: {
       title: "Zgłoszenia startowe",
-      intro: "Jeden kierowca może dodać wiele zgłoszeń. Każde zgłoszenie zawiera klasę, numer startowy i dane pojazdu.",
+      intro: "Tutaj dodajesz swoje starty na to wydarzenie. Dla każdego startu podajesz klasę, numer startowy i najważniejsze dane pojazdu.",
       empty: "Nie dodano jeszcze zgłoszenia startowego.",
       codriverBadge: "Pilot",
       backupBadge: "Pojazd zapasowy",

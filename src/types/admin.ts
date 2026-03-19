@@ -291,9 +291,7 @@ export type AdminEntryDetailViewModel = {
     model: string;
     year: string;
     displacementCcm: string;
-    engineType: string;
     cylinders: string;
-    brakes: string;
     ownerName: string;
     vehicleHistory: string;
   };
@@ -306,9 +304,7 @@ export type AdminEntryDetailViewModel = {
     model: string;
     year: string;
     displacementCcm: string;
-    engineType: string;
     cylinders: string;
-    brakes: string;
     ownerName: string;
     vehicleHistory: string;
   };

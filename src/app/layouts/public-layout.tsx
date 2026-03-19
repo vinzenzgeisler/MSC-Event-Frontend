@@ -85,6 +85,22 @@ function priceFallback(locale: AnmeldungLocale) {
   return "Wird mit den Eventdaten veröffentlicht";
 }
 
+function secondVehiclePriceHint(locale: AnmeldungLocale, priceLabel: string) {
+  if (!priceLabel) {
+    return "";
+  }
+  if (locale === "en") {
+    return `Second vehicle: ${priceLabel}`;
+  }
+  if (locale === "cz") {
+    return `Druhé vozidlo: ${priceLabel}`;
+  }
+  if (locale === "pl") {
+    return `Drugi pojazd: ${priceLabel}`;
+  }
+  return `Zweites Fahrzeug: ${priceLabel}`;
+}
+
 function PublicLayoutContent() {
   const location = useLocation();
   const { locale, setLocale, m } = useAnmeldungI18n();
@@ -153,6 +169,18 @@ function PublicLayoutContent() {
     }
     return `${formatted} ${perVehicle}`;
   }, [locale, pricingSnapshot]);
+
+  const headerSecondVehiclePrice = useMemo(() => {
+    if (!pricingSnapshot?.secondVehiclePrice || !headerEvent?.pricingRules) {
+      return "";
+    }
+    const discountCents = Math.max(0, headerEvent.pricingRules.secondVehicleDiscountCents ?? 0);
+    if (discountCents <= 0) {
+      return "";
+    }
+    const priceLabel = formatPriceRange(locale, pricingSnapshot.secondVehiclePrice);
+    return secondVehiclePriceHint(locale, priceLabel);
+  }, [headerEvent, locale, pricingSnapshot]);
 
   const headerDeadline = useMemo(() => {
     if (!pricingSnapshot || !pricingSnapshot.deadlineAt) {
@@ -258,6 +286,7 @@ function PublicLayoutContent() {
                 <div className="rounded border border-white/25 bg-white/10 p-3">
                   <div className="text-xs uppercase tracking-wide text-primary-foreground/80">{priceTitle(locale)}</div>
                   <div className="mt-1 text-sm font-semibold">{headerPrice}</div>
+                  {headerSecondVehiclePrice && <div className="mt-1 text-xs text-primary-foreground/85">{headerSecondVehiclePrice}</div>}
                 </div>
                 <div className="rounded border border-white/25 bg-white/10 p-3">
                   <div className="text-xs uppercase tracking-wide text-primary-foreground/80">{m.layout.infoDeadlineTitle}</div>

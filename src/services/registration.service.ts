@@ -130,9 +130,7 @@ function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicle
     model: value.model,
     year: value.year ? Number(value.year) : undefined,
     displacementCcm: Number(value.displacementCcm),
-    engineType: value.engineType,
     cylinders: parseCylinders(value.cylinders),
-    brakes: value.brakes,
     vehicleHistory: value.vehicleHistory,
     ownerName: value.ownerName,
     imageUploadId: value.imageUploadId || undefined

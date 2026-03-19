@@ -38,9 +38,7 @@ export type VehicleForm = {
   model: string;
   year: string;
   displacementCcm: string;
-  engineType: string;
   cylinders: string;
-  brakes: string;
   vehicleHistory: string;
   ownerName: string;
   imageFileName: string;
@@ -162,9 +160,7 @@ export type PublicCreateEntryRequestDto = {
     model: string;
     year?: number;
     displacementCcm: number;
-    engineType: string;
     cylinders: number;
-    brakes: string;
     vehicleHistory: string;
     ownerName: string;
     startNumberRaw?: string;
@@ -176,9 +172,7 @@ export type PublicCreateEntryRequestDto = {
     model: string;
     year?: number;
     displacementCcm: number;
-    engineType: string;
     cylinders: number;
-    brakes: string;
     vehicleHistory: string;
     ownerName: string;
     imageUploadId?: string;

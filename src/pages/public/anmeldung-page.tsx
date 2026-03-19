@@ -30,9 +30,7 @@ function createEmptyVehicle(): VehicleForm {
     model: "",
     year: "",
     displacementCcm: "",
-    engineType: "",
     cylinders: "",
-    brakes: "",
     vehicleHistory: "",
     ownerName: "",
     imageFileName: "",
@@ -257,10 +255,6 @@ function isPlausibleVehicleYear(value: string, now = new Date()) {
   const year = Number(value.trim());
   const maxYear = now.getFullYear() + 1;
   return year >= 1900 && year <= maxYear;
-}
-
-function isSupportedBrakeType(value: string) {
-  return value === "steel" || value === "ceramic";
 }
 
 function isEmailAlreadyUsedError(error: unknown) {
@@ -588,9 +582,7 @@ type StartFieldErrors = Partial<
     | "model"
     | "year"
     | "displacementCcm"
-    | "engineType"
     | "cylinders"
-    | "brakes"
     | "vehicleHistory"
     | "vehicleImage"
     | "codriverFirstName"
@@ -606,9 +598,7 @@ type StartFieldErrors = Partial<
     | "backupModel"
     | "backupYear"
     | "backupDisplacementCcm"
-    | "backupEngineType"
     | "backupCylinders"
-    | "backupBrakes"
     | "backupVehicleHistory"
     | "backupVehicleImage",
     string
@@ -656,9 +646,6 @@ function hydrateVehicleForm(value: (Partial<VehicleForm> & { imageS3Key?: string
   if (legacyImageKey && !next.imageUploadId) {
     next.imageUploadState = "idle";
   }
-  if (!isSupportedBrakeType(next.brakes.trim())) {
-    next.brakes = "";
-  }
   return next;
 }
 
@@ -692,9 +679,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.vehicle.model.trim()) ||
     Boolean(draftStart.vehicle.year.trim()) ||
     Boolean(draftStart.vehicle.displacementCcm.trim()) ||
-    Boolean(draftStart.vehicle.engineType.trim()) ||
     Boolean(draftStart.vehicle.cylinders.trim()) ||
-    Boolean(draftStart.vehicle.brakes.trim()) ||
     Boolean(draftStart.vehicle.vehicleHistory.trim()) ||
     Boolean(draftStart.vehicle.ownerName.trim()) ||
     Boolean(draftStart.vehicle.imageFileName.trim()) ||
@@ -714,9 +699,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.backupVehicle.model.trim()) ||
     Boolean(draftStart.backupVehicle.year.trim()) ||
     Boolean(draftStart.backupVehicle.displacementCcm.trim()) ||
-    Boolean(draftStart.backupVehicle.engineType.trim()) ||
     Boolean(draftStart.backupVehicle.cylinders.trim()) ||
-    Boolean(draftStart.backupVehicle.brakes.trim()) ||
     Boolean(draftStart.backupVehicle.ownerName.trim()) ||
     Boolean(draftStart.backupVehicle.vehicleHistory.trim()) ||
     Boolean(draftStart.backupVehicle.imageFileName.trim()) ||
@@ -767,16 +750,8 @@ function validateStartFields(
     }
   }
 
-  if (!start.vehicle.engineType.trim()) {
-    errors.engineType = m.errors.requiredEngine;
-  }
-
   if (!CYLINDERS_PATTERN.test(start.vehicle.cylinders.trim())) {
     errors.cylinders = m.errors.invalidCylinders;
-  }
-
-  if (!isSupportedBrakeType(start.vehicle.brakes.trim())) {
-    errors.brakes = m.errors.requiredBrakes;
   }
 
   if (!start.vehicle.vehicleHistory.trim()) {
@@ -842,14 +817,8 @@ function validateStartFields(
         errors.backupYear = m.errors.invalidBackupYearRange;
       }
     }
-    if (!start.backupVehicle.engineType.trim()) {
-      errors.backupEngineType = m.errors.requiredBackupEngine;
-    }
     if (!CYLINDERS_PATTERN.test(start.backupVehicle.cylinders.trim())) {
       errors.backupCylinders = m.errors.invalidBackupCylinders;
-    }
-    if (!isSupportedBrakeType(start.backupVehicle.brakes.trim())) {
-      errors.backupBrakes = m.errors.requiredBackupBrakes;
     }
     if (!start.backupVehicle.vehicleHistory.trim()) {
       errors.backupVehicleHistory = m.errors.requiredBackupVehicleHistory;
@@ -1610,9 +1579,7 @@ export function AnmeldungPage() {
                   model: "model",
                   year: "year",
                   displacementCcm: "displacementCcm",
-                  engineType: "engineType",
                   cylinders: "cylinders",
-                  brakes: "brakes",
                   vehicleHistory: "vehicleHistory"
                 };
                 const errorKey = errorKeyMap[field];
@@ -1663,9 +1630,7 @@ export function AnmeldungPage() {
                   model: "backupModel",
                   year: "backupYear",
                   displacementCcm: "backupDisplacementCcm",
-                  engineType: "backupEngineType",
                   cylinders: "backupCylinders",
-                  brakes: "backupBrakes",
                   vehicleHistory: "backupVehicleHistory"
                 };
                 const errorKey = errorKeyMap[field];

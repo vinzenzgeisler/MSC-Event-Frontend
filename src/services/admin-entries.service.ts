@@ -313,9 +313,7 @@ function fromAdminEntryDetailDto(
       model: dto.vehicle.model ?? "-",
       year: dto.vehicle.year ? String(dto.vehicle.year) : "-",
       displacementCcm: dto.vehicle.displacementCcm ? `${dto.vehicle.displacementCcm} ccm` : "-",
-      engineType: dto.vehicle.engineType ?? "-",
       cylinders: dto.vehicle.cylinders ? String(dto.vehicle.cylinders) : "-",
-      brakes: dto.vehicle.brakes ?? "-",
       ownerName: dto.vehicle.ownerName ?? "-",
       vehicleHistory: dto.vehicle.vehicleHistory ?? "Keine Angabe"
     },
@@ -328,9 +326,7 @@ function fromAdminEntryDetailDto(
       model: backupVehicle?.model ?? "-",
       year: backupVehicle?.year ? String(backupVehicle.year) : "-",
       displacementCcm: backupVehicle?.displacementCcm ? `${backupVehicle.displacementCcm} ccm` : "-",
-      engineType: backupVehicle?.engineType ?? "-",
       cylinders: backupVehicle?.cylinders ? String(backupVehicle.cylinders) : "-",
-      brakes: backupVehicle?.brakes ?? "-",
       ownerName: backupVehicle?.ownerName ?? "-",
       vehicleHistory: backupVehicle?.vehicleHistory ?? "Keine Angabe"
     },

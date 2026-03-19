@@ -52,13 +52,13 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
         <h3 className="font-semibold text-slate-900">
           {m.summary.startsTitle} ({form.starts.length})
         </h3>
-        {form.starts.map((start, index) => (
+        {form.starts.map((start) => (
           <div key={start.id} className="rounded-xl border p-4">
             <div className="font-medium text-slate-900">
-              #{index + 1} {start.classLabel} · {start.startNumber}
+              {start.classLabel} · {start.startNumber}
             </div>
             <div className="text-sm text-slate-600">
-              {start.vehicle.make} {start.vehicle.model} · {start.vehicle.displacementCcm} ccm · {start.vehicle.engineType}
+              {start.vehicle.make} {start.vehicle.model} · {start.vehicle.displacementCcm} ccm
             </div>
             {start.codriverEnabled && (
               <div className="text-sm text-slate-600">

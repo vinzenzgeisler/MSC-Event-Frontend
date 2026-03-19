@@ -16,9 +16,7 @@ type StartFieldKey =
   | "model"
   | "year"
   | "displacementCcm"
-  | "engineType"
   | "cylinders"
-  | "brakes"
   | "vehicleHistory"
   | "vehicleImage"
   | "codriverFirstName"
@@ -34,9 +32,7 @@ type StartFieldKey =
   | "backupModel"
   | "backupYear"
   | "backupDisplacementCcm"
-  | "backupEngineType"
   | "backupCylinders"
-  | "backupBrakes"
   | "backupVehicleHistory"
   | "backupVehicleImage";
 
@@ -275,11 +271,6 @@ export function StartEntriesStep({
             <FieldError message={fieldErrors.displacementCcm} />
           </div>
           <div className="space-y-2">
-            <Label>{m.start.engine}</Label>
-            <Input value={draft.vehicle.engineType} onChange={(event) => onVehicleFieldChange("engineType", event.target.value)} placeholder="BMW S14" />
-            <FieldError message={fieldErrors.engineType} />
-          </div>
-          <div className="space-y-2">
             <Label>{m.start.cylinders}</Label>
             <Input
               value={draft.vehicle.cylinders}
@@ -287,20 +278,6 @@ export function StartEntriesStep({
               onChange={(event) => onVehicleFieldChange("cylinders", event.target.value.toUpperCase())}
             />
             <FieldError message={fieldErrors.cylinders} />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label>{m.start.brakes}</Label>
-            <Select value={draft.vehicle.brakes || "__placeholder__"} onValueChange={(next) => onVehicleFieldChange("brakes", next === "__placeholder__" ? "" : next)}>
-              <SelectTrigger className="text-base md:text-sm">
-                <SelectValue placeholder={m.start.classPlaceholder} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
-                <SelectItem value="steel">{m.start.brakesSteel}</SelectItem>
-                <SelectItem value="ceramic">{m.start.brakesCeramic}</SelectItem>
-              </SelectContent>
-            </Select>
-            <FieldError message={fieldErrors.brakes} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.owner}</Label>
@@ -467,34 +444,12 @@ export function StartEntriesStep({
                   <FieldError message={fieldErrors.backupDisplacementCcm} />
                 </div>
                 <div className="space-y-2">
-                  <Label>{m.start.backupEngine}</Label>
-                  <Input value={draft.backupVehicle.engineType} onChange={(event) => onBackupFieldChange("engineType", event.target.value)} placeholder="BMW M10" />
-                  <FieldError message={fieldErrors.backupEngineType} />
-                </div>
-                <div className="space-y-2">
                   <Label>{m.start.backupCylinders}</Label>
                   <Input
                     value={draft.backupVehicle.cylinders}
                     onChange={(event) => onBackupFieldChange("cylinders", event.target.value.toUpperCase())}
                   />
                   <FieldError message={fieldErrors.backupCylinders} />
-                </div>
-                <div className="space-y-2">
-                  <Label>{m.start.backupBrakes}</Label>
-                  <Select
-                    value={draft.backupVehicle.brakes || "__placeholder__"}
-                    onValueChange={(next) => onBackupFieldChange("brakes", next === "__placeholder__" ? "" : next)}
-                  >
-                    <SelectTrigger className="text-base md:text-sm">
-                      <SelectValue placeholder={m.start.classPlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
-                      <SelectItem value="steel">{m.start.brakesSteel}</SelectItem>
-                      <SelectItem value="ceramic">{m.start.brakesCeramic}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FieldError message={fieldErrors.backupBrakes} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>{m.start.backupOwner}</Label>
