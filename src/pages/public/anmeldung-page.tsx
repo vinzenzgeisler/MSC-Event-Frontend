@@ -1207,18 +1207,18 @@ export function AnmeldungPage() {
     return { ok: true, reason: "ok" };
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async ({ goToSummary = false }: { goToSummary?: boolean } = {}) => {
     const fieldErrors = validateStartFields(draftStart, starts, editingId, locale, m);
     setStartFieldErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
       setStartError("");
-      return;
+      return false;
     }
 
     const startNumberValidation = await validateStartNumber();
     if (!startNumberValidation.ok && startNumberValidation.reason !== "taken") {
       setStartError("");
-      return;
+      return false;
     }
 
     const normalized = draftStart.startNumber.trim().toUpperCase();
@@ -1237,6 +1237,10 @@ export function AnmeldungPage() {
     setStartFieldErrors({});
     setStartNumberState("idle");
     setStartNumberHint("");
+    if (goToSummary) {
+      setStep(3);
+    }
+    return true;
   };
 
   const editStart = (id: string) => {
@@ -1289,13 +1293,17 @@ export function AnmeldungPage() {
   };
 
   const goToStep3 = () => {
-    if (!starts.length) {
-      setStartError(m.page.startErrorNeedOne);
+    if (showStartDraftForm && hasStartDraftContent(draftStart)) {
+      void saveDraft({ goToSummary: true }).then((saved) => {
+        if (!saved) {
+          setStartError(m.start.saveBeforeContinue);
+        }
+      });
       return;
     }
 
-    if (showStartDraftForm && hasStartDraftContent(draftStart)) {
-      setStartError(m.start.saveBeforeContinue);
+    if (!starts.length) {
+      setStartError(m.page.startErrorNeedOne);
       return;
     }
 
