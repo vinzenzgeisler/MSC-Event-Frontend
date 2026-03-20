@@ -547,10 +547,6 @@ export function AdminEntryDetailPage() {
                   <div className="font-medium text-slate-900">{detail.startNumber}</div>
                 </div>
                 <div className="rounded-md border bg-slate-50 p-2">
-                  <div className="text-xs uppercase text-slate-500">Orga-Code</div>
-                  <div className="font-medium text-slate-900">{detail.orgaCode || "—"}</div>
-                </div>
-                <div className="rounded-md border bg-slate-50 p-2">
                   <div className="text-xs uppercase text-slate-500">Fahrzeugtyp</div>
                   <div className="font-medium text-slate-900">{detail.vehicle.type === "moto" ? "Motorrad" : "Auto"}</div>
                 </div>
