@@ -618,15 +618,25 @@ export const adminEntriesService = {
       return false;
     };
 
-    const statusPayload = {
+    const includeDriverNoteInLifecycleMail =
+      mapped.sendLifecycleMail && typeof options?.includeDriverNoteInLifecycleMail === "boolean"
+        ? options.includeDriverNoteInLifecycleMail
+        : undefined;
+
+    const statusPayload: {
+      acceptanceStatus: AcceptanceStatus;
+      sendLifecycleMail: boolean;
+      lifecycleEventType: string;
+      includeDriverNoteInLifecycleMail?: boolean;
+    } = {
       acceptanceStatus: mapped.status,
       sendLifecycleMail: mapped.sendLifecycleMail,
-      lifecycleEventType: mapped.lifecycleEventType,
-      includeDriverNoteInLifecycleMail:
-        mapped.sendLifecycleMail && typeof options?.includeDriverNoteInLifecycleMail === "boolean"
-          ? options.includeDriverNoteInLifecycleMail
-          : undefined
+      lifecycleEventType: mapped.lifecycleEventType
     };
+
+    if (typeof includeDriverNoteInLifecycleMail === "boolean") {
+      statusPayload.includeDriverNoteInLifecycleMail = includeDriverNoteInLifecycleMail;
+    }
 
     try {
       await requestJson(`/admin/entries/${entryId}/status`, {
