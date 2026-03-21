@@ -1207,18 +1207,18 @@ export function AnmeldungPage() {
     return { ok: true, reason: "ok" };
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async ({ goToSummary = false }: { goToSummary?: boolean } = {}) => {
     const fieldErrors = validateStartFields(draftStart, starts, editingId, locale, m);
     setStartFieldErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
       setStartError("");
-      return;
+      return false;
     }
 
     const startNumberValidation = await validateStartNumber();
     if (!startNumberValidation.ok && startNumberValidation.reason !== "taken") {
       setStartError("");
-      return;
+      return false;
     }
 
     const normalized = draftStart.startNumber.trim().toUpperCase();
@@ -1237,6 +1237,10 @@ export function AnmeldungPage() {
     setStartFieldErrors({});
     setStartNumberState("idle");
     setStartNumberHint("");
+    if (goToSummary) {
+      setStep(3);
+    }
+    return true;
   };
 
   const editStart = (id: string) => {
@@ -1289,13 +1293,13 @@ export function AnmeldungPage() {
   };
 
   const goToStep3 = () => {
-    if (!starts.length) {
-      setStartError(m.page.startErrorNeedOne);
+    if (showStartDraftForm && hasStartDraftContent(draftStart)) {
+      setStartError(m.start.saveBeforeContinue);
       return;
     }
 
-    if (showStartDraftForm && hasStartDraftContent(draftStart)) {
-      setStartError(m.start.saveBeforeContinue);
+    if (!starts.length) {
+      setStartError(m.page.startErrorNeedOne);
       return;
     }
 
@@ -1424,7 +1428,8 @@ export function AnmeldungPage() {
       goToStep3();
     }
   };
-  const step2BlockedReason = m.page.step2BlockedReason;
+  const hasCurrentStartDraft = hasStartDraftContent(draftStart);
+  const step2PrimaryLabel = showStartDraftForm && hasCurrentStartDraft ? m.start.saveAndContinue : m.page.nextToSummary;
 
   if (eventLoadState === "loading") {
     return (
@@ -1673,11 +1678,18 @@ export function AnmeldungPage() {
               </Button>
             )}
             {step === 2 && (
-              <span title={!starts.length ? step2BlockedReason : undefined} className="inline-flex">
-                <Button type="button" disabled={!starts.length} onClick={goToStep3}>
-                  {m.page.nextToSummary}
-                </Button>
-              </span>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (showStartDraftForm && hasCurrentStartDraft) {
+                    void saveDraft({ goToSummary: true });
+                    return;
+                  }
+                  goToStep3();
+                }}
+              >
+                {step2PrimaryLabel}
+              </Button>
             )}
           </div>
         </CardContent>
@@ -1690,11 +1702,19 @@ export function AnmeldungPage() {
               {m.page.back}
             </Button>
             {step < 3 && (
-              <span title={step === 2 && !starts.length ? step2BlockedReason : undefined} className="flex-1">
-                <Button type="button" className="w-full" disabled={step === 2 && !starts.length} onClick={handleNext}>
-                  {m.page.next}
-                </Button>
-              </span>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => {
+                  if (step === 2 && showStartDraftForm && hasCurrentStartDraft) {
+                    void saveDraft({ goToSummary: true });
+                    return;
+                  }
+                  handleNext();
+                }}
+              >
+                {step === 2 ? step2PrimaryLabel : m.page.next}
+              </Button>
             )}
           </div>
         </div>
