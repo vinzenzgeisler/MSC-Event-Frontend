@@ -222,6 +222,9 @@ export function StartEntriesStep({
                 if (selected) {
                   onDraftChange("vehicleType", selected.vehicleType);
                 }
+                if (draft.startNumber.trim()) {
+                  window.setTimeout(() => onStartNumberBlur(), 0);
+                }
               }}
             >
               <SelectTrigger className="text-base md:text-sm" data-start-field="classId" {...fieldAria(fieldErrors.classId)}>

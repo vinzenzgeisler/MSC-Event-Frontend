@@ -407,6 +407,24 @@ function isStartNumberTakenError(error: unknown) {
   );
 }
 
+function getStartNumberConflictIndex(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return null;
+  }
+  for (const fieldError of error.fieldErrors ?? []) {
+    const field = (fieldError.field ?? "").trim();
+    const match = field.match(/entries\.(\d+)\.(?:startNumber|vehicle\.startNumberRaw)$/i);
+    if (!match) {
+      continue;
+    }
+    const index = Number(match[1]);
+    if (Number.isInteger(index) && index >= 0) {
+      return index;
+    }
+  }
+  return null;
+}
+
 function isImageUploadInvalidError(error: unknown) {
   if (!(error instanceof ApiError)) {
     return false;
@@ -936,6 +954,7 @@ export function AnmeldungPage() {
   const [startNumberHint, setStartNumberHint] = useState("");
   const [recentlySavedStart, setRecentlySavedStart] = useState<StartRegistrationForm | null>(null);
   const [showStartCompletionDialog, setShowStartCompletionDialog] = useState(false);
+  const [showDiscardAdditionalDialog, setShowDiscardAdditionalDialog] = useState(false);
   const [driverErrors, setDriverErrors] = useState<Partial<Record<keyof DriverForm, string>>>({});
   const [knownUsedDriverEmails, setKnownUsedDriverEmails] = useState<string[]>([]);
   const [consent, setConsent] = useState<RegistrationWizardForm["consent"]>(createInitialConsent(locale));
@@ -1314,7 +1333,12 @@ export function AnmeldungPage() {
     }
 
     const startNumberValidation = await validateStartNumber();
-    if (!startNumberValidation.ok && startNumberValidation.reason !== "taken") {
+    if (!startNumberValidation.ok) {
+      if (startNumberValidation.reason === "taken") {
+        setStartError(m.errors.startTaken);
+        focusFieldBySelector('[data-start-field="startNumber"]');
+        return false;
+      }
       if (startNumberValidation.reason === "invalid") {
         focusFieldBySelector('[data-start-field="startNumber"]');
       }
@@ -1384,6 +1408,16 @@ export function AnmeldungPage() {
     setShowStartCompletionDialog(false);
   };
 
+  const discardAdditionalStartDraft = () => {
+    setAddAnotherStart(false);
+    setDraftStart(createEmptyStart());
+    setStartError("");
+    setStartFieldErrors({});
+    setStartNumberState("idle");
+    setStartNumberHint("");
+    setShowDiscardAdditionalDialog(false);
+  };
+
   const goToStep2 = () => {
     if (!eventOverview) {
       return;
@@ -1408,9 +1442,17 @@ export function AnmeldungPage() {
     }
 
     if (showStartDraftForm) {
+      if (!editingId && starts.length > 0 && !hasStartDraftContent(draftStart)) {
+        setShowDiscardAdditionalDialog(true);
+        return;
+      }
       void saveDraft({ afterSave: "decide" }).then((saved) => {
         if (!saved) {
-          setStartError(m.start.completeEntryHint);
+          if (!editingId && starts.length > 0) {
+            setShowDiscardAdditionalDialog(true);
+          } else {
+            setStartError(m.start.completeEntryHint);
+          }
         }
       });
       return;
@@ -1504,6 +1546,12 @@ export function AnmeldungPage() {
         setStartError(m.errors.startTaken);
         setSubmitError(m.errors.startTaken);
         setStep(2);
+        const conflictIndex = getStartNumberConflictIndex(error);
+        if (typeof conflictIndex === "number" && starts[conflictIndex]) {
+          editStart(starts[conflictIndex].id);
+        } else if (starts.length === 1) {
+          editStart(starts[0].id);
+        }
         focusFieldBySelector('[data-start-field="startNumber"]');
       } else if (isImageUploadInvalidError(error)) {
         setSubmitError("Bild-Upload ist ungültig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
@@ -1875,6 +1923,63 @@ export function AnmeldungPage() {
                   }}
                 >
                   {m.start.completionDialogToSummary}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDiscardAdditionalDialog && starts.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 px-3 py-4 sm:items-center sm:justify-center sm:px-6">
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="discard-additional-start-title"
+          >
+            <div className="space-y-3">
+              <div>
+                <h3 id="discard-additional-start-title" className="text-lg font-semibold text-slate-900">
+                  {m.start.discardAdditionalDialogTitle}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{m.start.discardAdditionalDialogBody}</p>
+              </div>
+
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{m.start.discardAdditionalDialogPreviewTitle}</div>
+                <div className="mt-2 space-y-2">
+                  {starts.map((item) => (
+                    <div key={item.id} className="rounded-lg border bg-white px-3 py-2">
+                      <div className="text-sm font-semibold text-slate-900">
+                        {resolveStartClassLabel(item, eventOverview)} · {item.startNumber || "—"}
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {[item.vehicle.make, item.vehicle.model].filter(Boolean).join(" ").trim() || "—"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setShowDiscardAdditionalDialog(false)}
+                >
+                  {m.start.discardAdditionalDialogBack}
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    discardAdditionalStartDraft();
+                    setStep(3);
+                  }}
+                >
+                  {m.start.discardAdditionalDialogConfirm}
                 </Button>
               </div>
             </div>
