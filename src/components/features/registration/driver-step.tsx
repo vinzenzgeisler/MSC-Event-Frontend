@@ -45,18 +45,19 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
         <h3 className="md:col-span-2 text-lg font-semibold text-slate-900">{m.driver.title}</h3>
         <div className="space-y-2">
           <Label htmlFor="driver-firstName">{m.driver.firstName}</Label>
-          <Input id="driver-firstName" value={value.firstName} onChange={(event) => onChange("firstName", event.target.value)} {...fieldAria(errors.firstName, "driver-firstName-error")} />
+          <Input id="driver-firstName" data-driver-field="firstName" value={value.firstName} onChange={(event) => onChange("firstName", event.target.value)} {...fieldAria(errors.firstName, "driver-firstName-error")} />
           <FieldError id="driver-firstName-error" message={errors.firstName} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-lastName">{m.driver.lastName}</Label>
-          <Input id="driver-lastName" value={value.lastName} onChange={(event) => onChange("lastName", event.target.value)} {...fieldAria(errors.lastName, "driver-lastName-error")} />
+          <Input id="driver-lastName" data-driver-field="lastName" value={value.lastName} onChange={(event) => onChange("lastName", event.target.value)} {...fieldAria(errors.lastName, "driver-lastName-error")} />
           <FieldError id="driver-lastName-error" message={errors.lastName} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-birthdate">{m.driver.birthdate}</Label>
           <Input
             id="driver-birthdate"
+            data-driver-field="birthdate"
             value={value.birthdate}
             onChange={(event) => onChange("birthdate", event.target.value)}
             inputMode="numeric"
@@ -70,6 +71,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Label htmlFor="driver-phone">{m.driver.phone}</Label>
           <Input
             id="driver-phone"
+            data-driver-field="phone"
             value={value.phone}
             onChange={(event) => onChange("phone", event.target.value)}
             inputMode="tel"
@@ -83,6 +85,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Select value={value.nationality || "__placeholder__"} onValueChange={(next) => onChange("nationality", next === "__placeholder__" ? "" : next)}>
             <SelectTrigger
               id="driver-nationality"
+              data-driver-field="nationality"
               {...fieldAria(errors.nationality, "driver-nationality-error")}
               className="text-base md:text-sm"
             >
@@ -103,6 +106,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Label htmlFor="driver-email">{m.driver.email}</Label>
           <Input
             id="driver-email"
+            data-driver-field="email"
             type="email"
             value={value.email}
             onChange={(event) => onChange("email", event.target.value)}
@@ -117,17 +121,17 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
         <h3 className="md:col-span-3 text-lg font-semibold text-slate-900">{m.driver.addressTitle}</h3>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-street">{m.driver.street}</Label>
-          <Input id="driver-street" value={value.street} onChange={(event) => onChange("street", event.target.value)} placeholder={streetPlaceholder} {...fieldAria(errors.street, "driver-street-error")} />
+          <Input id="driver-street" data-driver-field="street" value={value.street} onChange={(event) => onChange("street", event.target.value)} placeholder={streetPlaceholder} {...fieldAria(errors.street, "driver-street-error")} />
           <FieldError id="driver-street-error" message={errors.street} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="driver-zip">{m.driver.zip}</Label>
-          <Input id="driver-zip" value={value.zip} onChange={(event) => onChange("zip", event.target.value)} placeholder="02763" {...fieldAria(errors.zip, "driver-zip-error")} />
+          <Input id="driver-zip" data-driver-field="zip" value={value.zip} onChange={(event) => onChange("zip", event.target.value)} placeholder="02763" {...fieldAria(errors.zip, "driver-zip-error")} />
           <FieldError id="driver-zip-error" message={errors.zip} />
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="driver-city">{m.driver.city}</Label>
-          <Input id="driver-city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder={cityPlaceholder} {...fieldAria(errors.city, "driver-city-error")} />
+          <Input id="driver-city" data-driver-field="city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder={cityPlaceholder} {...fieldAria(errors.city, "driver-city-error")} />
           <FieldError id="driver-city-error" message={errors.city} />
         </div>
       </section>
@@ -138,6 +142,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Label htmlFor="driver-emergency-firstName">{m.driver.emergencyFirstName}</Label>
           <Input
             id="driver-emergency-firstName"
+            data-driver-field="emergencyContactFirstName"
             value={value.emergencyContactFirstName}
             onChange={(event) => onChange("emergencyContactFirstName", event.target.value)}
             {...fieldAria(errors.emergencyContactFirstName, "driver-emergency-firstName-error")}
@@ -148,6 +153,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Label htmlFor="driver-emergency-lastName">{m.driver.emergencyLastName}</Label>
           <Input
             id="driver-emergency-lastName"
+            data-driver-field="emergencyContactLastName"
             value={value.emergencyContactLastName}
             onChange={(event) => onChange("emergencyContactLastName", event.target.value)}
             {...fieldAria(errors.emergencyContactLastName, "driver-emergency-lastName-error")}
@@ -158,6 +164,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Label htmlFor="driver-emergency-phone">{m.driver.emergencyPhone}</Label>
           <Input
             id="driver-emergency-phone"
+            data-driver-field="emergencyContactPhone"
             value={value.emergencyContactPhone}
             onChange={(event) => onChange("emergencyContactPhone", event.target.value)}
             inputMode="tel"
@@ -175,6 +182,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
             <Label htmlFor="driver-guardian-fullName">{legalTexts.guardianFullNameLabel}</Label>
             <Input
               id="driver-guardian-fullName"
+              data-driver-field="guardianFullName"
               value={value.guardianFullName}
               onChange={(event) => onChange("guardianFullName", event.target.value)}
               {...fieldAria(errors.guardianFullName, "driver-guardian-fullName-error")}
@@ -185,6 +193,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
             <Label htmlFor="driver-guardian-email">{legalTexts.guardianEmailLabel}</Label>
             <Input
               id="driver-guardian-email"
+              data-driver-field="guardianEmail"
               type="email"
               value={value.guardianEmail}
               onChange={(event) => onChange("guardianEmail", event.target.value)}
@@ -196,6 +205,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
             <Label htmlFor="driver-guardian-phone">{legalTexts.guardianPhoneLabel}</Label>
             <Input
               id="driver-guardian-phone"
+              data-driver-field="guardianPhone"
               value={value.guardianPhone}
               onChange={(event) => onChange("guardianPhone", event.target.value)}
               inputMode="tel"
@@ -206,6 +216,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <label className="md:col-span-2 flex items-start gap-2 text-sm text-slate-800">
             <input
               id="driver-guardian-consent"
+              data-driver-field="guardianConsentAccepted"
               type="checkbox"
               checked={value.guardianConsentAccepted}
               onChange={(event) => onChange("guardianConsentAccepted", event.target.checked)}
@@ -221,7 +232,8 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
       <section className="space-y-2">
         <Label htmlFor="driver-history">{m.driver.history}</Label>
         <textarea
-          id="driver-history"
+         id="driver-history"
+          data-driver-field="motorsportHistory"
           className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           value={value.motorsportHistory}
           onChange={(event) => onChange("motorsportHistory", event.target.value)}

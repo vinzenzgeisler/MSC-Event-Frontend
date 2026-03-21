@@ -1296,8 +1296,6 @@ export function AdminEntryDetailPage() {
                     "status-rejected",
                     () =>
                       adminEntriesService.setEntryStatus(detail.id, "to_rejected", {
-                        // Rejections must keep lifecycle mail metadata on the PATCH payload,
-                        // otherwise the backend persists only the status without sending the mail.
                         includeDriverNoteInLifecycleMail: hasDriverNote ? includeDriverNoteOnReject : false
                       }),
                     "Status auf Abgelehnt gesetzt.",

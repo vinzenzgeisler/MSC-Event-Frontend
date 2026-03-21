@@ -48,9 +48,8 @@ type StartEntriesStepProps = {
   startNumberState: StartNumberState;
   startNumberHint: string;
   showDraftForm: boolean;
-  addAnotherStart: boolean;
   onDraftChange: <K extends keyof StartRegistrationForm>(field: K, value: StartRegistrationForm[K]) => void;
-  onAddAnotherStartChange: (checked: boolean) => void;
+  onAddAnotherStart: () => void;
   onVehicleFieldChange: (field: keyof StartRegistrationForm["vehicle"], value: string) => void;
   onBackupVehicleImageSelect: (file: File | null) => void;
   onVehicleImageSelect: (file: File | null) => void;
@@ -73,6 +72,12 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-xs text-destructive">{message}</p>;
 }
 
+function fieldAria(error?: string) {
+  return {
+    "aria-invalid": error ? "true" : "false"
+  } as const;
+}
+
 export function StartEntriesStep({
   classes,
   starts,
@@ -84,9 +89,8 @@ export function StartEntriesStep({
   startNumberState,
   startNumberHint,
   showDraftForm,
-  addAnotherStart,
   onDraftChange,
-  onAddAnotherStartChange,
+  onAddAnotherStart,
   onVehicleFieldChange,
   onBackupVehicleImageSelect,
   onVehicleImageSelect,
@@ -175,16 +179,11 @@ export function StartEntriesStep({
         ))}
       </div>
 
-      {starts.length > 0 && !editingId && (
+      {starts.length > 0 && !editingId && !showDraftForm && (
         <div className="space-y-1">
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
-            <input
-              type="checkbox"
-              checked={addAnotherStart}
-              onChange={(event) => onAddAnotherStartChange(event.target.checked)}
-            />
-            {m.start.addAnotherToggle}
-          </label>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onAddAnotherStart}>
+            {m.start.addAnotherButton}
+          </Button>
           {secondVehiclePriceHint && <p className="text-xs text-slate-600">{secondVehiclePriceHint}</p>}
         </div>
       )}
@@ -194,7 +193,17 @@ export function StartEntriesStep({
           <div className="flex items-center justify-between gap-2">
             <h4 className="font-semibold text-slate-900">{editingId ? m.start.editTitle : m.start.addTitle}</h4>
           </div>
-          {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+          {error && (
+            <div
+              className={`rounded-md px-3 py-2 text-sm ${
+                error === m.start.completeEntryHint
+                  ? "border border-amber-300 bg-amber-50 text-amber-900"
+                  : "border border-destructive/40 bg-destructive/10 text-destructive"
+              }`}
+            >
+              {error}
+            </div>
+          )}
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
@@ -215,7 +224,7 @@ export function StartEntriesStep({
                 }
               }}
             >
-              <SelectTrigger className="text-base md:text-sm">
+              <SelectTrigger className="text-base md:text-sm" data-start-field="classId" {...fieldAria(fieldErrors.classId)}>
                 <SelectValue placeholder={m.start.classPlaceholder} />
               </SelectTrigger>
               <SelectContent>
@@ -234,11 +243,13 @@ export function StartEntriesStep({
             <Label>{m.start.startNumber}</Label>
             <div className="relative">
               <Input
+                data-start-field="startNumber"
                 value={draft.startNumber}
                 onChange={(event) => onDraftChange("startNumber", event.target.value.toUpperCase())}
                 onBlur={onStartNumberBlur}
                 placeholder={m.start.startNumberPlaceholder}
                 className="pr-9"
+                {...fieldAria(fieldErrors.startNumber)}
               />
               {startNumberState === "checking" && (
                 <Loader2 className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-slate-400" />
@@ -256,37 +267,43 @@ export function StartEntriesStep({
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label>{m.start.make}</Label>
-            <Input value={draft.vehicle.make} onChange={(event) => onVehicleFieldChange("make", event.target.value)} placeholder="BMW" />
+            <Input data-start-field="make" value={draft.vehicle.make} onChange={(event) => onVehicleFieldChange("make", event.target.value)} placeholder="BMW" {...fieldAria(fieldErrors.make)} />
             <FieldError message={fieldErrors.make} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.model}</Label>
-            <Input value={draft.vehicle.model} onChange={(event) => onVehicleFieldChange("model", event.target.value)} placeholder="M3 E30" />
+            <Input data-start-field="model" value={draft.vehicle.model} onChange={(event) => onVehicleFieldChange("model", event.target.value)} placeholder="M3 E30" {...fieldAria(fieldErrors.model)} />
             <FieldError message={fieldErrors.model} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.year}</Label>
             <Input
+              data-start-field="year"
               value={draft.vehicle.year}
               onChange={(event) => onVehicleFieldChange("year", event.target.value.replace(/\D/g, "").slice(0, 4))}
               placeholder="1989"
+              {...fieldAria(fieldErrors.year)}
             />
             <FieldError message={fieldErrors.year} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.displacement}</Label>
             <Input
+              data-start-field="displacementCcm"
               value={draft.vehicle.displacementCcm}
               onChange={(event) => onVehicleFieldChange("displacementCcm", event.target.value.replace(/\D/g, "").slice(0, 5))}
+              {...fieldAria(fieldErrors.displacementCcm)}
             />
             <FieldError message={fieldErrors.displacementCcm} />
           </div>
           <div className="space-y-2">
             <Label>{m.start.cylinders}</Label>
             <Input
+              data-start-field="cylinders"
               value={draft.vehicle.cylinders}
               placeholder={m.start.cylindersPlaceholder}
               onChange={(event) => onVehicleFieldChange("cylinders", event.target.value.toUpperCase())}
+              {...fieldAria(fieldErrors.cylinders)}
             />
             <FieldError message={fieldErrors.cylinders} />
           </div>
@@ -297,10 +314,12 @@ export function StartEntriesStep({
           <div className="space-y-2 md:col-span-3">
             <Label>{m.start.history}</Label>
             <textarea
+              data-start-field="vehicleHistory"
               className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={draft.vehicle.vehicleHistory}
               onChange={(event) => onVehicleFieldChange("vehicleHistory", event.target.value)}
               placeholder={historyPlaceholder}
+              {...fieldAria(fieldErrors.vehicleHistory)}
             />
             <p className="text-xs text-slate-500">{m.start.historyHint}</p>
             <FieldError message={fieldErrors.vehicleHistory} />
@@ -308,6 +327,7 @@ export function StartEntriesStep({
           <div className="space-y-2 md:col-span-3">
             <Label>{m.start.upload}</Label>
             <input
+              data-start-field="vehicleImage"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               className="block h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1"
@@ -340,22 +360,24 @@ export function StartEntriesStep({
               <h5 className="md:col-span-2 text-sm font-semibold text-slate-900">{m.start.codriverTitle}</h5>
               <div className="space-y-2">
                 <Label>{m.start.codriverFirstName}</Label>
-                <Input value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="Anna" />
+                <Input data-start-field="codriverFirstName" value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="Anna" {...fieldAria(fieldErrors.codriverFirstName)} />
                 <FieldError message={fieldErrors.codriverFirstName} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverLastName}</Label>
-                <Input value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="Beispiel" />
+                <Input data-start-field="codriverLastName" value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="Beispiel" {...fieldAria(fieldErrors.codriverLastName)} />
                 <FieldError message={fieldErrors.codriverLastName} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverBirthdate}</Label>
                 <Input
+                  data-start-field="codriverBirthdate"
                   value={draft.codriver.birthdate}
                   onChange={(event) => onCodriverFieldChange("birthdate", event.target.value)}
                   inputMode="numeric"
                   maxLength={10}
                   placeholder={m.start.codriverBirthdatePlaceholder}
+                  {...fieldAria(fieldErrors.codriverBirthdate)}
                 />
                 <FieldError message={fieldErrors.codriverBirthdate} />
               </div>
@@ -365,7 +387,7 @@ export function StartEntriesStep({
                   value={draft.codriver.nationality || "__placeholder__"}
                   onValueChange={(next) => onCodriverFieldChange("nationality", next === "__placeholder__" ? "" : next)}
                 >
-                  <SelectTrigger className="text-base md:text-sm">
+                  <SelectTrigger className="text-base md:text-sm" data-start-field="codriverNationality" {...fieldAria(fieldErrors.codriverNationality)}>
                     <SelectValue placeholder={m.start.codriverNationalityPlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
@@ -381,31 +403,33 @@ export function StartEntriesStep({
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>{m.start.codriverStreet}</Label>
-                <Input value={draft.codriver.street} onChange={(event) => onCodriverFieldChange("street", event.target.value)} />
+                <Input data-start-field="codriverStreet" value={draft.codriver.street} onChange={(event) => onCodriverFieldChange("street", event.target.value)} {...fieldAria(fieldErrors.codriverStreet)} />
                 <FieldError message={fieldErrors.codriverStreet} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverZip}</Label>
-                <Input value={draft.codriver.zip} onChange={(event) => onCodriverFieldChange("zip", event.target.value)} />
+                <Input data-start-field="codriverZip" value={draft.codriver.zip} onChange={(event) => onCodriverFieldChange("zip", event.target.value)} {...fieldAria(fieldErrors.codriverZip)} />
                 <FieldError message={fieldErrors.codriverZip} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverCity}</Label>
-                <Input value={draft.codriver.city} onChange={(event) => onCodriverFieldChange("city", event.target.value)} />
+                <Input data-start-field="codriverCity" value={draft.codriver.city} onChange={(event) => onCodriverFieldChange("city", event.target.value)} {...fieldAria(fieldErrors.codriverCity)} />
                 <FieldError message={fieldErrors.codriverCity} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverEmail}</Label>
-                <Input value={draft.codriver.email} onChange={(event) => onCodriverFieldChange("email", event.target.value)} placeholder="anna@example.com" />
+                <Input data-start-field="codriverEmail" value={draft.codriver.email} onChange={(event) => onCodriverFieldChange("email", event.target.value)} placeholder="anna@example.com" {...fieldAria(fieldErrors.codriverEmail)} />
                 <FieldError message={fieldErrors.codriverEmail} />
               </div>
               <div className="space-y-2">
                 <Label>{m.start.codriverPhone}</Label>
                 <Input
+                  data-start-field="codriverPhone"
                   value={draft.codriver.phone}
                   onChange={(event) => onCodriverFieldChange("phone", event.target.value)}
                   inputMode="tel"
                   placeholder={m.start.codriverPhonePlaceholder}
+                  {...fieldAria(fieldErrors.codriverPhone)}
                 />
                 <FieldError message={fieldErrors.codriverPhone} />
               </div>
@@ -428,36 +452,42 @@ export function StartEntriesStep({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{m.start.backupMake}</Label>
-                  <Input value={draft.backupVehicle.make} onChange={(event) => onBackupFieldChange("make", event.target.value)} placeholder="BMW" />
+                  <Input data-start-field="backupMake" value={draft.backupVehicle.make} onChange={(event) => onBackupFieldChange("make", event.target.value)} placeholder="BMW" {...fieldAria(fieldErrors.backupMake)} />
                   <FieldError message={fieldErrors.backupMake} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupModel}</Label>
-                  <Input value={draft.backupVehicle.model} onChange={(event) => onBackupFieldChange("model", event.target.value)} placeholder="2002 tii" />
+                  <Input data-start-field="backupModel" value={draft.backupVehicle.model} onChange={(event) => onBackupFieldChange("model", event.target.value)} placeholder="2002 tii" {...fieldAria(fieldErrors.backupModel)} />
                   <FieldError message={fieldErrors.backupModel} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupYear}</Label>
                   <Input
+                    data-start-field="backupYear"
                     value={draft.backupVehicle.year}
                     onChange={(event) => onBackupFieldChange("year", event.target.value.replace(/\D/g, "").slice(0, 4))}
                     inputMode="numeric"
+                    {...fieldAria(fieldErrors.backupYear)}
                   />
                   <FieldError message={fieldErrors.backupYear} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupDisplacement}</Label>
                   <Input
+                    data-start-field="backupDisplacementCcm"
                     value={draft.backupVehicle.displacementCcm}
                     onChange={(event) => onBackupFieldChange("displacementCcm", event.target.value.replace(/\D/g, "").slice(0, 5))}
+                    {...fieldAria(fieldErrors.backupDisplacementCcm)}
                   />
                   <FieldError message={fieldErrors.backupDisplacementCcm} />
                 </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupCylinders}</Label>
                   <Input
+                    data-start-field="backupCylinders"
                     value={draft.backupVehicle.cylinders}
                     onChange={(event) => onBackupFieldChange("cylinders", event.target.value.toUpperCase())}
+                    {...fieldAria(fieldErrors.backupCylinders)}
                   />
                   <FieldError message={fieldErrors.backupCylinders} />
                 </div>
@@ -468,10 +498,12 @@ export function StartEntriesStep({
                 <div className="space-y-2 md:col-span-2">
                   <Label>{m.start.backupHistory}</Label>
                   <textarea
+                    data-start-field="backupVehicleHistory"
                     className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={draft.backupVehicle.vehicleHistory}
                     onChange={(event) => onBackupFieldChange("vehicleHistory", event.target.value)}
                     placeholder={historyPlaceholder}
+                    {...fieldAria(fieldErrors.backupVehicleHistory)}
                   />
                   <p className="text-xs text-slate-500">{m.start.backupHistoryHint}</p>
                   <FieldError message={fieldErrors.backupVehicleHistory} />
@@ -479,6 +511,7 @@ export function StartEntriesStep({
                 <div className="space-y-2 md:col-span-2">
                   <Label>{m.start.backupUpload}</Label>
                   <input
+                    data-start-field="backupVehicleImage"
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     className="block h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1"
@@ -502,9 +535,11 @@ export function StartEntriesStep({
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-slate-500">{m.start.footerHint}</p>
-            <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onSave}>
-              {editingId ? m.start.saveEdit : m.start.saveAdd}
-            </Button>
+            {editingId && (
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onSave}>
+                {m.start.saveEdit}
+              </Button>
+            )}
           </div>
         </div>
       )}

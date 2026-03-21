@@ -65,6 +65,86 @@ function createEmptyStart(): StartRegistrationForm {
   };
 }
 
+function resolveStartClassLabel(start: StartRegistrationForm, eventOverview: PublicEventOverview | null) {
+  if (start.classLabel.trim()) {
+    return start.classLabel.trim();
+  }
+  return eventOverview?.classes.find((item) => item.id === start.classId)?.name ?? "—";
+}
+
+function focusFieldBySelector(selector: string) {
+  window.setTimeout(() => {
+    const target = document.querySelector<HTMLElement>(selector);
+    if (!target) {
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if ("focus" in target) {
+      target.focus({ preventScroll: true });
+    }
+  }, 40);
+}
+
+function focusFirstDriverError(errors: Partial<Record<keyof DriverForm, string>>) {
+  const order: Array<keyof DriverForm> = [
+    "firstName",
+    "lastName",
+    "birthdate",
+    "nationality",
+    "phone",
+    "email",
+    "street",
+    "zip",
+    "city",
+    "emergencyContactFirstName",
+    "emergencyContactLastName",
+    "emergencyContactPhone",
+    "guardianFullName",
+    "guardianEmail",
+    "guardianPhone",
+    "guardianConsentAccepted",
+    "motorsportHistory"
+  ];
+  const firstKey = order.find((key) => errors[key]);
+  if (firstKey) {
+    focusFieldBySelector(`[data-driver-field="${firstKey}"]`);
+  }
+}
+
+function focusFirstStartError(errors: StartFieldErrors) {
+  const order: Array<keyof StartFieldErrors> = [
+    "classId",
+    "startNumber",
+    "make",
+    "model",
+    "year",
+    "displacementCcm",
+    "cylinders",
+    "vehicleHistory",
+    "vehicleImage",
+    "codriverFirstName",
+    "codriverLastName",
+    "codriverBirthdate",
+    "codriverNationality",
+    "codriverStreet",
+    "codriverZip",
+    "codriverCity",
+    "codriverEmail",
+    "codriverPhone",
+    "backupMake",
+    "backupModel",
+    "backupYear",
+    "backupDisplacementCcm",
+    "backupCylinders",
+    "backupVehicleHistory",
+    "backupVehicleImage"
+  ];
+  const firstKey = order.find((key) => errors[key]);
+  if (firstKey) {
+    focusFieldBySelector(`[data-start-field="${firstKey}"]`);
+  }
+}
+
 const initialDriver: DriverForm = {
   firstName: "",
   lastName: "",
@@ -738,6 +818,10 @@ function validateStartFields(
     errors.model = m.errors.requiredModel;
   }
 
+  if (!start.vehicle.year.trim()) {
+    errors.year = m.errors.requiredYear;
+  }
+
   if (!HUBRAUM_PATTERN.test(start.vehicle.displacementCcm.trim())) {
     errors.displacementCcm = m.errors.invalidDisplacement;
   }
@@ -807,6 +891,9 @@ function validateStartFields(
     if (!start.backupVehicle.model.trim()) {
       errors.backupModel = m.errors.requiredBackupModel;
     }
+    if (!start.backupVehicle.year.trim()) {
+      errors.backupYear = m.errors.requiredBackupYear;
+    }
     if (!HUBRAUM_PATTERN.test(start.backupVehicle.displacementCcm.trim())) {
       errors.backupDisplacementCcm = m.errors.invalidBackupDisplacement;
     }
@@ -847,6 +934,8 @@ export function AnmeldungPage() {
   const [startFieldErrors, setStartFieldErrors] = useState<StartFieldErrors>({});
   const [startNumberState, setStartNumberState] = useState<"idle" | "checking" | "available" | "invalid" | "taken">("idle");
   const [startNumberHint, setStartNumberHint] = useState("");
+  const [recentlySavedStart, setRecentlySavedStart] = useState<StartRegistrationForm | null>(null);
+  const [showStartCompletionDialog, setShowStartCompletionDialog] = useState(false);
   const [driverErrors, setDriverErrors] = useState<Partial<Record<keyof DriverForm, string>>>({});
   const [knownUsedDriverEmails, setKnownUsedDriverEmails] = useState<string[]>([]);
   const [consent, setConsent] = useState<RegistrationWizardForm["consent"]>(createInitialConsent(locale));
@@ -974,6 +1063,14 @@ export function AnmeldungPage() {
       guardianConsentAccepted: undefined
     }));
   }, [isMinorDriver]);
+
+  useEffect(() => {
+    if (startError !== m.start.completeEntryHint) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setStartError(""), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [startError, m.start.completeEntryHint]);
 
   const form = useMemo<RegistrationWizardForm>(() => ({ driver, starts, consent }), [driver, starts, consent]);
   const showStartDraftForm = starts.length === 0 || Boolean(editingId) || addAnotherStart;
@@ -1207,18 +1304,22 @@ export function AnmeldungPage() {
     return { ok: true, reason: "ok" };
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async ({ afterSave = "stay" }: { afterSave?: "stay" | "summary" | "decide" } = {}) => {
     const fieldErrors = validateStartFields(draftStart, starts, editingId, locale, m);
     setStartFieldErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
-      setStartError("");
-      return;
+      setStartError(m.start.completeEntryHint);
+      focusFirstStartError(fieldErrors);
+      return false;
     }
 
     const startNumberValidation = await validateStartNumber();
     if (!startNumberValidation.ok && startNumberValidation.reason !== "taken") {
-      setStartError("");
-      return;
+      if (startNumberValidation.reason === "invalid") {
+        focusFieldBySelector('[data-start-field="startNumber"]');
+      }
+      setStartError(m.start.completeEntryHint);
+      return false;
     }
 
     const normalized = draftStart.startNumber.trim().toUpperCase();
@@ -1237,6 +1338,13 @@ export function AnmeldungPage() {
     setStartFieldErrors({});
     setStartNumberState("idle");
     setStartNumberHint("");
+    if (afterSave === "summary") {
+      setStep(3);
+    } else if (afterSave === "decide") {
+      setRecentlySavedStart(next);
+      setShowStartCompletionDialog(true);
+    }
+    return true;
   };
 
   const editStart = (id: string) => {
@@ -1265,15 +1373,15 @@ export function AnmeldungPage() {
     }
   };
 
-  const handleAddAnotherStartChange = (checked: boolean) => {
-    setAddAnotherStart(checked);
+  const openAnotherStartForm = () => {
+    setAddAnotherStart(true);
+    setEditingId(null);
+    setDraftStart(createEmptyStart());
     setStartError("");
-    if (!checked && !editingId) {
-      setDraftStart(createEmptyStart());
-      setStartFieldErrors({});
-      setStartNumberState("idle");
-      setStartNumberHint("");
-    }
+    setStartFieldErrors({});
+    setStartNumberState("idle");
+    setStartNumberHint("");
+    setShowStartCompletionDialog(false);
   };
 
   const goToStep2 = () => {
@@ -1283,19 +1391,33 @@ export function AnmeldungPage() {
     const errors = validateDriverForm(driver, locale, m);
     setDriverErrors(errors);
     if (Object.keys(errors).length) {
+      focusFirstDriverError(errors);
       return;
     }
     setStep(2);
   };
 
   const goToStep3 = () => {
-    if (!starts.length) {
-      setStartError(m.page.startErrorNeedOne);
+    if (editingId && showStartDraftForm) {
+      void saveDraft({ afterSave: "summary" }).then((saved) => {
+        if (!saved) {
+          setStartError(m.start.completeEntryHint);
+        }
+      });
       return;
     }
 
-    if (showStartDraftForm && hasStartDraftContent(draftStart)) {
-      setStartError(m.start.saveBeforeContinue);
+    if (showStartDraftForm) {
+      void saveDraft({ afterSave: "decide" }).then((saved) => {
+        if (!saved) {
+          setStartError(m.start.completeEntryHint);
+        }
+      });
+      return;
+    }
+
+    if (!starts.length) {
+      setStartError(m.page.startErrorNeedOne);
       return;
     }
 
@@ -1321,6 +1443,7 @@ export function AnmeldungPage() {
     setDriverErrors(currentDriverErrors);
     if (Object.keys(currentDriverErrors).length > 0) {
       setStep(1);
+      focusFirstDriverError(currentDriverErrors);
       setSubmitError("");
       return;
     }
@@ -1381,6 +1504,7 @@ export function AnmeldungPage() {
         setStartError(m.errors.startTaken);
         setSubmitError(m.errors.startTaken);
         setStep(2);
+        focusFieldBySelector('[data-start-field="startNumber"]');
       } else if (isImageUploadInvalidError(error)) {
         setSubmitError("Bild-Upload ist ungültig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
         setStep(2);
@@ -1425,6 +1549,13 @@ export function AnmeldungPage() {
     }
   };
   const step2BlockedReason = m.page.step2BlockedReason;
+  const step2NextBlocked = step === 2 && !showStartDraftForm && !starts.length;
+  const step2PrimaryLabel =
+    step === 2 ? (showStartDraftForm ? (editingId ? m.start.saveEdit : m.start.saveAdd) : m.page.nextToSummary) : m.page.next;
+  const recentStartClassLabel = recentlySavedStart ? resolveStartClassLabel(recentlySavedStart, eventOverview) : "—";
+  const recentStartVehicleLine = recentlySavedStart
+    ? [recentlySavedStart.vehicle.make, recentlySavedStart.vehicle.model].filter(Boolean).join(" ").trim() || "—"
+    : "—";
 
   if (eventLoadState === "loading") {
     return (
@@ -1565,9 +1696,8 @@ export function AnmeldungPage() {
               startNumberState={startNumberState}
               startNumberHint={startNumberHint}
               showDraftForm={showStartDraftForm}
-              addAnotherStart={addAnotherStart}
               onDraftChange={handleDraftChange}
-              onAddAnotherStartChange={handleAddAnotherStartChange}
+              onAddAnotherStart={openAnotherStartForm}
               onStartNumberBlur={() => {
                 void validateStartNumber();
               }}
@@ -1673,9 +1803,9 @@ export function AnmeldungPage() {
               </Button>
             )}
             {step === 2 && (
-              <span title={!starts.length ? step2BlockedReason : undefined} className="inline-flex">
-                <Button type="button" disabled={!starts.length} onClick={goToStep3}>
-                  {m.page.nextToSummary}
+              <span title={step2NextBlocked ? step2BlockedReason : undefined} className="inline-flex">
+                <Button type="button" disabled={step2NextBlocked} onClick={goToStep3}>
+                  {step2PrimaryLabel}
                 </Button>
               </span>
             )}
@@ -1690,15 +1820,67 @@ export function AnmeldungPage() {
               {m.page.back}
             </Button>
             {step < 3 && (
-              <span title={step === 2 && !starts.length ? step2BlockedReason : undefined} className="flex-1">
-                <Button type="button" className="w-full" disabled={step === 2 && !starts.length} onClick={handleNext}>
-                  {m.page.next}
+              <span title={step2NextBlocked ? step2BlockedReason : undefined} className="flex-1">
+                <Button type="button" className="w-full" disabled={step2NextBlocked} onClick={handleNext}>
+                  {step === 2 ? step2PrimaryLabel : m.page.next}
                 </Button>
               </span>
             )}
           </div>
         </div>
       </div>
+
+      {showStartCompletionDialog && recentlySavedStart && (
+        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 px-3 py-4 sm:items-center sm:justify-center sm:px-6">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl sm:p-6" role="dialog" aria-modal="true" aria-labelledby="start-completion-title">
+            <div className="space-y-3">
+              <div>
+                <h3 id="start-completion-title" className="text-lg font-semibold text-slate-900">
+                  {m.start.completionDialogTitle}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{m.start.completionDialogBody}</p>
+              </div>
+
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{m.start.completionDialogPreviewTitle}</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">
+                  {recentStartClassLabel} · {recentlySavedStart.startNumber || "—"}
+                </div>
+                <div className="mt-1 text-sm text-slate-700">{recentStartVehicleLine}</div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span>{recentlySavedStart.vehicleType === "moto" ? "Motorrad" : "Auto"}</span>
+                  {recentlySavedStart.codriverEnabled && <span>· {m.start.codriverBadge}</span>}
+                  {recentlySavedStart.backupVehicleEnabled && <span>· {m.start.backupBadge}</span>}
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    setShowStartCompletionDialog(false);
+                    openAnotherStartForm();
+                  }}
+                >
+                  {m.start.completionDialogAddAnother}
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    setShowStartCompletionDialog(false);
+                    setStep(3);
+                  }}
+                >
+                  {m.start.completionDialogToSummary}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
