@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: "autoUpdate",
-        injectRegister: "auto",
+        injectRegister: false,
         includeAssets: ["apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png", "maskable-icon-512x512.png"],
         manifest: {
           name: "MSC Oberlausitzer Dreilaendereck Admin",
