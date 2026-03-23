@@ -43,6 +43,7 @@ export type VehicleForm = {
   ownerName: string;
   imageFileName: string;
   imageUploadId: string;
+  imageUploadToken: string;
   imageUploadState: "idle" | "uploading" | "uploaded" | "error";
   imageUploadError: string;
 };
@@ -165,6 +166,7 @@ export type PublicCreateEntryRequestDto = {
     ownerName: string;
     startNumberRaw?: string;
     imageUploadId?: string;
+    imageUploadToken?: string;
   };
   backupVehicle?: {
     vehicleType: VehicleType;
@@ -176,6 +178,7 @@ export type PublicCreateEntryRequestDto = {
     vehicleHistory: string;
     ownerName: string;
     imageUploadId?: string;
+    imageUploadToken?: string;
   };
   startNumber: string;
   isBackupVehicle?: boolean;

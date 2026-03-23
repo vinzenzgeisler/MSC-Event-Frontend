@@ -35,6 +35,7 @@ function createEmptyVehicle(): VehicleForm {
     ownerName: "",
     imageFileName: "",
     imageUploadId: "",
+    imageUploadToken: "",
     imageUploadState: "idle",
     imageUploadError: ""
   };
@@ -733,12 +734,13 @@ function hydrateVehicleForm(value: (Partial<VehicleForm> & { imageS3Key?: string
   const next = {
     ...base,
     ...(value ?? {}),
-    imageUploadId: typeof value?.imageUploadId === "string" ? value.imageUploadId : ""
+    imageUploadId: typeof value?.imageUploadId === "string" ? value.imageUploadId : "",
+    imageUploadToken: typeof value?.imageUploadToken === "string" ? value.imageUploadToken : ""
   };
-  if (!next.imageUploadId && next.imageUploadState === "uploaded") {
+  if ((!next.imageUploadId || !next.imageUploadToken) && next.imageUploadState === "uploaded") {
     next.imageUploadState = "idle";
   }
-  if (next.imageUploadId && next.imageUploadState === "idle") {
+  if (next.imageUploadId && next.imageUploadToken && next.imageUploadState === "idle") {
     next.imageUploadState = "uploaded";
   }
   if (legacyImageKey && !next.imageUploadId) {
@@ -782,6 +784,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.vehicle.ownerName.trim()) ||
     Boolean(draftStart.vehicle.imageFileName.trim()) ||
     Boolean(draftStart.vehicle.imageUploadId.trim()) ||
+    Boolean(draftStart.vehicle.imageUploadToken.trim()) ||
     draftStart.codriverEnabled ||
     Boolean(draftStart.codriver.firstName.trim()) ||
     Boolean(draftStart.codriver.lastName.trim()) ||
@@ -801,7 +804,8 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.backupVehicle.ownerName.trim()) ||
     Boolean(draftStart.backupVehicle.vehicleHistory.trim()) ||
     Boolean(draftStart.backupVehicle.imageFileName.trim()) ||
-    Boolean(draftStart.backupVehicle.imageUploadId.trim())
+    Boolean(draftStart.backupVehicle.imageUploadId.trim()) ||
+    Boolean(draftStart.backupVehicle.imageUploadToken.trim())
   );
 }
 
@@ -860,7 +864,7 @@ function validateStartFields(
     errors.vehicleHistory = m.errors.requiredVehicleHistory;
   }
 
-  if (!start.vehicle.imageUploadId.trim()) {
+  if (!start.vehicle.imageUploadId.trim() || !start.vehicle.imageUploadToken.trim()) {
     errors.vehicleImage = m.errors.requiredVehicleImage;
   }
 
@@ -928,7 +932,7 @@ function validateStartFields(
     if (!start.backupVehicle.vehicleHistory.trim()) {
       errors.backupVehicleHistory = m.errors.requiredBackupVehicleHistory;
     }
-    if (!start.backupVehicle.imageUploadId.trim()) {
+    if (!start.backupVehicle.imageUploadId.trim() || !start.backupVehicle.imageUploadToken.trim()) {
       errors.backupVehicleImage = m.errors.requiredBackupVehicleImage;
     }
   }
@@ -1226,6 +1230,7 @@ export function AnmeldungPage() {
           ...prev[target],
           imageFileName: "",
           imageUploadId: "",
+          imageUploadToken: "",
           imageUploadState: "idle",
           imageUploadError: ""
         }
@@ -1239,6 +1244,7 @@ export function AnmeldungPage() {
         ...prev[target],
         imageFileName: file.name,
         imageUploadId: "",
+        imageUploadToken: "",
         imageUploadState: "uploading",
         imageUploadError: ""
       }
@@ -1255,6 +1261,7 @@ export function AnmeldungPage() {
           ...prev[target],
           imageFileName: uploaded.fileName,
           imageUploadId: uploaded.imageUploadId,
+          imageUploadToken: uploaded.imageUploadToken,
           imageUploadState: "uploaded",
           imageUploadError: ""
         }
@@ -1270,6 +1277,7 @@ export function AnmeldungPage() {
         [target]: {
           ...prev[target],
           imageUploadId: "",
+          imageUploadToken: "",
           imageUploadState: "error",
           imageUploadError: message
         }

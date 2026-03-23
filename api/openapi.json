@@ -456,7 +456,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleImageUploadInitResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -536,6 +543,16 @@
               }
             }
           }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleImageUploadInitRequest"
+              }
+            }
+          }
         }
       }
     },
@@ -547,7 +564,14 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleImageUploadFinalizeResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -579,6 +603,16 @@
               }
             }
           },
+          "422": {
+            "description": "Unprocessable Entity (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Error",
             "content": {
@@ -586,6 +620,16 @@
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleImageUploadFinalizeRequest"
               }
             }
           }
@@ -7023,8 +7067,8 @@
                       "firstName": "Max",
                       "driverName": "Max Mustermann"
                     },
-                    "subjectOverride": "Hallo {{firstName}}, bitte bestätigen",
-                    "bodyOverride": "Bitte bestätigen: {{verificationUrl}}",
+                    "subjectOverride": "Hallo {{firstName}}, bitte bestÃ¤tigen",
+                    "bodyOverride": "Bitte bestÃ¤tigen: {{verificationUrl}}",
                     "previewMode": "draft"
                   }
                 },
@@ -8210,6 +8254,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Upload id returned by /public/uploads/vehicle-image/finalize. Direct imageS3Key input is not accepted."
+          },
+          "imageUploadToken": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Upload token returned by /public/uploads/vehicle-image/init. Must be sent together with imageUploadId."
           }
         },
         "required": [
@@ -9175,9 +9224,9 @@
           },
           {
             "key": "email_confirmation_reminder",
-            "label": "Erinnerung E-Mail-Bestätigung",
-            "subject": "Erinnerung: E-Mail bestätigen - {{eventName}}",
-            "bodyText": "Hallo {{driverName}}, bitte bestätige deine E-Mail-Adresse über {{verificationUrl}}.",
+            "label": "Erinnerung E-Mail-BestÃ¤tigung",
+            "subject": "Erinnerung: E-Mail bestÃ¤tigen - {{eventName}}",
+            "bodyText": "Hallo {{driverName}}, bitte bestÃ¤tige deine E-Mail-Adresse Ã¼ber {{verificationUrl}}.",
             "status": "published",
             "isActive": true
           },
@@ -9314,9 +9363,9 @@
               "driverName": "Max Mustermann",
               "heroImageUrl": "https://nennungstool.example.org/assets/hero.jpg",
               "heroEyebrow": "MSC OBERLAUSITZ",
-              "heroSubtitle": "Frische Infos für deinen Start",
+              "heroSubtitle": "Frische Infos fÃ¼r deinen Start",
               "highlights": "Zeitplan aktualisiert\nBriefing 08:30\nAbnahmebereich erweitert",
-              "detailsText": "Bitte prüfe die neue Boxenzuteilung.",
+              "detailsText": "Bitte prÃ¼fe die neue Boxenzuteilung.",
               "closingText": "Bis zum Renntag!",
               "ctaText": "Alle Infos ansehen",
               "ctaUrl": "https://nennungstool.example.org/news"
@@ -9421,7 +9470,7 @@
             "ok": true,
             "templateKey": "registration_received",
             "subjectRendered": "Hallo Max",
-            "bodyTextRendered": "Hi Max, bitte bestätige hier:",
+            "bodyTextRendered": "Hi Max, bitte bestÃ¤tige hier:",
             "bodyHtmlRendered": "<p>Hi Max</p>",
             "htmlDocument": "<html>...</html>",
             "usedPlaceholders": [
@@ -9433,7 +9482,7 @@
             ],
             "unknownPlaceholders": [],
             "warnings": [
-              "verificationUrl fehlt; CTA und Verifizierungslink können nicht gerendert werden."
+              "verificationUrl fehlt; CTA und Verifizierungslink kÃ¶nnen nicht gerendert werden."
             ],
             "attachments": []
           }
@@ -9777,6 +9826,128 @@
             "enum": [
               "finalized"
             ]
+          }
+        }
+      },
+      "VehicleImageUploadInitRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventId",
+          "contentType",
+          "fileSizeBytes"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "fileSizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8388608
+          }
+        }
+      },
+      "VehicleImageUploadInitResponse": {
+        "type": "object",
+        "required": [
+          "ok",
+          "uploadId",
+          "uploadToken",
+          "key",
+          "uploadUrl",
+          "requiredHeaders",
+          "expiresAt"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadToken": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "requiredHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VehicleImageUploadFinalizeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "uploadId",
+          "uploadToken"
+        ],
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadToken": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VehicleImageUploadFinalizeResponse": {
+        "type": "object",
+        "required": [
+          "ok",
+          "uploadId",
+          "imageS3Key",
+          "finalizedAt"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "imageS3Key": {
+            "type": "string"
+          },
+          "finalizedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }

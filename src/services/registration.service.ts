@@ -124,6 +124,8 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
 }
 
 function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicleType"], value: RegistrationWizardForm["starts"][number]["vehicle"]) {
+  const imageUploadId = value.imageUploadId.trim();
+  const imageUploadToken = value.imageUploadToken.trim();
   return {
     vehicleType,
     make: value.make,
@@ -133,7 +135,8 @@ function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicle
     cylinders: parseCylinders(value.cylinders),
     vehicleHistory: value.vehicleHistory,
     ownerName: value.ownerName,
-    imageUploadId: value.imageUploadId || undefined
+    imageUploadId: imageUploadId && imageUploadToken ? imageUploadId : undefined,
+    imageUploadToken: imageUploadId && imageUploadToken ? imageUploadToken : undefined
   };
 }
 
@@ -234,6 +237,7 @@ type PublicCreateEntriesBatchResponse = {
 type PublicVehicleImageUploadInitResponse = {
   ok: boolean;
   uploadId: string;
+  uploadToken: string;
   key: string;
   uploadUrl: string;
   requiredHeaders: Record<string, string>;
@@ -243,7 +247,7 @@ type PublicVehicleImageUploadInitResponse = {
 type PublicVehicleImageUploadFinalizeResponse = {
   ok: boolean;
   uploadId: string;
-  imageUploadId?: string;
+  imageS3Key: string;
   finalizedAt: string | null;
 };
 
@@ -554,12 +558,14 @@ export const registrationService = {
       method: "POST",
       auth: false,
       body: {
-        uploadId: initResponse.uploadId
+        uploadId: initResponse.uploadId,
+        uploadToken: initResponse.uploadToken
       }
     });
 
     return {
-      imageUploadId: (finalizeResponse.imageUploadId ?? finalizeResponse.uploadId).trim(),
+      imageUploadId: finalizeResponse.uploadId.trim(),
+      imageUploadToken: initResponse.uploadToken.trim(),
       fileName: file.name
     };
   },
