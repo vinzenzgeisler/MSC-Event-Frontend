@@ -34,8 +34,8 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `VITE_PUBLIC_VERIFY_RESEND_URL` optionaler Link für CTA „Neue Verifizierungs-Mail anfordern“ auf `/anmeldung/verify`
 - `VITE_PUBLIC_CONTACT_EMAIL` Kontaktadresse im öffentlichen Header (nicht aus Event-Settings)
 - `VITE_PUBLIC_WEBSITE_URL` Website-Link im öffentlichen Header/Footer (nicht aus Event-Settings)
-- `VITE_AUTH_IDLE_TIMEOUT_MINUTES` optional (Default: `45`, nur außerhalb Dev aktiv)
-- `VITE_AUTH_MAX_SESSION_HOURS` optional (Default: `12`, nur außerhalb Dev aktiv)
+- `VITE_AUTH_IDLE_TIMEOUT_MINUTES` optional (Default: `43200` = 30 Tage, nur außerhalb Dev aktiv)
+- `VITE_AUTH_MAX_SESSION_HOURS` optional (Default: `720` = 30 Tage, nur außerhalb Dev aktiv)
 - `VITE_ADMIN_ENABLE_TOKEN_LOGIN` optionaler Dev-Fallback für manuellen JWT-Login
 - `VITE_ADMIN_ENABLE_ROLE_PREVIEW` optionaler Dev-Fallback für Rollen-UI-Test ohne Token
 

@@ -16,7 +16,9 @@ window.__MSC_RUNTIME_CONFIG__ = {
   cognitoClientId: "<client-id>",
   cognitoRedirectUri: "https://<your-host>/admin/login",
   cognitoLogoutUri: "https://<your-host>/admin/login",
-  cognitoScopes: "openid email profile"
+  cognitoScopes: "openid email profile",
+  authIdleTimeoutMinutes: 43200,
+  authMaxSessionHours: 720
 };
 ```
 
@@ -37,5 +39,8 @@ window.__MSC_RUNTIME_CONFIG__ = {
 - `VITE_COGNITO_REDIRECT_URI`
 - `VITE_COGNITO_LOGOUT_URI`
 - `VITE_COGNITO_SCOPES`
+- `VITE_AUTH_IDLE_TIMEOUT_MINUTES`
+- `VITE_AUTH_MAX_SESSION_HOURS`
 
 Hinweis: Redirect-URI muss exakt zur App-URL passen (`/admin/login`).
+Hinweis: Die tatsächliche Obergrenze bleibt die Refresh-Token-Laufzeit im Cognito App Client.

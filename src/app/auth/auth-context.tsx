@@ -15,6 +15,14 @@ import { getEffectiveRoles } from "@/app/auth/iam";
 import { extractRoles, parseJwtPayload } from "@/app/auth/jwt";
 import { ApiError, requestJson } from "@/services/api/http-client";
 
+type RuntimeConfig = Partial<Record<string, string | number | boolean | null | undefined>>;
+
+declare global {
+  interface Window {
+    __MSC_RUNTIME_CONFIG__?: RuntimeConfig;
+  }
+}
+
 type AuthContextValue = {
   token: string | null;
   provider: AuthProvider | null;
@@ -40,11 +48,13 @@ type AuthMeResponse = {
 const AUTO_REFRESH_SKEW_MS = 60_000;
 const ACTIVITY_WRITE_THROTTLE_MS = 30_000;
 const SESSION_MONITOR_INTERVAL_MS = 15_000;
-const DEFAULT_IDLE_TIMEOUT_MINUTES = 45;
-const DEFAULT_MAX_SESSION_HOURS = 12;
+const DEFAULT_IDLE_TIMEOUT_MINUTES = 60 * 24 * 30;
+const DEFAULT_MAX_SESSION_HOURS = 24 * 30;
 
-function readPositiveNumberEnv(name: string, fallback: number): number {
-  const raw = String(import.meta.env[name] ?? "").trim();
+function readPositiveNumberConfig(envKey: string, runtimeKey: string, fallback: number): number {
+  const runtimeConfig = window.__MSC_RUNTIME_CONFIG__;
+  const runtimeValue = runtimeConfig?.[runtimeKey] ?? runtimeConfig?.[envKey];
+  const raw = String(runtimeValue ?? import.meta.env[envKey] ?? "").trim();
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return fallback;
@@ -52,8 +62,8 @@ function readPositiveNumberEnv(name: string, fallback: number): number {
   return parsed;
 }
 
-const IDLE_TIMEOUT_MS = readPositiveNumberEnv("VITE_AUTH_IDLE_TIMEOUT_MINUTES", DEFAULT_IDLE_TIMEOUT_MINUTES) * 60 * 1000;
-const MAX_SESSION_AGE_MS = readPositiveNumberEnv("VITE_AUTH_MAX_SESSION_HOURS", DEFAULT_MAX_SESSION_HOURS) * 60 * 60 * 1000;
+const IDLE_TIMEOUT_MS = readPositiveNumberConfig("VITE_AUTH_IDLE_TIMEOUT_MINUTES", "authIdleTimeoutMinutes", DEFAULT_IDLE_TIMEOUT_MINUTES) * 60 * 1000;
+const MAX_SESSION_AGE_MS = readPositiveNumberConfig("VITE_AUTH_MAX_SESSION_HOURS", "authMaxSessionHours", DEFAULT_MAX_SESSION_HOURS) * 60 * 60 * 1000;
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
