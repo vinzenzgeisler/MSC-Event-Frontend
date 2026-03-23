@@ -15,7 +15,7 @@ import { getEffectiveRoles } from "@/app/auth/iam";
 import { extractRoles, parseJwtPayload } from "@/app/auth/jwt";
 import { ApiError, requestJson } from "@/services/api/http-client";
 
-type RuntimeConfig = Partial<Record<string, string | number | boolean | null | undefined>>;
+type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
 
 declare global {
   interface Window {
