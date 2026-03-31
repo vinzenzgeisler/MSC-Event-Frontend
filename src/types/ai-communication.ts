@@ -15,6 +15,7 @@ export type AiDashboardTool = {
   href: string;
   statLabel: string;
   bulletPoints: string[];
+  availabilityLabel: string;
 };
 
 export type AiWarning = {
@@ -48,6 +49,21 @@ export type AiEnvelopeBase = {
 };
 
 export type AiMessageStatus = "imported" | "processed" | "archived";
+
+export type AiKnowledgeTopic = "documents" | "payment" | "interview" | "logistics" | "contact" | "general";
+
+export type AiKnowledgeSuggestionStatus = "suggested" | "approved" | "rejected" | "archived";
+
+export type AiKnowledgeItemStatus = "suggested" | "approved" | "archived";
+
+export type AiKnowledgeSourceType = "ai_suggested" | "manual";
+
+export type AiKnowledgeHit = {
+  id?: string;
+  topic: AiKnowledgeTopic;
+  title: string;
+  content: string;
+};
 
 export type AiMessageListItem = {
   id: string;
@@ -99,15 +115,31 @@ export type AiMessageBasis = {
   } | null;
 };
 
+export type AiMessageAssistantContext = {
+  knowledgeHits: AiKnowledgeHit[];
+};
+
+export type AiMessageDetailResponse = {
+  ok: boolean;
+  message: AiMessageDetail;
+  basis: AiMessageBasis;
+  assistantContext: AiMessageAssistantContext;
+};
+
 export type ReplySuggestionRequest = {
   tone?: "friendly" | "neutral" | "formal";
   includeWarnings?: boolean;
+  additionalContext?: string;
+  mustMention?: string[];
+  mustAvoid?: string[];
 };
 
 export type ReplySuggestionResult = {
   summary: string;
   category: string;
   replySubject: string;
+  answerFacts: string[];
+  unknowns: string[];
   replyDraft: string;
   analysis: {
     intent: string;
@@ -133,12 +165,19 @@ export type ReplySuggestionBasis = {
     acceptanceStatusLabel?: string | null;
     paymentStatus: string | null;
     paymentStatusLabel?: string | null;
-    amountOpenCents?: number;
+    amountOpenCents?: number | null;
     paymentReference: string | null;
+  } | null;
+  knowledgeHits: AiKnowledgeHit[];
+  operatorInput: {
+    additionalContext?: string | null;
+    mustMention?: string[];
+    mustAvoid?: string[];
   } | null;
   usedKnowledge: {
     faqCount: number;
     logisticsNotesCount: number;
+    approvedKnowledgeCount: number;
     previousOutgoingCount: number;
     basedOnPreviousCorrespondence?: boolean;
   };
@@ -149,6 +188,106 @@ export type AiReplySuggestionEnvelope = AiEnvelopeBase & {
   task: "reply_suggestion";
   result: ReplySuggestionResult;
   basis: ReplySuggestionBasis;
+};
+
+export type AiChatHistoryMessage = {
+  role: "user" | "assistant";
+  message: string;
+};
+
+export type AiMessageChatRequest = {
+  message: string;
+  history?: AiChatHistoryMessage[];
+  contextMode?: "reply" | "knowledge_capture";
+};
+
+export type AiKnowledgeSuggestionDraft = {
+  topic: AiKnowledgeTopic;
+  title: string;
+  content: string;
+  rationale?: string;
+};
+
+export type AiMessageChatEnvelope = AiEnvelopeBase & {
+  messageId: string;
+  task: "message_chat";
+  result: {
+    answer: string;
+    usedFacts: string[];
+    unknowns: string[];
+    knowledgeSuggestions: AiKnowledgeSuggestionDraft[];
+  };
+  basis: {
+    message: {
+      id: string;
+      subject: string | null;
+    };
+    knowledgeHits: AiKnowledgeHit[];
+    historyCount: number;
+    contextMode: "reply" | "knowledge_capture";
+  };
+};
+
+export type AiGenerateKnowledgeSuggestionsRequest = {
+  additionalContext?: string;
+  history?: AiChatHistoryMessage[];
+  topicHint?: AiKnowledgeTopic;
+};
+
+export type AiKnowledgeSuggestion = {
+  id: string;
+  eventId: string | null;
+  messageId: string | null;
+  topic: AiKnowledgeTopic;
+  title: string;
+  content: string;
+  rationale: string | null;
+  status: AiKnowledgeSuggestionStatus;
+  sourceType: AiKnowledgeSourceType;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiKnowledgeSuggestionEnvelope = AiEnvelopeBase & {
+  messageId: string;
+  task: "knowledge_suggestions";
+  result: {
+    suggestions: AiKnowledgeSuggestion[];
+  };
+  basis: {
+    message: {
+      id: string;
+      subject: string | null;
+    };
+    approvedKnowledge: AiKnowledgeHit[];
+    operatorInput: string | null;
+    historyCount: number;
+  };
+};
+
+export type AiKnowledgeItem = {
+  id: string;
+  eventId: string | null;
+  messageId: string | null;
+  suggestionId: string | null;
+  topic: AiKnowledgeTopic;
+  title: string;
+  content: string;
+  status: AiKnowledgeItemStatus;
+  sourceType: AiKnowledgeSourceType;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateKnowledgeItemRequest = {
+  suggestionId?: string;
+  eventId?: string;
+  messageId?: string;
+  topic?: AiKnowledgeTopic;
+  title?: string;
+  content?: string;
+  status?: AiKnowledgeItemStatus;
+  metadata?: Record<string, unknown>;
 };
 
 export type AiDraftTaskType = "reply_suggestion" | "event_report" | "speaker_text";
@@ -179,32 +318,6 @@ export type SaveDraftRequest = {
   inputSnapshot?: Record<string, unknown>;
   outputPayload: Record<string, unknown>;
   warnings?: Array<string | AiWarning>;
-};
-
-export type AiClassOption = {
-  id: string;
-  name: string;
-};
-
-export type AiEventOption = {
-  id: string;
-  name: string;
-  dateLabel: string;
-  location: string;
-  stageLabel: string;
-  classes: AiClassOption[];
-  contextFacts: string[];
-};
-
-export type AiDriverOption = {
-  entryId: string;
-  eventId: string;
-  classId: string;
-  name: string;
-  vehicleLabel: string;
-  hometown: string;
-  startNumber: string;
-  achievements: string[];
 };
 
 export type AiReportFormat = "website" | "short_summary";
