@@ -15,6 +15,10 @@ import { AdminLoginPage } from "@/pages/admin/login-page";
 import { AdminCommunicationPage } from "@/pages/admin/communication-page";
 import { AdminSettingsPage } from "@/pages/admin/settings-page";
 import { AdminMailDesignLabPage } from "@/pages/admin/mail-design-lab-page";
+import { AdminAiCommunicationHubPage } from "@/pages/admin/ai-communication-hub-page";
+import { AdminAiMailAssistantPage } from "@/pages/admin/ai-mail-assistant-page";
+import { AdminAiReportGeneratorPage } from "@/pages/admin/ai-report-generator-page";
+import { AdminAiSpeakerAssistantPage } from "@/pages/admin/ai-speaker-assistant-page";
 
 export const router = createBrowserRouter([
   {
@@ -66,6 +70,38 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminMailDesignLabPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "ai-communication",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminAiCommunicationHubPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "ai-communication/mail-assistant",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminAiMailAssistantPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "ai-communication/report-generator",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminAiReportGeneratorPage />
+              </ProtectedRoute>
+            )
+          },
+          {
+            path: "ai-communication/speaker-assistant",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminAiSpeakerAssistantPage />
               </ProtectedRoute>
             )
           },
