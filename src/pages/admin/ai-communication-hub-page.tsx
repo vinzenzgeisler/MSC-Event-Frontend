@@ -92,47 +92,41 @@ export function AdminAiCommunicationHubPage() {
   }, []);
 
   return (
-    <AiCommunicationShell
-      title="AI Communication Hub"
-      description="Ruhiger Admin-Arbeitsbereich für KI-unterstützte Kommunikation. Quellenbasis, Review-Pflicht und wiederverwendbares Wissen bleiben in jedem Flow sichtbar."
-    >
-      <section className="grid gap-5 xl:grid-cols-3">
+    <AiCommunicationShell title="AI Communication Hub">
+      <section className="grid gap-4 xl:grid-cols-3">
         {aiDashboardTools.map((tool) => {
           const Icon = toolIcon(tool.key);
           return (
-            <Card key={tool.key} className="flex h-full flex-col rounded-3xl border-slate-200 bg-white/95 shadow-sm">
-              <CardHeader className="space-y-4 p-6">
+            <Card key={tool.key} className="flex h-full flex-col rounded-3xl border-slate-200 bg-white">
+              <CardHeader className="space-y-4 p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <div className="space-y-3">
-                      <CardTitle className="text-xl text-slate-950">{tool.title}</CardTitle>
-                      <CardDescription className="leading-7 text-slate-600">{tool.description}</CardDescription>
+                    <div className="space-y-2">
+                      <CardTitle className="text-lg text-slate-950">{tool.title}</CardTitle>
+                      <CardDescription className="text-sm leading-6 text-slate-600">{tool.description}</CardDescription>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                      {tool.availabilityLabel}
-                    </Badge>
-                    <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">
-                      {tool.statLabel}
-                    </Badge>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col justify-between space-y-5 p-6 pt-0">
-                <ul className="space-y-3 text-sm leading-6 text-slate-600">
+              <CardContent className="flex flex-1 flex-col justify-between space-y-4 p-5 pt-0">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">
+                    {tool.statLabel}
+                  </Badge>
+                </div>
+                <ul className="space-y-2 text-sm leading-6 text-slate-600">
                   {tool.bulletPoints.map((item) => (
-                    <li key={item} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <li key={item} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                       {item}
                     </li>
                   ))}
                 </ul>
                 <Button asChild className={aiPrimaryButtonClass}>
                   <Link to={tool.href}>
-                    Bereich öffnen
+                    Öffnen
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -142,26 +136,26 @@ export function AdminAiCommunicationHubPage() {
         })}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="rounded-3xl border-slate-200">
-          <CardHeader>
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
                 <Clock3 className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-lg">Zuletzt gesicherte Arbeitsstände</CardTitle>
-                <CardDescription>Gespeicherte Entwürfe bleiben als nachvollziehbare Zwischenstände verfügbar.</CardDescription>
+                <CardTitle className="text-lg">Letzte Drafts</CardTitle>
+                <CardDescription>Zuletzt gesicherte Arbeitsstände für Mail, Bericht und Sprechertext.</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {draftsLoading ? <LoadingState label="Lade Draft-Historie..." /> : null}
             {!draftsLoading && draftsError ? <ErrorState message={draftsError} /> : null}
             {!draftsLoading && !draftsError && drafts.length === 0 ? <EmptyState message="Noch keine gespeicherten Entwürfe vorhanden." /> : null}
             {!draftsLoading && !draftsError
               ? drafts.map((draft) => (
-                  <div key={draft.id} className="rounded-2xl border border-slate-200 bg-slate-50/90 p-5">
+                  <div key={draft.id} className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="font-medium text-slate-950">{draft.title || "Unbenannter Entwurf"}</div>
@@ -190,14 +184,14 @@ export function AdminAiCommunicationHubPage() {
 
         <div className="grid gap-5">
           <Card className="rounded-3xl border-slate-200">
-            <CardHeader>
+            <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
                   <BookOpenText className="h-4 w-4" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">Freigegebene Wissensbasis</CardTitle>
-                  <CardDescription>Kurzüberblick über zuletzt übernommene, wiederverwendbare Regeln und Fakten.</CardDescription>
+                  <CardTitle className="text-lg">Wissensbasis</CardTitle>
+                  <CardDescription>Zuletzt freigegebene wiederverwendbare Einträge.</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -225,25 +219,6 @@ export function AdminAiCommunicationHubPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-slate-200 bg-slate-950 text-slate-50">
-            <CardHeader>
-              <CardTitle className="text-lg text-white">Arbeitsprinzipien</CardTitle>
-              <CardDescription className="text-slate-300">
-                Die KI bleibt Assistenz. Entscheidungen, Freigaben und Versand liegen bewusst beim Team.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-slate-200">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                Quellenbasis und Wissensbezug bleiben sichtbar und werden nicht mit generierten Texten vermischt.
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                Warnungen, Unknowns und Review-Hinweise werden als eigene Blöcke gerendert und nicht im Entwurf versteckt.
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                Wissensvorschläge sind reviewpflichtig; erst freigegebene Knowledge-Items werden wiederverwendbare Basis.
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </section>
     </AiCommunicationShell>

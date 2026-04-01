@@ -15,7 +15,6 @@ export type AiDashboardTool = {
   href: string;
   statLabel: string;
   bulletPoints: string[];
-  availabilityLabel: string;
 };
 
 export type AiWarning = {

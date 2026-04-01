@@ -31,7 +31,7 @@ Relevante Admin-Routen:
 - `/admin/ai-communication/report-generator`
 - `/admin/ai-communication/speaker-assistant`
 
-Der Frontend-Einstieg für Nachbau, Demo und Backend-Anbindung ist in `docs/AI_COMMUNICATION_HUB_FRONTEND.md` beschrieben.
+Der Frontend-Einstieg für Nachbau, lokale Inbetriebnahme und Backend-Anbindung ist in `docs/AI_COMMUNICATION_HUB_FRONTEND.md` beschrieben.
 
 ## Environment
 

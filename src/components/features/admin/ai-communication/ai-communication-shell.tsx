@@ -1,6 +1,5 @@
 import { Sparkles } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -24,18 +23,14 @@ export function AiCommunicationShell(props: {
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-[linear-gradient(90deg,_#f8fafc,_#eef2f7_48%,_#f8fafc)] px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border-slate-300 bg-white text-slate-700" variant="outline">
-                  KI-Kommunikation
-                </Badge>
-                <div className="inline-flex items-center gap-2 text-sm text-slate-500">
-                  <Sparkles className="h-4 w-4" />
-                  KI unterstützt Formulierungen, Entscheidungen bleiben beim Team.
-                </div>
-              </div>
+            <div className="max-w-3xl space-y-2">
               <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2rem]">{props.title}</h1>
+                <div className="inline-flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2rem]">{props.title}</h1>
+                </div>
                 {props.description ? <p className="max-w-2xl text-sm leading-6 text-slate-600">{props.description}</p> : null}
               </div>
             </div>

@@ -7,7 +7,6 @@ export const aiDashboardTools: AiDashboardTool[] = [
     description: "Bearbeitet eingehende Anfragen mit sichtbar getrennter Quellenbasis, Entwurf, Rückfragen und Wissensreview.",
     href: "/admin/ai-communication/mail-assistant",
     statLabel: "Inbox + Reply",
-    availabilityLabel: "Live",
     bulletPoints: ["Posteingang mit Detailansicht", "Antwortentwürfe mit Fakten und Unknowns", "Kontext-Chat und Wissensreview"]
   },
   {
@@ -16,7 +15,6 @@ export const aiDashboardTools: AiDashboardTool[] = [
     description: "Erstellt prüfbare Event-Texte aus dem aktuellen Event-Kontext und rendert Varianten, Warnungen und Review-Hinweise klar getrennt.",
     href: "/admin/ai-communication/report-generator",
     statLabel: "Mehrvarianten",
-    availabilityLabel: "Live",
     bulletPoints: ["Scope für Event oder Klasse", "Varianten für Web und Kurzfassung", "Review, Warnings und Basis sichtbar"]
   },
   {
@@ -25,7 +23,6 @@ export const aiDashboardTools: AiDashboardTool[] = [
     description: "Generiert moderationsnahe Sprechertexte auf Basis realer Event-, Klassen- und Entry-Kontexte.",
     href: "/admin/ai-communication/speaker-assistant",
     statLabel: "On-track",
-    availabilityLabel: "Live",
-    bulletPoints: ["Fokus auf Fahrer oder Klasse", "Echte Entry-Auswahl statt Demo-Daten", "Faktenblock und Review-Hinweise"]
+    bulletPoints: ["Fokus auf Fahrer oder Klasse", "Echte Entry-Auswahl", "Faktenblock und Review-Hinweise"]
   }
 ];

@@ -4,7 +4,7 @@ Stand: 2026-04-02
 
 ## Ziel
 
-Dieses Dokument ermoeglicht einer fremden Person, die Frontend-Seite des `AI Communication Hub` nachzuvollziehen, lokal zu starten und fuer die Abgabe vorzufuehren.
+Dieses Dokument ermoeglicht einer fremden Person, die Frontend-Seite des `AI Communication Hub` nachzuvollziehen, lokal zu starten und technisch einzuordnen.
 
 Der Hub besteht aus drei review-pflichtigen KI-Assistenzbereichen:
 
@@ -73,7 +73,7 @@ Je nach Setup:
 Wichtig:
 
 - Die API-Base-URL muss auf die vorbereitete Backend-Stage zeigen.
-- Fuer die Demo braucht der Nutzer `admin` oder `editor`.
+- Fuer die Admin-AI-Bereiche braucht der Nutzer `admin` oder `editor`.
 - Wenn Login/CORS nicht stimmen, schlagen besonders die Admin-AI-Endpunkte schnell mit `401`, `403` oder `Failed to fetch` fehl.
 
 ## Relevante AI-Endpunkte im Frontend
@@ -106,18 +106,18 @@ Persistenz:
 - `PATCH /admin/ai/knowledge-items/{id}`
 - `DELETE /admin/ai/knowledge-items/{id}`
 
-## Was im Frontend demonstriert werden kann
+## Was im Frontend enthalten ist
 
 ### 1. Dashboard
 
-Ziel:
+Enthaelt:
 
-- ruhiger Einstieg in die drei Use Cases
+- ruhigen Einstieg in die drei Use Cases
 - schnelle Orientierung ueber letzte Drafts und Wissensbasis
 
 ### 2. Mail-Assistent
 
-Zeigen:
+Enthaelt:
 
 - Inbox links, geoeffnete Mail rechts
 - erkannter Event-/Nennungskontext
@@ -125,14 +125,9 @@ Zeigen:
 - Draft laden, bearbeiten und serverseitig aktualisieren
 - Wissensreview und Wissensbasis
 
-Kernaussage:
-
-- Antworten basieren auf Systemkontext und reviewter Wissensbasis
-- offene Punkte und Warnungen bleiben sichtbar
-
 ### 3. Berichtsgenerator
 
-Zeigen:
+Enthaelt:
 
 - Event-/Klassenfokus
 - Varianten `website` und `short_summary`
@@ -141,37 +136,14 @@ Zeigen:
 - gezielte Varianten-Regenerierung
 - Ableitung von Wissensvorschlaegen aus dem Bericht
 
-Kernaussage:
-
-- nicht nur Textgenerierung, sondern kontrollierbare, transparente Kommunikationsassistenz
-
 ### 4. Sprecherassistenz
 
-Zeigen:
+Enthaelt:
 
 - Entry- oder Klassenfokus
 - generierten Sprechertext
 - sichtbare Review-/Warnhinweise
 - Kontextbasis einklappbar statt dauerhaft dominant
-
-## Empfohlene Demo-Klickstrecke
-
-1. Dashboard oeffnen
-2. Mail-Assistent:
-   - Mail waehlen
-   - Antwortvorschlag erzeugen
-   - Fakten/Unknowns zeigen
-   - Draft speichern
-   - Wissenseintrag pruefen oder bearbeiten
-3. Berichtsgenerator:
-   - Event oder Klasse waehlen
-   - Bericht erzeugen
-   - Varianten umschalten
-   - Basis und fehlende Daten zeigen
-   - Variante regenerieren
-4. Sprecherassistenz:
-   - Fahrer oder Klasse waehlen
-   - Sprechertext erzeugen
 
 ## UI-/UX-Leitlinien im aktuellen Frontend
 
@@ -195,7 +167,7 @@ Zeigen:
 - leere AI-Seiten:
   es fehlen Testdaten wie importierte Mails, vorhandene Entries oder freigegebene Knowledge-Items
 
-## Vorfuehrungs-Checkliste
+## Betriebs-Checkliste
 
 - mindestens eine importierte AI-Mail vorhanden
 - mindestens ein freigegebener Wissenseintrag vorhanden
