@@ -290,6 +290,13 @@ export type CreateKnowledgeItemRequest = {
   metadata?: Record<string, unknown>;
 };
 
+export type UpdateKnowledgeItemRequest = {
+  topic?: AiKnowledgeTopic;
+  title?: string;
+  content?: string;
+  status?: AiKnowledgeItemStatus;
+};
+
 export type AiDraftTaskType = "reply_suggestion" | "event_report" | "speaker_text";
 
 export type AiDraftStatus = "draft" | "reviewed" | "archived";
@@ -306,6 +313,29 @@ export type AiDraftListItem = {
   updatedAt: string;
 };
 
+export type AiDraftOperatorEdits = {
+  editedBy?: string | null;
+  editedAt?: string | null;
+};
+
+export type AiDraftDetail = AiDraftListItem & {
+  promptVersion?: string | null;
+  modelId?: string | null;
+  inputSnapshot?: Record<string, unknown> | null;
+  outputPayload: Record<string, unknown>;
+  warnings?: Array<string | AiWarning> | null;
+  review?: AiReview | null;
+  operatorEdits?: AiDraftOperatorEdits | null;
+};
+
+export type UpdateDraftRequest = {
+  replySubject: string;
+  replyDraft: string;
+  answerFacts: string[];
+  unknowns: string[];
+  operatorEdits?: Record<string, unknown>;
+};
+
 export type SaveDraftRequest = {
   taskType: AiDraftTaskType;
   title?: string;
@@ -319,6 +349,14 @@ export type SaveDraftRequest = {
   outputPayload: Record<string, unknown>;
   warnings?: Array<string | AiWarning>;
 };
+
+export type UpdateEventReportDraftRequest = {
+  variants: AiEventReportVariant[];
+  highlights?: string[];
+  operatorEdits?: Record<string, unknown>;
+};
+
+export type UpdateAiDraftRequest = UpdateDraftRequest | UpdateEventReportDraftRequest;
 
 export type AiReportFormat = "website" | "short_summary";
 
@@ -334,6 +372,11 @@ export type AiEventReportRequest = {
   tone?: AiReportTone;
   length?: AiReportLength;
   highlights: string[];
+  additionalContext?: string;
+  mustMention?: string[];
+  mustAvoid?: string[];
+  audience?: string;
+  publishChannel?: string;
 };
 
 export type AiEventReportVariant = {
@@ -341,6 +384,68 @@ export type AiEventReportVariant = {
   title: string | null;
   teaser: string | null;
   text: string;
+  highlights?: string[];
+};
+
+export type AiEventReportVariantReview = {
+  format: AiReportFormat;
+  confidence: AiConfidence;
+  blockingIssues: string[];
+  uncertainClaims: string[];
+  warnings: AiWarning[];
+};
+
+export type AiEventReportFactBlock = {
+  key: string;
+  label: string;
+  source: string;
+  facts: string[];
+};
+
+export type AiEventReportSourceSummary = {
+  factBlockCount: number;
+  factCount: number;
+  approvedKnowledgeCount: number;
+  manualHighlightsCount: number;
+  missingDataCount: number;
+  operatorInputPresent: boolean;
+};
+
+export type AiEventReportOperatorInput = {
+  additionalContext?: string;
+  mustMention: string[];
+  mustAvoid: string[];
+  audience?: string;
+  publishChannel?: string;
+};
+
+export type AiRegenerateReportVariantRequest = {
+  format: AiReportFormat;
+  additionalContext?: string;
+  mustMention?: string[];
+  mustAvoid?: string[];
+  audience?: string;
+  publishChannel?: string;
+};
+
+export type AiReportKnowledgeSuggestionsRequest = {
+  additionalContext?: string;
+  topicHint?: AiKnowledgeTopic;
+};
+
+export type AiReportKnowledgeSuggestionsEnvelope = AiEnvelopeBase & {
+  draftId: string;
+  task: "knowledge_suggestions";
+  result: {
+    suggestions: AiKnowledgeSuggestion[];
+  };
+  basis: {
+    draftId: string;
+    eventId: string | null;
+    factBlockCount: number;
+    approvedKnowledge: AiKnowledgeHit[];
+    operatorInput: string | null;
+  };
 };
 
 export type AiEventReportEnvelope = AiEnvelopeBase & {
@@ -348,6 +453,9 @@ export type AiEventReportEnvelope = AiEnvelopeBase & {
   task: "event_report";
   result: {
     variants: AiEventReportVariant[];
+    variantReview: AiEventReportVariantReview[];
+    blockingIssues: string[];
+    uncertainClaims: string[];
   };
   basis: {
     scope: "event" | "class";
@@ -365,6 +473,11 @@ export type AiEventReportEnvelope = AiEnvelopeBase & {
       paidTotal: number;
     };
     highlights: string[];
+    factBlocks: AiEventReportFactBlock[];
+    usedKnowledge: AiKnowledgeHit[];
+    operatorInput: AiEventReportOperatorInput;
+    sourceSummary: AiEventReportSourceSummary;
+    missingData: string[];
   };
 };
 

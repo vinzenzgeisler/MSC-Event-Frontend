@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, BookOpenText, Clock3, Mail, Mic2, Newspaper } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AiCommunicationShell } from "@/components/features/admin/ai-communication/ai-communication-shell";
+import { aiPrimaryButtonClass } from "@/components/features/admin/ai-communication/ai-button-styles";
 import { aiDashboardTools } from "@/components/features/admin/ai-communication/ai-communication-config";
 import { EmptyState } from "@/components/state/empty-state";
 import { ErrorState } from "@/components/state/error-state";
@@ -95,20 +96,20 @@ export function AdminAiCommunicationHubPage() {
       title="AI Communication Hub"
       description="Ruhiger Admin-Arbeitsbereich für KI-unterstützte Kommunikation. Quellenbasis, Review-Pflicht und wiederverwendbares Wissen bleiben in jedem Flow sichtbar."
     >
-      <section className="grid gap-4 xl:grid-cols-3">
+      <section className="grid gap-5 xl:grid-cols-3">
         {aiDashboardTools.map((tool) => {
           const Icon = toolIcon(tool.key);
           return (
-            <Card key={tool.key} className="rounded-2xl border-slate-200 bg-white/95 shadow-sm">
-              <CardHeader className="space-y-4">
+            <Card key={tool.key} className="flex h-full flex-col rounded-3xl border-slate-200 bg-white/95 shadow-sm">
+              <CardHeader className="space-y-4 p-6">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <CardTitle className="text-xl text-slate-950">{tool.title}</CardTitle>
-                      <CardDescription className="leading-6 text-slate-600">{tool.description}</CardDescription>
+                      <CardDescription className="leading-7 text-slate-600">{tool.description}</CardDescription>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -121,15 +122,15 @@ export function AdminAiCommunicationHubPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-2 text-sm text-slate-600">
+              <CardContent className="flex flex-1 flex-col justify-between space-y-5 p-6 pt-0">
+                <ul className="space-y-3 text-sm leading-6 text-slate-600">
                   {tool.bulletPoints.map((item) => (
-                    <li key={item} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <li key={item} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                       {item}
                     </li>
                   ))}
                 </ul>
-                <Button asChild className="rounded-full">
+                <Button asChild className={aiPrimaryButtonClass}>
                   <Link to={tool.href}>
                     Bereich öffnen
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -141,8 +142,8 @@ export function AdminAiCommunicationHubPage() {
         })}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card className="rounded-2xl border-slate-200">
+      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="rounded-3xl border-slate-200">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
@@ -154,13 +155,13 @@ export function AdminAiCommunicationHubPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {draftsLoading ? <LoadingState label="Lade Draft-Historie..." /> : null}
             {!draftsLoading && draftsError ? <ErrorState message={draftsError} /> : null}
             {!draftsLoading && !draftsError && drafts.length === 0 ? <EmptyState message="Noch keine gespeicherten Entwürfe vorhanden." /> : null}
             {!draftsLoading && !draftsError
               ? drafts.map((draft) => (
-                  <div key={draft.id} className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4">
+                  <div key={draft.id} className="rounded-2xl border border-slate-200 bg-slate-50/90 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="font-medium text-slate-950">{draft.title || "Unbenannter Entwurf"}</div>
@@ -187,8 +188,8 @@ export function AdminAiCommunicationHubPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4">
-          <Card className="rounded-2xl border-slate-200">
+        <div className="grid gap-5">
+          <Card className="rounded-3xl border-slate-200">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
@@ -224,7 +225,7 @@ export function AdminAiCommunicationHubPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-slate-200 bg-slate-950 text-slate-50">
+          <Card className="rounded-3xl border-slate-200 bg-slate-950 text-slate-50">
             <CardHeader>
               <CardTitle className="text-lg text-white">Arbeitsprinzipien</CardTitle>
               <CardDescription className="text-slate-300">

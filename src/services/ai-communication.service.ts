@@ -2,7 +2,11 @@ import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
 import type {
   AiDraftListItem,
+  AiDraftDetail,
   AiEventReportEnvelope,
+  AiReportKnowledgeSuggestionsEnvelope,
+  AiReportKnowledgeSuggestionsRequest,
+  AiRegenerateReportVariantRequest,
   AiEventReportRequest,
   AiGenerateKnowledgeSuggestionsRequest,
   AiKnowledgeItem,
@@ -20,8 +24,11 @@ import type {
   AiSpeakerRequest,
   AiSpeakerTextEnvelope,
   CreateKnowledgeItemRequest,
+  UpdateKnowledgeItemRequest,
   ReplySuggestionRequest,
   SaveDraftRequest
+  ,
+  UpdateAiDraftRequest
 } from "@/types/ai-communication";
 
 type ListMessagesResponse = {
@@ -39,6 +46,11 @@ type SaveDraftResponse = {
   draft: AiDraftListItem;
 };
 
+type GetDraftResponse = {
+  ok: boolean;
+  draft: AiDraftDetail;
+};
+
 type ListKnowledgeSuggestionsResponse = {
   ok: boolean;
   suggestions: AiKnowledgeSuggestion[];
@@ -50,6 +62,11 @@ type ListKnowledgeItemsResponse = {
 };
 
 type CreateKnowledgeItemResponse = {
+  ok: boolean;
+  item: AiKnowledgeItem;
+};
+
+type GetKnowledgeItemResponse = {
   ok: boolean;
   item: AiKnowledgeItem;
 };
@@ -139,8 +156,42 @@ export const aiCommunicationService = {
     return response.item;
   },
 
+  async getKnowledgeItem(itemId: string) {
+    const response = await requestJson<GetKnowledgeItemResponse>(`/admin/ai/knowledge-items/${itemId}`);
+    return response.item;
+  },
+
+  async updateKnowledgeItem(itemId: string, payload: UpdateKnowledgeItemRequest) {
+    const response = await requestJson<GetKnowledgeItemResponse>(`/admin/ai/knowledge-items/${itemId}`, {
+      method: "PATCH",
+      body: payload
+    });
+    return response.item;
+  },
+
+  async archiveKnowledgeItem(itemId: string) {
+    const response = await requestJson<GetKnowledgeItemResponse>(`/admin/ai/knowledge-items/${itemId}`, {
+      method: "DELETE"
+    });
+    return response.item;
+  },
+
   async generateReport(payload: AiEventReportRequest) {
     return requestJson<AiEventReportEnvelope>("/admin/ai/reports/generate", {
+      method: "POST",
+      body: payload
+    });
+  },
+
+  async regenerateReportVariant(draftId: string, payload: AiRegenerateReportVariantRequest) {
+    return requestJson<{ ok: boolean; draft: AiDraftDetail; generated: AiEventReportEnvelope }>(`/admin/ai/reports/${draftId}/regenerate-variant`, {
+      method: "POST",
+      body: payload
+    });
+  },
+
+  async createReportKnowledgeSuggestions(draftId: string, payload: AiReportKnowledgeSuggestionsRequest) {
+    return requestJson<AiReportKnowledgeSuggestionsEnvelope>(`/admin/ai/reports/${draftId}/knowledge-suggestions`, {
       method: "POST",
       body: payload
     });
@@ -155,12 +206,13 @@ export const aiCommunicationService = {
 
   async listDrafts(params?: {
     taskType?: AiDraftListItem["taskType"];
+    eventId?: string;
     limit?: number;
   }) {
     const eventId = await getAdminEventId();
     const response = await requestJson<ListDraftsResponse>("/admin/ai/drafts", {
       query: {
-        eventId,
+        eventId: params?.eventId ?? eventId,
         taskType: params?.taskType,
         limit: params?.limit ?? 6
       }
@@ -171,6 +223,19 @@ export const aiCommunicationService = {
   async saveDraft(payload: SaveDraftRequest) {
     const response = await requestJson<SaveDraftResponse>("/admin/ai/drafts", {
       method: "POST",
+      body: payload
+    });
+    return response.draft;
+  },
+
+  async getDraft(draftId: string) {
+    const response = await requestJson<GetDraftResponse>(`/admin/ai/drafts/${draftId}`);
+    return response.draft;
+  },
+
+  async updateDraft(draftId: string, payload: UpdateAiDraftRequest) {
+    const response = await requestJson<GetDraftResponse>(`/admin/ai/drafts/${draftId}`, {
+      method: "PATCH",
       body: payload
     });
     return response.draft;

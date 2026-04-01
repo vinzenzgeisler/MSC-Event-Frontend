@@ -15,34 +15,34 @@ export const textareaClassName =
 
 export function AiCommunicationShell(props: {
   title: string;
-  description: string;
+  description?: string;
   children: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(186,230,253,0.35),_transparent_38%),linear-gradient(135deg,_#0f172a,_#1e293b_58%,_#0f766e)] px-6 py-6 text-white">
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 bg-[linear-gradient(90deg,_#f8fafc,_#eef2f7_48%,_#f8fafc)] px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="border-white/25 bg-white/10 text-white" variant="outline">
+                <Badge className="border-slate-300 bg-white text-slate-700" variant="outline">
                   KI-Kommunikation
                 </Badge>
-                <div className="inline-flex items-center gap-2 text-sm text-slate-200/90">
+                <div className="inline-flex items-center gap-2 text-sm text-slate-500">
                   <Sparkles className="h-4 w-4" />
                   KI unterstützt Formulierungen, Entscheidungen bleiben beim Team.
                 </div>
               </div>
               <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight sm:text-[2rem]">{props.title}</h1>
-                <p className="max-w-2xl text-sm leading-6 text-slate-200/90">{props.description}</p>
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2rem]">{props.title}</h1>
+                {props.description ? <p className="max-w-2xl text-sm leading-6 text-slate-600">{props.description}</p> : null}
               </div>
             </div>
             {props.actions ? <div className="flex shrink-0 flex-wrap gap-2">{props.actions}</div> : null}
           </div>
         </div>
-        <div className="border-t border-slate-200 bg-slate-50/90 px-4 py-3 sm:px-6">
+        <div className="bg-white px-4 py-3 sm:px-6">
           <div className="flex flex-wrap gap-2">
             {navItems.map((item) => (
               <NavLink
@@ -51,10 +51,10 @@ export function AiCommunicationShell(props: {
                 to={item.href}
                 className={({ isActive }) =>
                   cn(
-                    "rounded-full px-3 py-2 text-sm font-medium transition",
+                    "rounded-md px-3 py-2 text-sm font-medium transition",
                     isActive
                       ? "bg-slate-900 text-white shadow-sm"
-                      : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                      : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                   )
                 }
               >

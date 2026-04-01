@@ -6,6 +6,7 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 
 - Vollständige Projekt-Dokumentation: `docs/PROJECT-DOKUMENTATION.md`
 - OpenAPI-Vertrag: `api/openapi.json`
+- AI Communication Hub Frontend: `docs/AI_COMMUNICATION_HUB_FRONTEND.md`
 
 ## Stack
 
@@ -20,6 +21,17 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `npm run dev`
 - `npm run typecheck`
 - `npm run build`
+
+## AI Communication Hub
+
+Relevante Admin-Routen:
+
+- `/admin/ai-communication`
+- `/admin/ai-communication/mail-assistant`
+- `/admin/ai-communication/report-generator`
+- `/admin/ai-communication/speaker-assistant`
+
+Der Frontend-Einstieg für Nachbau, Demo und Backend-Anbindung ist in `docs/AI_COMMUNICATION_HUB_FRONTEND.md` beschrieben.
 
 ## Environment
 
@@ -44,3 +56,4 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.
 - IAM/Rollen im Frontend: `admin`, `editor`, `viewer` (Legacy-Claim `checkin` wird auf `editor` gemappt).
 - Gelöschte Nennungen: im Nennungen-Filter über „Ansicht“ (nur für Admin) mit Wiederherstellen-Action.
+- Der `AI Communication Hub` ist auf review-pflichtige Assistenz ausgelegt. Die UI zeigt Warnungen, Quellenbasis und Review-Hinweise bewusst sichtbar an und behandelt KI nicht als autonomen Entscheider.

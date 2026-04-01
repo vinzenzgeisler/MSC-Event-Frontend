@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Mic2, RefreshCcw, Sparkles } from "lucide-react";
+import { Copy, Mic2, RefreshCcw, Sparkles } from "lucide-react";
 import { AiCommunicationShell, textareaClassName } from "@/components/features/admin/ai-communication/ai-communication-shell";
-import { AiMetaPanel, AiReviewPanel, AiWarningsPanel } from "@/components/features/admin/ai-communication/ai-contract-panels";
-import { AiNotice } from "@/components/features/admin/ai-communication/ai-notice";
+import { aiActiveOutlineButtonClass, aiPrimaryButtonClass } from "@/components/features/admin/ai-communication/ai-button-styles";
 import { EmptyState } from "@/components/state/empty-state";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
@@ -15,6 +14,7 @@ import { adminEntriesService } from "@/services/admin-entries.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError } from "@/services/api/http-client";
 import { aiCommunicationService } from "@/services/ai-communication.service";
+import { cn } from "@/lib/utils";
 import type { AdminEntriesFilter, AdminEntryListItem } from "@/types/admin";
 import type { AiSpeakerMode, AiSpeakerRequest, AiSpeakerTextEnvelope, AiTaskStatus } from "@/types/ai-communication";
 
@@ -56,6 +56,33 @@ function toUiErrorMessage(error: unknown, label: string) {
   return `${label} konnte nicht geladen werden.`;
 }
 
+async function copyText(value: string) {
+  if (typeof navigator === "undefined" || !navigator.clipboard) {
+    throw new Error("Clipboard API ist im Browser nicht verfügbar.");
+  }
+  await navigator.clipboard.writeText(value);
+}
+
+function InfoPill(props: { label: string; tone?: "neutral" | "warning" | "critical"; children: React.ReactNode }) {
+  const toneClass =
+    props.tone === "critical"
+      ? "border-rose-200 bg-rose-50 text-rose-800"
+      : props.tone === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-900"
+        : "border-slate-200 bg-white text-slate-700";
+
+  return (
+    <div className="group relative inline-flex">
+      <button type="button" className={cn("inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium", toneClass)}>
+        {props.label}
+      </button>
+      <div className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-[320px] rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-6 text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+        {props.children}
+      </div>
+    </div>
+  );
+}
+
 export function AdminAiSpeakerAssistantPage() {
   const [event, setEvent] = useState<{ id: string; name: string } | null>(null);
   const [drivers, setDrivers] = useState<AdminEntryListItem[]>([]);
@@ -69,6 +96,7 @@ export function AdminAiSpeakerAssistantPage() {
   const [result, setResult] = useState<AiSpeakerTextEnvelope | null>(null);
   const [status, setStatus] = useState<AiTaskStatus>("idle");
   const [error, setError] = useState("");
+  const [copyState, setCopyState] = useState("");
 
   useEffect(() => {
     Promise.all([adminMetaService.getCurrentEvent(), adminMetaService.listClassOptions(), adminEntriesService.listEntriesPage(defaultEntryFilter, { limit: 100 })])
@@ -142,12 +170,11 @@ export function AdminAiSpeakerAssistantPage() {
   return (
     <AiCommunicationShell
       title="Sprecherassistenz"
-      description="Moderationsnahe Textassistenz für Fahrer- oder Klassenfokus. Auch hier bleiben Fakten, Warnungen, Review und Kontext transparent sichtbar."
       actions={
         <Button
           type="button"
           variant="outline"
-          className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+          className={aiPrimaryButtonClass}
           onClick={() => void handleGenerate()}
           disabled={!form.eventId || !focusId || status === "loading"}
         >
@@ -156,22 +183,17 @@ export function AdminAiSpeakerAssistantPage() {
         </Button>
       }
     >
-      <AiNotice title="Live-Kontext statt Demo-Daten">
-        Die Auswahl basiert auf dem aktuellen Admin-Event sowie vorhandenen Klassen und Entries. Der Text bleibt ein Entwurf für die redaktionelle Prüfung vor der Moderation.
-      </AiNotice>
-
       {loading ? <LoadingState label="Lade Event-, Klassen- und Entry-Kontext..." /> : null}
       {!loading && loadError ? <ErrorState message={loadError} /> : null}
 
       {!loading && !loadError ? (
-        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-          <Card className="rounded-2xl border-slate-200">
+        <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+          <Card className="rounded-3xl border-slate-200">
             <CardHeader>
               <CardTitle className="text-lg">Fokus und Eingaben</CardTitle>
-              <CardDescription>Reale Auswahlquellen für die spätere Live-Moderation mit bewusst sichtbarer Kontextbasis.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 p-4">
+            <CardContent className="space-y-5">
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/80 p-4">
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
                     <Mic2 className="h-4 w-4" />
@@ -187,7 +209,7 @@ export function AdminAiSpeakerAssistantPage() {
                 <div className="space-y-1">
                   <Label>Fokus</Label>
                   <Select value={focusType} onValueChange={(next) => handleFocusTypeChange(next as "entry" | "class")}>
-                    <SelectTrigger className="rounded-full">
+                    <SelectTrigger className="rounded-md">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -209,7 +231,7 @@ export function AdminAiSpeakerAssistantPage() {
                       }));
                     }}
                   >
-                    <SelectTrigger className="rounded-full">
+                    <SelectTrigger className="rounded-md">
                       <SelectValue placeholder="Auswahl treffen" />
                     </SelectTrigger>
                     <SelectContent>
@@ -232,7 +254,7 @@ export function AdminAiSpeakerAssistantPage() {
               <div className="space-y-1">
                 <Label>Modus</Label>
                 <Select value={form.mode} onValueChange={(next) => setForm((current) => ({ ...current, mode: next as AiSpeakerMode }))}>
-                  <SelectTrigger className="rounded-full">
+                  <SelectTrigger className="rounded-md">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -255,7 +277,7 @@ export function AdminAiSpeakerAssistantPage() {
                 />
               </div>
 
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/70 p-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Aktuelle Auswahlbasis</div>
                 {focusType === "entry" && selectedDriver ? (
                   <div className="mt-3 space-y-2 text-sm text-slate-700">
@@ -277,51 +299,91 @@ export function AdminAiSpeakerAssistantPage() {
           </Card>
 
           <div className="space-y-4">
-            <Card className="rounded-2xl border-slate-200">
+            <Card className="rounded-3xl border-slate-200">
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div className="space-y-1.5">
                   <CardTitle className="text-lg">Generierter Sprechertext</CardTitle>
-                  <CardDescription>Direkt aus dem Live-Contract gerendert mit sichtbaren Fakten- und Review-Blöcken.</CardDescription>
+                  {copyState ? <div className="text-xs text-slate-500">{copyState}</div> : null}
                 </div>
-                <Button type="button" variant="outline" className="rounded-full" onClick={() => void handleGenerate()} disabled={!form.eventId || !focusId || status === "loading"}>
-                  <RefreshCcw className="mr-2 h-4 w-4" />
-                  Neu erzeugen
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" className="h-9 rounded-md" onClick={() => void handleGenerate()} disabled={!form.eventId || !focusId || status === "loading"}>
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    Neu erzeugen
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-md"
+                    disabled={!result?.result.text}
+                    onClick={async () => {
+                      if (!result?.result.text) return;
+                      await copyText(result.result.text);
+                      setCopyState("Text kopiert");
+                      window.setTimeout(() => setCopyState(""), 1200);
+                    }}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Kopieren
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
                 {status === "idle" ? <EmptyState message="Noch kein Sprechertext vorhanden. Links Fokus setzen und Generierung starten." /> : null}
                 {status === "loading" ? <LoadingState label="Erzeuge Sprechertext..." /> : null}
                 {status === "error" ? <ErrorState message={error} /> : null}
 
                 {status === "success" && result ? (
                   <>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="rounded-[1.6rem] border border-slate-200 bg-white p-5">
                       <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Sprechertext</div>
-                      <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-800">{result.result.text}</p>
+                      <p className="mt-4 whitespace-pre-line text-sm leading-8 text-slate-800">{result.result.text}</p>
                     </div>
 
-                    <AiWarningsPanel warnings={result.warnings} title="Vor Live-Nutzung prüfen" />
-                    <AiReviewPanel review={result.review} />
-
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Basis-Kontext</div>
-                      <div className="mt-3 space-y-2 text-sm text-slate-700">
-                        <div className="rounded-xl bg-white px-3 py-2">Fokus: {result.basis.focusType}</div>
-                        {Object.entries(result.basis.context).map(([key, value]) => (
-                          <div key={key} className="rounded-xl bg-white px-3 py-2">
-                            {key}: {String(value ?? "—")}
+                    <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50/70 px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {result.review.required ? (
+                          <InfoPill label="Menschliche Prüfung erforderlich" tone="critical">
+                            <div>{result.review.reason || "Bitte Sprechertext vor der Live-Nutzung kurz redaktionell prüfen."}</div>
+                          </InfoPill>
+                        ) : null}
+                        {result.warnings.length ? (
+                          <InfoPill label={`Warnungen (${result.warnings.length})`} tone="warning">
+                            <div className="space-y-3">
+                              {result.warnings.map((warning) => (
+                                <div key={`${warning.code}:${warning.message}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                  <div className="font-medium text-slate-900">{warning.displayMessage || warning.message}</div>
+                                  {warning.recommendation ? <div className="mt-2 text-slate-600">{warning.recommendation}</div> : null}
+                                </div>
+                              ))}
+                            </div>
+                          </InfoPill>
+                        ) : null}
+                        <details className="min-w-[220px] rounded-full border border-slate-200 bg-white">
+                          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-slate-700">Basis-Kontext</summary>
+                          <div className="border-t border-slate-200 p-4 text-sm text-slate-700">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                                Fokus: {result.basis.focusType}
+                              </Badge>
+                              {Object.entries(result.basis.context).map(([key, value]) => (
+                                <Badge key={key} variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                                  {key}: {String(value ?? "—")}
+                                </Badge>
+                              ))}
+                            </div>
+                            <div className="mt-3 text-xs text-slate-500">
+                              Modell {result.meta.modelId} · Prompt {result.meta.promptVersion}
+                            </div>
                           </div>
-                        ))}
+                        </details>
                       </div>
                     </div>
-
-                    <AiMetaPanel meta={result.meta} />
                   </>
                 ) : null}
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border-slate-200">
+            <Card className="rounded-3xl border-slate-200">
               <CardHeader>
                 <CardTitle className="text-lg">Faktenansicht</CardTitle>
                 <CardDescription>Die Seite rendert direkt `result.facts` und die gesetzten Highlights aus dem Backend-Contract.</CardDescription>
@@ -338,7 +400,7 @@ export function AdminAiSpeakerAssistantPage() {
                 )}
 
                 {result?.basis.highlights.length ? (
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                  <div className="rounded-[1.6rem] border border-slate-200 bg-white p-5">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Highlights</div>
                     <div className="mt-3 grid gap-2">
                       {result.basis.highlights.map((fact) => (
