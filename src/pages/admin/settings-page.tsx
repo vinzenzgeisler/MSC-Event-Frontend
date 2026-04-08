@@ -1419,10 +1419,11 @@ export function AdminSettingsPage() {
       return;
     }
 
+    const restoreArchivedEvent = operation === "activate" && eventState.status === "archived";
     const confirmText: Record<typeof operation, string> = {
       close: "Event wirklich schließen?",
       archive: "Event wirklich archivieren?",
-      activate: "Archiviertes Event wirklich wieder aktivieren?"
+      activate: restoreArchivedEvent ? "Archiviertes Event wirklich als geschlossen wiederherstellen?" : "Geschlossenes Event wirklich wieder öffnen?"
     };
 
     if (!window.confirm(confirmText[operation])) {
@@ -1438,7 +1439,7 @@ export function AdminSettingsPage() {
         showToast("Event wurde geschlossen.");
       } else if (operation === "activate") {
         setEventState(await adminSettingsService.activateEvent(eventState.id));
-        showToast("Event wurde wieder aktiviert.");
+        showToast(restoreArchivedEvent ? "Event wurde als geschlossen wiederhergestellt." : "Event wurde wieder geöffnet.");
       } else {
         setEventState(await adminSettingsService.archiveEvent(eventState.id));
         showToast("Event wurde archiviert.");
@@ -1981,7 +1982,7 @@ export function AdminSettingsPage() {
                     onClick={() => void runOperation("activate")}
                   >
                     <Archive className="mr-2 h-4 w-4" />
-                    Event wiederherstellen
+                    Event als geschlossen wiederherstellen
                   </Button>
                 )}
                 <Button

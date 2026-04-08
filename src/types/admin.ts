@@ -227,6 +227,12 @@ export type AdminEntryDetailDto = {
     waiverAccepted?: boolean;
     mediaAccepted: boolean;
     clubInfoAccepted?: boolean;
+    guardian?: {
+      fullName: string | null;
+      email: string | null;
+      phone: string | null;
+      consentAccepted: boolean;
+    } | null;
     consentVersion: string | null;
     consentCapturedAt: string | null;
   };
@@ -320,6 +326,13 @@ export type AdminEntryDetailViewModel = {
     waiverAccepted: boolean;
     mediaAccepted: boolean;
     clubInfoAccepted: boolean;
+    guardian: {
+      present: boolean;
+      fullName: string;
+      email: string;
+      phone: string;
+      consentAccepted: boolean;
+    };
     consentVersion: string | null;
     consentCapturedAt: string | null;
   };
