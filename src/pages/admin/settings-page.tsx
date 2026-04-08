@@ -24,6 +24,7 @@ import type {
 import type { VehicleType } from "@/types/common";
 
 const PRICING_DRAFT_PREFIX = "msc_settings_pricing_draft_";
+const SELECTED_EVENT_STORAGE_KEY = "msc_admin_settings_event_id";
 const ENTRY_CONFIRMATION_LIST_LIMIT = 12;
 const TEXTAREA_CLASS_NAME =
   "min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm";
@@ -728,6 +729,25 @@ function storageKeyForEvent(eventId: string) {
   return `${PRICING_DRAFT_PREFIX}${eventId}`;
 }
 
+function readSelectedEventId() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const value = window.localStorage.getItem(SELECTED_EVENT_STORAGE_KEY);
+  return value && value.trim() ? value.trim() : null;
+}
+
+function persistSelectedEventId(eventId: string | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (eventId && eventId.trim()) {
+    window.localStorage.setItem(SELECTED_EVENT_STORAGE_KEY, eventId.trim());
+    return;
+  }
+  window.localStorage.removeItem(SELECTED_EVENT_STORAGE_KEY);
+}
+
 function isNonNegativeInteger(value: string) {
   return /^\d+$/.test(value);
 }
@@ -789,6 +809,8 @@ function getIamCreateUserErrorMessage(error: unknown) {
   return getApiErrorMessage(error, "IAM-Account konnte nicht angelegt werden.");
 }
 
+type SettingsTab = "event" | "confirmation" | "classes" | "iam";
+
 export function AdminSettingsPage() {
   const { roles } = useAuth();
   const canManage = hasPermission(roles, "settings.write");
@@ -839,6 +861,7 @@ export function AdminSettingsPage() {
 
   const [pricingInitializedForEventId, setPricingInitializedForEventId] = useState<string | null>(null);
   const [eventOverridesExpanded, setEventOverridesExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("event");
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -892,10 +915,11 @@ export function AdminSettingsPage() {
     setIamError("");
 
     try {
+      const selectedEventId = readSelectedEventId();
       const [defaultsResult, iamResult, eventResult] = await Promise.allSettled([
         adminSettingsService.getEntryConfirmationDefaults(),
         adminIamService.getOverview(),
-        adminSettingsService.getCurrentEvent()
+        selectedEventId ? adminSettingsService.getEvent(selectedEventId) : adminSettingsService.getCurrentEvent()
       ]);
 
       if (defaultsResult.status === "fulfilled") {
@@ -924,6 +948,7 @@ export function AdminSettingsPage() {
         ]);
 
         const nextEventForm = eventToForm(event);
+        persistSelectedEventId(event.id);
         setEventState(event);
         setEventForm(nextEventForm);
         setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
@@ -948,12 +973,58 @@ export function AdminSettingsPage() {
         }
         setPricingInitializedForEventId(event.id);
       } else if (
+        selectedEventId &&
+        eventResult.reason instanceof ApiError &&
+        eventResult.reason.status === 404
+      ) {
+        persistSelectedEventId(null);
+        const fallbackEvent = await adminSettingsService.getCurrentEvent().catch(() => null);
+        if (fallbackEvent) {
+          const [classList, pricingRules] = await Promise.all([
+            adminSettingsService.listClasses(fallbackEvent.id),
+            adminSettingsService.getPricingRules(fallbackEvent.id).catch(() => null)
+          ]);
+
+          const nextEventForm = eventToForm(fallbackEvent);
+          persistSelectedEventId(fallbackEvent.id);
+          setEventState(fallbackEvent);
+          setEventForm(nextEventForm);
+          setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
+          setClasses(classList);
+          setClassDrafts(
+            Object.fromEntries(
+              classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }])
+            )
+          );
+
+          const key = storageKeyForEvent(fallbackEvent.id);
+          const storedDraft = window.localStorage.getItem(key);
+          if (storedDraft) {
+            try {
+              const parsed = JSON.parse(storedDraft) as AdminSettingsPricingForm;
+              setPricingForm(mergePricingWithClasses(parsed, classList));
+            } catch {
+              setPricingForm(
+                pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList)
+              );
+            }
+          } else {
+            setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
+          }
+          setPricingInitializedForEventId(fallbackEvent.id);
+        } else {
+          resetEventScopedState();
+          setNoCurrentEvent(true);
+          persistSelectedEventId(null);
+        }
+      } else if (
         eventResult.reason instanceof ApiError &&
         eventResult.reason.status === 404 &&
         eventResult.reason.code === "NOT_FOUND"
       ) {
         resetEventScopedState();
         setNoCurrentEvent(true);
+        persistSelectedEventId(null);
         setEventForm({
           name: "",
           startsAt: "",
@@ -1435,13 +1506,19 @@ export function AdminSettingsPage() {
 
     try {
       if (operation === "close") {
-        setEventState(await adminSettingsService.closeEvent(eventState.id));
+        const updated = await adminSettingsService.closeEvent(eventState.id);
+        persistSelectedEventId(updated.id);
+        setEventState(updated);
         showToast("Event wurde geschlossen.");
       } else if (operation === "activate") {
-        setEventState(await adminSettingsService.activateEvent(eventState.id));
+        const updated = await adminSettingsService.activateEvent(eventState.id);
+        persistSelectedEventId(updated.id);
+        setEventState(updated);
         showToast(restoreArchivedEvent ? "Event wurde als geschlossen wiederhergestellt." : "Event wurde wieder geöffnet.");
       } else {
-        setEventState(await adminSettingsService.archiveEvent(eventState.id));
+        const updated = await adminSettingsService.archiveEvent(eventState.id);
+        persistSelectedEventId(updated.id);
+        setEventState(updated);
         showToast("Event wurde archiviert.");
       }
     } catch (error) {
@@ -1567,114 +1644,139 @@ export function AdminSettingsPage() {
 
       {!loading && (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Standarddaten für Nennbestätigung</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-sm text-slate-600">
-                Diese Standarddaten gelten für alle Veranstaltungen. Im Event können bei Bedarf nur einzelne Abweichungen
-                als Override gepflegt werden.
-              </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2">
+            <div className="flex flex-wrap gap-2">
+              {([
+                ["event", "Event"],
+                ["confirmation", "Nennbestätigung"],
+                ["classes", "Klassen"],
+                ["iam", "IAM"]
+              ] as Array<[SettingsTab, string]>).map(([tabId, label]) => (
+                <Button
+                  key={tabId}
+                  type="button"
+                  variant={activeTab === tabId ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab(tabId)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-              <EntryConfirmationConfigEditor
-                mode="defaults"
-                config={entryConfirmationDefaults}
-                disabled={!canManage}
-                onFieldChange={updateDefaultEntryConfirmationField}
-                onImportantNoteChange={updateDefaultImportantNote}
-                onAddImportantNote={addDefaultImportantNote}
-                onRemoveImportantNote={removeDefaultImportantNote}
-                onScheduleItemChange={updateDefaultScheduleItem}
-                onAddScheduleItem={addDefaultScheduleItem}
-                onRemoveScheduleItem={removeDefaultScheduleItem}
-              />
-
-              {entryConfirmationDefaultsError && (
-                <div className="text-sm text-destructive">{entryConfirmationDefaultsError}</div>
-              )}
-
-              <Button
-                type="button"
-                disabled={!canManage || savingEntryConfirmationDefaults}
-                onClick={() => void saveEntryConfirmationDefaults()}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                {savingEntryConfirmationDefaults ? "Speichert…" : "Standarddaten speichern"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {noCurrentEvent ? (
+          {activeTab === "confirmation" && (
             <Card>
               <CardHeader>
-                <CardTitle>Neues Event anlegen</CardTitle>
+                <CardTitle>Standarddaten für Nennbestätigung</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="text-sm text-slate-600">
-                  Es gibt aktuell kein Event. Lege hier zuerst ein Event an, danach kannst du Klassen, Preise und weitere Einstellungen pflegen.
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label>Event-Name</Label>
-                    <Input
-                      value={eventForm.name}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, name: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Event beginnt</Label>
-                    <Input
-                      type="date"
-                      value={eventForm.startsAt}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, startsAt: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Event endet</Label>
-                    <Input
-                      type="date"
-                      value={eventForm.endsAt}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, endsAt: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Anmeldung öffnet (optional)</Label>
-                    <Input
-                      type="datetime-local"
-                      value={eventForm.registrationOpenAt}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, registrationOpenAt: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Anmeldung schließt (optional)</Label>
-                    <Input
-                      type="datetime-local"
-                      value={eventForm.registrationCloseAt}
-                      disabled={!canManage}
-                      onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
-                    />
-                  </div>
+                  Diese Standarddaten gelten für alle Veranstaltungen. Im Event können bei Bedarf nur einzelne Abweichungen
+                  als Override gepflegt werden.
                 </div>
 
-                {eventError && <div className="text-sm text-destructive">{eventError}</div>}
+                <EntryConfirmationConfigEditor
+                  mode="defaults"
+                  config={entryConfirmationDefaults}
+                  disabled={!canManage}
+                  onFieldChange={updateDefaultEntryConfirmationField}
+                  onImportantNoteChange={updateDefaultImportantNote}
+                  onAddImportantNote={addDefaultImportantNote}
+                  onRemoveImportantNote={removeDefaultImportantNote}
+                  onScheduleItemChange={updateDefaultScheduleItem}
+                  onAddScheduleItem={addDefaultScheduleItem}
+                  onRemoveScheduleItem={removeDefaultScheduleItem}
+                />
 
-                <Button type="button" disabled={!canManage || creatingInitialEvent} onClick={() => void createInitialEvent()}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {creatingInitialEvent ? "Legt an…" : "Event anlegen"}
+                {entryConfirmationDefaultsError && (
+                  <div className="text-sm text-destructive">{entryConfirmationDefaultsError}</div>
+                )}
+
+                <Button
+                  type="button"
+                  disabled={!canManage || savingEntryConfirmationDefaults}
+                  onClick={() => void saveEntryConfirmationDefaults()}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {savingEntryConfirmationDefaults ? "Speichert…" : "Standarddaten speichern"}
                 </Button>
               </CardContent>
             </Card>
-          ) : (
+          )}
+
+          {activeTab === "event" && (
             <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Event-Konfiguration</CardTitle>
-                </CardHeader>
+              {noCurrentEvent ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Neues Event anlegen</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-sm text-slate-600">
+                      Es gibt aktuell kein Event. Lege hier zuerst ein Event an, danach kannst du Klassen, Preise und weitere Einstellungen pflegen.
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label>Event-Name</Label>
+                        <Input
+                          value={eventForm.name}
+                          disabled={!canManage}
+                          onChange={(event) => setEventForm((prev) => ({ ...prev, name: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Event beginnt</Label>
+                        <Input
+                          type="date"
+                          value={eventForm.startsAt}
+                          disabled={!canManage}
+                          onChange={(event) => setEventForm((prev) => ({ ...prev, startsAt: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Event endet</Label>
+                        <Input
+                          type="date"
+                          value={eventForm.endsAt}
+                          disabled={!canManage}
+                          onChange={(event) => setEventForm((prev) => ({ ...prev, endsAt: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Anmeldung öffnet (optional)</Label>
+                        <Input
+                          type="datetime-local"
+                          value={eventForm.registrationOpenAt}
+                          disabled={!canManage}
+                          onChange={(event) => setEventForm((prev) => ({ ...prev, registrationOpenAt: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Anmeldung schließt (optional)</Label>
+                        <Input
+                          type="datetime-local"
+                          value={eventForm.registrationCloseAt}
+                          disabled={!canManage}
+                          onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    {eventError && <div className="text-sm text-destructive">{eventError}</div>}
+
+                    <Button type="button" disabled={!canManage || creatingInitialEvent} onClick={() => void createInitialEvent()}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {creatingInitialEvent ? "Legt an…" : "Event anlegen"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <Card>
+            <CardHeader>
+              <CardTitle>Event-Konfiguration</CardTitle>
+            </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-1">
@@ -1721,74 +1823,6 @@ export function AdminSettingsPage() {
                         onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
                       />
                     </div>
-                  </div>
-
-                  <div className="space-y-4 border-t pt-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <div className="space-y-2">
-                        <div className="text-sm font-semibold text-slate-900">Abweichungen für dieses Event</div>
-                        <div className="text-sm text-slate-600">
-                          Standarddaten gelten automatisch. Öffne diesen Bereich nur, wenn dieses Event an einzelnen Stellen
-                          andere Angaben braucht.
-                        </div>
-                        {hasEntryConfirmationOverrides(eventForm.entryConfirmationConfig) ? (
-                          <div className="flex flex-wrap gap-2">
-                            {getEntryConfirmationOverrideSections(eventForm.entryConfirmationConfig).map((label) => (
-                              <span
-                                key={label}
-                                className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"
-                              >
-                                {label}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-xs font-medium text-emerald-700">Aktuell verwendet dieses Event nur die Standarddaten.</div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {hasEntryConfirmationOverrides(eventForm.entryConfirmationConfig) ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={!canManage || !eventState}
-                            onClick={() => {
-                              setEventForm((prev) => ({
-                                ...prev,
-                                entryConfirmationConfig: createEmptyEntryConfirmationConfig()
-                              }));
-                              setEventOverridesExpanded(false);
-                            }}
-                          >
-                            Overrides zurücksetzen
-                          </Button>
-                        ) : null}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!canManage || !eventState}
-                          onClick={() => setEventOverridesExpanded((prev) => !prev)}
-                        >
-                          {eventOverridesExpanded ? "Overrides ausblenden" : "Overrides bearbeiten"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {eventOverridesExpanded ? (
-                      <EntryConfirmationConfigEditor
-                        mode="overrides"
-                        config={eventForm.entryConfirmationConfig}
-                        defaults={entryConfirmationDefaults}
-                        disabled={!canManage || !eventState}
-                        onFieldChange={updateEventEntryConfirmationField}
-                        onImportantNoteChange={updateEventImportantNote}
-                        onAddImportantNote={addEventImportantNote}
-                        onRemoveImportantNote={removeEventImportantNote}
-                        onScheduleItemChange={updateEventScheduleItem}
-                        onAddScheduleItem={addEventScheduleItem}
-                        onRemoveScheduleItem={removeEventScheduleItem}
-                      />
-                    ) : null}
                   </div>
 
                   <div className="space-y-4 border-t pt-4">
@@ -1866,115 +1900,13 @@ export function AdminSettingsPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-            <CardHeader>
-              <CardTitle>Klassen</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-[1fr_180px_auto]">
-                <div className="space-y-1">
-                  <Label>Neue Klasse</Label>
-                  <Input
-                    value={newClassDraft.name}
-                    disabled={!canManage || !eventState}
-                    onChange={(event) => setNewClassDraft((prev) => ({ ...prev, name: event.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Fahrzeugtyp</Label>
-                  <Select
-                    value={newClassDraft.vehicleType}
-                    disabled={!canManage || !eventState}
-                    onValueChange={(next) =>
-                      setNewClassDraft((prev) => ({
-                        ...prev,
-                        vehicleType: next as VehicleType
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="text-base md:text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">auto</SelectItem>
-                      <SelectItem value="moto">moto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button type="button" disabled={!canManage || creatingClass || !eventState} onClick={() => void createClass()}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Anlegen
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {classes.map((item) => {
-                  const draft = classDrafts[item.id] ?? { name: item.name, vehicleType: item.vehicleType };
-                  const rowBusy = savingClassId === item.id;
-
-                  return (
-                    <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_160px_auto_auto]">
-                      <Input
-                        value={draft.name}
-                        disabled={!canManage || rowBusy}
-                        onChange={(event) =>
-                          setClassDrafts((prev) => ({
-                            ...prev,
-                            [item.id]: {
-                              ...draft,
-                              name: event.target.value
-                            }
-                          }))
-                        }
-                      />
-                      <Select
-                        value={draft.vehicleType}
-                        disabled={!canManage || rowBusy}
-                        onValueChange={(next) =>
-                          setClassDrafts((prev) => ({
-                            ...prev,
-                            [item.id]: {
-                              ...draft,
-                              vehicleType: next as VehicleType
-                            }
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="text-base md:text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">auto</SelectItem>
-                          <SelectItem value="moto">moto</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button type="button" variant="outline" disabled={!canManage || rowBusy} onClick={() => void saveClass(item.id)}>
-                        <Save className="mr-2 h-4 w-4" />
-                        Speichern
-                      </Button>
-                      <Button type="button" variant="destructive" disabled={!canManage || rowBusy} onClick={() => void removeClass(item.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Löschen
-                      </Button>
-                    </div>
-                  );
-                })}
-                {classes.length === 0 && <div className="text-sm text-slate-500">Keine Klassen vorhanden.</div>}
-              </div>
-
-              {classError && <div className="text-sm text-destructive">{classError}</div>}
-            </CardContent>
-          </Card>
-
-          <Card>
+                  <Card>
             <CardHeader>
               <CardTitle>Event-Status ändern</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                {eventState?.status === "archived" && (
+                {(eventState?.status === "archived" || eventState?.status === "closed") && (
                   <Button
                     type="button"
                     variant="outline"
@@ -1982,7 +1914,7 @@ export function AdminSettingsPage() {
                     onClick={() => void runOperation("activate")}
                   >
                     <Archive className="mr-2 h-4 w-4" />
-                    Event als geschlossen wiederherstellen
+                    {eventState?.status === "archived" ? "Event als geschlossen wiederherstellen" : "Event wieder öffnen"}
                   </Button>
                 )}
                 <Button
@@ -2007,11 +1939,209 @@ export function AdminSettingsPage() {
 
               {operationsError && <div className="text-sm text-destructive">{operationsError}</div>}
             </CardContent>
-          </Card>
+                  </Card>
+                </>
+              )}
             </>
           )}
 
-          <Card>
+          {activeTab === "confirmation" && !noCurrentEvent && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Event-Overrides für Nennbestätigung</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-slate-900">Abweichungen für dieses Event</div>
+                    <div className="text-sm text-slate-600">
+                      Standarddaten gelten automatisch. Öffne diesen Bereich nur, wenn dieses Event an einzelnen Stellen andere Angaben braucht.
+                    </div>
+                    {hasEntryConfirmationOverrides(eventForm.entryConfirmationConfig) ? (
+                      <div className="flex flex-wrap gap-2">
+                        {getEntryConfirmationOverrideSections(eventForm.entryConfirmationConfig).map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs font-medium text-emerald-700">Aktuell verwendet dieses Event nur die Standarddaten.</div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {hasEntryConfirmationOverrides(eventForm.entryConfirmationConfig) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!canManage || !eventState}
+                        onClick={() => {
+                          setEventForm((prev) => ({
+                            ...prev,
+                            entryConfirmationConfig: createEmptyEntryConfirmationConfig()
+                          }));
+                          setEventOverridesExpanded(false);
+                        }}
+                      >
+                        Overrides zurücksetzen
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!canManage || !eventState}
+                      onClick={() => setEventOverridesExpanded((prev) => !prev)}
+                    >
+                      {eventOverridesExpanded ? "Overrides ausblenden" : "Overrides bearbeiten"}
+                    </Button>
+                  </div>
+                </div>
+
+                {eventOverridesExpanded ? (
+                  <EntryConfirmationConfigEditor
+                    mode="overrides"
+                    config={eventForm.entryConfirmationConfig}
+                    defaults={entryConfirmationDefaults}
+                    disabled={!canManage || !eventState}
+                    onFieldChange={updateEventEntryConfirmationField}
+                    onImportantNoteChange={updateEventImportantNote}
+                    onAddImportantNote={addEventImportantNote}
+                    onRemoveImportantNote={removeEventImportantNote}
+                    onScheduleItemChange={updateEventScheduleItem}
+                    onAddScheduleItem={addEventScheduleItem}
+                    onRemoveScheduleItem={removeEventScheduleItem}
+                  />
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "confirmation" && noCurrentEvent && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Nennbestätigung</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-600">
+                Sobald ein Event angelegt ist, können hier eventbezogene Abweichungen zu den Standarddaten gepflegt werden.
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "classes" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Klassen</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {noCurrentEvent ? (
+                  <div className="text-sm text-slate-600">Lege zuerst ein Event an, bevor Klassen gepflegt werden.</div>
+                ) : (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-[1fr_180px_auto]">
+                      <div className="space-y-1">
+                        <Label>Neue Klasse</Label>
+                        <Input
+                          value={newClassDraft.name}
+                          disabled={!canManage || !eventState}
+                          onChange={(event) => setNewClassDraft((prev) => ({ ...prev, name: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Fahrzeugtyp</Label>
+                        <Select
+                          value={newClassDraft.vehicleType}
+                          disabled={!canManage || !eventState}
+                          onValueChange={(next) =>
+                            setNewClassDraft((prev) => ({
+                              ...prev,
+                              vehicleType: next as VehicleType
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="text-base md:text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">auto</SelectItem>
+                            <SelectItem value="moto">moto</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button type="button" disabled={!canManage || creatingClass || !eventState} onClick={() => void createClass()}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Anlegen
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {classes.map((item) => {
+                        const draft = classDrafts[item.id] ?? { name: item.name, vehicleType: item.vehicleType };
+                        const rowBusy = savingClassId === item.id;
+
+                        return (
+                          <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_160px_auto_auto]">
+                            <Input
+                              value={draft.name}
+                              disabled={!canManage || rowBusy}
+                              onChange={(event) =>
+                                setClassDrafts((prev) => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...draft,
+                                    name: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                            <Select
+                              value={draft.vehicleType}
+                              disabled={!canManage || rowBusy}
+                              onValueChange={(next) =>
+                                setClassDrafts((prev) => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...draft,
+                                    vehicleType: next as VehicleType
+                                  }
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="text-base md:text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="auto">auto</SelectItem>
+                                <SelectItem value="moto">moto</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button type="button" variant="outline" disabled={!canManage || rowBusy} onClick={() => void saveClass(item.id)}>
+                              <Save className="mr-2 h-4 w-4" />
+                              Speichern
+                            </Button>
+                            <Button type="button" variant="destructive" disabled={!canManage || rowBusy} onClick={() => void removeClass(item.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Löschen
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      {classes.length === 0 && <div className="text-sm text-slate-500">Keine Klassen vorhanden.</div>}
+                    </div>
+                  </>
+                )}
+
+                {classError && <div className="text-sm text-destructive">{classError}</div>}
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "iam" && (
+            <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
@@ -2223,7 +2353,8 @@ export function AdminSettingsPage() {
 
               {iamError && <div className="text-sm text-destructive">{iamError}</div>}
             </CardContent>
-          </Card>
+            </Card>
+          )}
         </>
       )}
 

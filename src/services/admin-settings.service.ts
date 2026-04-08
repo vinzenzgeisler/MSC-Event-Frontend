@@ -278,6 +278,11 @@ export const adminSettingsService = {
     return mapEvent(response.event);
   },
 
+  async getEvent(eventId: string): Promise<AdminSettingsEvent> {
+    const response = await requestJson<AdminEventResponse>(`/admin/events/${eventId}`);
+    return mapEvent(response.event);
+  },
+
   async createEvent(payload: AdminSettingsEventForm): Promise<AdminSettingsEvent> {
     const body: Record<string, unknown> = {
       name: payload.name,
