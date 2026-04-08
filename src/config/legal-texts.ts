@@ -2,7 +2,7 @@ export type LegalUiLocale = "de" | "en" | "cz" | "pl";
 export type ConsentLocale = "de-DE" | "en-GB" | "cs-CZ" | "pl-PL";
 export type LegalDocId = "impressum" | "datenschutz" | "teilnahmebedingungen" | "haftverzicht";
 
-export const CONSENT_VERSION = "privacy-v2.0+terms-v2.0+waiver-v2.0+media-v2.0+club-info-v1.0";
+export const CONSENT_VERSION = "privacy-v2.1+terms-v2.0+waiver-v2.0+media-v2.0+club-info-v1.0";
 
 export type LegalDocSection = {
   title: string;
@@ -166,19 +166,19 @@ const privacyDocDe: LegalDoc = {
     {
       title: "8. Speicherdauer",
       paragraphs: [
-        "Personenbezogene Daten werden nur so lange gespeichert, wie dies für die Durchführung und Nachbereitung der Veranstaltung, zur Erfüllung rechtlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich ist. Der dokumentierte aktuelle Speicherrahmen lautet insbesondere:"
+        "Personenbezogene Daten werden nur so lange gespeichert, wie dies für die Durchführung und Nachbereitung der Veranstaltung, zur Erfüllung rechtlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich ist. Personenbezogene Daten aus der Anmeldung werden grundsätzlich bis ein Jahr nach Veranstaltungsende gespeichert und anschließend gelöscht oder anonymisiert, soweit keine gesetzlichen Aufbewahrungspflichten oder rechtlichen Gründe einer weiteren Speicherung entgegenstehen. Es gelten insbesondere folgende Fristen:"
       ],
       bullets: [
-        "Teilnehmer-Stammdaten und Nennungsdaten: bis zu 3 Jahre nach Veranstaltungsende",
-        "Notizen mit erhöhtem Sensitivitätsbezug: 12 Monate nach Veranstaltungsende",
+        "Personenbezogene Daten aus der Anmeldung: 1 Jahr nach Veranstaltungsende",
+        "Notizen und Angaben zu Sorgeberechtigten bei Minderjährigen: 1 Jahr nach Veranstaltungsende",
         "Verifikationsdaten und Idempotenzdaten: 30 Tage",
         "Upload-Metadaten: 30 Tage nach Abschluss oder Verfall",
-        "Dokumentmetadaten und PDF-Unterlagen: bis zu 6 Jahre",
-        "Rechnungs- und Zahlungsdaten: 10 Jahre",
+        "Dokumentmetadaten und PDF-Unterlagen: 6 Jahre nach Veranstaltungsende",
+        "Rechnungs- und Zahlungsdaten: 10 Jahre nach Veranstaltungsende",
         "E-Mail-Outbox- und Zustelldaten: 12 Monate",
         "Exportdaten: 90 Tage",
         "Audit-Log-Daten: 24 Monate",
-        "CloudWatch-Anwendungslogs: in der Regel 30 Tage, sicherheitsrelevante Logs bis zu 90 Tage"
+        "CloudWatch-Anwendungslogs: 30 Tage, sicherheitsrelevante Logs bis zu 90 Tage"
       ]
     },
     {
@@ -308,7 +308,7 @@ const privacyDocEn: LegalDoc = {
     { title: "5. Mandatory and voluntary information", paragraphs: ["Data required to process the registration are marked as mandatory. Without them, the registration usually cannot be processed. Voluntary information and optional consents normally do not affect participation."] },
     { title: "6. Recipients of the data", paragraphs: ["Your data are made accessible only to the bodies that need them for the event. This includes in particular internal club teams, appointed function holders, technical service providers and processors, and associations, insurers or other bodies where required for execution or legal handling."] },
     { title: "7. Hosting and technical processing", paragraphs: ["The registration platform is operated with technical service providers. AWS services in region eu-central-1 are used in particular for RDS PostgreSQL, S3, SES, Cognito, CloudWatch, Lambda, EventBridge, API Gateway and Secrets Manager."] },
-    { title: "8. Retention period", paragraphs: ["Personal data are stored only as long as necessary for the event, legal obligations or legal claims. In particular, participant master and entry data are kept for up to 3 years after the event, notes for 12 months, verification and idempotency data for 30 days, document metadata for up to 6 years, billing and payment records for 10 years, e-mail outbox and delivery data for 12 months, export data for 90 days and audit data for 24 months."] },
+    { title: "8. Retention period", paragraphs: ["Personal data are stored only as long as necessary for the event, legal obligations or legal claims. Personal data from the registration are generally stored until one year after the end of the event and are then deleted or anonymized unless statutory retention obligations or legal reasons require longer storage. In particular, personal registration data are kept for 1 year after the event, notes and legal guardian details for minors for 1 year, verification and idempotency data for 30 days, document metadata and PDFs for 6 years after the event, billing and payment records for 10 years after the event, e-mail outbox and delivery data for 12 months, export data for 90 days and audit data for 24 months."] },
     { title: "9. Photo and video recordings", paragraphs: ["Where photo or video recordings are processed, this is done either on the basis of your separate consent or on another legally permissible basis in connection with documentation and public relations. Consent can be withdrawn at any time for future processing."] },
     { title: "10. Club information", paragraphs: ["If you consent separately, we use your contact data to inform you about club information, future events or organizational notices. This consent is voluntary and can be withdrawn at any time with effect for the future."] },
     { title: "11. Your rights", paragraphs: ["Subject to the statutory requirements, you have the right to access, rectification, erasure, restriction of processing, objection, data portability and withdrawal of consent with effect for the future."] },
@@ -381,7 +381,7 @@ const privacyDocCz: LegalDoc = {
     { title: "5. Povinne a dobrovolne udaje", paragraphs: ["Udaje potrebne pro registraci jsou oznaceny jako povinne. Bez nich nelze registraci zpravidla zpracovat. Dobrovolne udaje a volitelne souhlasy nejsou podminkou ucasti."] },
     { title: "6. Prijemci udaju", paragraphs: ["Udaje jsou pristupne pouze osobam a subjektum, ktere je potrebuji pro organizaci akce, zejmena internim klubovym rolim, poverenym organizacnim funkcionarum, technickym zpracovatelum a dalsim subjektum, pokud je to nezbytne pro provedeni nebo pravni vyrizeni akce."] },
     { title: "7. Hosting a technicke zpracovani", paragraphs: ["Pro provoz platformy se vyuzivaji technicke sluzby AWS v regionu eu-central-1, zejmena RDS PostgreSQL, S3, SES, Cognito, CloudWatch, Lambda, EventBridge, API Gateway a Secrets Manager."] },
-    { title: "8. Doba uchovani", paragraphs: ["Osobni udaje se uchovavaji jen po dobu nezbytnou pro akci, pravni povinnosti a pripadne pravni naroky. Udaje o ucastnicich a registracich se uchovavaji az 3 roky po akci, poznamky 12 mesicu, verifikacni a idempotencni data 30 dni, metadata dokumentu az 6 let, ucetni a platebni data 10 let, e-mailova outbox a delivery data 12 mesicu, exporty 90 dni a auditni data 24 mesicu."] },
+    { title: "8. Doba uchovani", paragraphs: ["Osobni udaje se uchovavaji jen po dobu nezbytnou pro akci, pravni povinnosti a pripadne pravni naroky. Osobni udaje z registrace se zpravidla uchovavaji do jednoho roku po skonceni akce a pote se vymazou nebo anonymizuji, pokud delsi uchovani nevyplyva ze zakonne povinnosti nebo pravniho duvodu. Konkretne se osobni udaje z registrace uchovavaji 1 rok po skonceni akce, poznamky a udaje o zakonnych zastupcich nezletilych 1 rok, verifikacni a idempotencni data 30 dni, metadata dokumentu a PDF 6 let po skonceni akce, ucetni a platebni data 10 let po skonceni akce, e-mailova outbox a delivery data 12 mesicu, exporty 90 dni a auditni data 24 mesicu."] },
     { title: "9. Foto a video zaznamy", paragraphs: ["Pokud jsou zpracovavany foto nebo video zaznamy, deje se tak bud na zaklade samostatneho souhlasu, nebo na jinem zakonem pripustnem zaklade. Souhlas lze kdykoli odvolat s ucinky do budoucna."] },
     { title: "10. Klubove informace", paragraphs: ["Pokud udelite samostatny souhlas, budou vase kontaktni udaje vyuzity pro informace o klubu, budouci akce a organizacni oznameni. Tento souhlas je dobrovolny a lze jej kdykoli odvolat."] },
     { title: "11. Vasa prava", paragraphs: ["Mate pravo na pristup, opravu, vymaz, omezeni zpracovani, namitku, prenositelnost udaju a odvolani souhlasu s ucinky do budoucna."] },
@@ -454,7 +454,7 @@ const privacyDocPl: LegalDoc = {
     { title: "5. Dane obowiazkowe i dobrowolne", paragraphs: ["Dane wymagane do obslugi rejestracji sa oznaczone jako obowiazkowe. Bez nich rejestracja z reguly nie moze zostac przetworzona. Dane dobrowolne i zgody pozostaja dobrowolne i nie warunkuja mozliwosci udzialu."] },
     { title: "6. Odbiorcy danych", paragraphs: ["Dane sa udostepniane wyłącznie osobom i podmiotom, ktore potrzebuja ich do organizacji wydarzenia, w szczegolnosci wewnetrznym rolom klubowym, wyznaczonym funkcjonariuszom, technicznym podmiotom przetwarzajacym oraz innym podmiotom, jezeli jest to konieczne do realizacji lub prawnej obslugi wydarzenia."] },
     { title: "7. Hosting i przetwarzanie techniczne", paragraphs: ["Do obslugi platformy wykorzystywane sa uslugi AWS w regionie eu-central-1, w szczegolnosci RDS PostgreSQL, S3, SES, Cognito, CloudWatch, Lambda, EventBridge, API Gateway i Secrets Manager."] },
-    { title: "8. Okres przechowywania", paragraphs: ["Dane osobowe przechowujemy tylko tak dlugo, jak jest to konieczne dla wydarzenia, obowiazkow prawnych i ewentualnych roszczen prawnych. Dane uczestnikow i zgloszen przechowywane sa do 3 lat po wydarzeniu, notatki przez 12 miesiecy, dane weryfikacyjne i idempotencyjne przez 30 dni, metadane dokumentow do 6 lat, dane rozliczeniowe i platnosci przez 10 lat, dane outbox i delivery przez 12 miesiecy, eksporty przez 90 dni, a dane audytowe przez 24 miesiace."] },
+    { title: "8. Okres przechowywania", paragraphs: ["Dane osobowe przechowujemy tylko tak dlugo, jak jest to konieczne dla wydarzenia, obowiazkow prawnych i ewentualnych roszczen prawnych. Dane osobowe zgloszenia sa co do zasady przechowywane do jednego roku po zakonczeniu wydarzenia, a nastepnie usuwane lub anonimizowane, chyba ze dluzsze przechowywanie wynika z obowiazkow ustawowych lub przyczyn prawnych. W szczegolnosci dane osobowe ze zgloszenia przechowujemy przez 1 rok po zakonczeniu wydarzenia, notatki i dane opiekuna prawnego osoby niepelnoletniej przez 1 rok, dane weryfikacyjne i idempotencyjne przez 30 dni, metadane dokumentow i pliki PDF przez 6 lat po zakonczeniu wydarzenia, dane rozliczeniowe i platnosci przez 10 lat po zakonczeniu wydarzenia, dane outbox i delivery przez 12 miesiecy, eksporty przez 90 dni, a dane audytowe przez 24 miesiace."] },
     { title: "9. Zdjecia i nagrania wideo", paragraphs: ["Jezeli przetwarzane sa zdjecia lub nagrania wideo, odbywa sie to na podstawie odrebnej zgody albo innej dopuszczalnej prawem podstawy. Zgode mozna w kazdym czasie odwolac ze skutkiem na przyszlosc."] },
     { title: "10. Informacje klubowe", paragraphs: ["Jesli wyrazisz odrebna zgode, wykorzystamy Twoje dane kontaktowe do przekazywania informacji klubowych, o przyszlych wydarzeniach i komunikatow organizacyjnych. Zgoda ta jest dobrowolna i moze byc w kazdym czasie odwolana."] },
     { title: "11. Twoje prawa", paragraphs: ["Masz prawo do dostepu, sprostowania, usuniecia, ograniczenia przetwarzania, sprzeciwu, przenoszenia danych oraz cofniecia zgody ze skutkiem na przyszlosc."] },
@@ -531,6 +531,7 @@ const legalTextsDe: LegalTexts = {
     introTitle: "Hinweise zur Anmeldung",
     introBody: [
       "Mit dem Absenden der Anmeldung verarbeitet der MSC Oberlausitzer Dreiländereck e.V. die von Ihnen angegebenen personenbezogenen Daten zur Durchführung der Veranstaltung, zur Teilnehmerverwaltung, zur Kommunikation im Zusammenhang mit Ihrer Anmeldung, zur Erstellung veranstaltungsbezogener Unterlagen sowie zur organisatorischen und rechtlichen Abwicklung der Teilnahme.",
+      "Personenbezogene Daten aus der Anmeldung werden grundsätzlich bis ein Jahr nach Veranstaltungsende gespeichert und anschließend gelöscht oder anonymisiert, soweit keine gesetzlichen Aufbewahrungspflichten oder rechtlichen Gründe einer weiteren Speicherung entgegenstehen.",
       "Rechtsgrundlagen sind insbesondere Art. 6 Abs. 1 lit. b DSGVO für die Teilnahmeabwicklung, Art. 6 Abs. 1 lit. c DSGVO für gesetzliche Pflichten sowie Art. 6 Abs. 1 lit. f DSGVO für berechtigte organisatorische Interessen des Veranstalters. Soweit eine Verarbeitung nicht für die Durchführung der Veranstaltung erforderlich ist, erfolgt sie nur auf Grundlage einer gesonderten Einwilligung.",
       "Weitere Informationen finden Sie in den Datenschutzhinweisen."
     ],
@@ -577,6 +578,7 @@ const legalTextsEn: LegalTexts = {
     introTitle: "Registration notice",
     introBody: [
       "By submitting the registration, MSC Oberlausitzer Dreiländereck e.V. processes the personal data you provide for event execution, participant management, communication related to your registration, preparation of event-related documents and the organizational and legal handling of participation.",
+      "Personal data from the registration are generally stored until one year after the end of the event and are then deleted or anonymized unless statutory retention obligations or legal reasons require longer storage.",
       "The main legal bases are Art. 6(1)(b) GDPR for participation handling, Art. 6(1)(c) GDPR for legal obligations and Art. 6(1)(f) GDPR for the organizer's legitimate organizational interests. Where processing is not required for the event itself, it takes place only on the basis of a separate consent.",
       "Further information is available in the privacy notice."
     ],
@@ -622,6 +624,7 @@ const legalTextsCz: LegalTexts = {
     introTitle: "Informace k registraci",
     introBody: [
       "Odeslanim registrace zpracovava MSC Oberlausitzer Dreiländereck e.V. vami zadane osobni udaje pro provedeni akce, spravu ucastniku, komunikaci k registraci, pripravu dokumentu k akci a organizacni i pravni vyrizeni ucasti.",
+      "Osobni udaje z registrace se zpravidla uchovavaji do jednoho roku po skonceni akce a pote se vymazou nebo anonymizuji, pokud delsi uchovani nevyplyva ze zakonne povinnosti nebo pravniho duvodu.",
       "Pravnimi zaklady jsou zejmena cl. 6 odst. 1 pism. b GDPR pro vyrizeni ucasti, cl. 6 odst. 1 pism. c GDPR pro zakonne povinnosti a cl. 6 odst. 1 pism. f GDPR pro opravneny organizacni zajem poradatele. Pokud zpracovani neni nutne pro samotnou akci, probiha pouze na zaklade samostatneho souhlasu.",
       "Dalsi informace naleznete v informacich o ochrane osobnich udaju."
     ],
@@ -667,6 +670,7 @@ const legalTextsPl: LegalTexts = {
     introTitle: "Informacje o rejestracji",
     introBody: [
       "Po wyslaniu rejestracji MSC Oberlausitzer Dreiländereck e.V. przetwarza podane przez Ciebie dane osobowe w celu przeprowadzenia wydarzenia, zarzadzania uczestnikami, komunikacji dotyczacej zgloszenia, przygotowania dokumentow zwiazanych z wydarzeniem oraz organizacyjnej i prawnej obslugi uczestnictwa.",
+      "Dane osobowe zgloszenia sa co do zasady przechowywane do jednego roku po zakonczeniu wydarzenia, a nastepnie usuwane lub anonimizowane, chyba ze dluzsze przechowywanie wynika z obowiazkow ustawowych lub przyczyn prawnych.",
       "Podstawami prawnymi sa w szczegolnosci art. 6 ust. 1 lit. b RODO dla obslugi uczestnictwa, art. 6 ust. 1 lit. c RODO dla obowiazkow prawnych oraz art. 6 ust. 1 lit. f RODO dla uzasadnionych interesow organizacyjnych organizatora. Jezeli przetwarzanie nie jest konieczne do realizacji wydarzenia, odbywa sie wylacznie na podstawie odrebnej zgody.",
       "Dalsze informacje znajduja sie w informacji o prywatnosci."
     ],

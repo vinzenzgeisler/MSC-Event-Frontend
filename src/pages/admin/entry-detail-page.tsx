@@ -677,12 +677,21 @@ export function AdminEntryDetailPage() {
                     </div>
                   ))}
                 </div>
-                <div className="rounded border bg-slate-50 p-3 text-xs">
+              <div className="rounded border bg-slate-50 p-3 text-xs">
                   <div>Teilnahmebedingungen: {detail.consent.termsAccepted ? "Ja" : "Nein"}</div>
                   <div>Datenschutz: {detail.consent.privacyAccepted ? "Ja" : "Nein"}</div>
                   <div>Haftverzicht: {detail.consent.waiverAccepted ? "Ja" : "Nein"}</div>
                   <div>Medien: {detail.consent.mediaAccepted ? "Ja" : "Nein"}</div>
                   <div>Vereinsinfos: {detail.consent.clubInfoAccepted ? "Ja" : "Nein"}</div>
+                  {detail.consent.guardian.present && (
+                    <>
+                      <div className="pt-2 font-medium text-slate-900">Sorgeberechtigte Person</div>
+                      <div>Name: {detail.consent.guardian.fullName}</div>
+                      <div>E-Mail: {detail.consent.guardian.email}</div>
+                      <div>Telefon: {detail.consent.guardian.phone}</div>
+                      <div>Zustimmung: {detail.consent.guardian.consentAccepted ? "Ja" : "Nein"}</div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -342,6 +342,13 @@ function fromAdminEntryDetailDto(
       waiverAccepted: Boolean(dto.consent.waiverAccepted),
       mediaAccepted: dto.consent.mediaAccepted,
       clubInfoAccepted: Boolean(dto.consent.clubInfoAccepted),
+      guardian: {
+        present: Boolean(dto.consent.guardian),
+        fullName: dto.consent.guardian?.fullName ?? "-",
+        email: dto.consent.guardian?.email ?? "-",
+        phone: formatPhoneForDisplay(dto.consent.guardian?.phone),
+        consentAccepted: Boolean(dto.consent.guardian?.consentAccepted)
+      },
       consentVersion: dto.consent.consentVersion,
       consentCapturedAt: dto.consent.consentCapturedAt
     },
