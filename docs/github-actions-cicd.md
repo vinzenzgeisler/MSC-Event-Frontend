@@ -42,8 +42,8 @@ Die Workflow-Datei verwendet bereits `environment: dev` und `environment: prod`.
 Öffentliche Kontaktadresse und Website werden fest aus dem Frontend ausgeliefert und sind bewusst nicht Teil der CI/CD-Environment-Konfiguration.
 
 ## Hinweis zu GitHub Variables vs Secrets
-- Bevorzugt `VITE_API_BASE_URL_DEV` und `VITE_API_BASE_URL_PROD` als Environment `Variables` speichern.
-- Der Workflow unterstützt jetzt zusätzlich einen Fallback auf gleichnamige `Secrets`, falls die URL dort bereits hinterlegt wurde.
+- `VITE_API_BASE_URL_DEV` und `VITE_API_BASE_URL_PROD` werden bewusst nur als Environment `Variables` erwartet.
+- Fehlt der Wert in der jeweiligen Stage, bricht der Workflow vor dem Build hart ab.
 - Die eigentliche Vercel-Produktion wird im Schritt `vercel build` gebaut. Deshalb muss die API-URL dort verfügbar sein, nicht nur im vorherigen `npm run build`.
 
 ## Verhalten

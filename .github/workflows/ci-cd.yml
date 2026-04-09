@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     env:
-      MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_DEV || secrets.VITE_API_BASE_URL_DEV }}
+      MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_DEV }}
       VITE_COGNITO_ENABLED: "false"
       VITE_COGNITO_DOMAIN: ""
       VITE_COGNITO_CLIENT_ID: ""
@@ -56,6 +56,13 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Validate Dev API base URL
+        run: |
+          if [ -z "${MSC_API_BASE_URL}" ]; then
+            echo "VITE_API_BASE_URL_DEV is missing in GitHub Environment 'dev'."
+            exit 1
+          fi
 
       - name: Build
         run: npm run build
@@ -100,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     env:
-      MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD || secrets.VITE_API_BASE_URL_PROD }}
+      MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD }}
       VITE_COGNITO_ENABLED: "false"
       VITE_COGNITO_DOMAIN: ""
       VITE_COGNITO_CLIENT_ID: ""
@@ -118,6 +125,13 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Validate Prod API base URL
+        run: |
+          if [ -z "${MSC_API_BASE_URL}" ]; then
+            echo "VITE_API_BASE_URL_PROD is missing in GitHub Environment 'prod'."
+            exit 1
+          fi
 
       - name: Build
         run: npm run build
