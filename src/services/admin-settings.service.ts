@@ -21,6 +21,11 @@ type AdminEventResponse = {
   event: Record<string, unknown>;
 };
 
+type AdminEventsListResponse = {
+  ok: boolean;
+  events: Array<Record<string, unknown>>;
+};
+
 type AdminEntryConfirmationDefaultsResponse = {
   ok: boolean;
   config: Record<string, unknown>;
@@ -281,6 +286,11 @@ export const adminSettingsService = {
   async getEvent(eventId: string): Promise<AdminSettingsEvent> {
     const response = await requestJson<AdminEventResponse>(`/admin/events/${eventId}`);
     return mapEvent(response.event);
+  },
+
+  async listEvents(): Promise<AdminSettingsEvent[]> {
+    const response = await requestJson<AdminEventsListResponse>("/admin/events");
+    return Array.isArray(response.events) ? response.events.map((item) => mapEvent(item)) : [];
   },
 
   async createEvent(payload: AdminSettingsEventForm): Promise<AdminSettingsEvent> {

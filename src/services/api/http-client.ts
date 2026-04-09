@@ -1,5 +1,13 @@
 import { getAuthToken, refreshAuthSession } from "@/app/auth/auth-store";
 
+type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
+
+declare global {
+  interface Window {
+    __MSC_RUNTIME_CONFIG__?: RuntimeConfig;
+  }
+}
+
 export type ApiFieldError = {
   field: string;
   code: string;
@@ -38,7 +46,20 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+function readConfigValue(envKey: string, runtimeKey: string, fallback = ""): string {
+  const runtimeConfig = window.__MSC_RUNTIME_CONFIG__;
+  const runtimeValue = runtimeConfig?.[runtimeKey] ?? runtimeConfig?.[envKey];
+  if (runtimeValue !== undefined && runtimeValue !== null) {
+    return String(runtimeValue).trim();
+  }
+  const envValue = (import.meta.env as Record<string, unknown>)[envKey];
+  if (envValue !== undefined && envValue !== null) {
+    return String(envValue).trim();
+  }
+  return fallback;
+}
+
+const baseUrl = readConfigValue("VITE_API_BASE_URL", "apiBaseUrl").replace(/\/$/, "");
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

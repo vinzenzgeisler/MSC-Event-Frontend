@@ -21,7 +21,6 @@ const HUBRAUM_PATTERN = /^\d{2,5}$/;
 const CYLINDERS_PATTERN = /^(?:\d{1,2}|V\d{1,2})$/i;
 const YEAR_PATTERN = /^\d{4}$/;
 const BIRTHDATE_PATTERN = /^(\d{2})\.(\d{2})\.(\d{4})$/;
-const REGISTRATION_DRAFT_STORAGE_KEY = "msc_registration_draft_v1";
 const CONSENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 function createEmptyVehicle(): VehicleForm {
@@ -1001,42 +1000,6 @@ export function AnmeldungPage() {
   }, []);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(REGISTRATION_DRAFT_STORAGE_KEY);
-    if (!saved) {
-      return;
-    }
-    try {
-      const parsed = JSON.parse(saved) as RegistrationDraftStorage;
-      if (!parsed || typeof parsed !== "object") {
-        return;
-      }
-      setStep(parsed.step && parsed.step >= 1 && parsed.step <= 3 ? parsed.step : 1);
-      setDriver(hydrateDriverForm(parsed.driver));
-      const hydratedStarts = Array.isArray(parsed.starts) ? parsed.starts.map((item) => hydrateStartForm(item)) : [];
-      setStarts(hydratedStarts);
-      setDraftStart(hydrateStartForm(parsed.draftStart));
-      setAddAnotherStart(typeof parsed.addAnotherStart === "boolean" ? parsed.addAnotherStart : hydratedStarts.length === 0);
-      setEditingId(parsed.editingId ?? null);
-      const baseConsent = createInitialConsent(locale);
-      const parsedConsent = parsed.consent;
-      setConsent({
-        ...baseConsent,
-        termsAccepted: Boolean(parsedConsent?.termsAccepted),
-        privacyAccepted: Boolean(parsedConsent?.privacyAccepted),
-        waiverAccepted: Boolean(parsedConsent?.waiverAccepted),
-        mediaAccepted: Boolean(parsedConsent?.mediaAccepted),
-        clubInfoAccepted: Boolean(parsedConsent?.clubInfoAccepted),
-        consentVersion: typeof parsedConsent?.consentVersion === "string" ? parsedConsent.consentVersion : baseConsent.consentVersion,
-        consentTextHash: typeof parsedConsent?.consentTextHash === "string" ? parsedConsent.consentTextHash : baseConsent.consentTextHash,
-        locale: typeof parsedConsent?.locale === "string" ? parsedConsent.locale : baseConsent.locale,
-        consentSource: "public_form"
-      });
-    } catch {
-      // ignore invalid persisted drafts
-    }
-  }, []);
-
-  useEffect(() => {
     let active = true;
     const consentLocale = mapUiLocaleToConsentLocale(locale);
     computeConsentTextHash(locale)
@@ -1068,11 +1031,6 @@ export function AnmeldungPage() {
       active = false;
     };
   }, [locale]);
-
-  useEffect(() => {
-    const payload: RegistrationDraftStorage = { step, driver, starts, draftStart, addAnotherStart, editingId, consent };
-    window.localStorage.setItem(REGISTRATION_DRAFT_STORAGE_KEY, JSON.stringify(payload));
-  }, [step, driver, starts, draftStart, addAnotherStart, editingId, consent]);
 
   useEffect(() => {
     if (isMinorDriver) {
@@ -1592,7 +1550,6 @@ export function AnmeldungPage() {
     setSubmissionFingerprint("");
     setSuccessMessage(m.page.submitSuccess);
     setSubmissionComplete(true);
-    window.localStorage.removeItem(REGISTRATION_DRAFT_STORAGE_KEY);
   };
 
   const handleNext = () => {

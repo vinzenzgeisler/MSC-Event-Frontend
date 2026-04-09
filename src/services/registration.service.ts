@@ -257,6 +257,11 @@ type PublicVerifyEmailResponse = {
   alreadyVerified?: boolean;
 };
 
+type PublicVerifyResendResponse = {
+  ok: boolean;
+  queued: boolean;
+};
+
 async function submitWizardFallbackSingle(
   eventId: string,
   normalizedForm: RegistrationWizardForm
@@ -577,6 +582,14 @@ export const registrationService = {
       body: {
         token
       }
+    });
+  },
+
+  async resendVerification(entryId: string) {
+    return requestJson<PublicVerifyResendResponse>(`/public/entries/${entryId}/verification-resend`, {
+      method: "POST",
+      auth: false,
+      body: {}
     });
   }
 };

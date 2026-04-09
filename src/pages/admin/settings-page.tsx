@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Shield, Users, Save, Plus, Trash2, StopCircle, Archive } from "lucide-react";
+import { Shield, Users, Save, Plus, Trash2, StopCircle, Archive, PlayCircle, RotateCcw } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
@@ -763,6 +763,36 @@ function parseDateTime(value: string) {
   return parsed;
 }
 
+function validateEventDraft(form: AdminSettingsEventForm): string | null {
+  if (!form.name.trim()) {
+    return "Event-Name ist erforderlich.";
+  }
+
+  if (!form.startsAt || !form.endsAt) {
+    return "Event-Beginn und Event-Ende sind erforderlich.";
+  }
+
+  if (form.startsAt > form.endsAt) {
+    return "Event-Beginn darf nicht nach Event-Ende liegen.";
+  }
+
+  const hasRegistrationOpen = Boolean(form.registrationOpenAt);
+  const hasRegistrationClose = Boolean(form.registrationCloseAt);
+  if (hasRegistrationOpen !== hasRegistrationClose) {
+    return "Anmeldung öffnet/schließt muss vollständig gesetzt werden oder leer bleiben.";
+  }
+
+  if (hasRegistrationOpen && hasRegistrationClose) {
+    const registrationOpen = parseDateTime(form.registrationOpenAt);
+    const registrationClose = parseDateTime(form.registrationCloseAt);
+    if (!registrationOpen || !registrationClose || registrationOpen >= registrationClose) {
+      return "Anmeldung öffnen muss vor Anmeldung schließen liegen.";
+    }
+  }
+
+  return null;
+}
+
 function asRoleList(value: string[]) {
   const unique = new Set<IamRole>();
   value.forEach((item) => {
@@ -818,10 +848,19 @@ export function AdminSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [noCurrentEvent, setNoCurrentEvent] = useState(false);
+  const [availableEvents, setAvailableEvents] = useState<AdminSettingsEvent[]>([]);
   const [eventState, setEventState] = useState<AdminSettingsEvent | null>(null);
   const [entryConfirmationDefaults, setEntryConfirmationDefaults] =
     useState<AdminSettingsEntryConfirmationConfig>(createEmptyEntryConfirmationConfig());
   const [eventForm, setEventForm] = useState<AdminSettingsEventForm>({
+    name: "",
+    startsAt: "",
+    endsAt: "",
+    registrationOpenAt: "",
+    registrationCloseAt: "",
+    entryConfirmationConfig: createEmptyEntryConfirmationConfig()
+  });
+  const [newEventForm, setNewEventForm] = useState<AdminSettingsEventForm>({
     name: "",
     startsAt: "",
     endsAt: "",
@@ -838,6 +877,7 @@ export function AdminSettingsPage() {
   const [savingEvent, setSavingEvent] = useState(false);
   const [savingEntryConfirmationDefaults, setSavingEntryConfirmationDefaults] = useState(false);
   const [creatingInitialEvent, setCreatingInitialEvent] = useState(false);
+  const [creatingNextEvent, setCreatingNextEvent] = useState(false);
   const [savingClassId, setSavingClassId] = useState<string | null>(null);
   const [creatingClass, setCreatingClass] = useState(false);
   const [operationBusy, setOperationBusy] = useState<string | null>(null);
@@ -862,6 +902,7 @@ export function AdminSettingsPage() {
   const [pricingInitializedForEventId, setPricingInitializedForEventId] = useState<string | null>(null);
   const [eventOverridesExpanded, setEventOverridesExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("event");
+  const selectedEventIsEditable = Boolean(eventState && (eventState.status === "draft" || eventState.status === "open"));
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -904,6 +945,38 @@ export function AdminSettingsPage() {
     setEventOverridesExpanded(false);
   };
 
+  const applyLoadedEvent = async (event: AdminSettingsEvent) => {
+    const [classList, pricingRules] = await Promise.all([
+      adminSettingsService.listClasses(event.id),
+      adminSettingsService.getPricingRules(event.id).catch(() => null)
+    ]);
+
+    const nextEventForm = eventToForm(event);
+    persistSelectedEventId(event.id);
+    setNoCurrentEvent(false);
+    setEventState(event);
+    setEventForm(nextEventForm);
+    setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
+    setClasses(classList);
+    setClassDrafts(
+      Object.fromEntries(classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }]))
+    );
+
+    const key = storageKeyForEvent(event.id);
+    const storedDraft = window.localStorage.getItem(key);
+    if (storedDraft) {
+      try {
+        const parsed = JSON.parse(storedDraft) as AdminSettingsPricingForm;
+        setPricingForm(mergePricingWithClasses(parsed, classList));
+      } catch {
+        setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
+      }
+    } else {
+      setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
+    }
+    setPricingInitializedForEventId(event.id);
+  };
+
   const loadData = async () => {
     setLoading(true);
     setNoCurrentEvent(false);
@@ -916,9 +989,10 @@ export function AdminSettingsPage() {
 
     try {
       const selectedEventId = readSelectedEventId();
-      const [defaultsResult, iamResult, eventResult] = await Promise.allSettled([
+      const [defaultsResult, iamResult, listResult, eventResult] = await Promise.allSettled([
         adminSettingsService.getEntryConfirmationDefaults(),
         adminIamService.getOverview(),
+        adminSettingsService.listEvents(),
         selectedEventId ? adminSettingsService.getEvent(selectedEventId) : adminSettingsService.getCurrentEvent()
       ]);
 
@@ -940,78 +1014,19 @@ export function AdminSettingsPage() {
         setIamError(getApiErrorMessage(iamResult.reason, "IAM-Übersicht konnte nicht geladen werden."));
       }
 
+      const resolvedEvents = listResult.status === "fulfilled" ? listResult.value : [];
+      setAvailableEvents(resolvedEvents);
+
       if (eventResult.status === "fulfilled") {
-        const event = eventResult.value;
-        const [classList, pricingRules] = await Promise.all([
-          adminSettingsService.listClasses(event.id),
-          adminSettingsService.getPricingRules(event.id).catch(() => null)
-        ]);
-
-        const nextEventForm = eventToForm(event);
-        persistSelectedEventId(event.id);
-        setEventState(event);
-        setEventForm(nextEventForm);
-        setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
-        setClasses(classList);
-        setClassDrafts(
-          Object.fromEntries(
-            classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }])
-          )
-        );
-
-        const key = storageKeyForEvent(event.id);
-        const storedDraft = window.localStorage.getItem(key);
-        if (storedDraft) {
-          try {
-            const parsed = JSON.parse(storedDraft) as AdminSettingsPricingForm;
-            setPricingForm(mergePricingWithClasses(parsed, classList));
-          } catch {
-            setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
-          }
-        } else {
-          setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
-        }
-        setPricingInitializedForEventId(event.id);
+        await applyLoadedEvent(eventResult.value);
       } else if (
         selectedEventId &&
         eventResult.reason instanceof ApiError &&
         eventResult.reason.status === 404
       ) {
         persistSelectedEventId(null);
-        const fallbackEvent = await adminSettingsService.getCurrentEvent().catch(() => null);
-        if (fallbackEvent) {
-          const [classList, pricingRules] = await Promise.all([
-            adminSettingsService.listClasses(fallbackEvent.id),
-            adminSettingsService.getPricingRules(fallbackEvent.id).catch(() => null)
-          ]);
-
-          const nextEventForm = eventToForm(fallbackEvent);
-          persistSelectedEventId(fallbackEvent.id);
-          setEventState(fallbackEvent);
-          setEventForm(nextEventForm);
-          setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
-          setClasses(classList);
-          setClassDrafts(
-            Object.fromEntries(
-              classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }])
-            )
-          );
-
-          const key = storageKeyForEvent(fallbackEvent.id);
-          const storedDraft = window.localStorage.getItem(key);
-          if (storedDraft) {
-            try {
-              const parsed = JSON.parse(storedDraft) as AdminSettingsPricingForm;
-              setPricingForm(mergePricingWithClasses(parsed, classList));
-            } catch {
-              setPricingForm(
-                pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList)
-              );
-            }
-          } else {
-            setPricingForm(pricingRules ? pricingRulesToForm(pricingRules, classList) : buildDefaultPricingForm(classList));
-          }
-          setPricingInitializedForEventId(fallbackEvent.id);
+        if (resolvedEvents.length > 0) {
+          await applyLoadedEvent(resolvedEvents[0]);
         } else {
           resetEventScopedState();
           setNoCurrentEvent(true);
@@ -1022,20 +1037,38 @@ export function AdminSettingsPage() {
         eventResult.reason.status === 404 &&
         eventResult.reason.code === "NOT_FOUND"
       ) {
-        resetEventScopedState();
-        setNoCurrentEvent(true);
-        persistSelectedEventId(null);
-        setEventForm({
-          name: "",
-          startsAt: "",
-          endsAt: "",
-          registrationOpenAt: "",
-          registrationCloseAt: "",
-          entryConfirmationConfig: createEmptyEntryConfirmationConfig()
-        });
+        if (resolvedEvents.length > 0) {
+          await applyLoadedEvent(resolvedEvents[0]);
+        } else {
+          resetEventScopedState();
+          setNoCurrentEvent(true);
+          persistSelectedEventId(null);
+          setEventForm({
+            name: "",
+            startsAt: "",
+            endsAt: "",
+            registrationOpenAt: "",
+            registrationCloseAt: "",
+            entryConfirmationConfig: createEmptyEntryConfirmationConfig()
+          });
+        }
       } else {
         setEventError(getApiErrorMessage(eventResult.reason, "Einstellungen konnten nicht geladen werden."));
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSelectedEvent = async (eventId: string) => {
+    setLoading(true);
+    setOperationsError("");
+    setEventError("");
+    try {
+      const event = await adminSettingsService.getEvent(eventId);
+      await applyLoadedEvent(event);
+    } catch (error) {
+      setEventError(getApiErrorMessage(error, "Event konnte nicht geladen werden."));
     } finally {
       setLoading(false);
     }
@@ -1203,36 +1236,10 @@ export function AdminSettingsPage() {
 
   const createInitialEvent = async () => {
     setEventError("");
-
-    if (!eventForm.name.trim()) {
-      setEventError("Event-Name ist erforderlich.");
+    const validationError = validateEventDraft(eventForm);
+    if (validationError) {
+      setEventError(validationError);
       return;
-    }
-
-    if (!eventForm.startsAt || !eventForm.endsAt) {
-      setEventError("Event-Beginn und Event-Ende sind erforderlich.");
-      return;
-    }
-
-    if (eventForm.startsAt > eventForm.endsAt) {
-      setEventError("Event-Beginn darf nicht nach Event-Ende liegen.");
-      return;
-    }
-
-    const hasRegistrationOpen = Boolean(eventForm.registrationOpenAt);
-    const hasRegistrationClose = Boolean(eventForm.registrationCloseAt);
-    if (hasRegistrationOpen !== hasRegistrationClose) {
-      setEventError("Anmeldung öffnet/schließt muss vollständig gesetzt werden oder leer bleiben.");
-      return;
-    }
-
-    if (hasRegistrationOpen && hasRegistrationClose) {
-      const registrationOpen = parseDateTime(eventForm.registrationOpenAt);
-      const registrationClose = parseDateTime(eventForm.registrationCloseAt);
-      if (!registrationOpen || !registrationClose || registrationOpen >= registrationClose) {
-        setEventError("Anmeldung öffnen muss vor Anmeldung schließen liegen.");
-        return;
-      }
     }
 
     setCreatingInitialEvent(true);
@@ -1260,6 +1267,43 @@ export function AdminSettingsPage() {
       setEventError(getApiErrorMessage(error, "Event konnte nicht angelegt werden."));
     } finally {
       setCreatingInitialEvent(false);
+    }
+  };
+
+  const createNextEvent = async () => {
+    setEventError("");
+    const validationError = validateEventDraft(newEventForm);
+    if (validationError) {
+      setEventError(validationError);
+      return;
+    }
+
+    setCreatingNextEvent(true);
+
+    try {
+      const created = await adminSettingsService.createEvent({
+        name: newEventForm.name.trim(),
+        startsAt: newEventForm.startsAt,
+        endsAt: newEventForm.endsAt,
+        registrationOpenAt: newEventForm.registrationOpenAt,
+        registrationCloseAt: newEventForm.registrationCloseAt,
+        entryConfirmationConfig: newEventForm.entryConfirmationConfig
+      });
+      setNewEventForm({
+        name: "",
+        startsAt: "",
+        endsAt: "",
+        registrationOpenAt: "",
+        registrationCloseAt: "",
+        entryConfirmationConfig: createEmptyEntryConfirmationConfig()
+      });
+      await loadData();
+      await loadSelectedEvent(created.id);
+      showToast("Neues Event angelegt.");
+    } catch (error) {
+      setEventError(getApiErrorMessage(error, "Neues Event konnte nicht angelegt werden."));
+    } finally {
+      setCreatingNextEvent(false);
     }
   };
 
@@ -1491,10 +1535,15 @@ export function AdminSettingsPage() {
     }
 
     const restoreArchivedEvent = operation === "activate" && eventState.status === "archived";
+    const activateDraftEvent = operation === "activate" && eventState.status === "draft";
     const confirmText: Record<typeof operation, string> = {
       close: "Event wirklich schließen?",
       archive: "Event wirklich archivieren?",
-      activate: restoreArchivedEvent ? "Archiviertes Event wirklich als geschlossen wiederherstellen?" : "Geschlossenes Event wirklich wieder öffnen?"
+      activate: restoreArchivedEvent
+        ? "Archiviertes Event wirklich als geschlossen wiederherstellen?"
+        : activateDraftEvent
+          ? "Event wirklich öffnen?"
+          : "Geschlossenes Event wirklich wieder öffnen?"
     };
 
     if (!window.confirm(confirmText[operation])) {
@@ -1514,7 +1563,13 @@ export function AdminSettingsPage() {
         const updated = await adminSettingsService.activateEvent(eventState.id);
         persistSelectedEventId(updated.id);
         setEventState(updated);
-        showToast(restoreArchivedEvent ? "Event wurde als geschlossen wiederhergestellt." : "Event wurde wieder geöffnet.");
+        showToast(
+          restoreArchivedEvent
+            ? "Event wurde als geschlossen wiederhergestellt."
+            : activateDraftEvent
+              ? "Event wurde geöffnet."
+              : "Event wurde wieder geöffnet."
+        );
       } else {
         const updated = await adminSettingsService.archiveEvent(eventState.id);
         persistSelectedEventId(updated.id);
@@ -1627,6 +1682,42 @@ export function AdminSettingsPage() {
     }
   };
 
+  const primaryEventAction = (() => {
+    if (!eventState) {
+      return null;
+    }
+    if (eventState.status === "open") {
+      return {
+        label: "Event schließen",
+        description: "Beendet die Anmeldung und macht Platz für das nächste Jahres-Event.",
+        icon: <StopCircle className="mr-2 h-4 w-4" />,
+        action: () => void runOperation("close")
+      };
+    }
+    if (eventState.status === "closed") {
+      return {
+        label: "Event wieder öffnen",
+        description: "Öffnet ein geschlossenes Event erneut und setzt es wieder als aktuelles Event.",
+        icon: <PlayCircle className="mr-2 h-4 w-4" />,
+        action: () => void runOperation("activate")
+      };
+    }
+    if (eventState.status === "archived") {
+      return {
+        label: "Als geschlossen wiederherstellen",
+        description: "Holt ein archiviertes Event zurück, ohne es direkt erneut zu öffnen.",
+        icon: <RotateCcw className="mr-2 h-4 w-4" />,
+        action: () => void runOperation("activate")
+      };
+    }
+    return {
+      label: "Event öffnen",
+      description: "Setzt das Event live und macht es zum aktuellen Event.",
+      icon: <PlayCircle className="mr-2 h-4 w-4" />,
+      action: () => void runOperation("activate")
+    };
+  })();
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1707,6 +1798,39 @@ export function AdminSettingsPage() {
 
           {activeTab === "event" && (
             <>
+              {availableEvents.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Event auswählen</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-1">
+                      <Label>Vorhandenes Event</Label>
+                      <Select
+                        value={eventState?.id ?? "__none__"}
+                        onValueChange={(next) => {
+                          if (next && next !== "__none__") {
+                            void loadSelectedEvent(next);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="text-base md:text-sm">
+                          <SelectValue placeholder="Event auswählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Event auswählen</SelectItem>
+                          {availableEvents.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.name} ({item.status})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {noCurrentEvent ? (
                 <Card>
                   <CardHeader>
@@ -1773,17 +1897,138 @@ export function AdminSettingsPage() {
                 </Card>
               ) : (
                 <>
+                  {!selectedEventIsEditable && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Neues Event anlegen</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="text-sm text-slate-600">
+                          Das ausgewählte Event ist abgeschlossen. Für das nächste Jahr legst du hier ein neues Event an.
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label>Event-Name</Label>
+                            <Input
+                              value={newEventForm.name}
+                              disabled={!canManage || creatingNextEvent}
+                              onChange={(event) => setNewEventForm((prev) => ({ ...prev, name: event.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Event beginnt</Label>
+                            <Input
+                              type="date"
+                              value={newEventForm.startsAt}
+                              disabled={!canManage || creatingNextEvent}
+                              onChange={(event) => setNewEventForm((prev) => ({ ...prev, startsAt: event.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Event endet</Label>
+                            <Input
+                              type="date"
+                              value={newEventForm.endsAt}
+                              disabled={!canManage || creatingNextEvent}
+                              onChange={(event) => setNewEventForm((prev) => ({ ...prev, endsAt: event.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Anmeldung öffnet (optional)</Label>
+                            <Input
+                              type="datetime-local"
+                              value={newEventForm.registrationOpenAt}
+                              disabled={!canManage || creatingNextEvent}
+                              onChange={(event) =>
+                                setNewEventForm((prev) => ({ ...prev, registrationOpenAt: event.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Anmeldung schließt (optional)</Label>
+                            <Input
+                              type="datetime-local"
+                              value={newEventForm.registrationCloseAt}
+                              disabled={!canManage || creatingNextEvent}
+                              onChange={(event) =>
+                                setNewEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <Button type="button" disabled={!canManage || creatingNextEvent} onClick={() => void createNextEvent()}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          {creatingNextEvent ? "Legt an…" : "Neues Event anlegen"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   <Card>
-            <CardHeader>
-              <CardTitle>Event-Konfiguration</CardTitle>
-            </CardHeader>
-                <CardContent className="space-y-6">
+                    <CardHeader>
+                      <CardTitle>Event</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-2">
+                            <div className="text-sm font-semibold text-slate-900">{eventState?.name}</div>
+                            <div className="text-sm text-slate-600">
+                              Status: <span className="font-medium text-slate-900">{eventState?.status}</span>
+                            </div>
+                            <div className="text-sm text-slate-600">
+                              {primaryEventAction?.description}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {primaryEventAction && (
+                              <Button
+                                type="button"
+                                disabled={!canManage || !eventState || operationBusy !== null}
+                                onClick={primaryEventAction.action}
+                              >
+                                {primaryEventAction.icon}
+                                {primaryEventAction.label}
+                              </Button>
+                            )}
+                            {eventState?.status === "closed" && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={!canManage || !eventState || operationBusy !== null}
+                                onClick={() => void runOperation("archive")}
+                              >
+                                <Archive className="mr-2 h-4 w-4" />
+                                Archivieren
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {eventState?.status === "closed" && (
+                          <div className="mt-3 text-xs text-slate-500">
+                            Geschlossene Events bleiben auswählbar. Für den Jahreswechsel reicht normalerweise schließen; archivieren ist optional.
+                          </div>
+                        )}
+                        {eventState?.status === "archived" && (
+                          <div className="mt-3 text-xs text-slate-500">
+                            Archivierte Events sind ausgeblendet und können bei Bedarf erst als geschlossen wiederhergestellt werden.
+                          </div>
+                        )}
+                        {!selectedEventIsEditable && (
+                          <div className="mt-3 text-xs text-slate-500">
+                            Dieses Event ist schreibgeschützt. Änderungen an Eventdaten, Preisen und Klassen erfolgen über ein neues oder wieder geöffnetes Event.
+                          </div>
+                        )}
+                      </div>
+
+                      {operationsError && <div className="text-sm text-destructive">{operationsError}</div>}
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label>Event-Name</Label>
                       <Input
                         value={eventForm.name}
-                        disabled={!canManage || !eventState}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, name: event.target.value }))}
                       />
                     </div>
@@ -1792,7 +2037,7 @@ export function AdminSettingsPage() {
                       <Input
                         type="date"
                         value={eventForm.startsAt}
-                        disabled={!canManage || !eventState}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, startsAt: event.target.value }))}
                       />
                     </div>
@@ -1801,7 +2046,7 @@ export function AdminSettingsPage() {
                       <Input
                         type="date"
                         value={eventForm.endsAt}
-                        disabled={!canManage || !eventState}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, endsAt: event.target.value }))}
                       />
                     </div>
@@ -1810,7 +2055,7 @@ export function AdminSettingsPage() {
                       <Input
                         type="datetime-local"
                         value={eventForm.registrationOpenAt}
-                        disabled={!canManage || !eventState}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, registrationOpenAt: event.target.value }))}
                       />
                     </div>
@@ -1819,7 +2064,7 @@ export function AdminSettingsPage() {
                       <Input
                         type="datetime-local"
                         value={eventForm.registrationCloseAt}
-                        disabled={!canManage || !eventState}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
                       />
                     </div>
@@ -1833,7 +2078,7 @@ export function AdminSettingsPage() {
                         <Input
                           type="datetime-local"
                           value={pricingForm.earlyDeadline}
-                          disabled={!canManage || !eventState}
+                          disabled={!canManage || !eventState || !selectedEventIsEditable}
                           onChange={(event) => setPricingForm((prev) => ({ ...prev, earlyDeadline: event.target.value }))}
                         />
                       </div>
@@ -1841,7 +2086,7 @@ export function AdminSettingsPage() {
                         <Label>Aufpreis ab 2. Fenster (Cent)</Label>
                         <Input
                           value={pricingForm.lateFeeCents}
-                          disabled={!canManage || !eventState}
+                          disabled={!canManage || !eventState || !selectedEventIsEditable}
                           onChange={(event) =>
                             setPricingForm((prev) => ({ ...prev, lateFeeCents: event.target.value.replace(/\D/g, "") }))
                           }
@@ -1851,7 +2096,7 @@ export function AdminSettingsPage() {
                         <Label>2. Fahrzeug Rabatt (Cent)</Label>
                         <Input
                           value={pricingForm.secondVehicleDiscountCents}
-                          disabled={!canManage || !eventState}
+                          disabled={!canManage || !eventState || !selectedEventIsEditable}
                           onChange={(event) =>
                             setPricingForm((prev) => ({
                               ...prev,
@@ -1870,7 +2115,7 @@ export function AdminSettingsPage() {
                             <Input
                               value={rule.baseFeeCents}
                               inputMode="numeric"
-                              disabled={!canManage || !eventState}
+                              disabled={!canManage || !eventState || !selectedEventIsEditable}
                               onChange={(event) => {
                                 const value = event.target.value.replace(/\D/g, "");
                                 setPricingForm((prev) => {
@@ -1891,54 +2136,13 @@ export function AdminSettingsPage() {
 
                   <Button
                     type="button"
-                    disabled={!canManage || savingEvent || !eventState}
+                    disabled={!canManage || savingEvent || !eventState || !selectedEventIsEditable}
                     onClick={() => void saveEventConfiguration()}
                   >
                     <Save className="mr-2 h-4 w-4" />
                     {savingEvent ? "Speichert…" : "Event-Konfiguration speichern"}
                   </Button>
                 </CardContent>
-              </Card>
-
-                  <Card>
-            <CardHeader>
-              <CardTitle>Event-Status ändern</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {(eventState?.status === "archived" || eventState?.status === "closed") && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!canManage || !eventState || operationBusy !== null}
-                    onClick={() => void runOperation("activate")}
-                  >
-                    <Archive className="mr-2 h-4 w-4" />
-                    {eventState?.status === "archived" ? "Event als geschlossen wiederherstellen" : "Event wieder öffnen"}
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!canManage || !eventState || operationBusy !== null}
-                  onClick={() => void runOperation("close")}
-                >
-                  <StopCircle className="mr-2 h-4 w-4" />
-                  Event schließen
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!canManage || !eventState || operationBusy !== null || eventState?.status === "archived"}
-                  onClick={() => void runOperation("archive")}
-                >
-                  <Archive className="mr-2 h-4 w-4" />
-                  Event archivieren
-                </Button>
-              </div>
-
-              {operationsError && <div className="text-sm text-destructive">{operationsError}</div>}
-            </CardContent>
                   </Card>
                 </>
               )}
@@ -1951,6 +2155,11 @@ export function AdminSettingsPage() {
                 <CardTitle>Event-Overrides für Nennbestätigung</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {!selectedEventIsEditable && (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    Dieses Event ist geschlossen oder archiviert. Event-Overrides können nur bei offenen oder noch nicht geöffneten Events geändert werden.
+                  </div>
+                )}
                 <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div className="space-y-2">
                     <div className="text-sm font-semibold text-slate-900">Abweichungen für dieses Event</div>
@@ -1977,7 +2186,7 @@ export function AdminSettingsPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={!canManage || !eventState}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onClick={() => {
                           setEventForm((prev) => ({
                             ...prev,
@@ -1992,7 +2201,7 @@ export function AdminSettingsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={!canManage || !eventState}
+                      disabled={!canManage || !eventState || !selectedEventIsEditable}
                       onClick={() => setEventOverridesExpanded((prev) => !prev)}
                     >
                       {eventOverridesExpanded ? "Overrides ausblenden" : "Overrides bearbeiten"}
@@ -2005,7 +2214,7 @@ export function AdminSettingsPage() {
                     mode="overrides"
                     config={eventForm.entryConfirmationConfig}
                     defaults={entryConfirmationDefaults}
-                    disabled={!canManage || !eventState}
+                    disabled={!canManage || !eventState || !selectedEventIsEditable}
                     onFieldChange={updateEventEntryConfirmationField}
                     onImportantNoteChange={updateEventImportantNote}
                     onAddImportantNote={addEventImportantNote}
@@ -2038,6 +2247,10 @@ export function AdminSettingsPage() {
               <CardContent className="space-y-4">
                 {noCurrentEvent ? (
                   <div className="text-sm text-slate-600">Lege zuerst ein Event an, bevor Klassen gepflegt werden.</div>
+                ) : !selectedEventIsEditable ? (
+                  <div className="text-sm text-slate-600">
+                    Das ausgewählte Event ist schreibgeschützt. Klassen werden für neue oder wieder geöffnete Events gepflegt.
+                  </div>
                 ) : (
                   <>
                     <div className="grid gap-4 md:grid-cols-[1fr_180px_auto]">

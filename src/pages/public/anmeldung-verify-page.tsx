@@ -9,8 +9,6 @@ import { registrationService } from "@/services/registration.service";
 
 type VerifyViewState = "loading" | "success" | "already" | "invalid" | "conflict" | "error";
 
-const verificationResendUrl = String(import.meta.env.VITE_PUBLIC_VERIFY_RESEND_URL || "").trim();
-
 function apiErrorCode(error: ApiError) {
   return (error.code ?? "").trim().toUpperCase();
 }
@@ -28,6 +26,8 @@ export function AnmeldungVerifyPage() {
   const { m } = useAnmeldungI18n();
   const [searchParams] = useSearchParams();
   const [state, setState] = useState<VerifyViewState>("loading");
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const entryId = useMemo(() => (searchParams.get("entryId") || "").trim(), [searchParams]);
   const token = useMemo(() => (searchParams.get("token") || "").trim(), [searchParams]);
@@ -94,6 +94,27 @@ export function AnmeldungVerifyPage() {
       active = false;
     };
   }, [entryId, token]);
+
+  const handleResend = async () => {
+    if (!entryId || resendBusy) {
+      return;
+    }
+    setResendBusy(true);
+    setResendMessage("");
+    try {
+      await registrationService.resendVerification(entryId);
+      setResendMessage(m.page.submitSuccess);
+    } catch (error) {
+      if (error instanceof ApiError && apiErrorCode(error) === "VERIFY_ALREADY_COMPLETED") {
+        setState("already");
+        setResendMessage(m.verify.alreadyText);
+      } else {
+        setResendMessage(m.verify.errorText);
+      }
+    } finally {
+      setResendBusy(false);
+    }
+  };
 
   const copy = m.verify;
 
@@ -166,12 +187,13 @@ export function AnmeldungVerifyPage() {
         )}
 
         <div className="flex flex-wrap gap-2">
-          {verificationResendUrl && state === "invalid" && (
-            <Button asChild type="button">
-              <a href={verificationResendUrl}>{copy.resendButton}</a>
+          {entryId && state === "invalid" && (
+            <Button type="button" onClick={() => void handleResend()} disabled={resendBusy}>
+              {resendBusy ? `${copy.resendButton}...` : copy.resendButton}
             </Button>
           )}
         </div>
+        {resendMessage && <p className="text-xs text-slate-600">{resendMessage}</p>}
 
         <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
           <p className="font-medium text-blue-900">{copy.spamReminderTitle}</p>
