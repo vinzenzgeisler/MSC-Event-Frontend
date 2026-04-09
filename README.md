@@ -31,9 +31,7 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 - `VITE_COGNITO_LOGOUT_URI` Logout Redirect
 - `VITE_COGNITO_SCOPES` typischerweise `openid email profile`
 - Runtime-Override optional über `/runtime-config.js` (`window.__MSC_RUNTIME_CONFIG__`, siehe `docs/DEPLOY_ENV.md`)
-- `VITE_PUBLIC_CONTACT_EMAIL` Kontaktadresse im öffentlichen Header (nicht aus Event-Settings)
-- `VITE_PUBLIC_WEBSITE_URL` Website-Link im öffentlichen Header/Footer (nicht aus Event-Settings)
-- Runtime-Override optional auch für `apiBaseUrl`, `publicContactEmail`, `publicWebsiteUrl` über `/runtime-config.js`
+- Runtime-Override optional für `apiBaseUrl` über `/runtime-config.js`
 - `VITE_AUTH_IDLE_TIMEOUT_MINUTES` optional (Default: `43200` = 30 Tage, nur außerhalb Dev aktiv)
 - `VITE_AUTH_MAX_SESSION_HOURS` optional (Default: `720` = 30 Tage, nur außerhalb Dev aktiv)
 - `VITE_ADMIN_ENABLE_TOKEN_LOGIN` optionaler Dev-Fallback für manuellen JWT-Login

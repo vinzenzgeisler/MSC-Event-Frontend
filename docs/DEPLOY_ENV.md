@@ -5,7 +5,7 @@ Der Admin-Login liest Cognito-Konfiguration in dieser Reihenfolge:
 1. `window.__MSC_RUNTIME_CONFIG__` aus `/runtime-config.js`
 2. `VITE_*` Build-Variablen
 
-Die öffentliche API-Basis-URL sowie Kontakt-/Website-Infos können ebenfalls zur Laufzeit geliefert werden. Für produktive Deployments sollte die Stage-Zuordnung bevorzugt über `/runtime-config.js` erfolgen, damit ein Build nicht versehentlich auf Dev-Endpunkte zeigt.
+Die öffentliche API-Basis-URL kann ebenfalls zur Laufzeit geliefert werden. Für produktive Deployments sollte die Stage-Zuordnung bevorzugt über `/runtime-config.js` erfolgen, damit ein Build nicht versehentlich auf Dev-Endpunkte zeigt.
 
 ## Runtime-Konfig (ohne Rebuild)
 
@@ -20,8 +20,6 @@ window.__MSC_RUNTIME_CONFIG__ = {
   cognitoRedirectUri: "https://<your-host>/admin/login",
   cognitoLogoutUri: "https://<your-host>/admin/login",
   cognitoScopes: "openid email profile",
-  publicContactEmail: "nennung@example.org",
-  publicWebsiteUrl: "https://example.org",
   authIdleTimeoutMinutes: 43200,
   authMaxSessionHours: 720
 };

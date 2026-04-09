@@ -20,16 +20,12 @@ Die Workflow-Datei verwendet bereits `environment: dev` und `environment: prod`.
 - Secret: `VERCEL_ORG_ID`
 - Secret: `VERCEL_PROJECT_ID`
 - Variable: `VITE_API_BASE_URL_DEV`
-- Variable: `VITE_PUBLIC_CONTACT_EMAIL`
-- Variable: `VITE_PUBLIC_WEBSITE_URL`
 
 ### Environment `prod`
 - Secret: `VERCEL_TOKEN`
 - Secret: `VERCEL_ORG_ID`
 - Secret: `VERCEL_PROJECT_ID`
 - Variable: `VITE_API_BASE_URL_PROD`
-- Variable: `VITE_PUBLIC_CONTACT_EMAIL`
-- Variable: `VITE_PUBLIC_WEBSITE_URL`
 
 ## Woher kommen die Werte?
 - `VERCEL_TOKEN`
@@ -42,10 +38,8 @@ Die Workflow-Datei verwendet bereits `environment: dev` und `environment: prod`.
   - Öffentliche Dev-API-URL des Backends, zum Beispiel `https://api-dev.example.tld`.
 - `VITE_API_BASE_URL_PROD`
   - Öffentliche Prod-API-URL des Backends, zum Beispiel `https://api.example.tld`.
-- `VITE_PUBLIC_CONTACT_EMAIL`
-  - Öffentliche Kontaktadresse für Nutzertexte im Frontend.
-- `VITE_PUBLIC_WEBSITE_URL`
-  - Öffentliche Basis-Website des Projekts, die im Frontend angezeigt/verlinkt wird.
+
+Öffentliche Kontaktadresse und Website werden fest aus dem Frontend ausgeliefert und sind bewusst nicht Teil der CI/CD-Environment-Konfiguration.
 
 ## Verhalten
 - PRs gegen `dev` oder `main` laufen Typecheck + Build.
