@@ -37,6 +37,13 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_DEV || secrets.VITE_API_BASE_URL_DEV }}
+      VITE_COGNITO_ENABLED: "false"
+      VITE_COGNITO_DOMAIN: ""
+      VITE_COGNITO_CLIENT_ID: ""
+      VITE_COGNITO_REDIRECT_URI: ""
+      VITE_COGNITO_LOGOUT_URI: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,12 +60,12 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_DEV }}
-          VITE_COGNITO_ENABLED: "false"
-          VITE_COGNITO_DOMAIN: ""
-          VITE_COGNITO_CLIENT_ID: ""
-          VITE_COGNITO_REDIRECT_URI: ""
-          VITE_COGNITO_LOGOUT_URI: ""
+          VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
+          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
+          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -74,6 +81,12 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
+          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
+          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
 
       - name: Deploy to Vercel Dev
         run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
@@ -86,6 +99,13 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD || secrets.VITE_API_BASE_URL_PROD }}
+      VITE_COGNITO_ENABLED: "false"
+      VITE_COGNITO_DOMAIN: ""
+      VITE_COGNITO_CLIENT_ID: ""
+      VITE_COGNITO_REDIRECT_URI: ""
+      VITE_COGNITO_LOGOUT_URI: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,12 +122,12 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD }}
-          VITE_COGNITO_ENABLED: "false"
-          VITE_COGNITO_DOMAIN: ""
-          VITE_COGNITO_CLIENT_ID: ""
-          VITE_COGNITO_REDIRECT_URI: ""
-          VITE_COGNITO_LOGOUT_URI: ""
+          VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
+          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
+          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -123,6 +143,12 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
+          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
+          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
 
       - name: Deploy to Vercel Prod
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
