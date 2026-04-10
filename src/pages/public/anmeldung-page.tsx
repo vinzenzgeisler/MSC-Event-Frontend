@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
-import { CONSENT_VERSION, computeConsentTextHash, mapUiLocaleToConsentLocale } from "@/config/legal-texts";
+import { computeConsentTextHash, mapUiLocaleToConsentLocale } from "@/config/legal-texts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DriverStep } from "@/components/features/registration/driver-step";
@@ -282,17 +282,41 @@ function getConsentRequiredError(locale: string) {
   return "Bitte Teilnahmebedingungen und Datenschutzhinweise vor dem Absenden akzeptieren.";
 }
 
-function getConsentMetaError(locale: string) {
+function getConsentMetaError(locale: string, reason: "missing" | "load_failed" | "changed" = "missing") {
   if (locale === "en") {
-    return "Consent metadata is incomplete. Please reload this page and try again.";
+    if (reason === "load_failed") {
+      return "The current legal texts could not be loaded. Please reload the page and try again.";
+    }
+    if (reason === "changed") {
+      return "The legal texts changed during your registration. Please reload the page and confirm them again.";
+    }
+    return "The legal confirmation is incomplete. Please reload the page and try again.";
   }
   if (locale === "cz") {
-    return "Metadata souhlasu nejsou uplna. Obnovte stranku a zkuste to znovu.";
+    if (reason === "load_failed") {
+      return "Aktualni pravni texty se nepodarilo nacist. Obnovte stranku a zkuste to znovu.";
+    }
+    if (reason === "changed") {
+      return "Pravni texty se behem registrace zmenily. Obnovte stranku a potvrďte je znovu.";
+    }
+    return "Potvrzeni pravnich textu neni uplne. Obnovte stranku a zkuste to znovu.";
   }
   if (locale === "pl") {
-    return "Metadane zgód są niepełne. Odśwież stronę i spróbuj ponownie.";
+    if (reason === "load_failed") {
+      return "Nie udało się załadować aktualnych tekstów prawnych. Odśwież stronę i spróbuj ponownie.";
+    }
+    if (reason === "changed") {
+      return "Teksty prawne zmieniły się w trakcie rejestracji. Odśwież stronę i potwierdź je ponownie.";
+    }
+    return "Potwierdzenie tekstów prawnych jest niepełne. Odśwież stronę i spróbuj ponownie.";
   }
-  return "Consent-Metadaten sind unvollständig. Bitte Seite neu laden und erneut versuchen.";
+  if (reason === "load_failed") {
+    return "Die aktuellen Rechtstexte konnten nicht geladen werden. Bitte Seite neu laden und erneut versuchen.";
+  }
+  if (reason === "changed") {
+    return "Die Rechtstexte haben sich während der Anmeldung geändert. Bitte Seite neu laden und erneut bestätigen.";
+  }
+  return "Die Bestätigung der Rechtstexte ist unvollständig. Bitte Seite neu laden und erneut versuchen.";
 }
 
 function getGuardianFieldMessages(locale: string) {
@@ -720,7 +744,7 @@ function createInitialConsent(uiLocale: string): RegistrationWizardForm["consent
     waiverAccepted: false,
     mediaAccepted: false,
     clubInfoAccepted: false,
-    consentVersion: CONSENT_VERSION,
+    consentVersion: "",
     consentTextHash: "",
     locale: mapUiLocaleToConsentLocale(uiLocale),
     consentSource: "public_form"
@@ -1002,18 +1026,32 @@ export function AnmeldungPage() {
   useEffect(() => {
     let active = true;
     const consentLocale = mapUiLocaleToConsentLocale(locale);
-    computeConsentTextHash(locale)
-      .then((consentTextHash) => {
+    Promise.all([computeConsentTextHash(locale), registrationService.getPublicLegalConsent(locale)])
+      .then(([localConsentTextHash, legalConsent]) => {
         if (!active) {
+          return;
+        }
+        const normalizedServerHash = legalConsent.consentTextHash.trim().toLowerCase();
+        const normalizedLocalHash = localConsentTextHash.trim().toLowerCase();
+        if (!normalizedServerHash || normalizedServerHash !== normalizedLocalHash) {
+          setConsent((prev) => ({
+            ...prev,
+            consentVersion: "",
+            consentTextHash: "",
+            locale: legalConsent.consentLocale || consentLocale,
+            consentSource: "public_form"
+          }));
+          setConsentError(getConsentMetaError(locale, "changed"));
           return;
         }
         setConsent((prev) => ({
           ...prev,
-          consentVersion: CONSENT_VERSION,
-          consentTextHash,
-          locale: consentLocale,
+          consentVersion: legalConsent.consentVersion.trim(),
+          consentTextHash: normalizedServerHash,
+          locale: legalConsent.consentLocale || consentLocale,
           consentSource: "public_form"
         }));
+        setConsentError((prev) => (prev === getConsentMetaError(locale) ? "" : prev));
       })
       .catch(() => {
         if (!active) {
@@ -1021,11 +1059,12 @@ export function AnmeldungPage() {
         }
         setConsent((prev) => ({
           ...prev,
-          consentVersion: CONSENT_VERSION,
+          consentVersion: "",
           consentTextHash: "",
           locale: consentLocale,
           consentSource: "public_form"
         }));
+        setConsentError(getConsentMetaError(locale, "load_failed"));
       });
     return () => {
       active = false;
@@ -1442,8 +1481,8 @@ export function AnmeldungPage() {
       setSubmitError("");
       return;
     }
-    if (!consent.locale.trim() || !CONSENT_HASH_PATTERN.test(consent.consentTextHash.trim())) {
-      setConsentError(getConsentMetaError(locale));
+    if (!consent.consentVersion.trim() || !consent.locale.trim() || !CONSENT_HASH_PATTERN.test(consent.consentTextHash.trim())) {
+      setConsentError(getConsentMetaError(locale, "missing"));
       setSubmitError("");
       return;
     }
@@ -1458,7 +1497,7 @@ export function AnmeldungPage() {
 
     const normalizedConsent: RegistrationWizardForm["consent"] = {
       ...consent,
-      consentVersion: CONSENT_VERSION,
+      consentVersion: consent.consentVersion.trim(),
       consentTextHash: consent.consentTextHash.trim().toLowerCase(),
       locale: consent.locale.trim(),
       consentSource: "public_form"
@@ -1494,13 +1533,24 @@ export function AnmeldungPage() {
           setIsSubmitting(false);
           return;
         }
-        if (error.message === "CONSENT_TEXT_HASH_INVALID" || error.message === "CONSENT_LOCALE_MISSING") {
-          setConsentError(getConsentMetaError(locale));
+        if (
+          error.message === "CONSENT_TEXT_HASH_INVALID" ||
+          error.message === "CONSENT_LOCALE_MISSING" ||
+          error.message === "CONSENT_VERSION_MISSING"
+        ) {
+          setConsentError(getConsentMetaError(locale, "missing"));
           setIsSubmitting(false);
           return;
         }
       }
-      if (isEmailAlreadyUsedError(error)) {
+      if (
+        error instanceof ApiError &&
+        (error.code === "CONSENT_LOCALE_INVALID" ||
+          error.code === "CONSENT_VERSION_MISMATCH" ||
+          error.code === "CONSENT_TEXT_HASH_MISMATCH")
+      ) {
+        setConsentError(getConsentMetaError(locale, "changed"));
+      } else if (isEmailAlreadyUsedError(error)) {
         const normalizedDriverEmail = normalizeEmailForCompare(submitForm.driver.email);
         if (normalizedDriverEmail) {
           setKnownUsedDriverEmails((prev) => (prev.includes(normalizedDriverEmail) ? prev : [...prev, normalizedDriverEmail]));

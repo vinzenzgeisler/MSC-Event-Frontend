@@ -1,13 +1,13 @@
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
 import { ApiError } from "@/services/api/http-client";
 import { requestJson } from "@/services/api/http-client";
-import { CONSENT_VERSION } from "@/config/legal-texts";
 import { resolveCountryCode, resolveCountryToCanonical } from "@/lib/countries";
 import type {
   PublicCreateEntriesBatchRequestDto,
   PublicCreateEntryRequestDto,
   PublicEventOverview,
   PublicPricingRules,
+  PublicLegalConsentMeta,
   RegistrationSubmitResult,
   RegistrationWizardForm,
   StartNumberValidationResult
@@ -109,13 +109,17 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
   if (!consentLocale) {
     throw new Error("CONSENT_LOCALE_MISSING");
   }
+  const consentVersion = form.consent.consentVersion.trim();
+  if (!consentVersion) {
+    throw new Error("CONSENT_VERSION_MISSING");
+  }
   return {
     termsAccepted: true,
     privacyAccepted: true,
     waiverAccepted: true,
     mediaAccepted: Boolean(form.consent.mediaAccepted),
     clubInfoAccepted: Boolean(form.consent.clubInfoAccepted),
-    consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
+    consentVersion,
     consentTextHash,
     locale: consentLocale,
     consentSource: "public_form",
@@ -206,6 +210,12 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
     },
   };
 }
+
+type PublicLegalCurrentResponse = {
+  ok: boolean;
+  consent: PublicLegalConsentMeta;
+  availableLocales: string[];
+};
 
 type PublicStartNumberValidateResponse = {
   ok: boolean;
@@ -442,6 +452,15 @@ export const registrationService = {
     };
   },
 
+  async getPublicLegalConsent(locale: string): Promise<PublicLegalConsentMeta> {
+    const response = await requestJson<PublicLegalCurrentResponse>("/public/legal/current", {
+      method: "GET",
+      auth: false,
+      query: { locale }
+    });
+    return response.consent;
+  },
+
   async validateStartNumber(classId: string, value: string): Promise<StartNumberValidationResult> {
     const normalized = value.trim().toUpperCase();
 
@@ -489,7 +508,7 @@ export const registrationService = {
       consent: {
         ...form.consent,
         consentSource: "public_form",
-        consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
+        consentVersion: form.consent.consentVersion.trim(),
         locale: form.consent.locale.trim()
       }
     };

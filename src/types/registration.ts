@@ -112,6 +112,13 @@ export type PublicEventOverview = {
   classes: PublicEventClass[];
 };
 
+export type PublicLegalConsentMeta = {
+  consentLocale: string;
+  consentVersion: string;
+  consentTextHash: string;
+  publishedAt: string;
+};
+
 export type StartNumberValidationResult = {
   normalizedStartNumber: string | null;
   validFormat: boolean;
