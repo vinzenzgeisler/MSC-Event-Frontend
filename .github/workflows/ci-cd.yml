@@ -81,6 +81,19 @@ jobs:
           VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
           VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
 
+      - name: Write runtime config
+        run: |
+          cat <<EOF > public/runtime-config.js
+          window.__MSC_RUNTIME_CONFIG__ = {
+            apiBaseUrl: "${MSC_API_BASE_URL}",
+            cognitoDomain: "${MSC_COGNITO_DOMAIN}",
+            cognitoClientId: "${MSC_COGNITO_CLIENT_ID}",
+            cognitoRedirectUri: "${MSC_COGNITO_REDIRECT_URI}",
+            cognitoLogoutUri: "${MSC_COGNITO_LOGOUT_URI}",
+            cognitoScopes: "${MSC_COGNITO_SCOPES}"
+          };
+          EOF
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
@@ -156,6 +169,19 @@ jobs:
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
           VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
           VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
+
+      - name: Write runtime config
+        run: |
+          cat <<EOF > public/runtime-config.js
+          window.__MSC_RUNTIME_CONFIG__ = {
+            apiBaseUrl: "${MSC_API_BASE_URL}",
+            cognitoDomain: "${MSC_COGNITO_DOMAIN}",
+            cognitoClientId: "${MSC_COGNITO_CLIENT_ID}",
+            cognitoRedirectUri: "${MSC_COGNITO_REDIRECT_URI}",
+            cognitoLogoutUri: "${MSC_COGNITO_LOGOUT_URI}",
+            cognitoScopes: "${MSC_COGNITO_SCOPES}"
+          };
+          EOF
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
