@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { getCountrySelectOptions } from "@/lib/countries";
+import { getVehicleTypeLabel } from "@/lib/vehicle-type";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +150,7 @@ export function StartEntriesStep({
                   #{index + 1} {item.classLabel || classLabel(item.classId, classes)} · {item.startNumber || "-"}
                 </div>
                 <div className="text-xs text-slate-600">
-                  {item.vehicle.make || "-"} {item.vehicle.model || ""} · {item.vehicleType}
+                  {item.vehicle.make || "-"} {item.vehicle.model || ""} · {getVehicleTypeLabel(item.vehicleType)}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { getLegalTexts } from "@/config/legal-texts";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { getCountryLabel } from "@/lib/countries";
+import { getVehicleTypeLabel } from "@/lib/vehicle-type";
 import { Button } from "@/components/ui/button";
 import type { RegistrationWizardForm } from "@/types/registration";
 
@@ -58,7 +59,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
               {start.classLabel} · {start.startNumber}
             </div>
             <div className="text-sm text-slate-600">
-              {start.vehicle.make} {start.vehicle.model} · {start.vehicle.displacementCcm} ccm
+              {start.vehicle.make} {start.vehicle.model} · {getVehicleTypeLabel(start.vehicleType)} · {start.vehicle.displacementCcm} ccm
             </div>
             {start.codriverEnabled && (
               <div className="text-sm text-slate-600">
