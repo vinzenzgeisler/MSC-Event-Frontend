@@ -39,7 +39,6 @@ jobs:
     environment: dev
     env:
       MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_DEV }}
-      MSC_COGNITO_ENABLED: ${{ vars.VITE_COGNITO_ENABLED_DEV }}
       MSC_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN_DEV }}
       MSC_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID_DEV }}
       MSC_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI_DEV }}
@@ -67,19 +66,15 @@ jobs:
 
       - name: Validate Dev Cognito configuration
         run: |
-          enabled="$(printf '%s' "${MSC_COGNITO_ENABLED}" | tr '[:upper:]' '[:lower:]')"
-          if [ "${enabled}" = "true" ]; then
-            if [ -z "${MSC_COGNITO_DOMAIN}" ] || [ -z "${MSC_COGNITO_CLIENT_ID}" ] || [ -z "${MSC_COGNITO_REDIRECT_URI}" ] || [ -z "${MSC_COGNITO_LOGOUT_URI}" ]; then
-              echo "Dev Cognito is enabled, but one or more required values are missing."
-              exit 1
-            fi
+          if [ -z "${MSC_COGNITO_DOMAIN}" ] || [ -z "${MSC_COGNITO_CLIENT_ID}" ] || [ -z "${MSC_COGNITO_REDIRECT_URI}" ] || [ -z "${MSC_COGNITO_LOGOUT_URI}" ]; then
+            echo "Dev Cognito configuration is incomplete."
+            exit 1
           fi
 
       - name: Build
         run: npm run build
         env:
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.MSC_COGNITO_ENABLED }}
           VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
           VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
@@ -101,7 +96,6 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.MSC_COGNITO_ENABLED }}
           VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
           VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
@@ -121,7 +115,6 @@ jobs:
     environment: prod
     env:
       MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD }}
-      MSC_COGNITO_ENABLED: ${{ vars.VITE_COGNITO_ENABLED_PROD }}
       MSC_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN_PROD }}
       MSC_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID_PROD }}
       MSC_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI_PROD }}
@@ -149,19 +142,15 @@ jobs:
 
       - name: Validate Prod Cognito configuration
         run: |
-          enabled="$(printf '%s' "${MSC_COGNITO_ENABLED}" | tr '[:upper:]' '[:lower:]')"
-          if [ "${enabled}" = "true" ]; then
-            if [ -z "${MSC_COGNITO_DOMAIN}" ] || [ -z "${MSC_COGNITO_CLIENT_ID}" ] || [ -z "${MSC_COGNITO_REDIRECT_URI}" ] || [ -z "${MSC_COGNITO_LOGOUT_URI}" ]; then
-              echo "Prod Cognito is enabled, but one or more required values are missing."
-              exit 1
-            fi
+          if [ -z "${MSC_COGNITO_DOMAIN}" ] || [ -z "${MSC_COGNITO_CLIENT_ID}" ] || [ -z "${MSC_COGNITO_REDIRECT_URI}" ] || [ -z "${MSC_COGNITO_LOGOUT_URI}" ]; then
+            echo "Prod Cognito configuration is incomplete."
+            exit 1
           fi
 
       - name: Build
         run: npm run build
         env:
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.MSC_COGNITO_ENABLED }}
           VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
           VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
@@ -183,7 +172,6 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.MSC_COGNITO_ENABLED }}
           VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
           VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}

@@ -34,7 +34,8 @@ async function createCodeChallenge(verifier: string): Promise<string> {
 }
 
 export function isCognitoEnabled() {
-  return readConfigValue("VITE_COGNITO_ENABLED", "cognitoEnabled", "false").toLowerCase() === "true";
+  const { domain, clientId, redirectUri, logoutUri } = getCognitoConfig();
+  return Boolean(domain && clientId && redirectUri && logoutUri);
 }
 
 function normalizeScopes(raw: string): string {
@@ -98,11 +99,7 @@ export function getCognitoConfig() {
 }
 
 export function isCognitoConfigured() {
-  if (!isCognitoEnabled()) {
-    return false;
-  }
-  const { domain, clientId, redirectUri } = getCognitoConfig();
-  return Boolean(domain && clientId && redirectUri);
+  return isCognitoEnabled();
 }
 
 export function shouldShowManualTokenLogin() {
