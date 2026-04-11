@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getLegalTexts } from "@/config/legal-texts";
+import { usePublicLegal } from "@/app/legal/public-legal-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,7 +35,7 @@ function fieldAria(error?: string, errorId?: string) {
 export function DriverStep({ value, errors, showGuardianFields, onChange }: DriverStepProps) {
   const { m, locale } = useAnmeldungI18n();
   const countryOptions = useMemo(() => getCountrySelectOptions(locale), [locale]);
-  const legalTexts = getLegalTexts(locale);
+  const { texts: legalTexts } = usePublicLegal();
   const streetPlaceholder = locale === "en" ? "Main Street 12" : locale === "cz" ? "Hlavní 12" : locale === "pl" ? "ul. Główna 12" : "Musterstraße 12";
   const cityPlaceholder = locale === "en" ? "Zittau" : locale === "cz" ? "Zittau" : locale === "pl" ? "Zittau" : "Zittau";
 
@@ -177,9 +177,9 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
 
       {showGuardianFields && (
         <section className="grid gap-4 md:grid-cols-2">
-          <h3 className="md:col-span-2 text-lg font-semibold text-slate-900">{legalTexts.guardianSectionTitle}</h3>
+          <h3 className="md:col-span-2 text-lg font-semibold text-slate-900">{legalTexts?.guardianSectionTitle ?? "Guardian"}</h3>
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="driver-guardian-fullName">{legalTexts.guardianFullNameLabel}</Label>
+            <Label htmlFor="driver-guardian-fullName">{legalTexts?.guardianFullNameLabel ?? "Guardian full name"}</Label>
             <Input
               id="driver-guardian-fullName"
               data-driver-field="guardianFullName"
@@ -190,7 +190,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
             <FieldError id="driver-guardian-fullName-error" message={errors.guardianFullName} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="driver-guardian-email">{legalTexts.guardianEmailLabel}</Label>
+            <Label htmlFor="driver-guardian-email">{legalTexts?.guardianEmailLabel ?? "Guardian email"}</Label>
             <Input
               id="driver-guardian-email"
               data-driver-field="guardianEmail"
@@ -202,7 +202,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
             <FieldError id="driver-guardian-email-error" message={errors.guardianEmail} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="driver-guardian-phone">{legalTexts.guardianPhoneLabel}</Label>
+            <Label htmlFor="driver-guardian-phone">{legalTexts?.guardianPhoneLabel ?? "Guardian phone"}</Label>
             <Input
               id="driver-guardian-phone"
               data-driver-field="guardianPhone"
@@ -223,7 +223,7 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
               className="mt-0.5 h-4 w-4"
               {...fieldAria(errors.guardianConsentAccepted, "driver-guardian-consent-error")}
             />
-            <span>{legalTexts.guardianConsentLabel}</span>
+            <span>{legalTexts?.guardianConsentLabel ?? "Guardian consent required."}</span>
           </label>
           <FieldError id="driver-guardian-consent-error" message={errors.guardianConsentAccepted} />
         </section>

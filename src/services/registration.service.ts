@@ -3,18 +3,17 @@ import { ApiError } from "@/services/api/http-client";
 import { requestJson } from "@/services/api/http-client";
 import { resolveCountryCode } from "@/lib/countries";
 import type {
+  PublicLegalBundle,
   PublicCreateEntriesBatchRequestDto,
   PublicCreateEntryRequestDto,
   PublicEventOverview,
   PublicPricingRules,
-  PublicLegalConsentMeta,
   RegistrationSubmitResult,
   RegistrationWizardForm,
   StartNumberValidationResult
 } from "@/types/registration";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
-const CONSENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 function parseCylinders(value: string): number {
   const digits = value.replace(/\D/g, "");
@@ -86,10 +85,6 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
   if (!form.consent.termsAccepted || !form.consent.privacyAccepted || !form.consent.waiverAccepted) {
     throw new Error("CONSENT_REQUIRED_MISSING");
   }
-  const consentTextHash = form.consent.consentTextHash.trim().toLowerCase();
-  if (!CONSENT_HASH_PATTERN.test(consentTextHash)) {
-    throw new Error("CONSENT_TEXT_HASH_INVALID");
-  }
   const consentLocale = form.consent.locale.trim();
   if (!consentLocale) {
     throw new Error("CONSENT_LOCALE_MISSING");
@@ -105,7 +100,6 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
     mediaAccepted: Boolean(form.consent.mediaAccepted),
     clubInfoAccepted: Boolean(form.consent.clubInfoAccepted),
     consentVersion,
-    consentTextHash,
     locale: consentLocale,
     consentSource: "public_form",
     consentCapturedAt
@@ -191,7 +185,8 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
 
 type PublicLegalCurrentResponse = {
   ok: boolean;
-  consent: PublicLegalConsentMeta;
+  consent: PublicLegalBundle["consent"];
+  texts: PublicLegalBundle["texts"];
   availableLocales: string[];
 };
 
@@ -431,13 +426,17 @@ export const registrationService = {
     };
   },
 
-  async getPublicLegalConsent(locale: string): Promise<PublicLegalConsentMeta> {
+  async getPublicLegalBundle(locale: string): Promise<PublicLegalBundle> {
     const response = await requestJson<PublicLegalCurrentResponse>("/public/legal/current", {
       method: "GET",
       auth: false,
       query: { locale }
     });
-    return response.consent;
+    return {
+      consent: response.consent,
+      texts: response.texts,
+      availableLocales: response.availableLocales
+    };
   },
 
   async validateStartNumber(classId: string, value: string): Promise<StartNumberValidationResult> {

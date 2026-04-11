@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
-import { CONSENT_VERSION, computeConsentTextHash, mapUiLocaleToConsentLocale } from "@/config/legal-texts";
+import { usePublicLegal } from "@/app/legal/public-legal-context";
+import { mapUiLocaleToConsentLocale } from "@/config/legal-texts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DriverStep } from "@/components/features/registration/driver-step";
@@ -21,7 +22,6 @@ const HUBRAUM_PATTERN = /^\d{2,5}$/;
 const CYLINDERS_PATTERN = /^(?:\d{1,2}|V\d{1,2})$/i;
 const YEAR_PATTERN = /^\d{4}$/;
 const BIRTHDATE_PATTERN = /^(\d{2})\.(\d{2})\.(\d{4})$/;
-const CONSENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 function createEmptyVehicle(): VehicleForm {
   return {
@@ -752,7 +752,6 @@ function createInitialConsent(uiLocale: string): RegistrationWizardForm["consent
     mediaAccepted: false,
     clubInfoAccepted: false,
     consentVersion: "",
-    consentTextHash: "",
     locale: mapUiLocaleToConsentLocale(uiLocale),
     consentSource: "public_form"
   };
@@ -972,6 +971,7 @@ function validateStartFields(
 
 export function AnmeldungPage() {
   const { m, locale } = useAnmeldungI18n();
+  const publicLegal = usePublicLegal();
   const mainVehicleUploadSequence = useRef(0);
   const backupVehicleUploadSequence = useRef(0);
   const [step, setStep] = useState(1);
@@ -1032,78 +1032,25 @@ export function AnmeldungPage() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const consentLocale = mapUiLocaleToConsentLocale(locale);
-    Promise.all([computeConsentTextHash(locale), registrationService.getPublicLegalConsent(locale)])
-      .then(([localConsentTextHash, legalConsent]) => {
-        if (!active) {
-          return;
-        }
-        const normalizedServerHash = legalConsent.consentTextHash.trim().toLowerCase();
-        const normalizedLocalHash = localConsentTextHash.trim().toLowerCase();
-        if (!normalizedServerHash || normalizedServerHash !== normalizedLocalHash) {
-          setConsent((prev) => ({
-            ...prev,
-            consentVersion: "",
-            consentTextHash: "",
-            locale: legalConsent.consentLocale || consentLocale,
-            consentSource: "public_form"
-          }));
-          setConsentError(getConsentMetaError(locale, "changed"));
-          return;
-        }
-        setConsent((prev) => ({
-          ...prev,
-          consentVersion: legalConsent.consentVersion.trim(),
-          consentTextHash: normalizedServerHash,
-          locale: legalConsent.consentLocale || consentLocale,
-          consentSource: "public_form"
-        }));
-        setConsentError((prev) => (prev === getConsentMetaError(locale) ? "" : prev));
-      })
-      .catch(() => {
-        if (!active) {
-          return;
-        }
-        setConsent((prev) => ({
-          ...prev,
-          consentVersion: CONSENT_VERSION,
-          consentTextHash: "",
-          locale: consentLocale,
-          consentSource: "public_form"
-        }));
-        computeConsentTextHash(locale)
-          .then((localConsentTextHash) => {
-            if (!active) {
-              return;
-            }
-            setConsent((prev) => ({
-              ...prev,
-              consentVersion: CONSENT_VERSION,
-              consentTextHash: localConsentTextHash.trim().toLowerCase(),
-              locale: consentLocale,
-              consentSource: "public_form"
-            }));
-            setConsentError("");
-          })
-          .catch(() => {
-            if (!active) {
-              return;
-            }
-            setConsent((prev) => ({
-              ...prev,
-              consentVersion: "",
-              consentTextHash: "",
-              locale: consentLocale,
-              consentSource: "public_form"
-            }));
-            setConsentError(getConsentMetaError(locale, "load_failed"));
-          });
-      });
-    return () => {
-      active = false;
-    };
-  }, [locale]);
+    const consentLocale = publicLegal.consent?.consentLocale?.trim() || mapUiLocaleToConsentLocale(locale);
+    const consentVersion = publicLegal.consent?.consentVersion?.trim() || "";
+
+    setConsent((prev) => ({
+      ...prev,
+      consentVersion,
+      locale: consentLocale,
+      consentSource: "public_form"
+    }));
+
+    if (publicLegal.loading) {
+      return;
+    }
+    if (publicLegal.error || !publicLegal.texts || !consentVersion) {
+      setConsentError(getConsentMetaError(locale, "load_failed"));
+      return;
+    }
+    setConsentError((prev) => (prev === getConsentMetaError(locale, "load_failed") ? "" : prev));
+  }, [locale, publicLegal.consent, publicLegal.error, publicLegal.loading, publicLegal.texts]);
 
   useEffect(() => {
     if (isMinorDriver) {
@@ -1542,7 +1489,7 @@ export function AnmeldungPage() {
       setSubmitError("");
       return;
     }
-    if (!consent.consentVersion.trim() || !consent.locale.trim() || !CONSENT_HASH_PATTERN.test(consent.consentTextHash.trim())) {
+    if (!consent.consentVersion.trim() || !consent.locale.trim()) {
       setConsentError(getConsentMetaError(locale, "missing"));
       setSubmitError("");
       return;
@@ -1559,7 +1506,6 @@ export function AnmeldungPage() {
     const normalizedConsent: RegistrationWizardForm["consent"] = {
       ...consent,
       consentVersion: consent.consentVersion.trim(),
-      consentTextHash: consent.consentTextHash.trim().toLowerCase(),
       locale: consent.locale.trim(),
       consentSource: "public_form"
     };
@@ -1595,7 +1541,6 @@ export function AnmeldungPage() {
           return;
         }
         if (
-          error.message === "CONSENT_TEXT_HASH_INVALID" ||
           error.message === "CONSENT_LOCALE_MISSING" ||
           error.message === "CONSENT_VERSION_MISSING"
         ) {
@@ -1606,9 +1551,7 @@ export function AnmeldungPage() {
       }
       if (
         error instanceof ApiError &&
-        (error.code === "CONSENT_LOCALE_INVALID" ||
-          error.code === "CONSENT_VERSION_MISMATCH" ||
-          error.code === "CONSENT_TEXT_HASH_MISMATCH")
+        (error.code === "CONSENT_LOCALE_INVALID" || error.code === "CONSENT_VERSION_MISMATCH")
       ) {
         setConsentError(getConsentMetaError(locale, "changed"));
       } else if (isEmailAlreadyUsedError(error)) {

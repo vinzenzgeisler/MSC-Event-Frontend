@@ -1,4 +1,5 @@
 import type { Id, RegistrationStatus, StartNumberConflictType, VehicleType } from "@/types/common";
+import type { LegalTexts } from "@/config/legal-texts";
 
 export type DriverForm = {
   firstName: string;
@@ -68,7 +69,6 @@ export type ConsentForm = {
   mediaAccepted: boolean;
   clubInfoAccepted: boolean;
   consentVersion: string;
-  consentTextHash: string;
   locale: string;
   consentSource: "public_form";
 };
@@ -116,8 +116,13 @@ export type PublicEventOverview = {
 export type PublicLegalConsentMeta = {
   consentLocale: string;
   consentVersion: string;
-  consentTextHash: string;
   publishedAt: string;
+};
+
+export type PublicLegalBundle = {
+  consent: PublicLegalConsentMeta;
+  texts: LegalTexts;
+  availableLocales: string[];
 };
 
 export type StartNumberValidationResult = {
@@ -199,7 +204,6 @@ export type PublicCreateEntryRequestDto = {
     mediaAccepted: boolean;
     clubInfoAccepted: boolean;
     consentVersion: string;
-    consentTextHash: string;
     locale: string;
     consentSource: "public_form";
     consentCapturedAt: string;
