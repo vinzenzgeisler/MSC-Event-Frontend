@@ -18,6 +18,8 @@ export type LegalDoc = {
 
 export type SummaryTexts = {
   title: string;
+  mandatoryHintsTitle: string;
+  mandatoryHints: string[];
   introTitle: string;
   introBody: string[];
   voluntaryTitle: string;

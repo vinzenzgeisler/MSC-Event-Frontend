@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { usePublicLegal } from "@/app/legal/public-legal-context";
@@ -19,13 +19,53 @@ type SummaryStepProps = {
   onSubmit: () => void;
 };
 
+function getSummaryUiLabels(locale: string) {
+  if (locale === "en") {
+    return {
+      showMore: "Show more",
+      showLess: "Show less",
+      showAllHints: "Show all notes",
+      showLessHints: "Show fewer notes"
+    };
+  }
+  if (locale === "cz") {
+    return {
+      showMore: "Zobrazit vice",
+      showLess: "Zobrazit mene",
+      showAllHints: "Zobrazit vsechny pokyny",
+      showLessHints: "Zobrazit mene pokynu"
+    };
+  }
+  if (locale === "pl") {
+    return {
+      showMore: "Pokaz wiecej",
+      showLess: "Pokaz mniej",
+      showAllHints: "Pokaz wszystkie wskazowki",
+      showLessHints: "Pokaz mniej wskazowek"
+    };
+  }
+  return {
+    showMore: "Mehr anzeigen",
+    showLess: "Weniger anzeigen",
+    showAllHints: "Alle Hinweise anzeigen",
+    showLessHints: "Weniger Hinweise anzeigen"
+  };
+}
+
 export function SummaryStep({ form, submitError, consentError, successMessage, isSubmitting = false, onConsentChange, onSubmit }: SummaryStepProps) {
   const { m, locale } = useAnmeldungI18n();
   const { texts: legalTexts } = usePublicLegal();
+  const ui = getSummaryUiLabels(locale);
+  const [showAllHints, setShowAllHints] = useState(false);
+  const [showFullIntro, setShowFullIntro] = useState(false);
   const errorRef = useRef<HTMLDivElement | HTMLParagraphElement | null>(null);
   const emergencyName = `${form.driver.emergencyContactFirstName} ${form.driver.emergencyContactLastName}`.replace(/\s+/g, " ").trim();
   const driverCountryLabel = getCountryLabel(form.driver.country, locale) ?? form.driver.country;
   const hasConsentError = Boolean(consentError);
+  const hintPoints = legalTexts?.summary.mandatoryHints ?? [];
+  const visibleHints = showAllHints ? hintPoints : hintPoints.slice(0, 3);
+  const introParagraphs = legalTexts?.summary.introBody ?? [];
+  const visibleIntroParagraphs = showFullIntro ? introParagraphs : introParagraphs.slice(0, 2);
 
   useEffect(() => {
     if (!submitError && !consentError) {
@@ -35,16 +75,19 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
   }, [submitError, consentError]);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border bg-slate-50 p-4">
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-slate-50 p-3 md:p-4">
         <h3 className="font-semibold text-slate-900">{m.summary.driverTitle}</h3>
         <p className="mt-1 text-sm text-slate-700">
           {form.driver.firstName} {form.driver.lastName} · {form.driver.email}
         </p>
-        <p className="text-sm text-slate-600">
+        <p className="text-xs text-slate-600">
+          {form.driver.street}, {form.driver.zip} {form.driver.city}
+        </p>
+        <p className="text-xs text-slate-600">
           {m.driver.country}: {driverCountryLabel}
         </p>
-        <p className="text-sm text-slate-600">
+        <p className="text-xs text-slate-600">
           {m.driver.emergencyTitle}: {emergencyName} ({form.driver.emergencyContactPhone})
         </p>
       </div>
@@ -54,34 +97,61 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
           {m.summary.startsTitle} ({form.starts.length})
         </h3>
         {form.starts.map((start) => (
-          <div key={start.id} className="rounded-xl border p-4">
-            <div className="font-medium text-slate-900">
+          <div key={start.id} className="rounded-xl border p-3 md:p-4">
+            <div className="text-sm font-medium text-slate-900">
               {start.classLabel} · {start.startNumber}
             </div>
-            <div className="text-sm text-slate-600">
+            <div className="text-xs text-slate-600">
               {start.vehicle.make} {start.vehicle.model} · {getVehicleTypeLabel(start.vehicleType)} · {start.vehicle.displacementCcm} ccm
             </div>
             {start.codriverEnabled && (
-              <div className="text-sm text-slate-600">
+              <div className="text-xs text-slate-600">
                 {m.start.codriverBadge}: {start.codriver.firstName} {start.codriver.lastName} · {start.codriver.email}
                 {start.codriver.phone ? ` · ${start.codriver.phone}` : ""}
               </div>
             )}
-            {start.backupVehicleEnabled && <div className="text-sm text-slate-600">{m.summary.backupVehicle}</div>}
+            {start.backupVehicleEnabled && <div className="text-xs text-slate-600">{m.summary.backupVehicle}</div>}
           </div>
         ))}
       </div>
 
-      <div className="space-y-5 rounded-xl border p-4 md:p-5">
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 md:p-4">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">{legalTexts?.summary.mandatoryHintsTitle ?? ""}</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-700">
+            {visibleHints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+          {hintPoints.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setShowAllHints((prev) => !prev)}
+              className="mt-2 text-xs font-medium text-slate-700 underline underline-offset-2 transition-colors hover:text-slate-900"
+            >
+              {showAllHints ? ui.showLessHints : ui.showAllHints}
+            </button>
+          )}
+        </div>
+
         <div className="space-y-2">
-          <h3 className="font-semibold text-slate-900">{legalTexts?.summary.title ?? m.summary.consentTitle}</h3>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{legalTexts?.summary.introTitle ?? m.summary.consentTitle}</p>
-            <div className="mt-2 space-y-3 text-sm leading-6 text-slate-700">
-              {(legalTexts?.summary.introBody ?? []).map((paragraph) => (
+          <h3 className="text-sm font-semibold text-slate-900">{legalTexts?.summary.title ?? m.summary.consentTitle}</h3>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">{legalTexts?.summary.introTitle ?? m.summary.consentTitle}</p>
+            <div className="mt-2 space-y-2 text-xs leading-5 text-slate-700">
+              {visibleIntroParagraphs.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
+            {introParagraphs.length > 2 && (
+              <button
+                type="button"
+                onClick={() => setShowFullIntro((prev) => !prev)}
+                className="mt-2 text-xs font-medium text-slate-700 underline underline-offset-2 transition-colors hover:text-slate-900"
+              >
+                {showFullIntro ? ui.showLess : ui.showMore}
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
             {(["datenschutz", "teilnahmebedingungen", "haftverzicht", "impressum"] as const).map((docId) => (
@@ -90,16 +160,12 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
               </Link>
             ))}
           </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-950">{legalTexts?.summary.waiverNoticeTitle ?? ""}</p>
-            <p className="mt-1 text-sm leading-6 text-amber-900">{legalTexts?.summary.waiverNoticeBody ?? ""}</p>
-          </div>
         </div>
 
         <fieldset className="space-y-4" aria-describedby={hasConsentError ? "summary-consent-error" : undefined}>
           <legend className="sr-only">{m.summary.consentTitle}</legend>
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{legalTexts?.summary.requiredTitle ?? m.summary.consentTitle}</p>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">{legalTexts?.summary.requiredTitle ?? m.summary.consentTitle}</p>
             <ConsentCheckbox
               id="summary-consent-terms"
               checked={form.consent.termsAccepted}
@@ -123,9 +189,9 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
             />
           </div>
 
-          <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{legalTexts?.summary.optionalTitle ?? ""}</p>
-            <p className="text-sm leading-6 text-slate-700">{legalTexts?.summary.voluntaryBody ?? ""}</p>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">{legalTexts?.summary.optionalTitle ?? ""}</p>
+            <p className="text-xs leading-5 text-slate-700">{legalTexts?.summary.voluntaryBody ?? ""}</p>
             <ConsentCheckbox
               id="summary-consent-media"
               checked={form.consent.mediaAccepted}
@@ -139,8 +205,6 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
               label={legalTexts?.summary.clubInfoAcceptanceLabel ?? ""}
             />
           </div>
-
-          <p className="text-xs leading-5 text-slate-600">{legalTexts?.summary.minorNotice ?? ""}</p>
           {consentError && (
             <p ref={errorRef} tabIndex={-1} id="summary-consent-error" className="text-sm text-destructive" role="alert" aria-live="assertive">
               {consentError}
