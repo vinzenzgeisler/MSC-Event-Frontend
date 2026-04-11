@@ -92,6 +92,15 @@ function focusFieldBySelector(selector: string) {
   }, 40);
 }
 
+function scrollToStepNavigator(element: HTMLElement | null) {
+  if (!element) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function focusFirstDriverError(errors: Partial<Record<keyof DriverForm, string>>) {
   const order: Array<keyof DriverForm> = [
     "firstName",
@@ -972,6 +981,8 @@ function validateStartFields(
 export function AnmeldungPage() {
   const { m, locale } = useAnmeldungI18n();
   const publicLegal = usePublicLegal();
+  const hasMountedRef = useRef(false);
+  const stepNavigatorRef = useRef<HTMLDivElement | null>(null);
   const mainVehicleUploadSequence = useRef(0);
   const backupVehicleUploadSequence = useRef(0);
   const submitInFlightRef = useRef(false);
@@ -1003,6 +1014,14 @@ export function AnmeldungPage() {
   const [submissionFingerprint, setSubmissionFingerprint] = useState("");
   const isMinorDriver = useMemo(() => isDriverMinor(driver.birthdate), [driver.birthdate]);
   const draftClassAllowsCodriver = useMemo(() => classAllowsCodriver(draftStart.classId, eventOverview), [draftStart.classId, eventOverview]);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    scrollToStepNavigator(stepNavigatorRef.current);
+  }, [step]);
 
   useEffect(() => {
     let active = true;
@@ -1749,7 +1768,9 @@ export function AnmeldungPage() {
         <p className="mt-2 max-w-3xl text-sm text-primary-foreground/85 md:text-base">{m.page.subtitle}</p>
       </div>
 
-      <WizardStepper currentStep={step} />
+      <div ref={stepNavigatorRef} className="scroll-mt-16 md:scroll-mt-20">
+        <WizardStepper currentStep={step} />
+      </div>
 
       <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
         <CardContent className="space-y-6 p-5 md:p-8">

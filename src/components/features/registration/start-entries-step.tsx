@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { type Dispatch, type FocusEvent, type RefObject, type SetStateAction, useMemo, useRef, useState } from "react";
+import { CheckCircle2, CircleHelp, Loader2 } from "lucide-react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { getCountrySelectOptions } from "@/lib/countries";
 import { getVehicleTypeLabel } from "@/lib/vehicle-type";
@@ -105,6 +105,10 @@ export function StartEntriesStep({
   onRemove
 }: StartEntriesStepProps) {
   const { m, locale } = useAnmeldungI18n();
+  const [showOwnerHint, setShowOwnerHint] = useState(false);
+  const [showBackupOwnerHint, setShowBackupOwnerHint] = useState(false);
+  const ownerHintRef = useRef<HTMLDivElement | null>(null);
+  const backupOwnerHintRef = useRef<HTMLDivElement | null>(null);
   const countryOptions = getCountrySelectOptions(locale);
   const sortedClasses = useMemo(() => {
     const collator = new Intl.Collator(locale === "cz" ? "cs" : locale === "pl" ? "pl" : locale === "en" ? "en" : "de", {
@@ -134,6 +138,30 @@ export function StartEntriesStep({
   const uploadRunning = locale === "en" ? "Upload in progress..." : locale === "cz" ? "Nahrávání probíhá..." : locale === "pl" ? "Trwa przesyłanie..." : "Upload läuft...";
   const uploadDone = locale === "en" ? "Upload completed." : locale === "cz" ? "Nahrávání dokončeno." : locale === "pl" ? "Przesyłanie zakończone." : "Upload abgeschlossen.";
   const uploadFailed = locale === "en" ? "Upload failed." : locale === "cz" ? "Nahrávání se nezdařilo." : locale === "pl" ? "Przesyłanie nie powiodło się." : "Upload fehlgeschlagen.";
+  const ownerHintText =
+    locale === "en"
+      ? "If the vehicle is not owned by you, a signed owner waiver must be submitted at registration (form on club website)."
+      : locale === "cz"
+        ? "Pokud vozidlo neni ve vlastnictvi jezdce, pri registraci je nutne predlozit podepsane prohlaseni vlastnika o zrizeni se naroku (formular na klubovem webu)."
+        : locale === "pl"
+          ? "Jesli pojazd nie jest wlasnoscia kierowcy, przy rejestracji nalezy przedlozyc podpisane oswiadczenie wlasciciela o zrzeczeniu roszczen (formularz na stronie klubu)."
+          : "Bei fremdem Fahrzeug ist eine unterschriebene Eigentuemer-Verzichtserklaerung bei Anmeldung vorzulegen (Formular auf Vereins-Website).";
+  const toggleHintOnTouch = (setter: Dispatch<SetStateAction<boolean>>) => {
+    if (typeof window !== "undefined" && window.matchMedia("(hover: none)").matches) {
+      setter((prev) => !prev);
+    }
+  };
+  const closeIfFocusLeft = (
+    container: RefObject<HTMLDivElement | null>,
+    event: FocusEvent<HTMLDivElement>,
+    close: () => void
+  ) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (container.current && nextTarget && container.current.contains(nextTarget)) {
+      return;
+    }
+    close();
+  };
 
   return (
     <div className="space-y-6">
@@ -230,13 +258,13 @@ export function StartEntriesStep({
                 }
               }}
             >
-              <SelectTrigger className="text-base md:text-sm" data-start-field="classId" {...fieldAria(fieldErrors.classId)}>
-                <SelectValue placeholder={m.start.classPlaceholder} />
+              <SelectTrigger className="h-auto min-h-10 items-start py-2 text-base md:text-sm" data-start-field="classId" {...fieldAria(fieldErrors.classId)}>
+                <SelectValue className="line-clamp-2 whitespace-normal text-left leading-snug" placeholder={m.start.classPlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
                 {sortedClasses.map((item) => (
-                  <SelectItem key={item.id} value={item.id} disabled={usedClassIds.has(item.id)}>
+                  <SelectItem key={item.id} value={item.id} disabled={usedClassIds.has(item.id)} className="items-start whitespace-normal py-2 leading-snug">
                     {item.name}
                   </SelectItem>
                 ))}
@@ -314,7 +342,30 @@ export function StartEntriesStep({
             <FieldError message={fieldErrors.cylinders} />
           </div>
           <div className="space-y-2">
-            <Label>{m.start.owner}</Label>
+            <div
+              ref={ownerHintRef}
+              className="relative flex items-center gap-2"
+              onMouseEnter={() => setShowOwnerHint(true)}
+              onMouseLeave={() => setShowOwnerHint(false)}
+              onFocusCapture={() => setShowOwnerHint(true)}
+              onBlurCapture={(event) => closeIfFocusLeft(ownerHintRef, event, () => setShowOwnerHint(false))}
+            >
+              <Label>{m.start.owner}</Label>
+              <button
+                type="button"
+                onClick={() => toggleHintOnTouch(setShowOwnerHint)}
+                aria-label="Hinweis zum Besitzerfeld"
+                aria-expanded={showOwnerHint ? "true" : "false"}
+                className="inline-flex h-5 w-5 items-center justify-center text-slate-500 hover:text-slate-800"
+              >
+                <CircleHelp className="h-3.5 w-3.5" />
+              </button>
+              {showOwnerHint && (
+                <div className="absolute left-0 top-full z-20 mt-2 max-w-xs rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 shadow-lg">
+                  {ownerHintText}
+                </div>
+              )}
+            </div>
             <Input value={draft.vehicle.ownerName} onChange={(event) => onVehicleFieldChange("ownerName", event.target.value)} placeholder={ownerPlaceholder} />
           </div>
           <div className="space-y-2 md:col-span-3">
@@ -500,7 +551,30 @@ export function StartEntriesStep({
                   <FieldError message={fieldErrors.backupCylinders} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>{m.start.backupOwner}</Label>
+                  <div
+                    ref={backupOwnerHintRef}
+                    className="relative flex items-center gap-2"
+                    onMouseEnter={() => setShowBackupOwnerHint(true)}
+                    onMouseLeave={() => setShowBackupOwnerHint(false)}
+                    onFocusCapture={() => setShowBackupOwnerHint(true)}
+                    onBlurCapture={(event) => closeIfFocusLeft(backupOwnerHintRef, event, () => setShowBackupOwnerHint(false))}
+                  >
+                    <Label>{m.start.backupOwner}</Label>
+                    <button
+                      type="button"
+                      onClick={() => toggleHintOnTouch(setShowBackupOwnerHint)}
+                      aria-label="Hinweis zum Besitzerfeld Ersatzfahrzeug"
+                      aria-expanded={showBackupOwnerHint ? "true" : "false"}
+                      className="inline-flex h-5 w-5 items-center justify-center text-slate-500 hover:text-slate-800"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </button>
+                    {showBackupOwnerHint && (
+                      <div className="absolute left-0 top-full z-20 mt-2 max-w-xs rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 shadow-lg">
+                        {ownerHintText}
+                      </div>
+                    )}
+                  </div>
                   <Input value={draft.backupVehicle.ownerName} onChange={(event) => onBackupFieldChange("ownerName", event.target.value)} placeholder={ownerPlaceholder} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
