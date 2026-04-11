@@ -974,6 +974,7 @@ export function AnmeldungPage() {
   const publicLegal = usePublicLegal();
   const mainVehicleUploadSequence = useRef(0);
   const backupVehicleUploadSequence = useRef(0);
+  const submitInFlightRef = useRef(false);
   const [step, setStep] = useState(1);
   const [eventLoadState, setEventLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [eventOverview, setEventOverview] = useState<PublicEventOverview | null>(null);
@@ -1480,7 +1481,7 @@ export function AnmeldungPage() {
   };
 
   const submit = async () => {
-    if (isSubmitting || submitLocked) {
+    if (isSubmitting || submitLocked || submitInFlightRef.current) {
       return;
     }
     setConsentError("");
@@ -1532,8 +1533,10 @@ export function AnmeldungPage() {
     }
 
     try {
+      submitInFlightRef.current = true;
       result = await registrationService.submitWizard(submitForm, { clientSubmissionKey: nextSubmissionKey });
     } catch (error) {
+      submitInFlightRef.current = false;
       if (error instanceof Error) {
         if (error.message === "CONSENT_REQUIRED_MISSING") {
           setConsentError(getConsentRequiredError(locale));
@@ -1587,6 +1590,7 @@ export function AnmeldungPage() {
       return;
     }
 
+    submitInFlightRef.current = false;
     setIsSubmitting(false);
 
     if (!result.ok) {
