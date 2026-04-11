@@ -7,7 +7,7 @@ const APP_NAME = "Event Hub";
 
 function resolvePageTitle(pathname: string) {
   if (pathname === "/" || pathname === "/anmeldung") {
-    return "Anmeldung";
+    return "Anmeldung OLD";
   }
   if (pathname.startsWith("/anmeldung/verify")) {
     return "E-Mail-Verifizierung";
@@ -79,7 +79,11 @@ export function DocumentMeta() {
 
   useEffect(() => {
     const pageTitle = resolvePageTitle(location.pathname);
-    document.title = `${pageTitle} | ${BRAND_NAME}`;
+    if (location.pathname === "/" || location.pathname === "/anmeldung") {
+      document.title = pageTitle;
+    } else {
+      document.title = `${pageTitle} | ${BRAND_NAME}`;
+    }
 
     upsertHeadLink("icon", mscLogoUrl, "image/png");
     upsertHeadLink("apple-touch-icon", mscLogoUrl);
