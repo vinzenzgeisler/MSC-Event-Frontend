@@ -83,6 +83,7 @@ export type PublicEventClass = {
   id: Id;
   name: string;
   vehicleType: VehicleType;
+  allowsCodriver: boolean;
 };
 
 export type PublicPricingClassRule = {

@@ -49,6 +49,7 @@ type StartEntriesStepProps = {
   startNumberState: StartNumberState;
   startNumberHint: string;
   showDraftForm: boolean;
+  codriverAllowed: boolean;
   onDraftChange: <K extends keyof StartRegistrationForm>(field: K, value: StartRegistrationForm[K]) => void;
   onAddAnotherStart: () => void;
   onVehicleFieldChange: (field: keyof StartRegistrationForm["vehicle"], value: string) => void;
@@ -90,6 +91,7 @@ export function StartEntriesStep({
   startNumberState,
   startNumberHint,
   showDraftForm,
+  codriverAllowed,
   onDraftChange,
   onAddAnotherStart,
   onVehicleFieldChange,
@@ -350,96 +352,98 @@ export function StartEntriesStep({
           </div>
         </div>
 
-        <div className="space-y-3 rounded-lg border p-4">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-900">
-            <input
-              type="checkbox"
-              checked={draft.codriverEnabled}
-              onChange={(event) => onDraftChange("codriverEnabled", event.target.checked)}
-            />
-            {m.start.codriverAdd}
-          </label>
-          {draft.codriverEnabled && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <h5 className="md:col-span-2 text-sm font-semibold text-slate-900">{m.start.codriverTitle}</h5>
-              <div className="space-y-2">
-                <Label>{m.start.codriverFirstName}</Label>
-                <Input data-start-field="codriverFirstName" value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="Anna" {...fieldAria(fieldErrors.codriverFirstName)} />
-                <FieldError message={fieldErrors.codriverFirstName} />
+        {codriverAllowed && (
+          <div className="space-y-3 rounded-lg border p-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-900">
+              <input
+                type="checkbox"
+                checked={draft.codriverEnabled}
+                onChange={(event) => onDraftChange("codriverEnabled", event.target.checked)}
+              />
+              {m.start.codriverAdd}
+            </label>
+            {draft.codriverEnabled && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <h5 className="md:col-span-2 text-sm font-semibold text-slate-900">{m.start.codriverTitle}</h5>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverFirstName}</Label>
+                  <Input data-start-field="codriverFirstName" value={draft.codriver.firstName} onChange={(event) => onCodriverFieldChange("firstName", event.target.value)} placeholder="Anna" {...fieldAria(fieldErrors.codriverFirstName)} />
+                  <FieldError message={fieldErrors.codriverFirstName} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverLastName}</Label>
+                  <Input data-start-field="codriverLastName" value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="Beispiel" {...fieldAria(fieldErrors.codriverLastName)} />
+                  <FieldError message={fieldErrors.codriverLastName} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverBirthdate}</Label>
+                  <Input
+                    data-start-field="codriverBirthdate"
+                    value={draft.codriver.birthdate}
+                    onChange={(event) => onCodriverFieldChange("birthdate", event.target.value)}
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder={m.start.codriverBirthdatePlaceholder}
+                    {...fieldAria(fieldErrors.codriverBirthdate)}
+                  />
+                  <FieldError message={fieldErrors.codriverBirthdate} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverCountry}</Label>
+                  <Select
+                    value={draft.codriver.country || "__placeholder__"}
+                    onValueChange={(next) => onCodriverFieldChange("country", next === "__placeholder__" ? "" : next)}
+                  >
+                    <SelectTrigger className="text-base md:text-sm" data-start-field="codriverCountry" {...fieldAria(fieldErrors.codriverCountry)}>
+                      <SelectValue placeholder={m.start.codriverCountryPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__placeholder__">{m.start.codriverCountryPlaceholder}</SelectItem>
+                      {countryOptions.map((country) => (
+                        <SelectItem key={country.code} value={country.code}>
+                          {country.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError message={fieldErrors.codriverCountry} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>{m.start.codriverStreet}</Label>
+                  <Input data-start-field="codriverStreet" value={draft.codriver.street} onChange={(event) => onCodriverFieldChange("street", event.target.value)} {...fieldAria(fieldErrors.codriverStreet)} />
+                  <FieldError message={fieldErrors.codriverStreet} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverZip}</Label>
+                  <Input data-start-field="codriverZip" value={draft.codriver.zip} onChange={(event) => onCodriverFieldChange("zip", event.target.value)} {...fieldAria(fieldErrors.codriverZip)} />
+                  <FieldError message={fieldErrors.codriverZip} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverCity}</Label>
+                  <Input data-start-field="codriverCity" value={draft.codriver.city} onChange={(event) => onCodriverFieldChange("city", event.target.value)} {...fieldAria(fieldErrors.codriverCity)} />
+                  <FieldError message={fieldErrors.codriverCity} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverEmail}</Label>
+                  <Input data-start-field="codriverEmail" value={draft.codriver.email} onChange={(event) => onCodriverFieldChange("email", event.target.value)} placeholder="anna@example.com" {...fieldAria(fieldErrors.codriverEmail)} />
+                  <FieldError message={fieldErrors.codriverEmail} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{m.start.codriverPhone}</Label>
+                  <Input
+                    data-start-field="codriverPhone"
+                    value={draft.codriver.phone}
+                    onChange={(event) => onCodriverFieldChange("phone", event.target.value)}
+                    inputMode="tel"
+                    placeholder={m.start.codriverPhonePlaceholder}
+                    {...fieldAria(fieldErrors.codriverPhone)}
+                  />
+                  <FieldError message={fieldErrors.codriverPhone} />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverLastName}</Label>
-                <Input data-start-field="codriverLastName" value={draft.codriver.lastName} onChange={(event) => onCodriverFieldChange("lastName", event.target.value)} placeholder="Beispiel" {...fieldAria(fieldErrors.codriverLastName)} />
-                <FieldError message={fieldErrors.codriverLastName} />
-              </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverBirthdate}</Label>
-                <Input
-                  data-start-field="codriverBirthdate"
-                  value={draft.codriver.birthdate}
-                  onChange={(event) => onCodriverFieldChange("birthdate", event.target.value)}
-                  inputMode="numeric"
-                  maxLength={10}
-                  placeholder={m.start.codriverBirthdatePlaceholder}
-                  {...fieldAria(fieldErrors.codriverBirthdate)}
-                />
-                <FieldError message={fieldErrors.codriverBirthdate} />
-              </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverCountry}</Label>
-                <Select
-                  value={draft.codriver.country || "__placeholder__"}
-                  onValueChange={(next) => onCodriverFieldChange("country", next === "__placeholder__" ? "" : next)}
-                >
-                  <SelectTrigger className="text-base md:text-sm" data-start-field="codriverCountry" {...fieldAria(fieldErrors.codriverCountry)}>
-                    <SelectValue placeholder={m.start.codriverCountryPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__placeholder__">{m.start.codriverCountryPlaceholder}</SelectItem>
-                    {countryOptions.map((country) => (
-                      <SelectItem key={country.code} value={country.code}>
-                        {country.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError message={fieldErrors.codriverCountry} />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label>{m.start.codriverStreet}</Label>
-                <Input data-start-field="codriverStreet" value={draft.codriver.street} onChange={(event) => onCodriverFieldChange("street", event.target.value)} {...fieldAria(fieldErrors.codriverStreet)} />
-                <FieldError message={fieldErrors.codriverStreet} />
-              </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverZip}</Label>
-                <Input data-start-field="codriverZip" value={draft.codriver.zip} onChange={(event) => onCodriverFieldChange("zip", event.target.value)} {...fieldAria(fieldErrors.codriverZip)} />
-                <FieldError message={fieldErrors.codriverZip} />
-              </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverCity}</Label>
-                <Input data-start-field="codriverCity" value={draft.codriver.city} onChange={(event) => onCodriverFieldChange("city", event.target.value)} {...fieldAria(fieldErrors.codriverCity)} />
-                <FieldError message={fieldErrors.codriverCity} />
-              </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverEmail}</Label>
-                <Input data-start-field="codriverEmail" value={draft.codriver.email} onChange={(event) => onCodriverFieldChange("email", event.target.value)} placeholder="anna@example.com" {...fieldAria(fieldErrors.codriverEmail)} />
-                <FieldError message={fieldErrors.codriverEmail} />
-              </div>
-              <div className="space-y-2">
-                <Label>{m.start.codriverPhone}</Label>
-                <Input
-                  data-start-field="codriverPhone"
-                  value={draft.codriver.phone}
-                  onChange={(event) => onCodriverFieldChange("phone", event.target.value)}
-                  inputMode="tel"
-                  placeholder={m.start.codriverPhonePlaceholder}
-                  {...fieldAria(fieldErrors.codriverPhone)}
-                />
-                <FieldError message={fieldErrors.codriverPhone} />
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <details className="rounded-lg border p-4">
           <summary className="cursor-pointer text-sm font-medium text-slate-900">{m.start.backupSummary}</summary>

@@ -425,7 +425,8 @@ export const registrationService = {
       classes: response.classes.map((item) => ({
         id: item.id,
         name: item.name,
-        vehicleType: item.vehicleType
+        vehicleType: item.vehicleType,
+        allowsCodriver: Boolean(item.allowsCodriver)
       }))
     };
   },

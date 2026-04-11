@@ -72,6 +72,13 @@ function resolveStartClassLabel(start: StartRegistrationForm, eventOverview: Pub
   return eventOverview?.classes.find((item) => item.id === start.classId)?.name ?? "—";
 }
 
+function classAllowsCodriver(classId: string, eventOverview: PublicEventOverview | null) {
+  if (!classId) {
+    return false;
+  }
+  return Boolean(eventOverview?.classes.find((item) => item.id === classId)?.allowsCodriver);
+}
+
 function focusFieldBySelector(selector: string) {
   window.setTimeout(() => {
     const target = document.querySelector<HTMLElement>(selector);
@@ -994,6 +1001,7 @@ export function AnmeldungPage() {
   const [submissionKey, setSubmissionKey] = useState("");
   const [submissionFingerprint, setSubmissionFingerprint] = useState("");
   const isMinorDriver = useMemo(() => isDriverMinor(driver.birthdate), [driver.birthdate]);
+  const draftClassAllowsCodriver = useMemo(() => classAllowsCodriver(draftStart.classId, eventOverview), [draftStart.classId, eventOverview]);
 
   useEffect(() => {
     let active = true;
@@ -1201,7 +1209,20 @@ export function AnmeldungPage() {
   };
 
   const handleDraftChange = <K extends keyof StartRegistrationForm>(field: K, value: StartRegistrationForm[K]) => {
-    setDraftStart((prev) => ({ ...prev, [field]: value }));
+    setDraftStart((prev) => {
+      if (field === "classId") {
+        const nextAllowsCodriver = classAllowsCodriver(String(value), eventOverview);
+        if (!nextAllowsCodriver) {
+          return {
+            ...prev,
+            [field]: value,
+            codriverEnabled: false,
+            codriver: createEmptyStart().codriver
+          };
+        }
+      }
+      return { ...prev, [field]: value };
+    });
     setStartError("");
     if (field === "classId") {
       setStartFieldErrors((prev) => ({ ...prev, classId: undefined }));
@@ -1212,6 +1233,20 @@ export function AnmeldungPage() {
       setStartFieldErrors((prev) => ({ ...prev, startNumber: undefined }));
     }
     if (field === "codriverEnabled" && !value) {
+      setStartFieldErrors((prev) => ({
+        ...prev,
+        codriverFirstName: undefined,
+        codriverLastName: undefined,
+        codriverBirthdate: undefined,
+        codriverCountry: undefined,
+        codriverStreet: undefined,
+        codriverZip: undefined,
+        codriverCity: undefined,
+        codriverEmail: undefined,
+        codriverPhone: undefined
+      }));
+    }
+    if (field === "classId" && !classAllowsCodriver(String(value), eventOverview)) {
       setStartFieldErrors((prev) => ({
         ...prev,
         codriverFirstName: undefined,
@@ -1785,6 +1820,7 @@ export function AnmeldungPage() {
               startNumberState={startNumberState}
               startNumberHint={startNumberHint}
               showDraftForm={showStartDraftForm}
+              codriverAllowed={draftClassAllowsCodriver}
               onDraftChange={handleDraftChange}
               onAddAnotherStart={openAnotherStartForm}
               onStartNumberBlur={() => {
