@@ -450,8 +450,8 @@ export function AdminEntryDetailPage() {
                 <div>{detail.driver.birthdate}</div>
               </div>
               <div>
-                <div className="text-xs uppercase text-slate-500">Nationalität</div>
-                <div>{detail.driver.nationality}</div>
+                <div className="text-xs uppercase text-slate-500">Land</div>
+                <div>{detail.driver.country}</div>
               </div>
               <div>
                 <div className="text-xs uppercase text-slate-500">E-Mail</div>
@@ -492,6 +492,10 @@ export function AdminEntryDetailPage() {
                       <div>
                         <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
                         <div>{detail.codriver.birthdate}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase text-slate-500">Land</div>
+                        <div>{detail.codriver.country}</div>
                       </div>
                       <div>
                         <div className="text-xs uppercase text-slate-500">E-Mail</div>

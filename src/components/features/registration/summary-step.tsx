@@ -24,7 +24,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
   const legalTexts = getLegalTexts(locale);
   const errorRef = useRef<HTMLDivElement | HTMLParagraphElement | null>(null);
   const emergencyName = `${form.driver.emergencyContactFirstName} ${form.driver.emergencyContactLastName}`.replace(/\s+/g, " ").trim();
-  const driverNationalityLabel = getCountryLabel(form.driver.nationality, locale) ?? form.driver.nationality;
+  const driverCountryLabel = getCountryLabel(form.driver.country, locale) ?? form.driver.country;
   const hasConsentError = Boolean(consentError);
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
           {form.driver.firstName} {form.driver.lastName} · {form.driver.email}
         </p>
         <p className="text-sm text-slate-600">
-          {m.driver.nationality}: {driverNationalityLabel}
+          {m.driver.country}: {driverCountryLabel}
         </p>
         <p className="text-sm text-slate-600">
           {m.driver.emergencyTitle}: {emergencyName} ({form.driver.emergencyContactPhone})

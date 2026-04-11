@@ -81,28 +81,6 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <FieldError id="driver-phone-error" message={errors.phone} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="driver-nationality">{m.driver.nationality}</Label>
-          <Select value={value.nationality || "__placeholder__"} onValueChange={(next) => onChange("nationality", next === "__placeholder__" ? "" : next)}>
-            <SelectTrigger
-              id="driver-nationality"
-              data-driver-field="nationality"
-              {...fieldAria(errors.nationality, "driver-nationality-error")}
-              className="text-base md:text-sm"
-            >
-              <SelectValue placeholder={m.driver.nationalityPlaceholder} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__placeholder__">{m.driver.nationalityPlaceholder}</SelectItem>
-              {countryOptions.map((country) => (
-                <SelectItem key={country.code} value={country.code}>
-                  {country.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldError id="driver-nationality-error" message={errors.nationality} />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="driver-email">{m.driver.email}</Label>
           <Input
             id="driver-email"
@@ -133,6 +111,28 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
           <Label htmlFor="driver-city">{m.driver.city}</Label>
           <Input id="driver-city" data-driver-field="city" value={value.city} onChange={(event) => onChange("city", event.target.value)} placeholder={cityPlaceholder} {...fieldAria(errors.city, "driver-city-error")} />
           <FieldError id="driver-city-error" message={errors.city} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="driver-country">{m.driver.country}</Label>
+          <Select value={value.country || "__placeholder__"} onValueChange={(next) => onChange("country", next === "__placeholder__" ? "" : next)}>
+            <SelectTrigger
+              id="driver-country"
+              data-driver-field="country"
+              {...fieldAria(errors.country, "driver-country-error")}
+              className="text-base md:text-sm"
+            >
+              <SelectValue placeholder={m.driver.countryPlaceholder} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__placeholder__">{m.driver.countryPlaceholder}</SelectItem>
+              {countryOptions.map((country) => (
+                <SelectItem key={country.code} value={country.code}>
+                  {country.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldError id="driver-country-error" message={errors.country} />
         </div>
       </section>
 

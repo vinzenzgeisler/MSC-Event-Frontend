@@ -4,7 +4,7 @@ export type DriverForm = {
   firstName: string;
   lastName: string;
   birthdate: string;
-  nationality: string;
+  country: string;
   street: string;
   zip: string;
   city: string;
@@ -25,7 +25,7 @@ export type CodriverForm = {
   firstName: string;
   lastName: string;
   birthdate: string;
-  nationality: string;
+  country: string;
   street: string;
   zip: string;
   city: string;
@@ -134,7 +134,7 @@ export type PublicCreateEntryRequestDto = {
     firstName: string;
     lastName: string;
     birthdate: string;
-    nationality?: string;
+    country: string;
     street: string;
     zip: string;
     city: string;
@@ -155,7 +155,7 @@ export type PublicCreateEntryRequestDto = {
     firstName: string;
     lastName: string;
     birthdate: string;
-    nationality: string;
+    country: string;
     street: string;
     zip: string;
     city: string;

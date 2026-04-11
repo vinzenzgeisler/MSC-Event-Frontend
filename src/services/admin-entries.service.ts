@@ -165,35 +165,6 @@ function resolveImageUrl(value: string | null | undefined): string | null {
   return null;
 }
 
-function splitNationalityFromNotes(value: string | null | undefined) {
-  const source = (value ?? "").trim();
-  if (!source) {
-    return { nationality: null as string | null, notes: "" };
-  }
-
-  const lines = source
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  let nationality: string | null = null;
-  const remaining: string[] = [];
-
-  for (const line of lines) {
-    const match = line.match(/^(?:nationalit[aä]t|nationality)\s*:\s*(.+)$/i);
-    if (match && !nationality) {
-      nationality = match[1].trim() || null;
-      continue;
-    }
-    remaining.push(line);
-  }
-
-  return {
-    nationality,
-    notes: remaining.join("\n").trim()
-  };
-}
-
 function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
   const nameFirst = (dto.driverFirstName ?? "").trim();
   const nameLast = (dto.driverLastName ?? "").trim();
@@ -260,9 +231,10 @@ function fromAdminEntryDetailDto(
   const driverName = parseName(dto.person.driver.firstName, dto.person.driver.lastName, `Fahrer ${dto.ids.entryId.slice(0, 8)}`);
   const vehicleLabel = dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug");
   const backupVehicleLabel = backupVehicle ? ([backupVehicle.make, backupVehicle.model].filter(Boolean).join(" ") || "Ersatzfahrzeug") : "Ersatzfahrzeug";
-  const notesSplit = splitNationalityFromNotes(dto.specialNotes);
-  const rawDriverNationality = (dto.person.driver.nationality ?? "").trim() || notesSplit.nationality || "";
-  const driverNationality = (getCountryLabel(rawDriverNationality, "de-DE") ?? rawDriverNationality) || "-";
+  const rawDriverCountry = (dto.person.driver.country ?? "").trim();
+  const driverCountry = (getCountryLabel(rawDriverCountry, "de-DE") ?? rawDriverCountry) || "-";
+  const rawCodriverCountry = (codriver?.country ?? "").trim();
+  const codriverCountry = (getCountryLabel(rawCodriverCountry, "de-DE") ?? rawCodriverCountry) || "-";
 
   return {
     id: dto.ids.entryId,
@@ -282,12 +254,12 @@ function fromAdminEntryDetailDto(
       name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
       email: dto.person.driver.email ?? "-",
       birthdate: asDate(dto.person.driver.birthdate),
-      nationality: driverNationality,
+      country: driverCountry,
       phone: formatPhoneForDisplay(dto.person.driver.phone),
       street: dto.person.driver.street ?? "-",
       zip: dto.person.driver.zip ?? "-",
       city: dto.person.driver.city ?? "-",
-      addressLine: [dto.person.driver.street, dto.person.driver.zip, dto.person.driver.city].filter(Boolean).join(", ") || "-",
+      addressLine: [dto.person.driver.street, dto.person.driver.zip, dto.person.driver.city, driverCountry !== "-" ? driverCountry : null].filter(Boolean).join(", ") || "-",
       emergencyContactName: dto.person.driver.emergencyContactName ?? "-",
       emergencyContactPhone: formatPhoneForDisplay(dto.person.driver.emergencyContactPhone),
       motorsportHistory: dto.person.driver.motorsportHistory ?? "Keine Angabe"
@@ -299,11 +271,12 @@ function fromAdminEntryDetailDto(
       lastName: codriver?.lastName ?? "-",
       email: codriver?.email ?? "-",
       birthdate: asDate(codriver?.birthdate),
+      country: codriverCountry,
       phone: formatPhoneForDisplay(codriver?.phone),
       street: codriver?.street ?? "-",
       zip: codriver?.zip ?? "-",
       city: codriver?.city ?? "-",
-      addressLine: [codriver?.street, codriver?.zip, codriver?.city].filter(Boolean).join(", ") || "-"
+      addressLine: [codriver?.street, codriver?.zip, codriver?.city, codriverCountry !== "-" ? codriverCountry : null].filter(Boolean).join(", ") || "-"
     },
     vehicle: {
       label: dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug"),
@@ -358,7 +331,7 @@ function fromAdminEntryDetailDto(
       status: doc.status
     })),
     relatedEntryIds: dto.relatedEntryIds,
-    notes: notesSplit.notes || "Keine Hinweise",
+    notes: (dto.specialNotes ?? "").trim() || "Keine Hinweise",
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     internalNote: dto.internalNote ?? "",

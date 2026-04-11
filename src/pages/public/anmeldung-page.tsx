@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
-import { computeConsentTextHash, mapUiLocaleToConsentLocale } from "@/config/legal-texts";
+import { CONSENT_VERSION, computeConsentTextHash, mapUiLocaleToConsentLocale } from "@/config/legal-texts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DriverStep } from "@/components/features/registration/driver-step";
@@ -15,7 +15,7 @@ import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegi
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
 const PHONE_ALLOWED_PATTERN = /^\+?[0-9()\/\-\s.]+$/;
-const ZIP_PATTERN = /^\d{5}$/;
+const ZIP_PATTERN = /^[A-Za-z0-9][A-Za-z0-9\- ]{1,11}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HUBRAUM_PATTERN = /^\d{2,5}$/;
 const CYLINDERS_PATTERN = /^(?:\d{1,2}|V\d{1,2})$/i;
@@ -53,7 +53,7 @@ function createEmptyStart(): StartRegistrationForm {
       firstName: "",
       lastName: "",
       birthdate: "",
-      nationality: "",
+      country: "",
       street: "",
       zip: "",
       city: "",
@@ -90,7 +90,7 @@ function focusFirstDriverError(errors: Partial<Record<keyof DriverForm, string>>
     "firstName",
     "lastName",
     "birthdate",
-    "nationality",
+    "country",
     "phone",
     "email",
     "street",
@@ -125,7 +125,7 @@ function focusFirstStartError(errors: StartFieldErrors) {
     "codriverFirstName",
     "codriverLastName",
     "codriverBirthdate",
-    "codriverNationality",
+    "codriverCountry",
     "codriverStreet",
     "codriverZip",
     "codriverCity",
@@ -149,7 +149,7 @@ const initialDriver: DriverForm = {
   firstName: "",
   lastName: "",
   birthdate: "",
-  nationality: "",
+  country: "",
   street: "",
   zip: "",
   city: "",
@@ -623,10 +623,10 @@ function validateDriverForm(value: DriverForm, locale: string, m: ReturnType<typ
   } else if (!isBirthdateInRange(value.birthdate.trim(), 6, 100)) {
     errors.birthdate = m.errors.invalidBirthdateRange;
   }
-  if (!value.nationality.trim()) {
-    errors.nationality = m.errors.requiredNationality;
-  } else if (!isCountryOption(value.nationality, locale)) {
-    errors.nationality = m.errors.invalidNationality;
+  if (!value.country.trim()) {
+    errors.country = m.errors.requiredCountry;
+  } else if (!isCountryOption(value.country, locale)) {
+    errors.country = m.errors.invalidCountry;
   }
   if (!value.street.trim()) errors.street = m.errors.requiredStreet;
   if (!value.city.trim()) errors.city = m.errors.requiredCity;
@@ -690,7 +690,7 @@ function hydrateDriverForm(value: Partial<DriverForm> | null | undefined): Drive
   }
 
   next.birthdate = normalizeStoredBirthdate(next.birthdate);
-  next.nationality = resolveCountryCode(next.nationality) ?? "";
+  next.country = resolveCountryCode(next.country) ?? "";
   next.guardianConsentAccepted = Boolean(next.guardianConsentAccepted);
 
   return next;
@@ -710,7 +710,7 @@ type StartFieldErrors = Partial<
     | "codriverFirstName"
     | "codriverLastName"
     | "codriverBirthdate"
-    | "codriverNationality"
+    | "codriverCountry"
     | "codriverStreet"
     | "codriverZip"
     | "codriverCity"
@@ -786,7 +786,7 @@ function hydrateStartForm(value: Partial<StartRegistrationForm> | undefined): St
       ...base.codriver,
       ...(value?.codriver ?? {}),
       birthdate: normalizeStoredBirthdate(String(value?.codriver?.birthdate ?? "")),
-      nationality: resolveCountryCode(String(value?.codriver?.nationality ?? "")) ?? ""
+      country: resolveCountryCode(String(value?.codriver?.country ?? "")) ?? ""
     },
     backupVehicleEnabled: Boolean(value?.backupVehicleEnabled),
     vehicle: hydrateVehicleForm(value?.vehicle),
@@ -812,7 +812,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.codriver.firstName.trim()) ||
     Boolean(draftStart.codriver.lastName.trim()) ||
     Boolean(draftStart.codriver.birthdate.trim()) ||
-    Boolean(draftStart.codriver.nationality.trim()) ||
+    Boolean(draftStart.codriver.country.trim()) ||
     Boolean(draftStart.codriver.street.trim()) ||
     Boolean(draftStart.codriver.zip.trim()) ||
     Boolean(draftStart.codriver.city.trim()) ||
@@ -905,10 +905,10 @@ function validateStartFields(
     } else if (!isBirthdateInRange(start.codriver.birthdate.trim(), 6, 100)) {
       errors.codriverBirthdate = m.errors.invalidCodriverBirthdateRange;
     }
-    if (!start.codriver.nationality.trim()) {
-      errors.codriverNationality = m.errors.requiredCodriverNationality;
-    } else if (!isCountryOption(start.codriver.nationality, locale)) {
-      errors.codriverNationality = m.errors.invalidNationality;
+    if (!start.codriver.country.trim()) {
+      errors.codriverCountry = m.errors.requiredCodriverCountry;
+    } else if (!isCountryOption(start.codriver.country, locale)) {
+      errors.codriverCountry = m.errors.invalidCodriverCountry;
     }
     if (!start.codriver.street.trim()) {
       errors.codriverStreet = m.errors.requiredCodriverStreet;
@@ -1059,12 +1059,38 @@ export function AnmeldungPage() {
         }
         setConsent((prev) => ({
           ...prev,
-          consentVersion: "",
+          consentVersion: CONSENT_VERSION,
           consentTextHash: "",
           locale: consentLocale,
           consentSource: "public_form"
         }));
-        setConsentError(getConsentMetaError(locale, "load_failed"));
+        computeConsentTextHash(locale)
+          .then((localConsentTextHash) => {
+            if (!active) {
+              return;
+            }
+            setConsent((prev) => ({
+              ...prev,
+              consentVersion: CONSENT_VERSION,
+              consentTextHash: localConsentTextHash.trim().toLowerCase(),
+              locale: consentLocale,
+              consentSource: "public_form"
+            }));
+            setConsentError("");
+          })
+          .catch(() => {
+            if (!active) {
+              return;
+            }
+            setConsent((prev) => ({
+              ...prev,
+              consentVersion: "",
+              consentTextHash: "",
+              locale: consentLocale,
+              consentSource: "public_form"
+            }));
+            setConsentError(getConsentMetaError(locale, "load_failed"));
+          });
       });
     return () => {
       active = false;
@@ -1191,7 +1217,7 @@ export function AnmeldungPage() {
         codriverFirstName: undefined,
         codriverLastName: undefined,
         codriverBirthdate: undefined,
-        codriverNationality: undefined,
+        codriverCountry: undefined,
         codriverStreet: undefined,
         codriverZip: undefined,
         codriverCity: undefined,
@@ -1803,7 +1829,7 @@ export function AnmeldungPage() {
                   firstName: "codriverFirstName",
                   lastName: "codriverLastName",
                   birthdate: "codriverBirthdate",
-                  nationality: "codriverNationality",
+                  country: "codriverCountry",
                   street: "codriverStreet",
                   zip: "codriverZip",
                   city: "codriverCity",

@@ -1,7 +1,7 @@
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
 import { ApiError } from "@/services/api/http-client";
 import { requestJson } from "@/services/api/http-client";
-import { resolveCountryCode, resolveCountryToCanonical } from "@/lib/countries";
+import { resolveCountryCode } from "@/lib/countries";
 import type {
   PublicCreateEntriesBatchRequestDto,
   PublicCreateEntryRequestDto,
@@ -30,24 +30,9 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function buildSpecialNotes(nationality: string, notes: string): string | undefined {
-  const nationalityValue = nationality.trim();
+function buildSpecialNotes(notes: string): string | undefined {
   const noteValue = notes.trim();
-  const nationalityLine = nationalityValue ? `Nationalität: ${nationalityValue}` : "";
-
-  if (!nationalityLine && !noteValue) {
-    return undefined;
-  }
-  if (!nationalityLine) {
-    return noteValue;
-  }
-  if (!noteValue) {
-    return nationalityLine;
-  }
-  if (/nationalit[aä]t:/i.test(noteValue)) {
-    return noteValue;
-  }
-  return `${nationalityLine}\n${noteValue}`;
+  return noteValue || undefined;
 }
 
 function buildEmergencyContactName(firstName: string, lastName: string): string {
@@ -147,14 +132,7 @@ function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicle
 function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: number, consentCapturedAt: string): PublicCreateEntryRequestDto {
   const start = form.starts[startIndex];
   const isMinorDriver = isMinorBirthdate(form.driver.birthdate);
-  const driverNationalityCode = resolveCountryCode(form.driver.nationality) ?? form.driver.nationality.trim();
-  const driverNationality = driverNationalityCode || undefined;
-  const driverNationalityForNotes = driverNationality ? resolveCountryToCanonical(driverNationality) ?? driverNationality : "";
-  const codriverNationality =
-    start.codriverEnabled && start.codriver.nationality
-      ? resolveCountryCode(start.codriver.nationality) ?? start.codriver.nationality.trim()
-      : undefined;
-  const specialNotes = buildSpecialNotes(driverNationalityForNotes, form.driver.specialNotes);
+  const specialNotes = buildSpecialNotes(form.driver.specialNotes);
   return {
     classId: start.classId,
     driver: {
@@ -162,7 +140,7 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       firstName: form.driver.firstName,
       lastName: form.driver.lastName,
       birthdate: toIsoBirthdate(form.driver.birthdate),
-      nationality: driverNationality,
+      country: resolveCountryCode(form.driver.country) ?? form.driver.country.trim(),
       street: form.driver.street,
       zip: form.driver.zip,
       city: form.driver.city,
@@ -179,11 +157,11 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       guardianConsentAccepted: isMinorDriver ? form.driver.guardianConsentAccepted : undefined
     },
     codriver: start.codriverEnabled
-      ? {
+        ? {
           firstName: start.codriver.firstName,
           lastName: start.codriver.lastName,
           birthdate: toIsoBirthdate(start.codriver.birthdate),
-          nationality: codriverNationality || "",
+          country: resolveCountryCode(start.codriver.country) ?? start.codriver.country.trim(),
           street: start.codriver.street,
           zip: start.codriver.zip,
           city: start.codriver.city,

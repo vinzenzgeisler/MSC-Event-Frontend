@@ -24,7 +24,7 @@ type StartFieldKey =
   | "codriverFirstName"
   | "codriverLastName"
   | "codriverBirthdate"
-  | "codriverNationality"
+  | "codriverCountry"
   | "codriverStreet"
   | "codriverZip"
   | "codriverCity"
@@ -386,16 +386,16 @@ export function StartEntriesStep({
                 <FieldError message={fieldErrors.codriverBirthdate} />
               </div>
               <div className="space-y-2">
-                <Label>{m.start.codriverNationality}</Label>
+                <Label>{m.start.codriverCountry}</Label>
                 <Select
-                  value={draft.codriver.nationality || "__placeholder__"}
-                  onValueChange={(next) => onCodriverFieldChange("nationality", next === "__placeholder__" ? "" : next)}
+                  value={draft.codriver.country || "__placeholder__"}
+                  onValueChange={(next) => onCodriverFieldChange("country", next === "__placeholder__" ? "" : next)}
                 >
-                  <SelectTrigger className="text-base md:text-sm" data-start-field="codriverNationality" {...fieldAria(fieldErrors.codriverNationality)}>
-                    <SelectValue placeholder={m.start.codriverNationalityPlaceholder} />
+                  <SelectTrigger className="text-base md:text-sm" data-start-field="codriverCountry" {...fieldAria(fieldErrors.codriverCountry)}>
+                    <SelectValue placeholder={m.start.codriverCountryPlaceholder} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__placeholder__">{m.start.codriverNationalityPlaceholder}</SelectItem>
+                    <SelectItem value="__placeholder__">{m.start.codriverCountryPlaceholder}</SelectItem>
                     {countryOptions.map((country) => (
                       <SelectItem key={country.code} value={country.code}>
                         {country.label}
@@ -403,7 +403,7 @@ export function StartEntriesStep({
                     ))}
                   </SelectContent>
                 </Select>
-                <FieldError message={fieldErrors.codriverNationality} />
+                <FieldError message={fieldErrors.codriverCountry} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>{m.start.codriverStreet}</Label>
