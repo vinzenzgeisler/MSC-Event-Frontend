@@ -5,6 +5,7 @@ export type AdminClassOption = {
   id: string;
   name: string;
   vehicleType: VehicleType;
+  allowsCodriver: boolean;
 };
 
 export const adminMetaService = {

@@ -66,6 +66,7 @@ export type AdminSettingsClass = {
   eventId: string;
   name: string;
   vehicleType: VehicleType;
+  allowsCodriver: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -73,6 +74,7 @@ export type AdminSettingsClass = {
 export type AdminSettingsClassDraft = {
   name: string;
   vehicleType: VehicleType;
+  allowsCodriver: boolean;
 };
 
 export type AdminSettingsPricingClassRule = {

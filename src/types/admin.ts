@@ -147,7 +147,7 @@ export type AdminEntryDetailDto = {
       lastName: string | null;
       email: string | null;
       birthdate: string | null;
-      nationality?: string | null;
+      country?: string | null;
       phone: string | null;
       street: string | null;
       zip: string | null;
@@ -161,7 +161,7 @@ export type AdminEntryDetailDto = {
       lastName: string | null;
       email: string | null;
       birthdate: string | null;
-      nationality?: string | null;
+      country?: string | null;
       phone: string | null;
       street: string | null;
       zip: string | null;
@@ -266,7 +266,7 @@ export type AdminEntryDetailViewModel = {
     name: string;
     email: string;
     birthdate: string;
-    nationality: string;
+    country: string;
     phone: string;
     street: string;
     zip: string;
@@ -283,6 +283,7 @@ export type AdminEntryDetailViewModel = {
     lastName: string;
     email: string;
     birthdate: string;
+    country: string;
     phone: string;
     street: string;
     zip: string;

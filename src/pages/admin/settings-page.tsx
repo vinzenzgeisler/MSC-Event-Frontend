@@ -870,7 +870,7 @@ export function AdminSettingsPage() {
   });
   const [classes, setClasses] = useState<AdminSettingsClass[]>([]);
   const [classDrafts, setClassDrafts] = useState<Record<string, AdminSettingsClassDraft>>({});
-  const [newClassDraft, setNewClassDraft] = useState<AdminSettingsClassDraft>({ name: "", vehicleType: "auto" });
+  const [newClassDraft, setNewClassDraft] = useState<AdminSettingsClassDraft>({ name: "", vehicleType: "auto", allowsCodriver: false });
   const [pricingForm, setPricingForm] = useState<AdminSettingsPricingForm>(buildDefaultPricingForm([]));
   const [iamOverview, setIamOverview] = useState<IamOverview | null>(null);
 
@@ -939,7 +939,7 @@ export function AdminSettingsPage() {
     setEventState(null);
     setClasses([]);
     setClassDrafts({});
-    setNewClassDraft({ name: "", vehicleType: "auto" });
+    setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false });
     setPricingForm(buildDefaultPricingForm([]));
     setPricingInitializedForEventId(null);
     setEventOverridesExpanded(false);
@@ -959,7 +959,7 @@ export function AdminSettingsPage() {
     setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
     setClasses(classList);
     setClassDrafts(
-      Object.fromEntries(classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType }]))
+      Object.fromEntries(classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType, allowsCodriver: item.allowsCodriver }]))
     );
 
     const key = storageKeyForEvent(event.id);
@@ -1450,7 +1450,8 @@ export function AdminSettingsPage() {
     try {
       const created = await adminSettingsService.createClass(eventState.id, {
         name: newClassDraft.name.trim(),
-        vehicleType: newClassDraft.vehicleType
+        vehicleType: newClassDraft.vehicleType,
+        allowsCodriver: newClassDraft.allowsCodriver
       });
 
       const nextClasses = [...classes, created];
@@ -1459,11 +1460,12 @@ export function AdminSettingsPage() {
         ...prev,
         [created.id]: {
           name: created.name,
-          vehicleType: created.vehicleType
+          vehicleType: created.vehicleType,
+          allowsCodriver: created.allowsCodriver
         }
       }));
       setPricingForm((prev) => mergePricingWithClasses(prev, nextClasses));
-      setNewClassDraft({ name: "", vehicleType: "auto" });
+      setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false });
       showToast("Klasse angelegt.");
     } catch (error) {
       setClassError(getApiErrorMessage(error, "Klasse konnte nicht angelegt werden."));
@@ -1489,7 +1491,8 @@ export function AdminSettingsPage() {
     try {
       const updated = await adminSettingsService.updateClass(classId, {
         name: draft.name.trim(),
-        vehicleType: draft.vehicleType
+        vehicleType: draft.vehicleType,
+        allowsCodriver: draft.allowsCodriver
       });
 
       const nextClasses = classes.map((item) => (item.id === classId ? { ...item, ...updated } : item));
@@ -2253,7 +2256,7 @@ export function AdminSettingsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid gap-4 md:grid-cols-[1fr_180px_auto]">
+                    <div className="grid gap-4 md:grid-cols-[1fr_180px_180px_auto]">
                       <div className="space-y-1">
                         <Label>Neue Klasse</Label>
                         <Input
@@ -2283,6 +2286,20 @@ export function AdminSettingsPage() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <label className="flex items-end gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={newClassDraft.allowsCodriver}
+                          disabled={!canManage || !eventState}
+                          onChange={(event) =>
+                            setNewClassDraft((prev) => ({
+                              ...prev,
+                              allowsCodriver: event.target.checked
+                            }))
+                          }
+                        />
+                        <span>Beifahrer erlaubt</span>
+                      </label>
                       <div className="flex items-end">
                         <Button type="button" disabled={!canManage || creatingClass || !eventState} onClick={() => void createClass()}>
                           <Plus className="mr-2 h-4 w-4" />
@@ -2293,11 +2310,11 @@ export function AdminSettingsPage() {
 
                     <div className="space-y-2">
                       {classes.map((item) => {
-                        const draft = classDrafts[item.id] ?? { name: item.name, vehicleType: item.vehicleType };
+                        const draft = classDrafts[item.id] ?? { name: item.name, vehicleType: item.vehicleType, allowsCodriver: item.allowsCodriver };
                         const rowBusy = savingClassId === item.id;
 
                         return (
-                          <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_160px_auto_auto]">
+                          <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_160px_180px_auto_auto]">
                             <Input
                               value={draft.name}
                               disabled={!canManage || rowBusy}
@@ -2332,6 +2349,23 @@ export function AdminSettingsPage() {
                                 <SelectItem value="moto">moto</SelectItem>
                               </SelectContent>
                             </Select>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={draft.allowsCodriver}
+                                disabled={!canManage || rowBusy}
+                                onChange={(event) =>
+                                  setClassDrafts((prev) => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      ...draft,
+                                      allowsCodriver: event.target.checked
+                                    }
+                                  }))
+                                }
+                              />
+                              <span>Beifahrer erlaubt</span>
+                            </label>
                             <Button type="button" variant="outline" disabled={!canManage || rowBusy} onClick={() => void saveClass(item.id)}>
                               <Save className="mr-2 h-4 w-4" />
                               Speichern

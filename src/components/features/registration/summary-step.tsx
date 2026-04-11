@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { getLegalTexts } from "@/config/legal-texts";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
+import { usePublicLegal } from "@/app/legal/public-legal-context";
 import { getCountryLabel } from "@/lib/countries";
+import { getVehicleTypeLabel } from "@/lib/vehicle-type";
 import { Button } from "@/components/ui/button";
 import type { RegistrationWizardForm } from "@/types/registration";
 
@@ -20,10 +21,10 @@ type SummaryStepProps = {
 
 export function SummaryStep({ form, submitError, consentError, successMessage, isSubmitting = false, onConsentChange, onSubmit }: SummaryStepProps) {
   const { m, locale } = useAnmeldungI18n();
-  const legalTexts = getLegalTexts(locale);
+  const { texts: legalTexts } = usePublicLegal();
   const errorRef = useRef<HTMLDivElement | HTMLParagraphElement | null>(null);
   const emergencyName = `${form.driver.emergencyContactFirstName} ${form.driver.emergencyContactLastName}`.replace(/\s+/g, " ").trim();
-  const driverNationalityLabel = getCountryLabel(form.driver.nationality, locale) ?? form.driver.nationality;
+  const driverCountryLabel = getCountryLabel(form.driver.country, locale) ?? form.driver.country;
   const hasConsentError = Boolean(consentError);
 
   useEffect(() => {
@@ -41,7 +42,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
           {form.driver.firstName} {form.driver.lastName} · {form.driver.email}
         </p>
         <p className="text-sm text-slate-600">
-          {m.driver.nationality}: {driverNationalityLabel}
+          {m.driver.country}: {driverCountryLabel}
         </p>
         <p className="text-sm text-slate-600">
           {m.driver.emergencyTitle}: {emergencyName} ({form.driver.emergencyContactPhone})
@@ -58,7 +59,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
               {start.classLabel} · {start.startNumber}
             </div>
             <div className="text-sm text-slate-600">
-              {start.vehicle.make} {start.vehicle.model} · {start.vehicle.displacementCcm} ccm
+              {start.vehicle.make} {start.vehicle.model} · {getVehicleTypeLabel(start.vehicleType)} · {start.vehicle.displacementCcm} ccm
             </div>
             {start.codriverEnabled && (
               <div className="text-sm text-slate-600">
@@ -73,11 +74,11 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
 
       <div className="space-y-5 rounded-xl border p-4 md:p-5">
         <div className="space-y-2">
-          <h3 className="font-semibold text-slate-900">{legalTexts.summary.title}</h3>
+          <h3 className="font-semibold text-slate-900">{legalTexts?.summary.title ?? m.summary.consentTitle}</h3>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{legalTexts.summary.introTitle}</p>
+            <p className="text-sm font-semibold text-slate-900">{legalTexts?.summary.introTitle ?? m.summary.consentTitle}</p>
             <div className="mt-2 space-y-3 text-sm leading-6 text-slate-700">
-              {legalTexts.summary.introBody.map((paragraph) => (
+              {(legalTexts?.summary.introBody ?? []).map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
@@ -85,61 +86,61 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
             {(["datenschutz", "teilnahmebedingungen", "haftverzicht", "impressum"] as const).map((docId) => (
               <Link key={docId} className="font-medium text-primary hover:underline" to={`/anmeldung/rechtliches/${docId}`} target="_blank" rel="noreferrer">
-                {legalTexts.docs[docId].summaryLinkLabel}
+                {legalTexts?.docs[docId].summaryLinkLabel ?? docId}
               </Link>
             ))}
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-950">{legalTexts.summary.waiverNoticeTitle}</p>
-            <p className="mt-1 text-sm leading-6 text-amber-900">{legalTexts.summary.waiverNoticeBody}</p>
+            <p className="text-sm font-semibold text-amber-950">{legalTexts?.summary.waiverNoticeTitle ?? ""}</p>
+            <p className="mt-1 text-sm leading-6 text-amber-900">{legalTexts?.summary.waiverNoticeBody ?? ""}</p>
           </div>
         </div>
 
         <fieldset className="space-y-4" aria-describedby={hasConsentError ? "summary-consent-error" : undefined}>
           <legend className="sr-only">{m.summary.consentTitle}</legend>
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{legalTexts.summary.requiredTitle}</p>
+            <p className="text-sm font-semibold text-slate-900">{legalTexts?.summary.requiredTitle ?? m.summary.consentTitle}</p>
             <ConsentCheckbox
               id="summary-consent-terms"
               checked={form.consent.termsAccepted}
               invalid={hasConsentError}
               onChange={(value) => onConsentChange("termsAccepted", value)}
-              label={legalTexts.summary.termsAcceptanceLabel}
+              label={legalTexts?.summary.termsAcceptanceLabel ?? ""}
             />
             <ConsentCheckbox
               id="summary-consent-privacy"
               checked={form.consent.privacyAccepted}
               invalid={hasConsentError}
               onChange={(value) => onConsentChange("privacyAccepted", value)}
-              label={legalTexts.summary.privacyAcceptanceLabel}
+              label={legalTexts?.summary.privacyAcceptanceLabel ?? ""}
             />
             <ConsentCheckbox
               id="summary-consent-waiver"
               checked={form.consent.waiverAccepted}
               invalid={hasConsentError}
               onChange={(value) => onConsentChange("waiverAccepted", value)}
-              label={legalTexts.summary.waiverAcceptanceLabel}
+              label={legalTexts?.summary.waiverAcceptanceLabel ?? ""}
             />
           </div>
 
           <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{legalTexts.summary.optionalTitle}</p>
-            <p className="text-sm leading-6 text-slate-700">{legalTexts.summary.voluntaryBody}</p>
+            <p className="text-sm font-semibold text-slate-900">{legalTexts?.summary.optionalTitle ?? ""}</p>
+            <p className="text-sm leading-6 text-slate-700">{legalTexts?.summary.voluntaryBody ?? ""}</p>
             <ConsentCheckbox
               id="summary-consent-media"
               checked={form.consent.mediaAccepted}
               onChange={(value) => onConsentChange("mediaAccepted", value)}
-              label={legalTexts.summary.mediaAcceptanceLabel}
+              label={legalTexts?.summary.mediaAcceptanceLabel ?? ""}
             />
             <ConsentCheckbox
               id="summary-consent-club-info"
               checked={form.consent.clubInfoAccepted}
               onChange={(value) => onConsentChange("clubInfoAccepted", value)}
-              label={legalTexts.summary.clubInfoAcceptanceLabel}
+              label={legalTexts?.summary.clubInfoAcceptanceLabel ?? ""}
             />
           </div>
 
-          <p className="text-xs leading-5 text-slate-600">{legalTexts.summary.minorNotice}</p>
+          <p className="text-xs leading-5 text-slate-600">{legalTexts?.summary.minorNotice ?? ""}</p>
           {consentError && (
             <p ref={errorRef} tabIndex={-1} id="summary-consent-error" className="text-sm text-destructive" role="alert" aria-live="assertive">
               {consentError}

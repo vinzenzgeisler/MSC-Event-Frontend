@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
-import { CONSENT_VERSION, computeConsentTextHash, mapUiLocaleToConsentLocale } from "@/config/legal-texts";
+import { usePublicLegal } from "@/app/legal/public-legal-context";
+import { mapUiLocaleToConsentLocale } from "@/config/legal-texts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DriverStep } from "@/components/features/registration/driver-step";
@@ -15,13 +16,12 @@ import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegi
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
 const PHONE_ALLOWED_PATTERN = /^\+?[0-9()\/\-\s.]+$/;
-const ZIP_PATTERN = /^\d{5}$/;
+const ZIP_PATTERN = /^[A-Za-z0-9][A-Za-z0-9\- ]{1,11}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HUBRAUM_PATTERN = /^\d{2,5}$/;
 const CYLINDERS_PATTERN = /^(?:\d{1,2}|V\d{1,2})$/i;
 const YEAR_PATTERN = /^\d{4}$/;
 const BIRTHDATE_PATTERN = /^(\d{2})\.(\d{2})\.(\d{4})$/;
-const CONSENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 function createEmptyVehicle(): VehicleForm {
   return {
@@ -53,7 +53,7 @@ function createEmptyStart(): StartRegistrationForm {
       firstName: "",
       lastName: "",
       birthdate: "",
-      nationality: "",
+      country: "",
       street: "",
       zip: "",
       city: "",
@@ -70,6 +70,13 @@ function resolveStartClassLabel(start: StartRegistrationForm, eventOverview: Pub
     return start.classLabel.trim();
   }
   return eventOverview?.classes.find((item) => item.id === start.classId)?.name ?? "—";
+}
+
+function classAllowsCodriver(classId: string, eventOverview: PublicEventOverview | null) {
+  if (!classId) {
+    return false;
+  }
+  return Boolean(eventOverview?.classes.find((item) => item.id === classId)?.allowsCodriver);
 }
 
 function focusFieldBySelector(selector: string) {
@@ -90,7 +97,7 @@ function focusFirstDriverError(errors: Partial<Record<keyof DriverForm, string>>
     "firstName",
     "lastName",
     "birthdate",
-    "nationality",
+    "country",
     "phone",
     "email",
     "street",
@@ -125,7 +132,7 @@ function focusFirstStartError(errors: StartFieldErrors) {
     "codriverFirstName",
     "codriverLastName",
     "codriverBirthdate",
-    "codriverNationality",
+    "codriverCountry",
     "codriverStreet",
     "codriverZip",
     "codriverCity",
@@ -149,7 +156,7 @@ const initialDriver: DriverForm = {
   firstName: "",
   lastName: "",
   birthdate: "",
-  nationality: "",
+  country: "",
   street: "",
   zip: "",
   city: "",
@@ -282,17 +289,41 @@ function getConsentRequiredError(locale: string) {
   return "Bitte Teilnahmebedingungen und Datenschutzhinweise vor dem Absenden akzeptieren.";
 }
 
-function getConsentMetaError(locale: string) {
+function getConsentMetaError(locale: string, reason: "missing" | "load_failed" | "changed" = "missing") {
   if (locale === "en") {
-    return "Consent metadata is incomplete. Please reload this page and try again.";
+    if (reason === "load_failed") {
+      return "The current legal texts could not be loaded. Please reload the page and try again.";
+    }
+    if (reason === "changed") {
+      return "The legal texts changed during your registration. Please reload the page and confirm them again.";
+    }
+    return "The legal confirmation is incomplete. Please reload the page and try again.";
   }
   if (locale === "cz") {
-    return "Metadata souhlasu nejsou uplna. Obnovte stranku a zkuste to znovu.";
+    if (reason === "load_failed") {
+      return "Aktualni pravni texty se nepodarilo nacist. Obnovte stranku a zkuste to znovu.";
+    }
+    if (reason === "changed") {
+      return "Pravni texty se behem registrace zmenily. Obnovte stranku a potvrďte je znovu.";
+    }
+    return "Potvrzeni pravnich textu neni uplne. Obnovte stranku a zkuste to znovu.";
   }
   if (locale === "pl") {
-    return "Metadane zgód są niepełne. Odśwież stronę i spróbuj ponownie.";
+    if (reason === "load_failed") {
+      return "Nie udało się załadować aktualnych tekstów prawnych. Odśwież stronę i spróbuj ponownie.";
+    }
+    if (reason === "changed") {
+      return "Teksty prawne zmieniły się w trakcie rejestracji. Odśwież stronę i potwierdź je ponownie.";
+    }
+    return "Potwierdzenie tekstów prawnych jest niepełne. Odśwież stronę i spróbuj ponownie.";
   }
-  return "Consent-Metadaten sind unvollständig. Bitte Seite neu laden und erneut versuchen.";
+  if (reason === "load_failed") {
+    return "Die aktuellen Rechtstexte konnten nicht geladen werden. Bitte Seite neu laden und erneut versuchen.";
+  }
+  if (reason === "changed") {
+    return "Die Rechtstexte haben sich während der Anmeldung geändert. Bitte Seite neu laden und erneut bestätigen.";
+  }
+  return "Die Bestätigung der Rechtstexte ist unvollständig. Bitte Seite neu laden und erneut versuchen.";
 }
 
 function getGuardianFieldMessages(locale: string) {
@@ -599,10 +630,10 @@ function validateDriverForm(value: DriverForm, locale: string, m: ReturnType<typ
   } else if (!isBirthdateInRange(value.birthdate.trim(), 6, 100)) {
     errors.birthdate = m.errors.invalidBirthdateRange;
   }
-  if (!value.nationality.trim()) {
-    errors.nationality = m.errors.requiredNationality;
-  } else if (!isCountryOption(value.nationality, locale)) {
-    errors.nationality = m.errors.invalidNationality;
+  if (!value.country.trim()) {
+    errors.country = m.errors.requiredCountry;
+  } else if (!isCountryOption(value.country, locale)) {
+    errors.country = m.errors.invalidCountry;
   }
   if (!value.street.trim()) errors.street = m.errors.requiredStreet;
   if (!value.city.trim()) errors.city = m.errors.requiredCity;
@@ -666,7 +697,7 @@ function hydrateDriverForm(value: Partial<DriverForm> | null | undefined): Drive
   }
 
   next.birthdate = normalizeStoredBirthdate(next.birthdate);
-  next.nationality = resolveCountryCode(next.nationality) ?? "";
+  next.country = resolveCountryCode(next.country) ?? "";
   next.guardianConsentAccepted = Boolean(next.guardianConsentAccepted);
 
   return next;
@@ -686,7 +717,7 @@ type StartFieldErrors = Partial<
     | "codriverFirstName"
     | "codriverLastName"
     | "codriverBirthdate"
-    | "codriverNationality"
+    | "codriverCountry"
     | "codriverStreet"
     | "codriverZip"
     | "codriverCity"
@@ -720,8 +751,7 @@ function createInitialConsent(uiLocale: string): RegistrationWizardForm["consent
     waiverAccepted: false,
     mediaAccepted: false,
     clubInfoAccepted: false,
-    consentVersion: CONSENT_VERSION,
-    consentTextHash: "",
+    consentVersion: "",
     locale: mapUiLocaleToConsentLocale(uiLocale),
     consentSource: "public_form"
   };
@@ -762,7 +792,7 @@ function hydrateStartForm(value: Partial<StartRegistrationForm> | undefined): St
       ...base.codriver,
       ...(value?.codriver ?? {}),
       birthdate: normalizeStoredBirthdate(String(value?.codriver?.birthdate ?? "")),
-      nationality: resolveCountryCode(String(value?.codriver?.nationality ?? "")) ?? ""
+      country: resolveCountryCode(String(value?.codriver?.country ?? "")) ?? ""
     },
     backupVehicleEnabled: Boolean(value?.backupVehicleEnabled),
     vehicle: hydrateVehicleForm(value?.vehicle),
@@ -788,7 +818,7 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.codriver.firstName.trim()) ||
     Boolean(draftStart.codriver.lastName.trim()) ||
     Boolean(draftStart.codriver.birthdate.trim()) ||
-    Boolean(draftStart.codriver.nationality.trim()) ||
+    Boolean(draftStart.codriver.country.trim()) ||
     Boolean(draftStart.codriver.street.trim()) ||
     Boolean(draftStart.codriver.zip.trim()) ||
     Boolean(draftStart.codriver.city.trim()) ||
@@ -881,10 +911,10 @@ function validateStartFields(
     } else if (!isBirthdateInRange(start.codriver.birthdate.trim(), 6, 100)) {
       errors.codriverBirthdate = m.errors.invalidCodriverBirthdateRange;
     }
-    if (!start.codriver.nationality.trim()) {
-      errors.codriverNationality = m.errors.requiredCodriverNationality;
-    } else if (!isCountryOption(start.codriver.nationality, locale)) {
-      errors.codriverNationality = m.errors.invalidNationality;
+    if (!start.codriver.country.trim()) {
+      errors.codriverCountry = m.errors.requiredCodriverCountry;
+    } else if (!isCountryOption(start.codriver.country, locale)) {
+      errors.codriverCountry = m.errors.invalidCodriverCountry;
     }
     if (!start.codriver.street.trim()) {
       errors.codriverStreet = m.errors.requiredCodriverStreet;
@@ -941,8 +971,10 @@ function validateStartFields(
 
 export function AnmeldungPage() {
   const { m, locale } = useAnmeldungI18n();
+  const publicLegal = usePublicLegal();
   const mainVehicleUploadSequence = useRef(0);
   const backupVehicleUploadSequence = useRef(0);
+  const submitInFlightRef = useRef(false);
   const [step, setStep] = useState(1);
   const [eventLoadState, setEventLoadState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [eventOverview, setEventOverview] = useState<PublicEventOverview | null>(null);
@@ -970,6 +1002,7 @@ export function AnmeldungPage() {
   const [submissionKey, setSubmissionKey] = useState("");
   const [submissionFingerprint, setSubmissionFingerprint] = useState("");
   const isMinorDriver = useMemo(() => isDriverMinor(driver.birthdate), [driver.birthdate]);
+  const draftClassAllowsCodriver = useMemo(() => classAllowsCodriver(draftStart.classId, eventOverview), [draftStart.classId, eventOverview]);
 
   useEffect(() => {
     let active = true;
@@ -1000,37 +1033,25 @@ export function AnmeldungPage() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const consentLocale = mapUiLocaleToConsentLocale(locale);
-    computeConsentTextHash(locale)
-      .then((consentTextHash) => {
-        if (!active) {
-          return;
-        }
-        setConsent((prev) => ({
-          ...prev,
-          consentVersion: CONSENT_VERSION,
-          consentTextHash,
-          locale: consentLocale,
-          consentSource: "public_form"
-        }));
-      })
-      .catch(() => {
-        if (!active) {
-          return;
-        }
-        setConsent((prev) => ({
-          ...prev,
-          consentVersion: CONSENT_VERSION,
-          consentTextHash: "",
-          locale: consentLocale,
-          consentSource: "public_form"
-        }));
-      });
-    return () => {
-      active = false;
-    };
-  }, [locale]);
+    const consentLocale = publicLegal.consent?.consentLocale?.trim() || mapUiLocaleToConsentLocale(locale);
+    const consentVersion = publicLegal.consent?.consentVersion?.trim() || "";
+
+    setConsent((prev) => ({
+      ...prev,
+      consentVersion,
+      locale: consentLocale,
+      consentSource: "public_form"
+    }));
+
+    if (publicLegal.loading) {
+      return;
+    }
+    if (publicLegal.error || !publicLegal.texts || !consentVersion) {
+      setConsentError(getConsentMetaError(locale, "load_failed"));
+      return;
+    }
+    setConsentError((prev) => (prev === getConsentMetaError(locale, "load_failed") ? "" : prev));
+  }, [locale, publicLegal.consent, publicLegal.error, publicLegal.loading, publicLegal.texts]);
 
   useEffect(() => {
     if (isMinorDriver) {
@@ -1136,7 +1157,20 @@ export function AnmeldungPage() {
   };
 
   const handleDraftChange = <K extends keyof StartRegistrationForm>(field: K, value: StartRegistrationForm[K]) => {
-    setDraftStart((prev) => ({ ...prev, [field]: value }));
+    setDraftStart((prev) => {
+      if (field === "classId") {
+        const nextAllowsCodriver = classAllowsCodriver(String(value), eventOverview);
+        if (!nextAllowsCodriver) {
+          return {
+            ...prev,
+            [field]: value,
+            codriverEnabled: false,
+            codriver: createEmptyStart().codriver
+          };
+        }
+      }
+      return { ...prev, [field]: value };
+    });
     setStartError("");
     if (field === "classId") {
       setStartFieldErrors((prev) => ({ ...prev, classId: undefined }));
@@ -1152,7 +1186,21 @@ export function AnmeldungPage() {
         codriverFirstName: undefined,
         codriverLastName: undefined,
         codriverBirthdate: undefined,
-        codriverNationality: undefined,
+        codriverCountry: undefined,
+        codriverStreet: undefined,
+        codriverZip: undefined,
+        codriverCity: undefined,
+        codriverEmail: undefined,
+        codriverPhone: undefined
+      }));
+    }
+    if (field === "classId" && !classAllowsCodriver(String(value), eventOverview)) {
+      setStartFieldErrors((prev) => ({
+        ...prev,
+        codriverFirstName: undefined,
+        codriverLastName: undefined,
+        codriverBirthdate: undefined,
+        codriverCountry: undefined,
         codriverStreet: undefined,
         codriverZip: undefined,
         codriverCity: undefined,
@@ -1433,7 +1481,7 @@ export function AnmeldungPage() {
   };
 
   const submit = async () => {
-    if (isSubmitting || submitLocked) {
+    if (isSubmitting || submitLocked || submitInFlightRef.current) {
       return;
     }
     setConsentError("");
@@ -1442,8 +1490,8 @@ export function AnmeldungPage() {
       setSubmitError("");
       return;
     }
-    if (!consent.locale.trim() || !CONSENT_HASH_PATTERN.test(consent.consentTextHash.trim())) {
-      setConsentError(getConsentMetaError(locale));
+    if (!consent.consentVersion.trim() || !consent.locale.trim()) {
+      setConsentError(getConsentMetaError(locale, "missing"));
       setSubmitError("");
       return;
     }
@@ -1458,8 +1506,7 @@ export function AnmeldungPage() {
 
     const normalizedConsent: RegistrationWizardForm["consent"] = {
       ...consent,
-      consentVersion: CONSENT_VERSION,
-      consentTextHash: consent.consentTextHash.trim().toLowerCase(),
+      consentVersion: consent.consentVersion.trim(),
       locale: consent.locale.trim(),
       consentSource: "public_form"
     };
@@ -1486,21 +1533,31 @@ export function AnmeldungPage() {
     }
 
     try {
+      submitInFlightRef.current = true;
       result = await registrationService.submitWizard(submitForm, { clientSubmissionKey: nextSubmissionKey });
     } catch (error) {
+      submitInFlightRef.current = false;
       if (error instanceof Error) {
         if (error.message === "CONSENT_REQUIRED_MISSING") {
           setConsentError(getConsentRequiredError(locale));
           setIsSubmitting(false);
           return;
         }
-        if (error.message === "CONSENT_TEXT_HASH_INVALID" || error.message === "CONSENT_LOCALE_MISSING") {
-          setConsentError(getConsentMetaError(locale));
+        if (
+          error.message === "CONSENT_LOCALE_MISSING" ||
+          error.message === "CONSENT_VERSION_MISSING"
+        ) {
+          setConsentError(getConsentMetaError(locale, "missing"));
           setIsSubmitting(false);
           return;
         }
       }
-      if (isEmailAlreadyUsedError(error)) {
+      if (
+        error instanceof ApiError &&
+        (error.code === "CONSENT_LOCALE_INVALID" || error.code === "CONSENT_VERSION_MISMATCH")
+      ) {
+        setConsentError(getConsentMetaError(locale, "changed"));
+      } else if (isEmailAlreadyUsedError(error)) {
         const normalizedDriverEmail = normalizeEmailForCompare(submitForm.driver.email);
         if (normalizedDriverEmail) {
           setKnownUsedDriverEmails((prev) => (prev.includes(normalizedDriverEmail) ? prev : [...prev, normalizedDriverEmail]));
@@ -1533,6 +1590,7 @@ export function AnmeldungPage() {
       return;
     }
 
+    submitInFlightRef.current = false;
     setIsSubmitting(false);
 
     if (!result.ok) {
@@ -1709,6 +1767,7 @@ export function AnmeldungPage() {
               startNumberState={startNumberState}
               startNumberHint={startNumberHint}
               showDraftForm={showStartDraftForm}
+              codriverAllowed={draftClassAllowsCodriver}
               onDraftChange={handleDraftChange}
               onAddAnotherStart={openAnotherStartForm}
               onStartNumberBlur={() => {
@@ -1753,7 +1812,7 @@ export function AnmeldungPage() {
                   firstName: "codriverFirstName",
                   lastName: "codriverLastName",
                   birthdate: "codriverBirthdate",
-                  nationality: "codriverNationality",
+                  country: "codriverCountry",
                   street: "codriverStreet",
                   zip: "codriverZip",
                   city: "codriverCity",

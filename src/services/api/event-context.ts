@@ -20,6 +20,7 @@ type PublicCurrentEventResponse = {
     eventId: string;
     name: string;
     vehicleType: VehicleType;
+    allowsCodriver: boolean;
   }>;
   registration: {
     isOpen: boolean;
@@ -44,12 +45,13 @@ type AdminClassesResponse = {
     eventId?: string;
     name: string;
     vehicleType: VehicleType;
+    allowsCodriver?: boolean;
   }>;
 };
 
 let publicEventCache: PublicCurrentEventResponse | null = null;
 let adminEventCache: AdminCurrentEventResponse | null = null;
-let adminClassesCache: Array<{ id: string; name: string; vehicleType: VehicleType }> | null = null;
+let adminClassesCache: Array<{ id: string; name: string; vehicleType: VehicleType; allowsCodriver: boolean }> | null = null;
 
 export async function getPublicCurrentEvent() {
   if (publicEventCache) {
@@ -107,7 +109,8 @@ export async function getAdminClassOptions() {
     .map((item) => ({
       id: item.id,
       name: item.name,
-      vehicleType: item.vehicleType
+      vehicleType: item.vehicleType,
+      allowsCodriver: Boolean(item.allowsCodriver)
     }));
 
   return adminClassesCache;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { AnmeldungI18nProvider, type AnmeldungLocale, useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { DocumentMeta } from "@/app/document-meta";
-import { getLegalTexts } from "@/config/legal-texts";
+import { PublicLegalProvider, usePublicLegal } from "@/app/legal/public-legal-context";
 import { publicContactEmail, publicWebsiteUrl } from "@/config/public-info";
 import { ApiError } from "@/services/api/http-client";
 import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
@@ -104,7 +104,7 @@ function secondVehiclePriceHint(locale: AnmeldungLocale, priceLabel: string) {
 function PublicLayoutContent() {
   const location = useLocation();
   const { locale, setLocale, m } = useAnmeldungI18n();
-  const legalTexts = getLegalTexts(locale);
+  const { texts: legalTexts } = usePublicLegal();
   const [headerEvent, setHeaderEvent] = useState<HeaderEvent | null>(null);
 
   useEffect(() => {
@@ -315,16 +315,16 @@ function PublicLayoutContent() {
           <p>{m.layout.footerCopyright}</p>
           <div className="flex flex-wrap items-center gap-3">
             <Link to="/anmeldung/rechtliches/impressum" className="hover:text-primary">
-              {legalTexts.footerImprintLabel}
+              {legalTexts?.footerImprintLabel ?? "Impressum"}
             </Link>
             <Link to="/anmeldung/rechtliches/datenschutz" className="hover:text-primary">
-              {legalTexts.footerPrivacyLabel}
+              {legalTexts?.footerPrivacyLabel ?? "Datenschutz"}
             </Link>
             <Link to="/anmeldung/rechtliches/teilnahmebedingungen" className="hover:text-primary">
-              {legalTexts.footerTermsLabel}
+              {legalTexts?.footerTermsLabel ?? "Teilnahmebedingungen"}
             </Link>
             <Link to="/anmeldung/rechtliches/haftverzicht" className="hover:text-primary">
-              {legalTexts.footerWaiverLabel}
+              {legalTexts?.footerWaiverLabel ?? "Haftverzicht"}
             </Link>
             {headerWebsiteUrl && (
               <a href={headerWebsiteUrl} target="_blank" rel="noreferrer" className="hover:text-primary">
@@ -341,7 +341,9 @@ function PublicLayoutContent() {
 export function PublicLayout() {
   return (
     <AnmeldungI18nProvider>
-      <PublicLayoutContent />
+      <PublicLegalProvider>
+        <PublicLayoutContent />
+      </PublicLegalProvider>
     </AnmeldungI18nProvider>
   );
 }

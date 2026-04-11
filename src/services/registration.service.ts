@@ -1,9 +1,9 @@
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
 import { ApiError } from "@/services/api/http-client";
 import { requestJson } from "@/services/api/http-client";
-import { CONSENT_VERSION } from "@/config/legal-texts";
-import { resolveCountryCode, resolveCountryToCanonical } from "@/lib/countries";
+import { resolveCountryCode } from "@/lib/countries";
 import type {
+  PublicLegalBundle,
   PublicCreateEntriesBatchRequestDto,
   PublicCreateEntryRequestDto,
   PublicEventOverview,
@@ -14,7 +14,6 @@ import type {
 } from "@/types/registration";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
-const CONSENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 function parseCylinders(value: string): number {
   const digits = value.replace(/\D/g, "");
@@ -30,24 +29,9 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function buildSpecialNotes(nationality: string, notes: string): string | undefined {
-  const nationalityValue = nationality.trim();
+function buildSpecialNotes(notes: string): string | undefined {
   const noteValue = notes.trim();
-  const nationalityLine = nationalityValue ? `Nationalität: ${nationalityValue}` : "";
-
-  if (!nationalityLine && !noteValue) {
-    return undefined;
-  }
-  if (!nationalityLine) {
-    return noteValue;
-  }
-  if (!noteValue) {
-    return nationalityLine;
-  }
-  if (/nationalit[aä]t:/i.test(noteValue)) {
-    return noteValue;
-  }
-  return `${nationalityLine}\n${noteValue}`;
+  return noteValue || undefined;
 }
 
 function buildEmergencyContactName(firstName: string, lastName: string): string {
@@ -101,13 +85,13 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
   if (!form.consent.termsAccepted || !form.consent.privacyAccepted || !form.consent.waiverAccepted) {
     throw new Error("CONSENT_REQUIRED_MISSING");
   }
-  const consentTextHash = form.consent.consentTextHash.trim().toLowerCase();
-  if (!CONSENT_HASH_PATTERN.test(consentTextHash)) {
-    throw new Error("CONSENT_TEXT_HASH_INVALID");
-  }
   const consentLocale = form.consent.locale.trim();
   if (!consentLocale) {
     throw new Error("CONSENT_LOCALE_MISSING");
+  }
+  const consentVersion = form.consent.consentVersion.trim();
+  if (!consentVersion) {
+    throw new Error("CONSENT_VERSION_MISSING");
   }
   return {
     termsAccepted: true,
@@ -115,8 +99,7 @@ function buildConsentPayload(form: RegistrationWizardForm, consentCapturedAt: st
     waiverAccepted: true,
     mediaAccepted: Boolean(form.consent.mediaAccepted),
     clubInfoAccepted: Boolean(form.consent.clubInfoAccepted),
-    consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
-    consentTextHash,
+    consentVersion,
     locale: consentLocale,
     consentSource: "public_form",
     consentCapturedAt
@@ -143,14 +126,7 @@ function mapVehicle(vehicleType: PublicCreateEntryRequestDto["vehicle"]["vehicle
 function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: number, consentCapturedAt: string): PublicCreateEntryRequestDto {
   const start = form.starts[startIndex];
   const isMinorDriver = isMinorBirthdate(form.driver.birthdate);
-  const driverNationalityCode = resolveCountryCode(form.driver.nationality) ?? form.driver.nationality.trim();
-  const driverNationality = driverNationalityCode || undefined;
-  const driverNationalityForNotes = driverNationality ? resolveCountryToCanonical(driverNationality) ?? driverNationality : "";
-  const codriverNationality =
-    start.codriverEnabled && start.codriver.nationality
-      ? resolveCountryCode(start.codriver.nationality) ?? start.codriver.nationality.trim()
-      : undefined;
-  const specialNotes = buildSpecialNotes(driverNationalityForNotes, form.driver.specialNotes);
+  const specialNotes = buildSpecialNotes(form.driver.specialNotes);
   return {
     classId: start.classId,
     driver: {
@@ -158,7 +134,7 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       firstName: form.driver.firstName,
       lastName: form.driver.lastName,
       birthdate: toIsoBirthdate(form.driver.birthdate),
-      nationality: driverNationality,
+      country: resolveCountryCode(form.driver.country) ?? form.driver.country.trim(),
       street: form.driver.street,
       zip: form.driver.zip,
       city: form.driver.city,
@@ -175,11 +151,11 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
       guardianConsentAccepted: isMinorDriver ? form.driver.guardianConsentAccepted : undefined
     },
     codriver: start.codriverEnabled
-      ? {
+        ? {
           firstName: start.codriver.firstName,
           lastName: start.codriver.lastName,
           birthdate: toIsoBirthdate(start.codriver.birthdate),
-          nationality: codriverNationality || "",
+          country: resolveCountryCode(start.codriver.country) ?? start.codriver.country.trim(),
           street: start.codriver.street,
           zip: start.codriver.zip,
           city: start.codriver.city,
@@ -206,6 +182,13 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
     },
   };
 }
+
+type PublicLegalCurrentResponse = {
+  ok: boolean;
+  consent: PublicLegalBundle["consent"];
+  texts: PublicLegalBundle["texts"];
+  availableLocales: string[];
+};
 
 type PublicStartNumberValidateResponse = {
   ok: boolean;
@@ -437,8 +420,22 @@ export const registrationService = {
       classes: response.classes.map((item) => ({
         id: item.id,
         name: item.name,
-        vehicleType: item.vehicleType
+        vehicleType: item.vehicleType,
+        allowsCodriver: Boolean(item.allowsCodriver)
       }))
+    };
+  },
+
+  async getPublicLegalBundle(locale: string): Promise<PublicLegalBundle> {
+    const response = await requestJson<PublicLegalCurrentResponse>("/public/legal/current", {
+      method: "GET",
+      auth: false,
+      query: { locale }
+    });
+    return {
+      consent: response.consent,
+      texts: response.texts,
+      availableLocales: response.availableLocales
     };
   },
 
@@ -489,7 +486,7 @@ export const registrationService = {
       consent: {
         ...form.consent,
         consentSource: "public_form",
-        consentVersion: form.consent.consentVersion.trim() || CONSENT_VERSION,
+        consentVersion: form.consent.consentVersion.trim(),
         locale: form.consent.locale.trim()
       }
     };

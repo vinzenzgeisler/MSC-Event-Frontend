@@ -1,10 +1,11 @@
 import type { Id, RegistrationStatus, StartNumberConflictType, VehicleType } from "@/types/common";
+import type { LegalTexts } from "@/config/legal-texts";
 
 export type DriverForm = {
   firstName: string;
   lastName: string;
   birthdate: string;
-  nationality: string;
+  country: string;
   street: string;
   zip: string;
   city: string;
@@ -25,7 +26,7 @@ export type CodriverForm = {
   firstName: string;
   lastName: string;
   birthdate: string;
-  nationality: string;
+  country: string;
   street: string;
   zip: string;
   city: string;
@@ -68,7 +69,6 @@ export type ConsentForm = {
   mediaAccepted: boolean;
   clubInfoAccepted: boolean;
   consentVersion: string;
-  consentTextHash: string;
   locale: string;
   consentSource: "public_form";
 };
@@ -83,6 +83,7 @@ export type PublicEventClass = {
   id: Id;
   name: string;
   vehicleType: VehicleType;
+  allowsCodriver: boolean;
 };
 
 export type PublicPricingClassRule = {
@@ -112,6 +113,18 @@ export type PublicEventOverview = {
   classes: PublicEventClass[];
 };
 
+export type PublicLegalConsentMeta = {
+  consentLocale: string;
+  consentVersion: string;
+  publishedAt: string;
+};
+
+export type PublicLegalBundle = {
+  consent: PublicLegalConsentMeta;
+  texts: LegalTexts;
+  availableLocales: string[];
+};
+
 export type StartNumberValidationResult = {
   normalizedStartNumber: string | null;
   validFormat: boolean;
@@ -127,7 +140,7 @@ export type PublicCreateEntryRequestDto = {
     firstName: string;
     lastName: string;
     birthdate: string;
-    nationality?: string;
+    country: string;
     street: string;
     zip: string;
     city: string;
@@ -148,7 +161,7 @@ export type PublicCreateEntryRequestDto = {
     firstName: string;
     lastName: string;
     birthdate: string;
-    nationality: string;
+    country: string;
     street: string;
     zip: string;
     city: string;
@@ -191,7 +204,6 @@ export type PublicCreateEntryRequestDto = {
     mediaAccepted: boolean;
     clubInfoAccepted: boolean;
     consentVersion: string;
-    consentTextHash: string;
     locale: string;
     consentSource: "public_form";
     consentCapturedAt: string;

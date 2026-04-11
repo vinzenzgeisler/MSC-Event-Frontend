@@ -39,11 +39,11 @@ jobs:
     environment: dev
     env:
       MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_DEV }}
-      VITE_COGNITO_ENABLED: "false"
-      VITE_COGNITO_DOMAIN: ""
-      VITE_COGNITO_CLIENT_ID: ""
-      VITE_COGNITO_REDIRECT_URI: ""
-      VITE_COGNITO_LOGOUT_URI: ""
+      MSC_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN_DEV }}
+      MSC_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID_DEV }}
+      MSC_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI_DEV }}
+      MSC_COGNITO_LOGOUT_URI: ${{ vars.VITE_COGNITO_LOGOUT_URI_DEV }}
+      MSC_COGNITO_SCOPES: ${{ vars.VITE_COGNITO_SCOPES_DEV }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,15 +64,35 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Dev Cognito configuration
+        run: |
+          if [ -z "${MSC_COGNITO_DOMAIN}" ] || [ -z "${MSC_COGNITO_CLIENT_ID}" ] || [ -z "${MSC_COGNITO_REDIRECT_URI}" ] || [ -z "${MSC_COGNITO_LOGOUT_URI}" ]; then
+            echo "Dev Cognito configuration is incomplete."
+            exit 1
+          fi
+
       - name: Build
         run: npm run build
         env:
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
-          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
-          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
-          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
+
+      - name: Write runtime config
+        run: |
+          cat <<EOF > public/runtime-config.js
+          window.__MSC_RUNTIME_CONFIG__ = {
+            apiBaseUrl: "${MSC_API_BASE_URL}",
+            cognitoDomain: "${MSC_COGNITO_DOMAIN}",
+            cognitoClientId: "${MSC_COGNITO_CLIENT_ID}",
+            cognitoRedirectUri: "${MSC_COGNITO_REDIRECT_URI}",
+            cognitoLogoutUri: "${MSC_COGNITO_LOGOUT_URI}",
+            cognitoScopes: "${MSC_COGNITO_SCOPES}"
+          };
+          EOF
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -89,11 +109,11 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
-          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
-          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
-          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
 
       - name: Deploy to Vercel Dev
         run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
@@ -108,11 +128,11 @@ jobs:
     environment: prod
     env:
       MSC_API_BASE_URL: ${{ vars.VITE_API_BASE_URL_PROD }}
-      VITE_COGNITO_ENABLED: "false"
-      VITE_COGNITO_DOMAIN: ""
-      VITE_COGNITO_CLIENT_ID: ""
-      VITE_COGNITO_REDIRECT_URI: ""
-      VITE_COGNITO_LOGOUT_URI: ""
+      MSC_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN_PROD }}
+      MSC_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID_PROD }}
+      MSC_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI_PROD }}
+      MSC_COGNITO_LOGOUT_URI: ${{ vars.VITE_COGNITO_LOGOUT_URI_PROD }}
+      MSC_COGNITO_SCOPES: ${{ vars.VITE_COGNITO_SCOPES_PROD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,15 +153,35 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Prod Cognito configuration
+        run: |
+          if [ -z "${MSC_COGNITO_DOMAIN}" ] || [ -z "${MSC_COGNITO_CLIENT_ID}" ] || [ -z "${MSC_COGNITO_REDIRECT_URI}" ] || [ -z "${MSC_COGNITO_LOGOUT_URI}" ]; then
+            echo "Prod Cognito configuration is incomplete."
+            exit 1
+          fi
+
       - name: Build
         run: npm run build
         env:
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
-          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
-          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
-          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
+
+      - name: Write runtime config
+        run: |
+          cat <<EOF > public/runtime-config.js
+          window.__MSC_RUNTIME_CONFIG__ = {
+            apiBaseUrl: "${MSC_API_BASE_URL}",
+            cognitoDomain: "${MSC_COGNITO_DOMAIN}",
+            cognitoClientId: "${MSC_COGNITO_CLIENT_ID}",
+            cognitoRedirectUri: "${MSC_COGNITO_REDIRECT_URI}",
+            cognitoLogoutUri: "${MSC_COGNITO_LOGOUT_URI}",
+            cognitoScopes: "${MSC_COGNITO_SCOPES}"
+          };
+          EOF
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -158,11 +198,11 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VITE_API_BASE_URL: ${{ env.MSC_API_BASE_URL }}
-          VITE_COGNITO_ENABLED: ${{ env.VITE_COGNITO_ENABLED }}
-          VITE_COGNITO_DOMAIN: ${{ env.VITE_COGNITO_DOMAIN }}
-          VITE_COGNITO_CLIENT_ID: ${{ env.VITE_COGNITO_CLIENT_ID }}
-          VITE_COGNITO_REDIRECT_URI: ${{ env.VITE_COGNITO_REDIRECT_URI }}
-          VITE_COGNITO_LOGOUT_URI: ${{ env.VITE_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_DOMAIN: ${{ env.MSC_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.MSC_COGNITO_CLIENT_ID }}
+          VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
+          VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
+          VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
 
       - name: Deploy to Vercel Prod
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
