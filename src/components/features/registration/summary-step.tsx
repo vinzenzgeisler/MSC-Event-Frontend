@@ -162,7 +162,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
         {legalReady && (
           <>
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">{legalTexts?.summary.title ?? m.summary.consentTitle}</h3>
+              {/* <h3 className="text-sm font-semibold text-slate-900">{legalTexts?.summary.title ?? m.summary.consentTitle}</h3> */}
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">{legalTexts?.summary.introTitle ?? m.summary.consentTitle}</p>
                 <div className="mt-2 space-y-2 text-xs leading-5 text-slate-700">
