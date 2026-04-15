@@ -744,6 +744,8 @@ type StartFieldErrors = Partial<
 >;
 
 type RegistrationDraftStorage = {
+  eventId?: string;
+  savedAt?: string;
   step: number;
   driver: DriverForm;
   starts: StartRegistrationForm[];
@@ -752,6 +754,44 @@ type RegistrationDraftStorage = {
   editingId: string | null;
   consent: RegistrationWizardForm["consent"];
 };
+
+const REGISTRATION_DRAFT_STORAGE_KEY = "msc_public_registration_draft_v1";
+
+function readRegistrationDraft(): RegistrationDraftStorage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const raw = window.localStorage.getItem(REGISTRATION_DRAFT_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as RegistrationDraftStorage;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    if (!parsed.driver || !parsed.draftStart || !Array.isArray(parsed.starts) || !parsed.consent) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeRegistrationDraft(value: RegistrationDraftStorage) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(REGISTRATION_DRAFT_STORAGE_KEY, JSON.stringify(value));
+}
+
+function clearRegistrationDraft() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.removeItem(REGISTRATION_DRAFT_STORAGE_KEY);
+}
 
 function createInitialConsent(uiLocale: string): RegistrationWizardForm["consent"] {
   return {
@@ -844,6 +884,29 @@ function hasStartDraftContent(draftStart: StartRegistrationForm) {
     Boolean(draftStart.backupVehicle.imageFileName.trim()) ||
     Boolean(draftStart.backupVehicle.imageUploadId.trim()) ||
     Boolean(draftStart.backupVehicle.imageUploadToken.trim())
+  );
+}
+
+function hasDriverDraftContent(driver: DriverForm) {
+  return (
+    Boolean(driver.firstName.trim()) ||
+    Boolean(driver.lastName.trim()) ||
+    Boolean(driver.birthdate.trim()) ||
+    Boolean(driver.country.trim()) ||
+    Boolean(driver.street.trim()) ||
+    Boolean(driver.zip.trim()) ||
+    Boolean(driver.city.trim()) ||
+    Boolean(driver.phone.trim()) ||
+    Boolean(driver.email.trim()) ||
+    Boolean(driver.emergencyContactFirstName.trim()) ||
+    Boolean(driver.emergencyContactLastName.trim()) ||
+    Boolean(driver.emergencyContactPhone.trim()) ||
+    Boolean(driver.motorsportHistory.trim()) ||
+    Boolean(driver.specialNotes.trim()) ||
+    Boolean(driver.guardianFullName.trim()) ||
+    Boolean(driver.guardianEmail.trim()) ||
+    Boolean(driver.guardianPhone.trim()) ||
+    driver.guardianConsentAccepted
   );
 }
 
@@ -982,6 +1045,7 @@ export function AnmeldungPage() {
   const { m, locale } = useAnmeldungI18n();
   const publicLegal = usePublicLegal();
   const hasMountedRef = useRef(false);
+  const draftHydratedRef = useRef(false);
   const stepNavigatorRef = useRef<HTMLDivElement | null>(null);
   const mainVehicleUploadSequence = useRef(0);
   const backupVehicleUploadSequence = useRef(0);
@@ -1014,6 +1078,39 @@ export function AnmeldungPage() {
   const [submissionFingerprint, setSubmissionFingerprint] = useState("");
   const isMinorDriver = useMemo(() => isDriverMinor(driver.birthdate), [driver.birthdate]);
   const draftClassAllowsCodriver = useMemo(() => classAllowsCodriver(draftStart.classId, eventOverview), [draftStart.classId, eventOverview]);
+
+  useEffect(() => {
+    if (draftHydratedRef.current) {
+      return;
+    }
+    const savedDraft = readRegistrationDraft();
+    if (!savedDraft) {
+      draftHydratedRef.current = true;
+      return;
+    }
+
+    const hydratedDriver = hydrateDriverForm(savedDraft.driver);
+    const hydratedStarts = Array.isArray(savedDraft.starts) ? savedDraft.starts.map((item) => hydrateStartForm(item)) : [];
+    const hydratedDraftStart = hydrateStartForm(savedDraft.draftStart);
+    const hydratedEditingId =
+      typeof savedDraft.editingId === "string" && hydratedStarts.some((item) => item.id === savedDraft.editingId)
+        ? savedDraft.editingId
+        : null;
+    const nextConsent = {
+      ...createInitialConsent(locale),
+      ...(savedDraft.consent ?? {}),
+      consentSource: "public_form" as const
+    };
+
+    setDriver(hydratedDriver);
+    setStarts(hydratedStarts);
+    setDraftStart(hydratedDraftStart);
+    setAddAnotherStart(Boolean(savedDraft.addAnotherStart));
+    setEditingId(hydratedEditingId);
+    setStep(Math.min(3, Math.max(1, Number(savedDraft.step) || 1)));
+    setConsent(nextConsent);
+    draftHydratedRef.current = true;
+  }, [locale]);
 
   useEffect(() => {
     if (!hasMountedRef.current) {
@@ -1092,6 +1189,48 @@ export function AnmeldungPage() {
     const timeoutId = window.setTimeout(() => setStartError(""), 3200);
     return () => window.clearTimeout(timeoutId);
   }, [startError, m.start.completeEntryHint]);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) {
+      return;
+    }
+    if (submissionComplete) {
+      clearRegistrationDraft();
+      return;
+    }
+
+    const hasDraftContent =
+      step > 1 ||
+      starts.length > 0 ||
+      hasStartDraftContent(draftStart) ||
+      hasDriverDraftContent(driver) ||
+      consent.mediaAccepted ||
+      consent.clubInfoAccepted ||
+      consent.termsAccepted ||
+      consent.privacyAccepted ||
+      consent.waiverAccepted;
+
+    if (!hasDraftContent) {
+      clearRegistrationDraft();
+      return;
+    }
+
+    const payload: RegistrationDraftStorage = {
+      eventId: eventOverview?.id,
+      savedAt: new Date().toISOString(),
+      step,
+      driver,
+      starts,
+      draftStart,
+      addAnotherStart,
+      editingId,
+      consent: {
+        ...consent,
+        consentSource: "public_form"
+      }
+    };
+    writeRegistrationDraft(payload);
+  }, [addAnotherStart, consent, driver, draftStart, editingId, eventOverview?.id, starts, step, submissionComplete]);
 
   const form = useMemo<RegistrationWizardForm>(() => ({ driver, starts, consent }), [driver, starts, consent]);
   const showStartDraftForm = starts.length === 0 || Boolean(editingId) || addAnotherStart;
