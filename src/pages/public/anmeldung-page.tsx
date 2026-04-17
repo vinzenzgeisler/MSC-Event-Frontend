@@ -465,6 +465,48 @@ function getStartNumberConflictIndex(error: unknown) {
   return null;
 }
 
+function getCodriverEmailConflictIndex(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return null;
+  }
+  for (const fieldError of error.fieldErrors ?? []) {
+    const field = (fieldError.field ?? "").trim();
+    const match = field.match(/^entries\.(\d+)\.codriver\.email$/i);
+    if (match) {
+      const index = Number(match[1]);
+      if (Number.isInteger(index) && index >= 0) {
+        return index;
+      }
+    }
+    if (/^codriver\.email$/i.test(field)) {
+      return 0;
+    }
+  }
+  return null;
+}
+
+function isCodriverEmailConflictError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+
+  const matchingFieldError = (error.fieldErrors ?? []).some((fieldError) => {
+    const field = (fieldError.field ?? "").toLowerCase();
+    if (!/codriver\.email/.test(field)) {
+      return false;
+    }
+    const detail = `${fieldError.code ?? ""} ${fieldError.message ?? ""}`.toLowerCase();
+    return detail.includes("must differ from driver email");
+  });
+
+  if (matchingFieldError) {
+    return true;
+  }
+
+  const haystack = `${(error.code ?? "").toLowerCase()} ${(error.message ?? "").toLowerCase()} ${error.details ? JSON.stringify(error.details).toLowerCase() : ""}`;
+  return haystack.includes("codriver email must differ from driver email");
+}
+
 function isImageUploadInvalidError(error: unknown) {
   if (!(error instanceof ApiError)) {
     return false;
@@ -914,6 +956,7 @@ function validateStartFields(
   start: StartRegistrationForm,
   existingStarts: StartRegistrationForm[],
   editingId: string | null,
+  driverEmail: string,
   locale: string,
   m: ReturnType<typeof useAnmeldungI18n>["m"]
 ): StartFieldErrors {
@@ -1001,6 +1044,8 @@ function validateStartFields(
     }
     if (!EMAIL_PATTERN.test(start.codriver.email.trim())) {
       errors.codriverEmail = m.errors.invalidCodriverEmail;
+    } else if (normalizeEmailForCompare(start.codriver.email) === normalizeEmailForCompare(driverEmail)) {
+      errors.codriverEmail = m.errors.codriverEmailMustDifferFromDriver;
     }
     if (!start.codriver.phone.trim() || !isValidPhone(start.codriver.phone.trim())) {
       errors.codriverPhone = m.errors.invalidCodriverPhone;
@@ -1496,7 +1541,7 @@ export function AnmeldungPage() {
   };
 
   const saveDraft = async ({ afterSave = "stay" }: { afterSave?: "stay" | "summary" | "decide" } = {}) => {
-    const fieldErrors = validateStartFields(draftStart, starts, editingId, locale, m);
+    const fieldErrors = validateStartFields(draftStart, starts, editingId, driver.email, locale, m);
     setStartFieldErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
       setStartError(m.start.completeEntryHint);
@@ -1715,6 +1760,18 @@ export function AnmeldungPage() {
         (error.code === "CONSENT_LOCALE_INVALID" || error.code === "CONSENT_VERSION_MISMATCH")
       ) {
         setConsentError(getConsentMetaError(locale, "changed"));
+      } else if (isCodriverEmailConflictError(error)) {
+        const conflictIndex = getCodriverEmailConflictIndex(error);
+        setStartError(m.errors.codriverEmailMustDifferFromDriver);
+        setSubmitError(m.errors.codriverEmailMustDifferFromDriver);
+        setStep(2);
+        if (typeof conflictIndex === "number" && starts[conflictIndex]) {
+          editStart(starts[conflictIndex].id);
+        } else if (starts.length === 1) {
+          editStart(starts[0].id);
+        }
+        setStartFieldErrors((prev) => ({ ...prev, codriverEmail: m.errors.codriverEmailMustDifferFromDriver }));
+        focusFieldBySelector('[data-start-field="codriverEmail"]');
       } else if (isEmailAlreadyUsedError(error)) {
         const normalizedDriverEmail = normalizeEmailForCompare(submitForm.driver.email);
         if (normalizedDriverEmail) {
