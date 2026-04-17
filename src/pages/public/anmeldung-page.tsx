@@ -205,6 +205,14 @@ function normalizeEmailForCompare(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeNameForCompare(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function buildComparableFullName(firstName: string, lastName: string) {
+  return normalizeNameForCompare(`${firstName} ${lastName}`.trim());
+}
+
 function isValidPhone(value: string) {
   const normalized = normalizePhone(value);
   if (!normalized || !PHONE_ALLOWED_PATTERN.test(normalized)) {
@@ -700,6 +708,11 @@ function validateDriverForm(value: DriverForm, locale: string, m: ReturnType<typ
   if (!value.emergencyContactPhone.trim() || !isValidPhone(value.emergencyContactPhone.trim())) {
     errors.emergencyContactPhone = m.errors.invalidEmergencyPhone;
   }
+  const driverFullName = buildComparableFullName(value.firstName, value.lastName);
+  const emergencyFullName = buildComparableFullName(value.emergencyContactFirstName, value.emergencyContactLastName);
+  if (driverFullName && emergencyFullName && driverFullName === emergencyFullName) {
+    errors.emergencyContactFirstName = m.errors.emergencyContactNameMustDifferFromDriver;
+  }
   if (!value.motorsportHistory.trim()) errors.motorsportHistory = m.errors.requiredHistory;
   if (isDriverMinor(value.birthdate.trim())) {
     const guardianMessages = getGuardianFieldMessages(locale);
@@ -956,11 +969,14 @@ function validateStartFields(
   start: StartRegistrationForm,
   existingStarts: StartRegistrationForm[],
   editingId: string | null,
-  driverEmail: string,
+  driver: DriverForm,
   locale: string,
   m: ReturnType<typeof useAnmeldungI18n>["m"]
 ): StartFieldErrors {
   const errors: StartFieldErrors = {};
+  const driverEmail = normalizeEmailForCompare(driver.email);
+  const driverFullName = buildComparableFullName(driver.firstName, driver.lastName);
+  const emergencyFullName = buildComparableFullName(driver.emergencyContactFirstName, driver.emergencyContactLastName);
 
   if (!start.classId) {
     errors.classId = m.errors.requiredClass;
@@ -1044,8 +1060,12 @@ function validateStartFields(
     }
     if (!EMAIL_PATTERN.test(start.codriver.email.trim())) {
       errors.codriverEmail = m.errors.invalidCodriverEmail;
-    } else if (normalizeEmailForCompare(start.codriver.email) === normalizeEmailForCompare(driverEmail)) {
+    } else if (normalizeEmailForCompare(start.codriver.email) === driverEmail) {
       errors.codriverEmail = m.errors.codriverEmailMustDifferFromDriver;
+    }
+    const codriverFullName = buildComparableFullName(start.codriver.firstName, start.codriver.lastName);
+    if (codriverFullName && (codriverFullName === driverFullName || codriverFullName === emergencyFullName)) {
+      errors.codriverFirstName = m.errors.codriverNameMustDiffer;
     }
     if (!start.codriver.phone.trim() || !isValidPhone(start.codriver.phone.trim())) {
       errors.codriverPhone = m.errors.invalidCodriverPhone;
@@ -1541,7 +1561,7 @@ export function AnmeldungPage() {
   };
 
   const saveDraft = async ({ afterSave = "stay" }: { afterSave?: "stay" | "summary" | "decide" } = {}) => {
-    const fieldErrors = validateStartFields(draftStart, starts, editingId, driver.email, locale, m);
+    const fieldErrors = validateStartFields(draftStart, starts, editingId, driver, locale, m);
     setStartFieldErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
       setStartError(m.start.completeEntryHint);
@@ -1703,6 +1723,25 @@ export function AnmeldungPage() {
     if (Object.keys(currentDriverErrors).length > 0) {
       setStep(1);
       focusFirstDriverError(currentDriverErrors);
+      setSubmitError("");
+      return;
+    }
+    const conflictingStartIndex = starts.findIndex((start) => Object.keys(validateStartFields(start, starts, start.id, driver, locale, m)).length > 0);
+    if (conflictingStartIndex >= 0) {
+      const conflictingStart = starts[conflictingStartIndex];
+      const fieldErrors = validateStartFields(conflictingStart, starts, conflictingStart.id, driver, locale, m);
+      setStep(2);
+      editStart(conflictingStart.id);
+      setStartFieldErrors(fieldErrors);
+      setStartError(m.start.completeEntryHint);
+      const focusSelector = fieldErrors.codriverEmail
+        ? '[data-start-field="codriverEmail"]'
+        : fieldErrors.codriverFirstName
+          ? '[data-start-field="codriverFirstName"]'
+          : null;
+      if (focusSelector) {
+        focusFieldBySelector(focusSelector);
+      }
       setSubmitError("");
       return;
     }
