@@ -16,7 +16,7 @@ import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12;
 const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_KEY = "admin.entries.page.cache.v5";
@@ -902,7 +902,7 @@ export function AdminEntriesPage() {
           void loadMore();
         }
       },
-      { rootMargin: "220px 0px" }
+      { rootMargin: "640px 0px" }
     );
 
     observer.observe(loadMoreNode);
