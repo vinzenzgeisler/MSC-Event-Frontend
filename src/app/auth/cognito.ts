@@ -3,6 +3,9 @@ import type { AuthSession } from "@/app/auth/auth-store";
 const COGNITO_STATE_KEY = "msc_cognito_oauth_state";
 const COGNITO_VERIFIER_KEY = "msc_cognito_pkce_verifier";
 const COGNITO_RETURN_TO_KEY = "msc_cognito_return_to";
+const COGNITO_BRIDGE_REFRESH_COOKIE = "msc_cognito_bridge_refresh_token";
+const COGNITO_BRIDGE_CREATED_AT_COOKIE = "msc_cognito_bridge_created_at";
+const COGNITO_BRIDGE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
 const REQUIRED_SCOPES = ["openid", "email", "profile"] as const;
 
 type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
@@ -80,6 +83,59 @@ function readConfigValue(envKey: string, runtimeKey: string, fallback = ""): str
   }
 
   return fallback;
+}
+
+function readBooleanConfig(envKey: string, runtimeKey: string, fallback = false): boolean {
+  const raw = readConfigValue(envKey, runtimeKey, fallback ? "true" : "false").toLowerCase();
+  return raw === "true" || raw === "1" || raw === "yes" || raw === "on";
+}
+
+function isCognitoStorageBridgeEnabled(): boolean {
+  return readBooleanConfig("VITE_COGNITO_STORAGE_BRIDGE", "cognitoStorageBridgeEnabled", false);
+}
+
+function buildCookieAttributes(maxAgeSeconds: number): string {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  return `Max-Age=${maxAgeSeconds}; Path=/; SameSite=Lax${secure}`;
+}
+
+function readCookie(name: string): string | null {
+  const prefix = `${name}=`;
+  const entry = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix));
+  if (!entry) {
+    return null;
+  }
+  return decodeURIComponent(entry.slice(prefix.length));
+}
+
+function writeCookie(name: string, value: string, maxAgeSeconds: number) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; ${buildCookieAttributes(maxAgeSeconds)}`;
+}
+
+function clearCookie(name: string) {
+  document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax${window.location.protocol === "https:" ? "; Secure" : ""}`;
+}
+
+export function persistCognitoSessionBridge(session: AuthSession) {
+  if (!isCognitoStorageBridgeEnabled() || !session.refreshToken) {
+    return;
+  }
+
+  const createdAt = typeof session.createdAt === "number" ? session.createdAt : Date.now();
+  writeCookie(COGNITO_BRIDGE_REFRESH_COOKIE, session.refreshToken, COGNITO_BRIDGE_MAX_AGE_SECONDS);
+  writeCookie(COGNITO_BRIDGE_CREATED_AT_COOKIE, String(createdAt), COGNITO_BRIDGE_MAX_AGE_SECONDS);
+}
+
+export function clearCognitoSessionBridge() {
+  if (!isCognitoStorageBridgeEnabled()) {
+    return;
+  }
+
+  clearCookie(COGNITO_BRIDGE_REFRESH_COOKIE);
+  clearCookie(COGNITO_BRIDGE_CREATED_AT_COOKIE);
 }
 
 export function getCognitoConfig() {
@@ -244,7 +300,7 @@ export async function handleCognitoCallbackIfPresent(currentHref = window.locati
 
   const expiresInSeconds = typeof payload.expires_in === "number" ? payload.expires_in : 3600;
 
-  return {
+  const session: AuthSession = {
     apiToken,
     roleToken: payload.id_token || payload.access_token,
     idToken: payload.id_token,
@@ -252,6 +308,8 @@ export async function handleCognitoCallbackIfPresent(currentHref = window.locati
     expiresAt: Date.now() + expiresInSeconds * 1000,
     provider: "cognito"
   };
+  persistCognitoSessionBridge(session);
+  return session;
 }
 
 export async function refreshCognitoSession(session: AuthSession): Promise<AuthSession> {
@@ -281,7 +339,7 @@ export async function refreshCognitoSession(session: AuthSession): Promise<AuthS
   const expiresInSeconds = typeof payload.expires_in === "number" ? payload.expires_in : 3600;
   const now = Date.now();
 
-  return {
+  const nextSession: AuthSession = {
     ...session,
     apiToken: nextApiToken,
     roleToken: payload.id_token || payload.access_token || session.roleToken || nextApiToken,
@@ -290,6 +348,55 @@ export async function refreshCognitoSession(session: AuthSession): Promise<AuthS
     expiresAt: now + expiresInSeconds * 1000,
     lastActivityAt: now
   };
+  persistCognitoSessionBridge(nextSession);
+  return nextSession;
+}
+
+export async function restoreCognitoSessionFromBridge(): Promise<AuthSession | null> {
+  if (!isCognitoStorageBridgeEnabled()) {
+    return null;
+  }
+
+  const refreshToken = readCookie(COGNITO_BRIDGE_REFRESH_COOKIE);
+  if (!refreshToken) {
+    return null;
+  }
+
+  const createdAtRaw = readCookie(COGNITO_BRIDGE_CREATED_AT_COOKIE);
+  const createdAt = createdAtRaw ? Number(createdAtRaw) : Date.now();
+  const { clientId } = getCognitoConfig();
+
+  const body = new URLSearchParams();
+  body.set("grant_type", "refresh_token");
+  body.set("client_id", clientId);
+  body.set("refresh_token", refreshToken);
+
+  try {
+    const payload = await requestOAuthToken(body);
+    const nextApiToken = payload.access_token || payload.id_token;
+    if (!nextApiToken) {
+      clearCognitoSessionBridge();
+      return null;
+    }
+
+    const expiresInSeconds = typeof payload.expires_in === "number" ? payload.expires_in : 3600;
+    const now = Date.now();
+    const nextSession: AuthSession = {
+      apiToken: nextApiToken,
+      roleToken: payload.id_token || payload.access_token || nextApiToken,
+      idToken: payload.id_token,
+      refreshToken: payload.refresh_token || refreshToken,
+      expiresAt: now + expiresInSeconds * 1000,
+      createdAt: Number.isFinite(createdAt) && createdAt > 0 ? createdAt : now,
+      lastActivityAt: now,
+      provider: "cognito"
+    };
+    persistCognitoSessionBridge(nextSession);
+    return nextSession;
+  } catch {
+    clearCognitoSessionBridge();
+    return null;
+  }
 }
 
 export function getCognitoLogoutUrl() {

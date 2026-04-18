@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { consumeCognitoReturnTo, getCognitoConfig, handleCognitoCallbackIfPresent, isCognitoConfigured, startCognitoLogin } from "@/app/auth/cognito";
+import {
+  consumeCognitoReturnTo,
+  getCognitoConfig,
+  handleCognitoCallbackIfPresent,
+  isCognitoConfigured,
+  restoreCognitoSessionFromBridge,
+  startCognitoLogin
+} from "@/app/auth/cognito";
 import { DocumentMeta } from "@/app/document-meta";
 import { consumeAuthLogoutReason } from "@/app/auth/auth-store";
 import { useAuth } from "@/app/auth/auth-context";
@@ -46,7 +53,7 @@ export function AdminLoginPage() {
     const runCallback = async () => {
       try {
         setBusy(true);
-        const session = await handleCognitoCallbackIfPresent();
+        const session = (await handleCognitoCallbackIfPresent()) ?? (await restoreCognitoSessionFromBridge());
         if (!session) {
           return;
         }
