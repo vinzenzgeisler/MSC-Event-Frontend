@@ -133,6 +133,9 @@ jobs:
       MSC_COGNITO_REDIRECT_URI: ${{ vars.VITE_COGNITO_REDIRECT_URI_PROD }}
       MSC_COGNITO_LOGOUT_URI: ${{ vars.VITE_COGNITO_LOGOUT_URI_PROD }}
       MSC_COGNITO_SCOPES: ${{ vars.VITE_COGNITO_SCOPES_PROD }}
+      MSC_ENABLE_PWA: "true"
+      MSC_AUTH_IDLE_TIMEOUT_MINUTES: "129600"
+      MSC_AUTH_MAX_SESSION_HOURS: "2160"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -169,6 +172,9 @@ jobs:
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
           VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
           VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
+          VITE_ENABLE_PWA: ${{ env.MSC_ENABLE_PWA }}
+          VITE_AUTH_IDLE_TIMEOUT_MINUTES: ${{ env.MSC_AUTH_IDLE_TIMEOUT_MINUTES }}
+          VITE_AUTH_MAX_SESSION_HOURS: ${{ env.MSC_AUTH_MAX_SESSION_HOURS }}
 
       - name: Write runtime config
         run: |
@@ -179,7 +185,9 @@ jobs:
             cognitoClientId: "${MSC_COGNITO_CLIENT_ID}",
             cognitoRedirectUri: "${MSC_COGNITO_REDIRECT_URI}",
             cognitoLogoutUri: "${MSC_COGNITO_LOGOUT_URI}",
-            cognitoScopes: "${MSC_COGNITO_SCOPES}"
+            cognitoScopes: "${MSC_COGNITO_SCOPES}",
+            authIdleTimeoutMinutes: "${MSC_AUTH_IDLE_TIMEOUT_MINUTES}",
+            authMaxSessionHours: "${MSC_AUTH_MAX_SESSION_HOURS}"
           };
           EOF
 
@@ -203,6 +211,9 @@ jobs:
           VITE_COGNITO_REDIRECT_URI: ${{ env.MSC_COGNITO_REDIRECT_URI }}
           VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
           VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
+          VITE_ENABLE_PWA: ${{ env.MSC_ENABLE_PWA }}
+          VITE_AUTH_IDLE_TIMEOUT_MINUTES: ${{ env.MSC_AUTH_IDLE_TIMEOUT_MINUTES }}
+          VITE_AUTH_MAX_SESSION_HOURS: ${{ env.MSC_AUTH_MAX_SESSION_HOURS }}
 
       - name: Deploy to Vercel Prod
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
