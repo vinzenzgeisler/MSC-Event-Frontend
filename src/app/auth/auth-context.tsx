@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import { getCognitoLogoutUrl, refreshCognitoSession } from "@/app/auth/cognito";
+import { clearCognitoSessionBridge, getCognitoLogoutUrl, refreshCognitoSession } from "@/app/auth/cognito";
 import {
   clearAuthToken,
   getAuthSession,
@@ -80,6 +80,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       const previousProvider = session?.provider ?? getAuthSession()?.provider ?? null;
+      clearCognitoSessionBridge();
       clearAuthToken();
       setSession(null);
       setAuthMe(null);
