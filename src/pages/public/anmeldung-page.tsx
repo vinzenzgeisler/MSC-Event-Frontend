@@ -209,6 +209,41 @@ function normalizeNameForCompare(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+type NormalizedApiFieldError = {
+  field: string;
+  code: string;
+  message: string;
+};
+
+function getNormalizedApiFieldErrors(error: ApiError): NormalizedApiFieldError[] {
+  const directFieldErrors = (error.fieldErrors ?? []).map((fieldError) => ({
+    field: String(fieldError.field ?? "").trim(),
+    code: String(fieldError.code ?? "").trim(),
+    message: String(fieldError.message ?? "").trim()
+  }));
+
+  const detailIssues = Array.isArray((error.details as { issues?: unknown } | undefined)?.issues)
+    ? ((error.details as { issues?: unknown[] }).issues ?? [])
+    : [];
+
+  const normalizedDetailIssues = detailIssues.flatMap((issue) => {
+    if (!issue || typeof issue !== "object") {
+      return [];
+    }
+    const record = issue as Record<string, unknown>;
+    const path = Array.isArray(record.path) ? record.path : [];
+    const field = path.map((segment) => String(segment)).join(".").trim();
+    const code = typeof record.code === "string" ? record.code.trim() : "";
+    const message = typeof record.message === "string" ? record.message.trim() : "";
+    if (!field && !code && !message) {
+      return [];
+    }
+    return [{ field, code, message }];
+  });
+
+  return [...directFieldErrors, ...normalizedDetailIssues];
+}
+
 function buildComparableFullName(firstName: string, lastName: string) {
   return normalizeNameForCompare(`${firstName} ${lastName}`.trim());
 }
@@ -399,7 +434,7 @@ function isEmailAlreadyUsedError(error: unknown) {
     return false;
   }
 
-  const hasConflictingEmailFieldError = (error.fieldErrors ?? []).some((fieldError) => {
+  const hasConflictingEmailFieldError = getNormalizedApiFieldErrors(error).some((fieldError) => {
     const field = (fieldError.field ?? "").toLowerCase();
     if (!field.includes("email")) {
       return false;
@@ -434,7 +469,7 @@ function isStartNumberTakenError(error: unknown) {
     return false;
   }
 
-  const hasStartNumberFieldError = (error.fieldErrors ?? []).some((fieldError) => {
+  const hasStartNumberFieldError = getNormalizedApiFieldErrors(error).some((fieldError) => {
     const field = (fieldError.field ?? "").toLowerCase();
     if (!field.includes("start") || !field.includes("number")) {
       return false;
@@ -459,7 +494,7 @@ function getStartNumberConflictIndex(error: unknown) {
   if (!(error instanceof ApiError)) {
     return null;
   }
-  for (const fieldError of error.fieldErrors ?? []) {
+  for (const fieldError of getNormalizedApiFieldErrors(error)) {
     const field = (fieldError.field ?? "").trim();
     const match = field.match(/entries\.(\d+)\.(?:startNumber|vehicle\.startNumberRaw)$/i);
     if (!match) {
@@ -477,7 +512,7 @@ function getCodriverEmailConflictIndex(error: unknown) {
   if (!(error instanceof ApiError)) {
     return null;
   }
-  for (const fieldError of error.fieldErrors ?? []) {
+  for (const fieldError of getNormalizedApiFieldErrors(error)) {
     const field = (fieldError.field ?? "").trim();
     const match = field.match(/^entries\.(\d+)\.codriver\.email$/i);
     if (match) {
@@ -498,7 +533,7 @@ function isCodriverEmailConflictError(error: unknown) {
     return false;
   }
 
-  const matchingFieldError = (error.fieldErrors ?? []).some((fieldError) => {
+  const matchingFieldError = getNormalizedApiFieldErrors(error).some((fieldError) => {
     const field = (fieldError.field ?? "").toLowerCase();
     if (!/codriver\.email/.test(field)) {
       return false;
