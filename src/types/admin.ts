@@ -27,6 +27,7 @@ export type AdminEntryListItemDto = {
   orgaCode?: string | null;
   vehicleLabel: string;
   vehicleThumbUrl: string | null;
+  registrationStatus: RegistrationStatus;
   acceptanceStatus: AcceptanceStatus;
   paymentStatus: PaymentStatus | null;
   checkinIdVerified: boolean;

@@ -1234,7 +1234,7 @@ export function AdminEntriesPage() {
                 <div className="text-lg font-semibold text-slate-900">Filter</div>
                 <div className="text-xs text-slate-500">Nennungen gezielt eingrenzen</div>
               </div>
-              <Button type="button" size="icon" variant="ghost" onClick={() => setMobileFiltersOpen(false)}>
+              <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setMobileFiltersOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
