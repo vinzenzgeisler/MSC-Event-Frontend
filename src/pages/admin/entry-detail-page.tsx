@@ -945,7 +945,7 @@ export function AdminEntryDetailPage() {
                     anyActionInFlight
                       ? "Aktion wird verarbeitet…"
                       : !canPaymentWrite
-                        ? "Nur Admin-Rollen dürfen Zahlungen ändern."
+                        ? "Nur Admin und Editor dürfen Zahlungen ändern."
                         : status !== "accepted"
                           ? "Zahlung kann erst nach Zulassung bestätigt werden."
                           : undefined
@@ -969,7 +969,7 @@ export function AdminEntryDetailPage() {
                     anyActionInFlight
                       ? "Aktion wird verarbeitet…"
                       : !canPaymentWrite
-                        ? "Nur Admin-Rollen dürfen Zahlungen ändern."
+                        ? "Nur Admin und Editor dürfen Zahlungen ändern."
                         : undefined
                   }
                   onClick={() => {
