@@ -23,6 +23,7 @@ type DashboardSummary = {
     oldestDriverAge: number | null;
     oldestDriverLabel: string;
     youngestDriverAge: number | null;
+    youngestDriverLabel: string;
     medianDriverAge: number | null;
   };
 };
@@ -59,6 +60,7 @@ const EMPTY_SUMMARY: DashboardSummary = {
     oldestDriverAge: null,
     oldestDriverLabel: "",
     youngestDriverAge: null,
+    youngestDriverLabel: "",
     medianDriverAge: null
   }
 };
@@ -178,6 +180,7 @@ function normalizeDriverAgeStats(summaryStats: unknown): DashboardSummary["drive
     oldestDriverAge: pickFirstNumber(sources, ["oldestDriverAge", "oldestAge", "oldest_driver_age"]),
     oldestDriverLabel: pickFirstString(sources, ["oldestDriverLabel", "oldestLabel", "oldest_driver_label"]),
     youngestDriverAge: pickFirstNumber(sources, ["youngestDriverAge", "youngestAge", "youngest_driver_age"]),
+    youngestDriverLabel: pickFirstString(sources, ["youngestDriverLabel", "youngestLabel", "youngest_driver_label"]),
     medianDriverAge: pickFirstNumber(sources, ["medianDriverAge", "medianAge", "median_driver_age"])
   };
 }
@@ -270,6 +273,7 @@ export function AdminDashboardPage() {
             query: "",
             classId: "all",
             acceptanceStatus: "accepted",
+            registrationStatus: "all",
             paymentStatus: "due",
             checkinIdVerified: "all",
             sortBy: "createdAt",
@@ -279,6 +283,7 @@ export function AdminDashboardPage() {
             query: "",
             classId: "all",
             acceptanceStatus: "all",
+            registrationStatus: "all",
             paymentStatus: "all",
             checkinIdVerified: "all",
             sortBy: "createdAt",
@@ -427,6 +432,7 @@ export function AdminDashboardPage() {
   const newEntriesLast7Days = dailyActivity.reduce((sum, item) => sum + item.count, 0);
   const medianDriverAge = summary.driverAgeStats.medianDriverAge;
   const youngestDriverAge = summary.driverAgeStats.youngestDriverAge;
+  const youngestDriverLabel = summary.driverAgeStats.youngestDriverLabel?.trim() || "—";
   const oldestDriverAge = summary.driverAgeStats.oldestDriverAge;
   const oldestDriverLabel = summary.driverAgeStats.oldestDriverLabel?.trim() || "—";
   const ageRangeText =
@@ -466,6 +472,7 @@ export function AdminDashboardPage() {
         query: "",
         classId: "all",
         acceptanceStatus: "all",
+        registrationStatus: "all",
         paymentStatus: "all",
         checkinIdVerified: "all",
         sortBy: "createdAt",
@@ -570,7 +577,7 @@ export function AdminDashboardPage() {
     <div className="space-y-5">
       <Card className="border-slate-200 bg-gradient-to-r from-white via-slate-50 to-emerald-50/60">
         <CardContent className="space-y-4 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
               <p className="mt-1 text-sm text-slate-600">Statistischer Überblick mit Fokus auf operative Entscheidungen.</p>
@@ -636,8 +643,9 @@ export function AdminDashboardPage() {
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
                 <div className="h-2 rounded-full bg-sky-500" style={{ width: `${loading ? 0 : 100}%` }} />
               </div>
-              <div className="mt-1 text-xs text-slate-500">
-                {loading ? "…" : `Ältester Fahrer: ${oldestDriverLabel}`}
+              <div className="mt-1 space-y-1 text-xs text-slate-500">
+                <div>{loading ? "…" : `Jüngster Fahrer: ${youngestDriverLabel}`}</div>
+                <div>{loading ? "…" : `Ältester Fahrer: ${oldestDriverLabel}`}</div>
               </div>
             </div>
           </div>
@@ -684,8 +692,8 @@ export function AdminDashboardPage() {
             ) : (
               <>
                 <div className="mb-3 flex items-center justify-center">
-                  <div className="relative h-44 w-44 rounded-full" style={{ background: donutGradient }}>
-                    <div className="absolute inset-[18%] flex flex-col items-center justify-center rounded-full bg-white text-center">
+                  <div className="relative h-36 w-36 rounded-full sm:h-44 sm:w-44" style={{ background: donutGradient }}>
+                    <div className="absolute inset-[18%] flex flex-col items-center justify-center rounded-full bg-white px-2 text-center">
                       <div className="text-[11px] uppercase text-slate-500">Nennungen</div>
                       <div className="text-2xl font-semibold text-slate-900">{totalClassEntries}</div>
                     </div>
@@ -695,12 +703,12 @@ export function AdminDashboardPage() {
                   {classLegendItems.map((item, index) => {
                     const percentage = totalClassEntries > 0 ? Math.round((item.count / totalClassEntries) * 100) : 0;
                     return (
-                      <div key={item.classId} className="flex items-center justify-between rounded border p-2 text-xs">
-                        <div className="flex min-w-0 items-center gap-2">
+                      <div key={item.classId} className="flex flex-col gap-1 rounded border p-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-2">
                           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: CLASS_COLORS[index % CLASS_COLORS.length] }} />
-                          <span className="truncate text-slate-700">{item.className}</span>
+                          <span className="break-words text-slate-700">{item.className}</span>
                         </div>
-                        <span className="shrink-0 font-medium text-slate-900">
+                        <span className="shrink-0 pl-4 font-medium text-slate-900 sm:pl-2">
                           {item.count} · {percentage}%
                         </span>
                       </div>

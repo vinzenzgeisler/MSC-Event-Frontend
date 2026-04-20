@@ -9,18 +9,33 @@ type EntriesFilterBarProps = {
   classOptions: AdminClassOption[];
   statusScope?: "active" | "deleted";
   allowDeletedStatusOption?: boolean;
+  compact?: boolean;
   onStatusScopeChange?: (scope: "active" | "deleted") => void;
   onChange: <K extends keyof AdminEntriesFilter>(field: K, value: AdminEntriesFilter[K]) => void;
 };
 
 const DELETED_SCOPE_VALUE = "__deleted_scope__";
+const UNVERIFIED_STATUS_VALUE = "__submitted_unverified__";
 
-export function EntriesFilterBar({ filter, classOptions, statusScope = "active", allowDeletedStatusOption = false, onStatusScopeChange, onChange }: EntriesFilterBarProps) {
-  const statusSelectValue = statusScope === "deleted" ? DELETED_SCOPE_VALUE : filter.acceptanceStatus;
+export function EntriesFilterBar({
+  filter,
+  classOptions,
+  statusScope = "active",
+  allowDeletedStatusOption = false,
+  compact = false,
+  onStatusScopeChange,
+  onChange
+}: EntriesFilterBarProps) {
+  const statusSelectValue =
+    statusScope === "deleted"
+      ? DELETED_SCOPE_VALUE
+      : filter.registrationStatus === "submitted_unverified"
+        ? UNVERIFIED_STATUS_VALUE
+        : filter.acceptanceStatus;
   const sortValue = `${filter.sortBy}:${filter.sortDir}`;
 
   return (
-    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div className={compact ? "grid gap-3" : "grid gap-3 md:grid-cols-3 xl:grid-cols-5"}>
       <div className="space-y-1">
         <Label htmlFor="admin-filter-search">Suche</Label>
         <Input
@@ -54,10 +69,17 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
             if (next === DELETED_SCOPE_VALUE) {
               onStatusScopeChange?.("deleted");
               onChange("acceptanceStatus", "all");
+              onChange("registrationStatus", "all");
               return;
             }
             onStatusScopeChange?.("active");
+            if (next === UNVERIFIED_STATUS_VALUE) {
+              onChange("acceptanceStatus", "all");
+              onChange("registrationStatus", "submitted_unverified");
+              return;
+            }
             onChange("acceptanceStatus", next as AdminEntriesFilter["acceptanceStatus"]);
+            onChange("registrationStatus", "all");
           }}
         >
           <SelectTrigger id="admin-filter-status" className="text-base md:text-sm">
@@ -65,6 +87,7 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Alle</SelectItem>
+            <SelectItem value={UNVERIFIED_STATUS_VALUE}>Nicht verifiziert</SelectItem>
             <SelectItem value="pending">Offen</SelectItem>
             <SelectItem value="shortlist">Vorauswahl</SelectItem>
             <SelectItem value="accepted">Zugelassen</SelectItem>
@@ -83,19 +106,6 @@ export function EntriesFilterBar({ filter, classOptions, statusScope = "active",
             <SelectItem value="all">Alle</SelectItem>
             <SelectItem value="due">Offen</SelectItem>
             <SelectItem value="paid">Bezahlt</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="admin-filter-checkin">Einchecken</Label>
-        <Select value={filter.checkinIdVerified} onValueChange={(next) => onChange("checkinIdVerified", next as AdminEntriesFilter["checkinIdVerified"])}>
-          <SelectTrigger id="admin-filter-checkin" className="text-base md:text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle</SelectItem>
-            <SelectItem value="true">Eingecheckt</SelectItem>
-            <SelectItem value="false">Nicht eingecheckt</SelectItem>
           </SelectContent>
         </Select>
       </div>

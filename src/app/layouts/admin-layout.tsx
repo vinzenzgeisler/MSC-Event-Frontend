@@ -18,7 +18,7 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-slate-100">
       <DocumentMeta />
-      <div className="border-b bg-white lg:hidden">
+      <div className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur lg:hidden">
         <div className="flex w-full items-center justify-between px-4 py-3">
           <div className="text-base font-semibold text-slate-900">MSC Event Verwaltung</div>
           <Button type="button" size="sm" variant="outline" onClick={() => setMenuOpen((prev) => !prev)}>
@@ -40,7 +40,7 @@ export function AdminLayout() {
         <aside
           className={[
             "rounded-lg border bg-white p-4",
-            "fixed inset-y-0 left-0 z-40 w-[86%] max-w-xs overflow-y-auto transition lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-auto lg:max-w-none",
+            "fixed inset-y-0 left-0 z-40 w-[86%] max-w-xs overflow-y-auto transition lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:w-auto lg:max-w-none",
             menuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           ].join(" ")}
         >

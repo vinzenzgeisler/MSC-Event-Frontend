@@ -371,64 +371,66 @@ export function AdminEntryDetailPage() {
 
   return (
     <div className="w-full max-w-[1120px] space-y-4 overflow-x-hidden">
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
-            if (state?.fromEntriesList) {
-              navigate(-1);
-              return;
-            }
-            navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
-          }}
-        >
-          Zurück zu Nennungen
-        </Button>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="break-words text-2xl font-semibold text-slate-900">
-            {detail.headline}
-            {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
-          </h1>
-          <p className="break-words text-sm text-slate-600">
-            {detail.classLabel} · Startnummer {detail.startNumber}
-          </p>
-          <p className="break-words text-xs text-slate-500">
-            Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
-          </p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge
-            className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+      <div className="sticky top-[57px] z-20 -mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:top-0 md:-mx-3 md:px-3">
+        <div>
+          <Button
+            type="button"
             variant="outline"
+            size="sm"
+            onClick={() => {
+              const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
+              if (state?.fromEntriesList) {
+                navigate(-1);
+                return;
+              }
+              navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
+            }}
           >
-            E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
-          </Badge>
-          <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
-            Status: {acceptanceStatusLabel(status)}
-          </Badge>
-          <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
-            Zahlung: {paymentStatusLabel(paymentState)}
-          </Badge>
-          {status === "accepted" ? (
-            <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
-              Check-in: {checkinLabel(checkinDone)}
+            Zurück zu Nennungen
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-semibold text-slate-900">
+              {detail.headline}
+              {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
+            </h1>
+            <p className="break-words text-sm text-slate-600">
+              {detail.classLabel} · Startnummer {detail.startNumber}
+            </p>
+            <p className="break-words text-xs text-slate-500">
+              Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
+            </p>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Badge
+              className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+              variant="outline"
+            >
+              E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
             </Badge>
-          ) : (
-            <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
-              Check-in: Noch nicht relevant
+            <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
+              Status: {acceptanceStatusLabel(status)}
             </Badge>
-          )}
-          {statusActionInFlight && (
-            <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
-              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              Status wird aktualisiert…
+            <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
+              Zahlung: {paymentStatusLabel(paymentState)}
             </Badge>
-          )}
+            {status === "accepted" ? (
+              <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
+                Check-in: {checkinLabel(checkinDone)}
+              </Badge>
+            ) : (
+              <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+                Check-in: Noch nicht relevant
+              </Badge>
+            )}
+            {statusActionInFlight && (
+              <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                Status wird aktualisiert…
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -439,7 +441,7 @@ export function AdminEntryDetailPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
-        <div className="order-2 min-w-0 space-y-4 lg:order-1">
+        <div className="order-1 min-w-0 space-y-4 lg:order-1">
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Fahrerdaten</CardTitle>
@@ -747,72 +749,71 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-1 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-4 lg:w-[340px] lg:justify-self-end lg:self-start">
+        <div className="order-2 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-28 lg:w-[340px] lg:justify-self-end lg:self-start">
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0 space-y-4">
-              <div className="grid gap-2">
-                <HintButton
-                  label={actionInFlight === "status-shortlist" ? "Status wird gesetzt…" : "Auf Vorauswahl setzen"}
-                  icon={actionInFlight === "status-shortlist" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
-                  variant={status === "shortlist" ? "default" : "outline"}
-                  className={status === "shortlist" ? actionActiveClass : actionOutlineClass}
-                  disabledReason={statusDisabledReason("shortlist")}
-                  onClick={() => {
-                    void runAction(
-                      "status-shortlist",
-                      () => adminEntriesService.setEntryStatus(detail.id, "to_shortlist"),
-                      "Status auf Vorauswahl gesetzt.",
-                      "Status konnte nicht geändert werden."
-                    );
-                  }}
-                />
-                <HintButton
-                  label={
-                    actionInFlight === "status-accepted"
-                      ? "Status wird gesetzt…"
-                      : "Auf Zugelassen setzen"
-                  }
-                  icon={actionInFlight === "status-accepted" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
-                  variant={status === "accepted" ? "default" : "outline"}
-                  className={status === "accepted" ? actionActiveClass : actionOutlineClass}
-                  disabledReason={statusDisabledReason("accepted")}
-                  onClick={() => setPendingAcceptConfirm(true)}
-                />
-                <HintButton
-                  label={
-                    actionInFlight === "status-rejected"
-                      ? "Status wird gesetzt…"
-                      : "Auf Abgelehnt setzen"
-                  }
-                  icon={actionInFlight === "status-rejected" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
-                  variant={status === "rejected" ? "default" : "outline"}
-                  className={status === "rejected" ? actionActiveClass : actionOutlineClass}
-                  disabledReason={statusDisabledReason("rejected")}
-                  onClick={() => setPendingRejectConfirm(true)}
-                />
-                <HintButton
-                  label={actionInFlight === "checkin-confirm" ? "Check-in wird bestätigt…" : "Einchecken bestätigen"}
-                  icon={actionInFlight === "checkin-confirm" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
-                  variant={checkinDone ? "default" : "outline"}
-                  className={checkinDone ? actionActiveClass : actionOutlineClass}
-                  disabledReason={
-                    anyActionInFlight
-                      ? "Aktion wird verarbeitet…"
-                      : !canCheckin
-                        ? "Nur Admin/Editor-Rollen dürfen einchecken."
-                        : status !== "accepted"
-                          ? "Check-in erst nach Zulassung möglich."
-                          : undefined
-                  }
-                  onClick={() => setPendingCheckinConfirm(true)}
-                />
-              </div>
+              {(canSetStatus || canCheckin) && (
+                <div className="grid gap-2">
+                  {canSetStatus && (
+                    <>
+                      <HintButton
+                        label={actionInFlight === "status-shortlist" ? "Status wird gesetzt…" : "Auf Vorauswahl setzen"}
+                        icon={actionInFlight === "status-shortlist" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
+                        variant={status === "shortlist" ? "default" : "outline"}
+                        className={status === "shortlist" ? actionActiveClass : actionOutlineClass}
+                        disabledReason={statusDisabledReason("shortlist")}
+                        onClick={() => {
+                          void runAction(
+                            "status-shortlist",
+                            () => adminEntriesService.setEntryStatus(detail.id, "to_shortlist"),
+                            "Status auf Vorauswahl gesetzt.",
+                            "Status konnte nicht geändert werden."
+                          );
+                        }}
+                      />
+                      <HintButton
+                        label={actionInFlight === "status-accepted" ? "Status wird gesetzt…" : "Auf Zugelassen setzen"}
+                        icon={actionInFlight === "status-accepted" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
+                        variant={status === "accepted" ? "default" : "outline"}
+                        className={status === "accepted" ? actionActiveClass : actionOutlineClass}
+                        disabledReason={statusDisabledReason("accepted")}
+                        onClick={() => setPendingAcceptConfirm(true)}
+                      />
+                      <HintButton
+                        label={actionInFlight === "status-rejected" ? "Status wird gesetzt…" : "Auf Abgelehnt setzen"}
+                        icon={actionInFlight === "status-rejected" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
+                        variant={status === "rejected" ? "default" : "outline"}
+                        className={status === "rejected" ? actionActiveClass : actionOutlineClass}
+                        disabledReason={statusDisabledReason("rejected")}
+                        onClick={() => setPendingRejectConfirm(true)}
+                      />
+                    </>
+                  )}
+                  {canCheckin && (
+                    <HintButton
+                      label={actionInFlight === "checkin-confirm" ? "Check-in wird bestätigt…" : "Einchecken bestätigen"}
+                      icon={actionInFlight === "checkin-confirm" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
+                      variant={checkinDone ? "default" : "outline"}
+                      className={checkinDone ? actionActiveClass : actionOutlineClass}
+                      disabledReason={
+                        anyActionInFlight
+                          ? "Aktion wird verarbeitet…"
+                          : status !== "accepted"
+                            ? "Check-in erst nach Zulassung möglich."
+                            : undefined
+                      }
+                      onClick={() => setPendingCheckinConfirm(true)}
+                    />
+                  )}
+                </div>
+              )}
 
-              <div className="grid gap-2 border-t border-slate-200 pt-4">
-                <HintButton
+              {canSendMail && (
+                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                  <HintButton
                   label={
                     sendingVerificationMail
                       ? "Verifizierungsprozess wird gesendet…"
@@ -825,15 +826,7 @@ export function AdminEntryDetailPage() {
                   icon={sendingVerificationMail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                   variant={!confirmationMailSent ? "default" : "outline"}
                   className={!confirmationMailSent ? actionActiveClass : actionOutlineClass}
-                  disabledReason={
-                    !canSendMail
-                      ? "Nur Admin-Rollen dürfen Mails senden."
-                      : confirmationMailVerified
-                        ? "E-Mail wurde bereits verifiziert."
-                        : sendingVerificationMail
-                          ? "Verifizierungs-Mail wird gerade versendet."
-                          : undefined
-                  }
+                  disabledReason={confirmationMailVerified ? "E-Mail wurde bereits verifiziert." : sendingVerificationMail ? "Verifizierungs-Mail wird gerade versendet." : undefined}
                   onClick={async () => {
                     if (sendingVerificationMail) {
                       return;
@@ -869,68 +862,68 @@ export function AdminEntryDetailPage() {
                     }
                   }}
                 />
-                <HintButton
-                  label={sendingPaymentReminder ? "Zahlungserinnerung wird gesendet…" : "Zahlungserinnerung senden"}
-                  icon={sendingPaymentReminder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                  variant="outline"
-                  className={actionOutlineClass}
-                  disabledReason={
-                    !canSendMail
-                      ? "Nur Admin-Rollen dürfen Mails senden."
-                      : status !== "accepted"
+                  <HintButton
+                    label={sendingPaymentReminder ? "Zahlungserinnerung wird gesendet…" : "Zahlungserinnerung senden"}
+                    icon={sendingPaymentReminder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                    variant="outline"
+                    className={actionOutlineClass}
+                    disabledReason={
+                      status !== "accepted"
                         ? "Zahlungserinnerung erst bei zugelassener Nennung."
                         : paymentState === "paid"
                           ? "Bei bezahlter Nennung keine Zahlungserinnerung nötig."
-                        : sendingPaymentReminder
-                          ? "Zahlungserinnerung wird gerade eingeplant."
-                          : undefined
-                  }
-                  onClick={async () => {
-                    if (sendingPaymentReminder) {
-                      return;
+                          : sendingPaymentReminder
+                            ? "Zahlungserinnerung wird gerade eingeplant."
+                            : undefined
                     }
-                    if (paymentState === "paid") {
-                      flashMessage("Für bezahlte Nennungen wird keine Zahlungserinnerung versendet.");
-                      return;
-                    }
-                    setSendingPaymentReminder(true);
-                    try {
-                      const result = await communicationService.queuePaymentReminderForEntry(detail.id, {
-                        allowDuplicate: true,
-                        eventId: detail.eventId
-                      });
-                      if (result.queued < 1) {
-                        const reason = (result.reason ?? "").trim().toLowerCase();
-                        if (reason.includes("not_allowed")) {
-                          flashMessage("Für diese Nennung ist aktuell keine Zahlungserinnerung zulässig.", 4200);
-                          return;
-                        }
-                        flashMessage(
-                          result.reason?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",
-                          4200
-                        );
+                    onClick={async () => {
+                      if (sendingPaymentReminder) {
                         return;
                       }
-                      flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
-                    } catch (error) {
-                      if (error instanceof ApiError) {
-                        const code = (error.code ?? "").toLowerCase();
-                        const message = (error.message ?? "").toLowerCase();
-                        if (code.includes("not_allowed") || message.includes("not allowed") || message.includes("not_allowed")) {
-                          flashMessage("Für diese Nennung ist aktuell keine Zahlungserinnerung zulässig.", 4200);
+                      if (paymentState === "paid") {
+                        flashMessage("Für bezahlte Nennungen wird keine Zahlungserinnerung versendet.");
+                        return;
+                      }
+                      setSendingPaymentReminder(true);
+                      try {
+                        const result = await communicationService.queuePaymentReminderForEntry(detail.id, {
+                          allowDuplicate: true,
+                          eventId: detail.eventId
+                        });
+                        if (result.queued < 1) {
+                          const reason = (result.reason ?? "").trim().toLowerCase();
+                          if (reason.includes("not_allowed")) {
+                            flashMessage("Für diese Nennung ist aktuell keine Zahlungserinnerung zulässig.", 4200);
+                            return;
+                          }
+                          flashMessage(
+                            result.reason?.trim() || "Es wurde keine Zahlungserinnerung eingeplant (bereits vorhanden oder nicht zulässig).",
+                            4200
+                          );
                           return;
                         }
+                        flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
+                      } catch (error) {
+                        if (error instanceof ApiError) {
+                          const code = (error.code ?? "").toLowerCase();
+                          const message = (error.message ?? "").toLowerCase();
+                          if (code.includes("not_allowed") || message.includes("not allowed") || message.includes("not_allowed")) {
+                            flashMessage("Für diese Nennung ist aktuell keine Zahlungserinnerung zulässig.", 4200);
+                            return;
+                          }
+                        }
+                        flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 4200);
+                      } finally {
+                        setSendingPaymentReminder(false);
                       }
-                      flashMessage(getApiErrorMessage(error, "Zahlungserinnerung konnte nicht versendet werden."), 4200);
-                    } finally {
-                      setSendingPaymentReminder(false);
-                    }
-                  }}
-                />
-              </div>
+                    }}
+                  />
+                </div>
+              )}
 
-              <div className="grid gap-2 border-t border-slate-200 pt-4">
-                <HintButton
+              {canPaymentWrite && (
+                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                  <HintButton
                   label={actionInFlight === "payment-mark" ? "Zahlung wird bestätigt…" : "Zahlung als eingegangen markieren"}
                   icon={
                     actionInFlight === "payment-mark" ? (
@@ -941,44 +934,31 @@ export function AdminEntryDetailPage() {
                   }
                   variant={paid ? "default" : "outline"}
                   className={paid ? actionActiveClass : actionOutlineClass}
-                  disabledReason={
-                    anyActionInFlight
-                      ? "Aktion wird verarbeitet…"
-                      : !canPaymentWrite
-                        ? "Nur Admin und Editor dürfen Zahlungen ändern."
-                        : status !== "accepted"
-                          ? "Zahlung kann erst nach Zulassung bestätigt werden."
-                          : undefined
-                  }
+                  disabledReason={anyActionInFlight ? "Aktion wird verarbeitet…" : status !== "accepted" ? "Zahlung kann erst nach Zulassung bestätigt werden." : undefined}
                   onClick={async () => {
                     setPendingPaymentConfirm(true);
                   }}
                 />
-                <HintButton
-                  label={actionInFlight === "payment-adjust" ? "Zahlungsdaten werden gespeichert…" : "Zahlung manuell anpassen"}
-                  icon={
-                    actionInFlight === "payment-adjust" ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wallet className="mr-2 h-4 w-4" />
-                    )
-                  }
-                  variant="outline"
-                  className={actionOutlineClass}
-                  disabledReason={
-                    anyActionInFlight
-                      ? "Aktion wird verarbeitet…"
-                      : !canPaymentWrite
-                        ? "Nur Admin und Editor dürfen Zahlungen ändern."
-                        : undefined
-                  }
-                  onClick={() => {
-                    setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
-                    setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
-                    setPaymentEditorOpen(true);
-                  }}
-                />
-              </div>
+                  <HintButton
+                    label={actionInFlight === "payment-adjust" ? "Zahlungsdaten werden gespeichert…" : "Zahlung manuell anpassen"}
+                    icon={
+                      actionInFlight === "payment-adjust" ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wallet className="mr-2 h-4 w-4" />
+                      )
+                    }
+                    variant="outline"
+                    className={actionOutlineClass}
+                    disabledReason={anyActionInFlight ? "Aktion wird verarbeitet…" : undefined}
+                    onClick={() => {
+                      setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
+                      setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
+                      setPaymentEditorOpen(true);
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="grid gap-2 border-t border-slate-200 pt-4">
                 <Button
@@ -1015,8 +995,9 @@ export function AdminEntryDetailPage() {
                 </Button>
               </div>
 
-              <div className="grid gap-2 border-t border-slate-200 pt-4">
-                <HintButton
+              {canDeleteEntry && (
+                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                  <HintButton
                   label={actionInFlight === "entry-delete" ? "Nennung wird gelöscht…" : "Nennung löschen"}
                   icon={
                     actionInFlight === "entry-delete" ? (
@@ -1027,19 +1008,14 @@ export function AdminEntryDetailPage() {
                   }
                   variant="outline"
                   className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                  disabledReason={
-                    anyActionInFlight
-                      ? "Aktion wird verarbeitet…"
-                      : !canDeleteEntry
-                        ? "Nur Admin-Rollen dürfen Nennungen löschen."
-                        : undefined
-                  }
+                  disabledReason={anyActionInFlight ? "Aktion wird verarbeitet…" : undefined}
                   onClick={() => {
                     setDeleteReasonDraft("");
                     setPendingDeleteConfirm(true);
                   }}
                 />
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1067,32 +1043,35 @@ export function AdminEntryDetailPage() {
                   onChange={(event) => setDriverNote(event.target.value)}
                 />
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!canNotesWrite || anyActionInFlight}
-                onClick={async () => {
-                  await runAction(
-                    "notes-save",
-                    () => adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote, status: detail.status }),
-                    "Notizen gespeichert.",
-                    "Notizen konnten nicht gespeichert werden."
-                  );
-                }}
-              >
-                {actionInFlight === "notes-save" ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Speichert…
-                  </>
-                ) : (
-                  "Notizen speichern"
-                )}
-              </Button>
+              {canNotesWrite && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={anyActionInFlight}
+                  onClick={async () => {
+                    await runAction(
+                      "notes-save",
+                      () => adminEntriesService.saveEntryNotes(detail.id, { internalNote, driverNote, status: detail.status }),
+                      "Notizen gespeichert.",
+                      "Notizen konnten nicht gespeichert werden."
+                    );
+                  }}
+                >
+                  {actionInFlight === "notes-save" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Speichert…
+                    </>
+                  ) : (
+                    "Notizen speichern"
+                  )}
+                </Button>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="min-w-0">
+          {canChangeClass && (
+            <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Klasse ändern</CardTitle>
             </CardHeader>
@@ -1162,11 +1141,9 @@ export function AdminEntryDetailPage() {
                   "Klasse ändern"
                 )}
               </Button>
-              {!canChangeClass && (
-                <div className="text-xs text-slate-500">Nur Admin und Editor dürfen die Klasse ändern.</div>
-              )}
             </CardContent>
           </Card>
+          )}
         </div>
       </div>
 

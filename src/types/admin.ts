@@ -71,6 +71,7 @@ export type AdminEntryListItem = {
   vehicleLabel: string;
   vehicleThumbUrl: string | null;
   status: AcceptanceStatus;
+  registrationStatus: RegistrationStatus;
   payment: PaymentStatus;
   checkin: "offen" | "bestätigt";
   confirmationMailSent: boolean;
@@ -113,6 +114,7 @@ export type AdminEntriesFilter = {
   query: string;
   classId: string;
   acceptanceStatus: "all" | AcceptanceStatus;
+  registrationStatus: "all" | RegistrationStatus;
   paymentStatus: "all" | PaymentStatus;
   checkinIdVerified: "all" | "true" | "false";
   sortBy: "createdAt" | "updatedAt" | "driverLastName" | "driverFirstName" | "className" | "startNumberNorm";

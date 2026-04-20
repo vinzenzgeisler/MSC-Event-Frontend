@@ -15,6 +15,10 @@ export const adminMetaService = {
   },
 
   async listClassOptions(): Promise<AdminClassOption[]> {
-    return getAdminClassOptions();
+    const collator = new Intl.Collator("de", {
+      numeric: true,
+      sensitivity: "base"
+    });
+    return [...(await getAdminClassOptions())].sort((left, right) => collator.compare(left.name, right.name));
   }
 };

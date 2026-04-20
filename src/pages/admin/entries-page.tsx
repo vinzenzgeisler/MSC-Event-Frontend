@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Filter, Loader2, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -29,6 +29,7 @@ const initialFilter: AdminEntriesFilter = {
   query: "",
   classId: "all",
   acceptanceStatus: "all",
+  registrationStatus: "all",
   paymentStatus: "all",
   checkinIdVerified: "all",
   sortBy: "createdAt",
@@ -44,8 +45,8 @@ const EMPTY_META: ListMeta = {
 };
 
 const ACCEPTANCE_VALUES: AdminEntriesFilter["acceptanceStatus"][] = ["all", "pending", "shortlist", "accepted", "rejected"];
+const REGISTRATION_VALUES: AdminEntriesFilter["registrationStatus"][] = ["all", "submitted_unverified", "submitted_verified"];
 const PAYMENT_VALUES: AdminEntriesFilter["paymentStatus"][] = ["all", "due", "paid"];
-const CHECKIN_VALUES: AdminEntriesFilter["checkinIdVerified"][] = ["all", "true", "false"];
 const SORT_BY_VALUES: AdminEntriesFilter["sortBy"][] = ["createdAt", "updatedAt", "driverLastName", "driverFirstName", "className", "startNumberNorm"];
 const SORT_DIR_VALUES: AdminEntriesFilter["sortDir"][] = ["asc", "desc"];
 
@@ -164,8 +165,8 @@ function filterFromSearchParams(searchParams: URLSearchParams): AdminEntriesFilt
   const classId = searchParams.get("class");
   const query = searchParams.get("q");
   const acceptanceStatus = searchParams.get("status");
+  const registrationStatus = searchParams.get("registrationStatus");
   const paymentStatus = searchParams.get("payment");
-  const checkin = searchParams.get("checkin");
   const sortBy = searchParams.get("sortBy");
   const sortDir = searchParams.get("sortDir");
 
@@ -173,8 +174,9 @@ function filterFromSearchParams(searchParams: URLSearchParams): AdminEntriesFilt
     query: query ?? "",
     classId: classId && classId.trim() ? classId : "all",
     acceptanceStatus: hasValue(acceptanceStatus, ACCEPTANCE_VALUES) ? acceptanceStatus : "all",
+    registrationStatus: hasValue(registrationStatus, REGISTRATION_VALUES) ? registrationStatus : "all",
     paymentStatus: hasValue(paymentStatus, PAYMENT_VALUES) ? paymentStatus : "all",
-    checkinIdVerified: hasValue(checkin, CHECKIN_VALUES) ? checkin : "all",
+    checkinIdVerified: "all",
     sortBy: hasValue(sortBy, SORT_BY_VALUES) ? sortBy : "createdAt",
     sortDir: hasValue(sortDir, SORT_DIR_VALUES) ? sortDir : "desc"
   };
@@ -199,11 +201,11 @@ function searchParamsFromState(filter: AdminEntriesFilter, scope: EntriesScope, 
   if (filter.acceptanceStatus !== "all") {
     params.set("status", filter.acceptanceStatus);
   }
+  if (filter.registrationStatus !== "all") {
+    params.set("registrationStatus", filter.registrationStatus);
+  }
   if (filter.paymentStatus !== "all") {
     params.set("payment", filter.paymentStatus);
-  }
-  if (filter.checkinIdVerified !== "all") {
-    params.set("checkin", filter.checkinIdVerified);
   }
   if (filter.sortBy !== initialFilter.sortBy) {
     params.set("sortBy", filter.sortBy);
@@ -222,8 +224,8 @@ function sameFilter(a: AdminEntriesFilter, b: AdminEntriesFilter) {
     a.query === b.query &&
     a.classId === b.classId &&
     a.acceptanceStatus === b.acceptanceStatus &&
+    a.registrationStatus === b.registrationStatus &&
     a.paymentStatus === b.paymentStatus &&
-    a.checkinIdVerified === b.checkinIdVerified &&
     a.sortBy === b.sortBy &&
     a.sortDir === b.sortDir
   );
@@ -284,15 +286,12 @@ function rowMatchesFilter(row: AdminEntryListItem, filter: AdminEntriesFilter, c
     return false;
   }
 
-  if (filter.paymentStatus !== "all" && row.payment !== filter.paymentStatus) {
+  if (filter.registrationStatus !== "all" && row.registrationStatus !== filter.registrationStatus) {
     return false;
   }
 
-  if (filter.checkinIdVerified !== "all") {
-    const checkinAsString = row.checkin === "bestätigt" ? "true" : "false";
-    if (checkinAsString !== filter.checkinIdVerified) {
-      return false;
-    }
+  if (filter.paymentStatus !== "all" && row.payment !== filter.paymentStatus) {
+    return false;
   }
 
   const tokens = parseSmartSearchQuery(filter.query);
@@ -433,12 +432,13 @@ export function AdminEntriesPage() {
       query: debouncedQuery,
       classId: filterDraft.classId,
       acceptanceStatus: filterDraft.acceptanceStatus,
+      registrationStatus: filterDraft.registrationStatus,
       paymentStatus: filterDraft.paymentStatus,
       checkinIdVerified: filterDraft.checkinIdVerified,
       sortBy: filterDraft.sortBy,
       sortDir: filterDraft.sortDir
     }),
-    [debouncedQuery, filterDraft.classId, filterDraft.acceptanceStatus, filterDraft.paymentStatus, filterDraft.checkinIdVerified, filterDraft.sortBy, filterDraft.sortDir]
+    [debouncedQuery, filterDraft.classId, filterDraft.acceptanceStatus, filterDraft.registrationStatus, filterDraft.paymentStatus, filterDraft.checkinIdVerified, filterDraft.sortBy, filterDraft.sortDir]
   );
 
   const [rows, setRows] = useState<AdminEntryListItem[]>([]);
@@ -450,6 +450,7 @@ export function AdminEntriesPage() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
@@ -948,12 +949,10 @@ export function AdminEntriesPage() {
       key: "classId",
       label: `Klasse: ${classOptions.find((item) => item.id === filterDraft.classId)?.name ?? filterDraft.classId}`
     },
+    filterDraft.registrationStatus === "submitted_unverified" && { key: "registrationStatus", label: "Status: Nicht verifiziert" },
+    filterDraft.registrationStatus === "submitted_verified" && { key: "registrationStatus", label: "Status: Verifiziert" },
     filterDraft.acceptanceStatus !== "all" && { key: "acceptanceStatus", label: `Status: ${acceptanceStatusLabel(filterDraft.acceptanceStatus)}` },
     filterDraft.paymentStatus !== "all" && { key: "paymentStatus", label: `Zahlung: ${paymentStatusLabel(filterDraft.paymentStatus)}` },
-    filterDraft.checkinIdVerified !== "all" && {
-      key: "checkinIdVerified",
-      label: `Einchecken: ${filterDraft.checkinIdVerified === "true" ? "Ja" : "Nein"}`
-    },
     (filterDraft.sortBy !== initialFilter.sortBy || filterDraft.sortDir !== initialFilter.sortDir) && {
       key: "sortBy",
       label: `Sortierung: ${sortLabel(filterDraft.sortBy, filterDraft.sortDir)}`
@@ -1044,14 +1043,25 @@ export function AdminEntriesPage() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
       <div className="rounded-xl border bg-white p-4">
-        <EntriesFilterBar
-          filter={filterDraft}
-          classOptions={classOptions}
-          statusScope={viewScope}
-          allowDeletedStatusOption={canDeleteEntries}
-          onStatusScopeChange={(scope) => setViewScope(scope)}
-          onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
-        />
+        <div className="hidden md:block">
+          <EntriesFilterBar
+            filter={filterDraft}
+            classOptions={classOptions}
+            statusScope={viewScope}
+            allowDeletedStatusOption={canDeleteEntries}
+            onStatusScopeChange={(scope) => setViewScope(scope)}
+            onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2 md:hidden">
+          <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
+            <Filter className="mr-2 h-4 w-4" />
+            Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
+            Zurücksetzen
+          </Button>
+        </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs text-slate-500">{loadedCountText}</div>
@@ -1213,6 +1223,41 @@ export function AdminEntriesPage() {
       {toastMessage && (
         <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">
           {toastMessage}
+        </div>
+      )}
+
+      {mobileFiltersOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 p-4 md:hidden">
+          <div className="mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div>
+                <div className="text-lg font-semibold text-slate-900">Filter</div>
+                <div className="text-xs text-slate-500">Nennungen gezielt eingrenzen</div>
+              </div>
+              <Button type="button" size="icon" variant="ghost" onClick={() => setMobileFiltersOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              <EntriesFilterBar
+                compact
+                filter={filterDraft}
+                classOptions={classOptions}
+                statusScope={viewScope}
+                allowDeletedStatusOption={canDeleteEntries}
+                onStatusScopeChange={(scope) => setViewScope(scope)}
+                onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
+              />
+            </div>
+            <div className="flex items-center justify-between border-t px-4 py-3">
+              <Button type="button" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
+                Filter zurücksetzen
+              </Button>
+              <Button type="button" onClick={() => setMobileFiltersOpen(false)}>
+                Anwenden
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
