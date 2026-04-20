@@ -246,6 +246,9 @@ export function AdminEntryDetailPage() {
       if (code === "outbox_insert_failed") {
         return `Mail konnte nicht in die Outbox geschrieben werden.${reason ? ` Grund: ${reason}` : ""}`;
       }
+      if (code === "pre_acceptance_payment_not_allowed") {
+        return "Ein Zahlungseingang kann erst nach der Zulassung erfasst werden.";
+      }
       if (code.includes("duplicate")) {
         return "Doppelte Anfrage: Eine identische Mail-Aktion wurde bereits ausgelöst. Bitte Outbox prüfen.";
       }
@@ -370,8 +373,8 @@ export function AdminEntryDetailPage() {
   };
 
   return (
-    <div className="w-full max-w-[1120px] space-y-4 overflow-x-hidden">
-      <div className="sticky top-[57px] z-20 -mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:top-0 md:-mx-3 md:px-3">
+    <div className="w-full max-w-[1120px] space-y-4">
+      <div className="sticky top-[57px] z-30 -mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:-mx-3 md:top-4 md:px-3">
         <div>
           <Button
             type="button"
@@ -674,7 +677,9 @@ export function AdminEntryDetailPage() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-md border bg-slate-50 p-3">
-                    <div className="text-xs uppercase text-slate-500">Nennungsbetrag</div>
+                    <div className="text-xs uppercase text-slate-500">
+                      {status === "accepted" ? "Nennungsbetrag" : "Vorgesehener Betrag"}
+                    </div>
                     <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.totalCents)}</div>
                   </div>
                   <div className="rounded-md border bg-slate-50 p-3">
@@ -749,7 +754,7 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-2 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-28 lg:w-[340px] lg:justify-self-end lg:self-start">
+        <div className="order-2 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-6 lg:w-[340px] lg:justify-self-end lg:self-start">
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
@@ -921,7 +926,7 @@ export function AdminEntryDetailPage() {
                 </div>
               )}
 
-              {canPaymentWrite && (
+                  {canPaymentWrite && (
                 <div className="grid gap-2 border-t border-slate-200 pt-4">
                   <HintButton
                   label={actionInFlight === "payment-mark" ? "Zahlung wird bestätigt…" : "Zahlung als eingegangen markieren"}
@@ -953,7 +958,7 @@ export function AdminEntryDetailPage() {
                     disabledReason={anyActionInFlight ? "Aktion wird verarbeitet…" : undefined}
                     onClick={() => {
                       setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
-                      setPaymentPaidInput(euroInputFromCents(detail.payment.paidAmountCents));
+                      setPaymentPaidInput(status === "accepted" ? euroInputFromCents(detail.payment.paidAmountCents) : "0,00");
                       setPaymentEditorOpen(true);
                     }}
                   />
@@ -1374,7 +1379,11 @@ export function AdminEntryDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
             <h2 className="text-lg font-semibold text-slate-900">Zahlungsbetrag anpassen</h2>
-            <p className="mt-2 text-sm text-slate-600">Werte in EUR eintragen, z. B. 89,00.</p>
+            <p className="mt-2 text-sm text-slate-600">
+              {status === "accepted"
+                ? "Werte in EUR eintragen, z. B. 89,00."
+                : "Vor Zulassung kann hier nur der vorgesehene Betrag angepasst werden. Zahlungseingänge werden erst nach Zulassung erfasst."}
+            </p>
             <div className="mt-4 space-y-3">
               <div>
                 <label className="mb-1 block text-sm text-slate-700">Gesamtbetrag (EUR)</label>
@@ -1389,6 +1398,7 @@ export function AdminEntryDetailPage() {
                 <input
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={paymentPaidInput}
+                  disabled={status !== "accepted"}
                   onChange={(event) => setPaymentPaidInput(event.target.value)}
                 />
               </div>
