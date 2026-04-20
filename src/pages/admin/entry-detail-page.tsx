@@ -34,6 +34,10 @@ function euroInputFromCents(value: number): string {
   return (value / 100).toFixed(2).replace(".", ",");
 }
 
+function euroDisplayFromCents(value: number): string {
+  return `${euroInputFromCents(value)} EUR`;
+}
+
 function formatTimestamp(value: string) {
   const raw = (value ?? "").trim();
   if (!raw) {
@@ -154,7 +158,7 @@ export function AdminEntryDetailPage() {
   const canNotesWrite = hasPermission(roles, "entries.notes.write");
   const canDeleteEntry = hasPermission(roles, "entries.delete");
   const canSendMail = hasPermission(roles, "communication.write");
-  const canChangeClass = hasPermission(roles, "entries.status.write") || roles.includes("admin") || roles.includes("editor");
+  const canChangeClass = hasPermission(roles, "entries.status.write");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -666,6 +670,20 @@ export function AdminEntryDetailPage() {
                     {paymentStatusLabel(paymentState)}
                   </Badge>
                 </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-md border bg-slate-50 p-3">
+                    <div className="text-xs uppercase text-slate-500">Nennungsbetrag</div>
+                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.totalCents)}</div>
+                  </div>
+                  <div className="rounded-md border bg-slate-50 p-3">
+                    <div className="text-xs uppercase text-slate-500">Bereits bezahlt</div>
+                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.paidAmountCents)}</div>
+                  </div>
+                  <div className="rounded-md border bg-slate-50 p-3">
+                    <div className="text-xs uppercase text-slate-500">Offen</div>
+                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.amountOpenCents)}</div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -952,9 +970,7 @@ export function AdminEntryDetailPage() {
                       ? "Aktion wird verarbeitet…"
                       : !canPaymentWrite
                         ? "Nur Admin-Rollen dürfen Zahlungen ändern."
-                        : status !== "accepted"
-                          ? "Betragsanpassung erst nach Zulassung möglich."
-                          : undefined
+                        : undefined
                   }
                   onClick={() => {
                     setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
