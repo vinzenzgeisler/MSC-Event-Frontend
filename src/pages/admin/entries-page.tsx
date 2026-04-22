@@ -460,7 +460,8 @@ export function AdminEntriesPage() {
   const [actorLabelById, setActorLabelById] = useState<Map<string, string>>(new Map());
   const [actorLookupLoaded, setActorLookupLoaded] = useState(false);
   const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
-  const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
+  const [mobileLoadMoreNode, setMobileLoadMoreNode] = useState<HTMLDivElement | null>(null);
+  const [desktopLoadMoreNode, setDesktopLoadMoreNode] = useState<HTMLDivElement | null>(null);
   const [activeTableScrollContainerNode, setActiveTableScrollContainerNode] = useState<HTMLDivElement | null>(null);
 
   const rowsRef = useRef<AdminEntryListItem[]>([]);
@@ -909,11 +910,15 @@ export function AdminEntriesPage() {
   }, [appliedFilter, replaceActiveRows, replaceDeletedRows, viewScope]);
 
   useEffect(() => {
-    if (viewScope !== "active" || !loadMoreNode || !meta.hasMore || loadingMore || loadingInitial) {
+    if (viewScope !== "active" || !meta.hasMore || loadingMore || loadingInitial) {
       return;
     }
 
     const observerRoot = getVisibleActiveTableScrollContainer();
+    const observerTarget = observerRoot ? desktopLoadMoreNode : mobileLoadMoreNode;
+    if (!observerTarget) {
+      return;
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -923,12 +928,12 @@ export function AdminEntriesPage() {
       { root: observerRoot, rootMargin: "640px 0px" }
     );
 
-    observer.observe(loadMoreNode);
+    observer.observe(observerTarget);
 
     return () => {
       observer.disconnect();
     };
-  }, [activeTableScrollContainerNode, getVisibleActiveTableScrollContainer, loadMore, loadMoreNode, loadingInitial, loadingMore, meta.hasMore, viewScope]);
+  }, [activeTableScrollContainerNode, desktopLoadMoreNode, getVisibleActiveTableScrollContainer, loadMore, loadingInitial, loadingMore, meta.hasMore, mobileLoadMoreNode, viewScope]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -1191,7 +1196,8 @@ export function AdminEntriesPage() {
           isLoadingMore={loadingMore}
           hasMore={meta.hasMore}
           onLoadMore={() => void loadMore()}
-          loadMoreRef={setLoadMoreNode}
+          loadMoreRef={setMobileLoadMoreNode}
+          desktopLoadMoreRef={setDesktopLoadMoreNode}
           desktopScrollContainerRef={handleActiveTableScrollContainer}
           resolveScrollOffset={() => getVisibleActiveTableScrollContainer()?.scrollTop ?? window.scrollY}
           onSetShortlist={async (entryId) => {

@@ -25,6 +25,7 @@ type EntriesTableProps = {
   hasMore: boolean;
   onLoadMore: () => void;
   loadMoreRef: (node: HTMLDivElement | null) => void;
+  desktopLoadMoreRef?: (node: HTMLDivElement | null) => void;
   desktopScrollContainerRef?: (node: HTMLDivElement | null) => void;
   resolveScrollOffset?: () => number;
   onSetShortlist: (entryId: string) => void;
@@ -116,6 +117,7 @@ export function EntriesTable({
   hasMore,
   onLoadMore,
   loadMoreRef,
+  desktopLoadMoreRef,
   desktopScrollContainerRef,
   resolveScrollOffset,
   onSetShortlist,
@@ -413,7 +415,7 @@ export function EntriesTable({
           </table>
           {(hasMore || isLoadingMore) && (
             <div className="flex flex-col items-center gap-2 px-3 py-3">
-              <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+              <div ref={desktopLoadMoreRef} className="h-1 w-full" aria-hidden="true" />
               <Button type="button" size="sm" variant="outline" disabled={isLoadingMore} onClick={onLoadMore}>
                 {isLoadingMore ? "Lade weitere Nennungen…" : "Weitere Nennungen laden"}
               </Button>
