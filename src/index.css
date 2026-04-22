@@ -29,13 +29,11 @@
 
 html {
   overflow-y: scroll;
-  scrollbar-gutter: stable;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   @apply bg-background text-foreground antialiased;
-  overflow-x: hidden;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 

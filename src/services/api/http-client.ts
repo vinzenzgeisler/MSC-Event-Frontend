@@ -60,7 +60,28 @@ function readConfigValue(envKey: string, runtimeKey: string, fallback = ""): str
   return fallback;
 }
 
-const baseUrl = readConfigValue("VITE_API_BASE_URL", "apiBaseUrl").replace(/\/$/, "");
+function resolveBaseUrl(): string {
+  const runtimeConfig = window.__MSC_RUNTIME_CONFIG__;
+  const runtimeValue = runtimeConfig?.apiBaseUrl ?? runtimeConfig?.VITE_API_BASE_URL;
+  if (runtimeValue !== undefined && runtimeValue !== null) {
+    return String(runtimeValue).trim().replace(/\/$/, "");
+  }
+
+  const env = import.meta.env as Record<string, unknown>;
+  const proxyTarget = env.VITE_API_PROXY_TARGET;
+  if (import.meta.env.DEV && proxyTarget !== undefined && proxyTarget !== null && String(proxyTarget).trim()) {
+    return "/api";
+  }
+
+  const envValue = env.VITE_API_BASE_URL;
+  if (envValue !== undefined && envValue !== null) {
+    return String(envValue).trim().replace(/\/$/, "");
+  }
+
+  return "";
+}
+
+const baseUrl = resolveBaseUrl();
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

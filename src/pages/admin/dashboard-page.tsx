@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { communicationService } from "@/services/communication.service";
 import { getAdminEventId } from "@/services/api/event-context";
-import { getApiErrorMessage, requestJson } from "@/services/api/http-client";
+import { ApiError, getApiErrorMessage, requestJson } from "@/services/api/http-client";
 import type { AdminEntriesFilter } from "@/types/admin";
 
 type DashboardSummary = {
@@ -372,7 +372,11 @@ export function AdminDashboardPage() {
       setSummary(EMPTY_SUMMARY);
       setClassDistribution([]);
       setRecentEntries([]);
-      setError(getApiErrorMessage(err, "Dashboard-Daten konnten nicht geladen werden."));
+      if (err instanceof ApiError && err.status === 404 && err.code === "NOT_FOUND") {
+        setError("Aktuell ist kein Event als laufendes Event markiert. Bitte im Admin unter Einstellungen ein Event als aktuell anlegen oder aktivieren.");
+      } else {
+        setError(getApiErrorMessage(err, "Dashboard-Daten konnten nicht geladen werden."));
+      }
     } finally {
       if (isRefresh) {
         setRefreshing(false);
@@ -574,7 +578,7 @@ export function AdminDashboardPage() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       <Card className="border-slate-200 bg-gradient-to-r from-white via-slate-50 to-emerald-50/60">
         <CardContent className="space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">

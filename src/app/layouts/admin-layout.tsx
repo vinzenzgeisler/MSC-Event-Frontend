@@ -14,6 +14,34 @@ export function AdminLayout() {
   const { logout, roles, displayName, email } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const showDisplayName = Boolean(displayName && !looksLikeOpaqueId(displayName));
+  const sidebarContent = (
+    <>
+      <div className="mb-4 border-b pb-4">
+        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Admin-Bereich</div>
+        <div className="mt-2 text-lg font-semibold text-slate-900">MSC Event</div>
+        <div className="mt-3 space-y-1 rounded-md bg-slate-50 p-2 text-xs text-slate-600">
+          <div className="font-medium text-slate-800">{showDisplayName ? displayName : email || "Angemeldet"}</div>
+          {email && showDisplayName && <div>{email}</div>}
+          <div>Rollen: {roles.length > 0 ? roles.join(", ") : "nicht im Token"}</div>
+        </div>
+      </div>
+      <div onClick={() => setMenuOpen(false)}>
+        <AdminNav />
+      </div>
+      <div className="mt-6 border-t pt-4">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setMenuOpen(false);
+            logout();
+          }}
+        >
+          Logout
+        </Button>
+      </div>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -37,40 +65,19 @@ export function AdminLayout() {
       )}
 
       <div className="mx-auto grid w-full max-w-[1500px] items-start gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[240px_1fr] lg:gap-6 xl:px-5 2xl:px-6">
-        <div className="lg:sticky lg:top-6 lg:self-start">
-          <aside
-            className={[
-              "rounded-lg border bg-white p-4",
-              "fixed inset-y-0 left-0 z-50 w-[86%] max-w-xs overflow-y-auto transition lg:static lg:z-auto lg:h-[calc(100vh-3rem)] lg:w-full lg:max-w-none",
-              menuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-            ].join(" ")}
-          >
-            <div className="mb-4 border-b pb-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Admin-Bereich</div>
-              <div className="mt-2 text-lg font-semibold text-slate-900">MSC Event</div>
-              <div className="mt-3 space-y-1 rounded-md bg-slate-50 p-2 text-xs text-slate-600">
-                <div className="font-medium text-slate-800">{showDisplayName ? displayName : email || "Angemeldet"}</div>
-                {email && showDisplayName && <div>{email}</div>}
-                <div>Rollen: {roles.length > 0 ? roles.join(", ") : "nicht im Token"}</div>
-              </div>
-            </div>
-            <div onClick={() => setMenuOpen(false)}>
-              <AdminNav />
-            </div>
-            <div className="mt-6 border-t pt-4">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setMenuOpen(false);
-                  logout();
-                }}
-              >
-                Logout
-              </Button>
-            </div>
-          </aside>
-        </div>
+        <aside className="hidden self-start rounded-lg border bg-white p-4 lg:sticky lg:top-0 lg:block lg:max-h-[100dvh] lg:overflow-y-auto">
+          {sidebarContent}
+        </aside>
+
+        <aside
+          className={[
+            "fixed inset-y-0 left-0 z-50 w-[86%] max-w-xs overflow-y-auto rounded-r-xl border-r bg-white p-4 shadow-xl transition lg:hidden",
+            menuOpen ? "translate-x-0" : "-translate-x-full"
+          ].join(" ")}
+        >
+          {sidebarContent}
+        </aside>
+
         <main className="min-w-0 space-y-4">
           <Outlet />
         </main>

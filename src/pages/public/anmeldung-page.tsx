@@ -2190,7 +2190,7 @@ export function AnmeldungPage() {
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-0 z-20 -mx-3 border-t bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur sm:-mx-4 md:hidden">
+      <div className="sticky bottom-0 z-20 border-t bg-white/95 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:hidden">
         <div className="mx-auto max-w-6xl space-y-2">
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" className="flex-1" disabled={step === 1} onClick={() => setStep((prev) => Math.max(1, prev - 1))}>

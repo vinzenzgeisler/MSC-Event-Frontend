@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bike, Car, CheckCircle2, Clock3, Download, Loader2, Mail, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
@@ -191,6 +191,8 @@ export function AdminEntryDetailPage() {
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [classDraft, setClassDraft] = useState("");
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -319,6 +321,27 @@ export function AdminEntryDetailPage() {
       .catch(() => setClassOptions([]));
   }, []);
 
+  useEffect(() => {
+    const element = headerRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateHeaderHeight = () => {
+      setHeaderHeight(Math.ceil(element.getBoundingClientRect().height));
+    };
+
+    updateHeaderHeight();
+    const observer = new ResizeObserver(() => updateHeaderHeight());
+    observer.observe(element);
+    window.addEventListener("resize", updateHeaderHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateHeaderHeight);
+    };
+  }, [detail?.id, detail?.headline, detail?.orgaCode, detail?.classLabel, detail?.startNumber, confirmationMailVerified, status, paid, checkinDone, actionInFlight]);
+
   const hasDriverNote = driverNote.trim().length > 0;
 
   useEffect(() => {
@@ -338,6 +361,7 @@ export function AdminEntryDetailPage() {
   }
 
   const paymentState = paid ? "paid" : "due";
+  const desktopStickyTop = `${Math.max(16, headerHeight + 16)}px`;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const changedAt = detail.history.reduce((latest, item) => {
@@ -373,9 +397,9 @@ export function AdminEntryDetailPage() {
   };
 
   return (
-    <div className="w-full max-w-[1120px] space-y-4">
-      <div className="sticky top-[57px] z-30 md:top-4 lg:top-6">
-        <div className="-mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:-mx-3 md:px-3">
+    <div className="w-full max-w-[1120px] pb-4">
+      <div ref={headerRef} className="sticky top-0 z-40 bg-slate-100">
+        <div className="space-y-3 bg-slate-100 px-3 py-3">
           <div>
             <Button
               type="button"
@@ -437,6 +461,7 @@ export function AdminEntryDetailPage() {
             </div>
           </div>
         </div>
+        <div aria-hidden="true" className="h-4 bg-slate-100" />
       </div>
 
       {actionMessage && (
@@ -445,7 +470,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
+      <div className="relative z-0 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
         <div className="order-1 min-w-0 space-y-4 lg:order-1">
           <Card className="min-w-0">
             <CardHeader>
@@ -756,9 +781,8 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-2 w-full min-w-0 lg:order-2 lg:w-[340px] lg:justify-self-end lg:self-start">
-          <div className="space-y-4 lg:sticky lg:top-6">
-            <div className="space-y-4 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+        <aside className="order-2 w-full min-w-0 lg:order-2 lg:w-[340px] lg:justify-self-end lg:self-start">
+          <div className="space-y-4 lg:sticky lg:z-20" style={{ top: desktopStickyTop }}>
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
@@ -1153,9 +1177,8 @@ export function AdminEntryDetailPage() {
             </CardContent>
           </Card>
           )}
-            </div>
           </div>
-        </div>
+        </aside>
       </div>
 
       {previewImage && (
