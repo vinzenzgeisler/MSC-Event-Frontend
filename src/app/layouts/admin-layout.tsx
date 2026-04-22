@@ -46,7 +46,7 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-slate-100">
       <DocumentMeta />
-      <div className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur lg:hidden" style={{ overflowAnchor: "none" }}>
         <div className="flex w-full items-center justify-between px-4 py-3">
           <div className="text-base font-semibold text-slate-900">MSC Event Verwaltung</div>
           <Button type="button" size="sm" variant="outline" onClick={() => setMenuOpen((prev) => !prev)}>
@@ -65,9 +65,11 @@ export function AdminLayout() {
       )}
 
       <div className="mx-auto grid w-full max-w-[1500px] items-start gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[240px_1fr] lg:gap-6 xl:px-5 2xl:px-6">
-        <aside className="hidden self-start rounded-lg border bg-white p-4 lg:sticky lg:top-0 lg:block lg:max-h-[100dvh] lg:overflow-y-auto">
-          {sidebarContent}
-        </aside>
+        <div className="hidden self-start lg:sticky lg:top-6 lg:block" style={{ overflowAnchor: "none" }}>
+          <aside className="rounded-lg border bg-white p-4 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+            {sidebarContent}
+          </aside>
+        </div>
 
         <aside
           className={[

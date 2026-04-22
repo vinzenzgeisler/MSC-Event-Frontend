@@ -461,6 +461,7 @@ export function AdminEntriesPage() {
   const [actorLookupLoaded, setActorLookupLoaded] = useState(false);
   const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
   const [loadMoreNode, setLoadMoreNode] = useState<HTMLDivElement | null>(null);
+  const [activeTableScrollContainerNode, setActiveTableScrollContainerNode] = useState<HTMLDivElement | null>(null);
 
   const rowsRef = useRef<AdminEntryListItem[]>([]);
   const deletedRowsRef = useRef<AdminDeletedEntryListItem[]>([]);
@@ -469,6 +470,7 @@ export function AdminEntriesPage() {
   const hydratedFromCacheRef = useRef(false);
   const firstFilterLoadRef = useRef(true);
   const hasRestoredFromStateRef = useRef(false);
+  const activeTableScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const classNameById = useMemo(() => {
     return new Map(classOptions.map((item) => [item.id, item.name]));
@@ -478,6 +480,19 @@ export function AdminEntriesPage() {
     setToastMessage(message);
     setTimeout(() => setToastMessage(""), 2600);
   };
+
+  const handleActiveTableScrollContainer = useCallback((node: HTMLDivElement | null) => {
+    activeTableScrollContainerRef.current = node;
+    setActiveTableScrollContainerNode(node);
+  }, []);
+
+  const getVisibleActiveTableScrollContainer = useCallback(() => {
+    const node = activeTableScrollContainerRef.current;
+    if (!node || node.offsetParent === null) {
+      return null;
+    }
+    return node;
+  }, []);
 
   const beginRequest = () => {
     activeRequestRef.current += 1;
@@ -898,13 +913,14 @@ export function AdminEntriesPage() {
       return;
     }
 
+    const observerRoot = getVisibleActiveTableScrollContainer();
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           void loadMore();
         }
       },
-      { rootMargin: "640px 0px" }
+      { root: observerRoot, rootMargin: "640px 0px" }
     );
 
     observer.observe(loadMoreNode);
@@ -912,7 +928,7 @@ export function AdminEntriesPage() {
     return () => {
       observer.disconnect();
     };
-  }, [loadMore, loadMoreNode, loadingInitial, loadingMore, meta.hasMore, viewScope]);
+  }, [activeTableScrollContainerNode, getVisibleActiveTableScrollContainer, loadMore, loadMoreNode, loadingInitial, loadingMore, meta.hasMore, viewScope]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -936,13 +952,18 @@ export function AdminEntriesPage() {
       return;
     }
     const frame = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: pendingScrollRestoreY, behavior: "auto" });
+      const activeTableScroller = getVisibleActiveTableScrollContainer();
+      if (activeTableScroller) {
+        activeTableScroller.scrollTo({ top: pendingScrollRestoreY, behavior: "auto" });
+      } else {
+        window.scrollTo({ top: pendingScrollRestoreY, behavior: "auto" });
+      }
       setPendingScrollRestoreY(null);
     });
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [loadingInitial, pendingScrollRestoreY, rows.length, viewScope]);
+  }, [activeTableScrollContainerNode, getVisibleActiveTableScrollContainer, loadingInitial, pendingScrollRestoreY, rows.length, viewScope]);
 
   const activeFilterChips = [
     filterDraft.query && { key: "query", label: `Suche: ${filterDraft.query}` },
@@ -1003,6 +1024,7 @@ export function AdminEntriesPage() {
   const pendingRejectRow = pendingRejectEntryId ? rows.find((item) => item.id === pendingRejectEntryId) : null;
   const hasAcceptDriverNote = Boolean(pendingAcceptRow?.driverNote);
   const hasRejectDriverNote = Boolean(pendingRejectRow?.driverNote);
+  const useDesktopTableShell = viewScope === "active";
   const loadedCountText =
     shownTotal > 0
       ? `${shownTotal} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${shownCount < shownTotal ? ` · ${shownCount} geladen` : ""}${refreshing ? " · aktualisiere…" : ""}`
@@ -1041,56 +1063,59 @@ export function AdminEntriesPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
-      <div className="rounded-xl border bg-white p-4">
-        <div className="hidden md:block">
-          <EntriesFilterBar
-            filter={filterDraft}
-            classOptions={classOptions}
-            statusScope={viewScope}
-            allowDeletedStatusOption={canDeleteEntries}
-            onStatusScopeChange={(scope) => setViewScope(scope)}
-            onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
-          />
-        </div>
-        <div className="space-y-3 md:hidden">
-          <Input
-            id="admin-filter-search-mobile"
-            placeholder="Suche nach E-Mail, Startnummer oder Name"
-            value={filterDraft.query}
-            onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
-          />
-          <div className="flex items-center justify-between gap-2">
-            <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
-              <Filter className="mr-2 h-4 w-4" />
-              Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
-            </Button>
+    <div className={cn("space-y-4", useDesktopTableShell && "xl:flex xl:h-[calc(100dvh-3rem)] xl:flex-col xl:overflow-hidden xl:space-y-0")}>
+      <div className={cn("space-y-4", useDesktopTableShell && "xl:flex-none xl:pb-4")}>
+        <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
+        <div className="rounded-xl border bg-white p-4">
+          <div className="hidden md:block">
+            <EntriesFilterBar
+              filter={filterDraft}
+              classOptions={classOptions}
+              statusScope={viewScope}
+              allowDeletedStatusOption={canDeleteEntries}
+              onStatusScopeChange={(scope) => setViewScope(scope)}
+              onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
+            />
           </div>
-        </div>
+          <div className="space-y-3 md:hidden">
+            <Input
+              id="admin-filter-search-mobile"
+              placeholder="Suche nach E-Mail, Startnummer oder Name"
+              value={filterDraft.query}
+              onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
+                <Filter className="mr-2 h-4 w-4" />
+                Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
+              </Button>
+            </div>
+          </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs text-slate-500">{loadedCountText}</div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={refreshing} onClick={() => void refreshSnapshot(true)}>
-              {refreshing ? "Aktualisiere…" : "Aktualisieren"}
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
-              Filter zurücksetzen
-            </Button>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-slate-500">{loadedCountText}</div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={refreshing} onClick={() => void refreshSnapshot(true)}>
+                {refreshing ? "Aktualisiere…" : "Aktualisieren"}
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
+                Filter zurücksetzen
+              </Button>
+            </div>
           </div>
+          {activeFilterChips.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterChips.map((chip) => (
+                <button key={chip.key} type="button" onClick={() => removeFilterChip(chip.key)}>
+                  <Badge variant="outline">{chip.label} ×</Badge>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        {activeFilterChips.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {activeFilterChips.map((chip) => (
-              <button key={chip.key} type="button" onClick={() => removeFilterChip(chip.key)}>
-                <Badge variant="outline">{chip.label} ×</Badge>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
+      <div className={cn(useDesktopTableShell && "xl:flex xl:min-h-0 xl:flex-1 xl:flex-col")}>
       {viewScope === "deleted" ? (
         <>
           {!deletedRows.length ? (
@@ -1167,6 +1192,8 @@ export function AdminEntriesPage() {
           hasMore={meta.hasMore}
           onLoadMore={() => void loadMore()}
           loadMoreRef={setLoadMoreNode}
+          desktopScrollContainerRef={handleActiveTableScrollContainer}
+          resolveScrollOffset={() => getVisibleActiveTableScrollContainer()?.scrollTop ?? window.scrollY}
           onSetShortlist={async (entryId) => {
             if (statusActionBusy) {
               return;
@@ -1225,6 +1252,7 @@ export function AdminEntriesPage() {
           }}
         />
       )}
+      </div>
 
       {toastMessage && (
         <div className="fixed right-4 top-4 z-40 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm">

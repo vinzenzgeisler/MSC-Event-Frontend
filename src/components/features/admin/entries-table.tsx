@@ -25,6 +25,8 @@ type EntriesTableProps = {
   hasMore: boolean;
   onLoadMore: () => void;
   loadMoreRef: (node: HTMLDivElement | null) => void;
+  desktopScrollContainerRef?: (node: HTMLDivElement | null) => void;
+  resolveScrollOffset?: () => number;
   onSetShortlist: (entryId: string) => void;
   onSetAccepted: (entryId: string) => void;
   onSetRejected: (entryId: string) => void;
@@ -44,6 +46,24 @@ function doppelstarterKey(row: AdminEntryListItem) {
     return `email:${driverEmail}`;
   }
   return "";
+}
+
+function acceptanceStatusRowBackgroundClasses(status: AdminEntryListItem["status"]): string {
+  return {
+    pending: "bg-amber-50/25",
+    shortlist: "bg-primary/5",
+    accepted: "bg-primary/5",
+    rejected: "bg-rose-50/25"
+  }[status];
+}
+
+function acceptanceStatusRowBorderClasses(status: AdminEntryListItem["status"]): string {
+  return {
+    pending: "border-l-4 border-l-amber-400",
+    shortlist: "border-l-4 border-l-primary/70",
+    accepted: "border-l-4 border-l-primary/70",
+    rejected: "border-l-4 border-l-rose-400"
+  }[status];
 }
 
 function ActionButton(props: {
@@ -96,6 +116,8 @@ export function EntriesTable({
   hasMore,
   onLoadMore,
   loadMoreRef,
+  desktopScrollContainerRef,
+  resolveScrollOffset,
   onSetShortlist,
   onSetAccepted,
   onSetRejected
@@ -107,7 +129,7 @@ export function EntriesTable({
         RETURN_SNAPSHOT_KEY,
         JSON.stringify({
           search: location.search,
-          scrollY: window.scrollY,
+          scrollY: Math.max(0, Math.floor(resolveScrollOffset?.() ?? window.scrollY)),
           loadedCount: rows.length,
           savedAt: Date.now()
         })
@@ -156,7 +178,7 @@ export function EntriesTable({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 xl:flex xl:h-full xl:min-h-0 xl:flex-1 xl:flex-col">
       <div className="space-y-2 xl:hidden">
         {rows.map((row) => (
           <div
@@ -255,8 +277,8 @@ export function EntriesTable({
         ))}
       </div>
 
-      <div className="hidden overflow-hidden rounded-xl border bg-white shadow-sm xl:block">
-        <div className="overflow-x-auto">
+      <div className="hidden min-h-0 overflow-hidden rounded-xl border bg-white shadow-sm xl:flex xl:flex-1 xl:flex-col">
+        <div ref={desktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
               <col className="w-[32%]" />
@@ -269,24 +291,24 @@ export function EntriesTable({
               <col className="w-[19%]" />
             </colgroup>
             <thead className="bg-slate-100 text-left text-slate-700">
-              <tr className="border-l-4 border-l-slate-100">
-                <th className="px-4 py-3 font-semibold">Nennung</th>
-                <th className="px-3 py-3 font-semibold">Klasse</th>
-                <th className="px-3 py-3 font-semibold">St.-Nr.</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold">Zahlung</th>
-                <th className="px-3 py-3 font-semibold">Check-in</th>
-                <th className="px-3 py-3 font-semibold">Erstellt am</th>
-                <th className="px-3 py-3 font-semibold">Aktion</th>
+              <tr>
+                <th className="sticky top-0 z-10 border-l-4 border-l-slate-100 bg-slate-100 px-4 py-3 font-semibold">Nennung</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Klasse</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">St.-Nr.</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Status</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Zahlung</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Check-in</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Erstellt am</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Aktion</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowAccentClasses(row.status) : "border-l-4 border-l-slate-300 bg-slate-50"}`}
+                  className={`border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowBackgroundClasses(row.status) : "bg-slate-50"}`}
                 >
-                  <td className="px-4 py-2.5">
+                  <td className={`px-4 py-2.5 ${row.confirmationMailVerified ? acceptanceStatusRowBorderClasses(row.status) : "border-l-4 border-l-slate-300"}`}>
                     <div className="flex items-start gap-3">
                       <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
                       <div className="min-w-0 pt-0.5">
@@ -389,11 +411,19 @@ export function EntriesTable({
               ))}
             </tbody>
           </table>
+          {(hasMore || isLoadingMore) && (
+            <div className="flex flex-col items-center gap-2 px-3 py-3">
+              <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
+              <Button type="button" size="sm" variant="outline" disabled={isLoadingMore} onClick={onLoadMore}>
+                {isLoadingMore ? "Lade weitere Nennungen…" : "Weitere Nennungen laden"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       {(hasMore || isLoadingMore) && (
-        <div className="flex flex-col items-center gap-2 py-1">
+        <div className="flex flex-col items-center gap-2 py-1 xl:hidden">
           <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
           <Button type="button" size="sm" variant="outline" disabled={isLoadingMore} onClick={onLoadMore}>
             {isLoadingMore ? "Lade weitere Nennungen…" : "Weitere Nennungen laden"}
