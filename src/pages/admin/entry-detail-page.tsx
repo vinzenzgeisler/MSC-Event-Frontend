@@ -374,65 +374,67 @@ export function AdminEntryDetailPage() {
 
   return (
     <div className="w-full max-w-[1120px] space-y-4">
-      <div className="sticky top-[57px] z-30 -mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:-mx-3 md:top-4 md:px-3 lg:top-6">
-        <div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
-              if (state?.fromEntriesList) {
-                navigate(-1);
-                return;
-              }
-              navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
-            }}
-          >
-            Zurück zu Nennungen
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold text-slate-900">
-              {detail.headline}
-              {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
-            </h1>
-            <p className="break-words text-sm text-slate-600">
-              {detail.classLabel} · Startnummer {detail.startNumber}
-            </p>
-            <p className="break-words text-xs text-slate-500">
-              Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
-            </p>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Badge
-              className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+      <div className="sticky top-[57px] z-30 md:top-4 lg:top-6">
+        <div className="-mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:-mx-3 md:px-3">
+          <div>
+            <Button
+              type="button"
               variant="outline"
+              size="sm"
+              onClick={() => {
+                const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
+                if (state?.fromEntriesList) {
+                  navigate(-1);
+                  return;
+                }
+                navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
+              }}
             >
-              E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
-            </Badge>
-            <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
-              Status: {acceptanceStatusLabel(status)}
-            </Badge>
-            <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
-              Zahlung: {paymentStatusLabel(paymentState)}
-            </Badge>
-            {status === "accepted" ? (
-              <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
-                Check-in: {checkinLabel(checkinDone)}
+              Zurück zu Nennungen
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="break-words text-2xl font-semibold text-slate-900">
+                {detail.headline}
+                {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
+              </h1>
+              <p className="break-words text-sm text-slate-600">
+                {detail.classLabel} · Startnummer {detail.startNumber}
+              </p>
+              <p className="break-words text-xs text-slate-500">
+                Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
+              </p>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge
+                className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+                variant="outline"
+              >
+                E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
               </Badge>
-            ) : (
-              <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
-                Check-in: Noch nicht relevant
+              <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
+                Status: {acceptanceStatusLabel(status)}
               </Badge>
-            )}
-            {statusActionInFlight && (
-              <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                Status wird aktualisiert…
+              <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
+                Zahlung: {paymentStatusLabel(paymentState)}
               </Badge>
-            )}
+              {status === "accepted" ? (
+                <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
+                  Check-in: {checkinLabel(checkinDone)}
+                </Badge>
+              ) : (
+                <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+                  Check-in: Noch nicht relevant
+                </Badge>
+              )}
+              {statusActionInFlight && (
+                <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  Status wird aktualisiert…
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -754,7 +756,9 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-2 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:w-[340px] lg:justify-self-end lg:self-start lg:overflow-y-auto">
+        <div className="order-2 w-full min-w-0 lg:order-2 lg:w-[340px] lg:justify-self-end lg:self-start">
+          <div className="space-y-4 lg:sticky lg:top-6">
+            <div className="space-y-4 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
@@ -1149,6 +1153,8 @@ export function AdminEntryDetailPage() {
             </CardContent>
           </Card>
           )}
+            </div>
+          </div>
         </div>
       </div>
 

@@ -56,6 +56,10 @@ function withSessionDefaults(session: AuthSession): AuthSession {
   };
 }
 
+function canRestoreExpiredSession(session: AuthSession): boolean {
+  return session.provider === "cognito" && typeof session.refreshToken === "string" && session.refreshToken.trim().length > 0;
+}
+
 export function getAuthSession(): AuthSession | null {
   if (inMemorySession) {
     return inMemorySession;
@@ -63,9 +67,10 @@ export function getAuthSession(): AuthSession | null {
 
   const storedSession = parseSession(localStorage.getItem(SESSION_KEY));
   if (storedSession) {
-    if (typeof storedSession.expiresAt === "number" && storedSession.expiresAt <= Date.now()) {
+    if (typeof storedSession.expiresAt === "number" && storedSession.expiresAt <= Date.now() && !canRestoreExpiredSession(storedSession)) {
       localStorage.removeItem(SESSION_KEY);
     } else {
+      // Keep expired Cognito sessions with refresh tokens so AuthProvider can refresh them on startup.
       const normalized = withSessionDefaults(storedSession);
       inMemorySession = normalized;
       localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
