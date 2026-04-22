@@ -8,7 +8,7 @@ import { DriverStep } from "@/components/features/registration/driver-step";
 import { StartEntriesStep } from "@/components/features/registration/start-entries-step";
 import { SummaryStep } from "@/components/features/registration/summary-step";
 import { WizardStepper } from "@/components/features/registration/wizard-stepper";
-import { ApiError } from "@/services/api/http-client";
+import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
 import { isCountryOption, resolveCountryCode } from "@/lib/countries";
 import { registrationService } from "@/services/registration.service";
@@ -578,6 +578,19 @@ function isServiceUnavailableError(error: unknown) {
     message.includes("network request failed") ||
     message.includes("load failed")
   );
+}
+
+function getImageUploadFailedError(locale: string) {
+  if (locale === "en") {
+    return "Image upload failed. Please try again.";
+  }
+  if (locale === "cz") {
+    return "Nahrání obrázku se nezdařilo. Zkuste to prosím znovu.";
+  }
+  if (locale === "pl") {
+    return "Przesyłanie obrazu nie powiodło się. Spróbuj ponownie.";
+  }
+  return "Bild-Upload fehlgeschlagen. Bitte erneut versuchen.";
 }
 
 function buildPartialSubmitErrorMessage(locale: string, createdEntries: number, attemptedEntries: number) {
@@ -1240,13 +1253,15 @@ export function AnmeldungPage() {
           return;
         }
         setEventLoadState("error");
-        setSubmitError(isServiceUnavailableError(error) ? m.page.submitErrorUnavailable : m.page.submitErrorGeneric);
+        setSubmitError(
+          getApiErrorMessage(error, isServiceUnavailableError(error) ? m.page.submitErrorUnavailable : m.page.submitErrorGeneric, locale)
+        );
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [locale, m.page.submitErrorGeneric, m.page.submitErrorUnavailable]);
 
   useEffect(() => {
     const consentLocale = publicLegal.consent?.consentLocale?.trim() || mapUiLocaleToConsentLocale(locale);
@@ -1534,8 +1549,7 @@ export function AnmeldungPage() {
       if (sequenceRef.current !== uploadId) {
         return;
       }
-      const fallback = "Bild-Upload fehlgeschlagen.";
-      const message = error instanceof Error && error.message.trim() ? error.message : fallback;
+      const message = getApiErrorMessage(error, getImageUploadFailedError(locale), locale);
       setDraftStart((prev) => ({
         ...prev,
         [target]: {
@@ -1866,14 +1880,14 @@ export function AnmeldungPage() {
         }
         focusFieldBySelector('[data-start-field="startNumber"]');
       } else if (isImageUploadInvalidError(error)) {
-        setSubmitError("Bild-Upload ist ungültig oder abgelaufen. Bitte Fahrzeugbilder erneut hochladen.");
+        setSubmitError(getApiErrorMessage(error, m.page.submitErrorGeneric, locale));
         setStep(2);
       } else if (isRegistrationConfirmationQueueFailedError(error)) {
-        setSubmitError("Anmeldung gespeichert, aber die Bestätigungs-Mail konnte nicht eingeplant werden. Bitte Support kontaktieren.");
-      } else if (isServiceUnavailableError(error)) {
-        setSubmitError(m.page.submitErrorUnavailable);
+        setSubmitError(getApiErrorMessage(error, m.page.submitErrorGeneric, locale));
       } else {
-        setSubmitError(m.page.submitErrorGeneric);
+        setSubmitError(
+          getApiErrorMessage(error, isServiceUnavailableError(error) ? m.page.submitErrorUnavailable : m.page.submitErrorGeneric, locale)
+        );
       }
       setIsSubmitting(false);
       return;

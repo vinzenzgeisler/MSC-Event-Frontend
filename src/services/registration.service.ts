@@ -1,4 +1,5 @@
 import { getPublicCurrentEvent, getPublicEventId } from "@/services/api/event-context";
+import { VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES } from "@/config/public-upload-limits";
 import { ApiError } from "@/services/api/http-client";
 import { requestJson } from "@/services/api/http-client";
 import { resolveCountryCode } from "@/lib/countries";
@@ -526,7 +527,10 @@ export const registrationService = {
   async uploadVehicleImage(file: File) {
     const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
     if (!allowedTypes.has(file.type)) {
-      throw new Error("Dateityp nicht unterstützt (nur JPG, PNG, WEBP).");
+      throw new ApiError(422, { code: "UNSUPPORTED_IMAGE_TYPE" });
+    }
+    if (file.size > VEHICLE_IMAGE_MAX_FILE_SIZE_BYTES) {
+      throw new ApiError(422, { code: "UPLOAD_FILE_TOO_LARGE" });
     }
 
     const eventId = await getPublicEventId();
@@ -553,7 +557,7 @@ export const registrationService = {
     });
 
     if (!uploadResult.ok) {
-      throw new Error("Bild-Upload fehlgeschlagen.");
+      throw new ApiError(uploadResult.status || 500, { code: "UPLOAD_PUT_FAILED" });
     }
 
     const finalizeResponse = await requestJson<PublicVehicleImageUploadFinalizeResponse>("/public/uploads/vehicle-image/finalize", {
