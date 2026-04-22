@@ -10,6 +10,7 @@ type EntriesFilterBarProps = {
   statusScope?: "active" | "deleted";
   allowDeletedStatusOption?: boolean;
   compact?: boolean;
+  hideSearch?: boolean;
   onStatusScopeChange?: (scope: "active" | "deleted") => void;
   onChange: <K extends keyof AdminEntriesFilter>(field: K, value: AdminEntriesFilter[K]) => void;
 };
@@ -23,6 +24,7 @@ export function EntriesFilterBar({
   statusScope = "active",
   allowDeletedStatusOption = false,
   compact = false,
+  hideSearch = false,
   onStatusScopeChange,
   onChange
 }: EntriesFilterBarProps) {
@@ -36,15 +38,17 @@ export function EntriesFilterBar({
 
   return (
     <div className={compact ? "grid gap-3" : "grid gap-3 md:grid-cols-3 xl:grid-cols-5"}>
-      <div className="space-y-1">
-        <Label htmlFor="admin-filter-search">Suche</Label>
-        <Input
-          id="admin-filter-search"
-          placeholder="Suche nach E-Mail, Startnummer oder Name"
-          value={filter.query}
-          onChange={(event) => onChange("query", event.target.value)}
-        />
-      </div>
+      {!hideSearch && (
+        <div className="space-y-1">
+          <Label htmlFor="admin-filter-search">Suche</Label>
+          <Input
+            id="admin-filter-search"
+            placeholder="Suche nach E-Mail, Startnummer oder Name"
+            value={filter.query}
+            onChange={(event) => onChange("query", event.target.value)}
+          />
+        </div>
+      )}
       <div className="space-y-1">
         <Label htmlFor="admin-filter-class">Klasse</Label>
         <Select value={filter.classId} onValueChange={(next) => onChange("classId", next)}>

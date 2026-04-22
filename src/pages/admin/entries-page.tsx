@@ -7,6 +7,7 @@ import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar
 import { EntriesTable } from "@/components/features/admin/entries-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import { acceptanceStatusClasses, acceptanceStatusLabel, paymentStatusClasses, paymentStatusLabel } from "@/lib/admin-status";
@@ -1053,14 +1054,19 @@ export function AdminEntriesPage() {
             onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
           />
         </div>
-        <div className="flex items-center justify-between gap-2 md:hidden">
-          <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
-            <Filter className="mr-2 h-4 w-4" />
-            Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
-            Zurücksetzen
-          </Button>
+        <div className="space-y-3 md:hidden">
+          <Input
+            id="admin-filter-search-mobile"
+            placeholder="Suche nach E-Mail, Startnummer oder Name"
+            value={filterDraft.query}
+            onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
+              <Filter className="mr-2 h-4 w-4" />
+              Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
+            </Button>
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -1241,6 +1247,7 @@ export function AdminEntriesPage() {
             <div className="overflow-y-auto p-4">
               <EntriesFilterBar
                 compact
+                hideSearch
                 filter={filterDraft}
                 classOptions={classOptions}
                 statusScope={viewScope}

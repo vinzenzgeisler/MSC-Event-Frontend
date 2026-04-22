@@ -40,7 +40,7 @@ export function AdminLayout() {
         <aside
           className={[
             "rounded-lg border bg-white p-4",
-            "fixed inset-y-0 left-0 z-50 w-[86%] max-w-xs overflow-y-auto transition lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)] lg:w-auto lg:max-w-none lg:self-start",
+            "fixed inset-y-0 left-0 z-50 w-[86%] max-w-xs overflow-y-auto transition lg:sticky lg:inset-auto lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-auto lg:max-w-none lg:self-start",
             menuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           ].join(" ")}
         >

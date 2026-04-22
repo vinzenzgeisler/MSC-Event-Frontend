@@ -374,7 +374,7 @@ export function AdminEntryDetailPage() {
 
   return (
     <div className="w-full max-w-[1120px] space-y-4">
-      <div className="sticky top-[57px] z-30 -mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:-mx-3 md:top-4 md:px-3">
+      <div className="sticky top-[57px] z-30 -mx-2 space-y-3 border-b border-slate-200 bg-slate-100/95 px-2 pb-3 pt-1 backdrop-blur md:-mx-3 md:top-4 md:px-3 lg:top-6">
         <div>
           <Button
             type="button"
@@ -754,7 +754,7 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <div className="order-2 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-6 lg:w-[340px] lg:justify-self-end lg:self-start">
+        <div className="order-2 w-full min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:w-[340px] lg:justify-self-end lg:self-start lg:overflow-y-auto">
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
