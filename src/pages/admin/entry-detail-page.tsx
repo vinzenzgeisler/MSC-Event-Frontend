@@ -191,6 +191,7 @@ export function AdminEntryDetailPage() {
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [classDraft, setClassDraft] = useState("");
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
+  const [mobileHeaderCompact, setMobileHeaderCompact] = useState(false);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -329,6 +330,19 @@ export function AdminEntryDetailPage() {
     setIncludeDriverNoteOnReject(false);
   }, [hasDriverNote]);
 
+  useEffect(() => {
+    const updateCompactHeader = () => {
+      setMobileHeaderCompact(window.scrollY > 72);
+    };
+
+    updateCompactHeader();
+    window.addEventListener("scroll", updateCompactHeader, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", updateCompactHeader);
+    };
+  }, []);
+
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
   }
@@ -372,72 +386,108 @@ export function AdminEntryDetailPage() {
     return undefined;
   };
 
+  const backToEntries = () => {
+    const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
+    if (state?.fromEntriesList) {
+      navigate(-1);
+      return;
+    }
+    navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
+  };
+
   return (
     <div className="w-full max-w-[1120px] pb-4 lg:flex lg:h-[calc(100dvh-3rem)] lg:flex-col lg:overflow-hidden lg:pb-0">
       <div
-        className="-mt-4 sticky top-[57px] z-40 bg-slate-100 md:-mt-6 lg:static lg:mt-0 lg:flex-none"
+        className="-mt-4 sticky top-[57px] z-40 border-b border-slate-200/80 bg-slate-100/95 px-3 backdrop-blur transition-[padding] duration-200 md:-mt-6 lg:static lg:mt-0 lg:hidden"
         style={{ overflowAnchor: "none" }}
       >
-        <div className="space-y-3 bg-slate-100 px-3 py-3">
-          <div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const state = location.state as { fromEntriesList?: boolean; scrollY?: number; loadedCount?: number } | null;
-                if (state?.fromEntriesList) {
-                  navigate(-1);
-                  return;
-                }
-                navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
-              }}
-            >
-              Zurück zu Nennungen
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-0 -translate-y-1 opacity-0 pointer-events-none py-0" : "max-h-40 py-3 opacity-100"}`}>
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="break-words text-2xl font-semibold text-slate-900">
+              <h1 className="break-words text-xl font-semibold text-slate-900">
                 {detail.headline}
                 {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
               </h1>
-              <p className="break-words text-sm text-slate-600">
+              <p className="mt-1 break-words text-sm text-slate-600">
                 {detail.classLabel} · Startnummer {detail.startNumber}
               </p>
-              <p className="break-words text-xs text-slate-500">
-                Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
-              </p>
             </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Badge
-                className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
-                variant="outline"
-              >
-                E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
-              </Badge>
-              <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
-                Status: {acceptanceStatusLabel(status)}
-              </Badge>
-              <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
-                Zahlung: {paymentStatusLabel(paymentState)}
-              </Badge>
-              {status === "accepted" ? (
-                <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
-                  Check-in: {checkinLabel(checkinDone)}
-                </Badge>
-              ) : (
-                <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
-                  Check-in: Noch nicht relevant
-                </Badge>
-              )}
-              {statusActionInFlight && (
-                <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
-                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                  Status wird aktualisiert…
-                </Badge>
-              )}
+            <div className="shrink-0">
+              <Button type="button" variant="outline" size="sm" className="h-9 bg-white/90" onClick={backToEntries}>
+                Zurück
+              </Button>
             </div>
+          </div>
+        </div>
+
+        <div className={`flex items-center justify-between gap-3 transition-[padding] duration-200 ${mobileHeaderCompact ? "py-2" : "py-2.5"}`}>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-slate-900">{detail.headline}</div>
+            <div className="truncate text-xs text-slate-500">
+              #{detail.startNumber} · {detail.classLabel}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge
+              className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2 text-[11px] text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2 text-[11px] text-slate-700"}
+              variant="outline"
+            >
+              {confirmationMailVerified ? "Mail ok" : "Mail offen"}
+            </Badge>
+            <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2 text-[11px]`} variant="outline">
+              {acceptanceStatusLabel(status)}
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden space-y-3 bg-slate-100 px-3 py-3 lg:flex-none lg:block" style={{ overflowAnchor: "none" }}>
+        <div className="hidden lg:block">
+          <Button type="button" variant="outline" size="sm" onClick={backToEntries}>
+            Zurück zu Nennungen
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="break-words text-xl font-semibold text-slate-900 sm:text-2xl">
+              {detail.headline}
+              {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
+            </h1>
+            <p className="mt-1 break-words text-sm text-slate-600">
+              {detail.classLabel} · Startnummer {detail.startNumber}
+            </p>
+            <p className="mt-1 break-words text-xs text-slate-500">
+              Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
+            </p>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Badge
+              className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+              variant="outline"
+            >
+              E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
+            </Badge>
+            <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
+              Status: {acceptanceStatusLabel(status)}
+            </Badge>
+            <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
+              Zahlung: {paymentStatusLabel(paymentState)}
+            </Badge>
+            {status === "accepted" ? (
+              <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
+                Check-in: {checkinLabel(checkinDone)}
+              </Badge>
+            ) : (
+              <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+                Check-in: Noch nicht relevant
+              </Badge>
+            )}
+            {statusActionInFlight && (
+              <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                Status wird aktualisiert…
+              </Badge>
+            )}
           </div>
         </div>
       </div>

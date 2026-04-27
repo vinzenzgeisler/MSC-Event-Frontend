@@ -472,6 +472,7 @@ export function AdminEntriesPage() {
   const firstFilterLoadRef = useRef(true);
   const hasRestoredFromStateRef = useRef(false);
   const activeTableScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const selfAuthoredSearchRef = useRef<string | null>(null);
 
   const classNameById = useMemo(() => {
     return new Map(classOptions.map((item) => [item.id, item.name]));
@@ -835,6 +836,11 @@ export function AdminEntriesPage() {
   }, [actorLookupLoaded, canDeleteEntries, canReadIam, viewScope]);
 
   useEffect(() => {
+    const currentSearch = searchParams.toString();
+    if (selfAuthoredSearchRef.current === currentSearch) {
+      selfAuthoredSearchRef.current = null;
+      return;
+    }
     const nextFilter = filterFromSearchParams(searchParams);
     setFilterDraft((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
 
@@ -844,7 +850,9 @@ export function AdminEntriesPage() {
 
   useEffect(() => {
     const nextParams = searchParamsFromState(appliedFilter, viewScope, canDeleteEntries);
-    if (nextParams.toString() !== searchParams.toString()) {
+    const nextSearch = nextParams.toString();
+    if (nextSearch !== searchParams.toString()) {
+      selfAuthoredSearchRef.current = nextSearch;
       setSearchParams(nextParams, { replace: true });
     }
   }, [appliedFilter, canDeleteEntries, searchParams, setSearchParams, viewScope]);

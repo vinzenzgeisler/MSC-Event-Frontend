@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Bike, Car, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -108,7 +109,7 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
   );
 }
 
-export function EntriesTable({
+function EntriesTableInner({
   rows,
   canManageStatus,
   statusActionBusy = false,
@@ -435,3 +436,14 @@ export function EntriesTable({
     </div>
   );
 }
+
+export const EntriesTable = memo(EntriesTableInner, (prev, next) => {
+  return (
+    prev.rows === next.rows &&
+    prev.canManageStatus === next.canManageStatus &&
+    prev.statusActionBusy === next.statusActionBusy &&
+    prev.isLoadingInitial === next.isLoadingInitial &&
+    prev.isLoadingMore === next.isLoadingMore &&
+    prev.hasMore === next.hasMore
+  );
+});
