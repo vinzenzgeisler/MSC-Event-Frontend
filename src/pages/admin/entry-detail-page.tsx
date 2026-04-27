@@ -402,20 +402,54 @@ export function AdminEntryDetailPage() {
         style={{ overflowAnchor: "none" }}
       >
         <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-0 -translate-y-1 opacity-0 pointer-events-none py-0" : "max-h-40 py-3 opacity-100"}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="break-words text-xl font-semibold text-slate-900">
-                {detail.headline}
-                {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
-              </h1>
-              <p className="mt-1 break-words text-sm text-slate-600">
-                {detail.classLabel} · Startnummer {detail.startNumber}
-              </p>
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="break-words text-xl font-semibold text-slate-900">
+                  {detail.headline}
+                  {detail.orgaCode ? ` · ${detail.orgaCode}` : ""}
+                </h1>
+                <p className="mt-1 break-words text-sm text-slate-600">
+                  {detail.classLabel} · Startnummer {detail.startNumber}
+                </p>
+                <p className="mt-1 break-words text-xs text-slate-500">
+                  Erstellt am: {formatTimestamp(detail.createdAt)} · Geändert am: {formatTimestamp(changedAt)}
+                </p>
+              </div>
+              <div className="shrink-0">
+                <Button type="button" variant="outline" size="sm" className="h-9 bg-white/90" onClick={backToEntries}>
+                  Zurück
+                </Button>
+              </div>
             </div>
-            <div className="shrink-0">
-              <Button type="button" variant="outline" size="sm" className="h-9 bg-white/90" onClick={backToEntries}>
-                Zurück
-              </Button>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge
+                className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2.5 text-xs text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2.5 text-xs text-slate-700"}
+                variant="outline"
+              >
+                E-Mail: {confirmationMailVerified ? "Verifiziert" : "Nicht verifiziert"}
+              </Badge>
+              <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
+                Status: {acceptanceStatusLabel(status)}
+              </Badge>
+              <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
+                Zahlung: {paymentStatusLabel(paymentState)}
+              </Badge>
+              {status === "accepted" ? (
+                <Badge className={`${checkinClasses(checkinDone)} h-6 px-2.5 text-xs`} variant="outline">
+                  Check-in: {checkinLabel(checkinDone)}
+                </Badge>
+              ) : (
+                <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+                  Check-in: Noch nicht relevant
+                </Badge>
+              )}
+              {statusActionInFlight && (
+                <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  Status wird aktualisiert…
+                </Badge>
+              )}
             </div>
           </div>
         </div>
