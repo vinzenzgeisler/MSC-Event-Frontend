@@ -228,13 +228,6 @@ function EntriesTableInner({
     return undefined;
   };
 
-  if (!rows.length) {
-    if (isLoadingInitial) {
-      return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Nennungen werden geladen…</div>;
-    }
-    return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Keine Nennungen für die aktuelle Filterung.</div>;
-  }
-
   const desktopVisibleRange = useMemo(() => {
     const total = rows.length;
     if (total === 0) {
@@ -250,6 +243,13 @@ function EntriesTableInner({
 
   const desktopVisibleRows = rows.slice(desktopVisibleRange.startIndex, desktopVisibleRange.endIndex);
   const desktopTotalHeight = rows.length * DESKTOP_ROW_HEIGHT;
+
+  if (!rows.length) {
+    if (isLoadingInitial) {
+      return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Nennungen werden geladen…</div>;
+    }
+    return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Keine Nennungen für die aktuelle Filterung.</div>;
+  }
 
   return (
     <div className="space-y-3 xl:flex xl:h-full xl:min-h-0 xl:flex-1 xl:flex-col">
