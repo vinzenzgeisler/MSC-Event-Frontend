@@ -452,6 +452,7 @@ export function AdminEntriesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileHeaderCompact, setMobileHeaderCompact] = useState(false);
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
@@ -771,6 +772,19 @@ export function AdminEntriesPage() {
   }, [rows]);
 
   useEffect(() => {
+    const updateCompactHeader = () => {
+      setMobileHeaderCompact(window.scrollY > 0);
+    };
+
+    updateCompactHeader();
+    window.addEventListener("scroll", updateCompactHeader, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", updateCompactHeader);
+    };
+  }, []);
+
+  useEffect(() => {
     deletedRowsRef.current = deletedRows;
   }, [deletedRows]);
 
@@ -1078,8 +1092,55 @@ export function AdminEntriesPage() {
   return (
     <div className={cn("space-y-4", useDesktopTableShell && "xl:flex xl:h-[calc(100dvh-3rem)] xl:flex-col xl:overflow-hidden xl:space-y-0")}>
       <div className={cn("space-y-4", useDesktopTableShell && "xl:flex-none xl:pb-4")}>
-        <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
-        <div className="rounded-xl border bg-white p-4">
+        <div className="md:hidden">
+          <div className="-mt-4 sticky top-[57px] z-40 rounded-b-2xl border-b border-slate-200/80 bg-slate-100/95 px-3 pb-3 pt-3 backdrop-blur">
+            <div className={`overflow-hidden transition-[max-height,opacity,transform,padding,margin] duration-200 ${mobileHeaderCompact ? "pointer-events-none -translate-y-1 opacity-0 max-h-0 py-0 mb-0" : "opacity-100 max-h-80 mb-3"}`}>
+              <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
+              <div className="mt-3 rounded-xl border bg-white p-4">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-slate-500">{loadedCountText}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={refreshing} onClick={() => void refreshSnapshot(true)}>
+                      {refreshing ? "Aktualisiere…" : "Aktualisieren"}
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
+                      Filter zurücksetzen
+                    </Button>
+                  </div>
+                </div>
+                {activeFilterChips.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeFilterChips.map((chip) => (
+                      <button key={chip.key} type="button" onClick={() => removeFilterChip(chip.key)}>
+                        <Badge variant="outline">{chip.label} ×</Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="space-y-3">
+                <Input
+                  id="admin-filter-search-mobile"
+                  placeholder="Suche nach E-Mail, Startnummer oder Name"
+                  value={filterDraft.query}
+                  onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h1 className="hidden text-2xl font-semibold text-slate-900 md:block">Nennungen</h1>
+        <div className="hidden rounded-xl border bg-white p-4 md:block">
           <div className="hidden md:block">
             <EntriesFilterBar
               filter={filterDraft}
@@ -1089,20 +1150,6 @@ export function AdminEntriesPage() {
               onStatusScopeChange={(scope) => setViewScope(scope)}
               onChange={(field, value) => setFilterDraft((prev) => ({ ...prev, [field]: value }))}
             />
-          </div>
-          <div className="space-y-3 md:hidden">
-            <Input
-              id="admin-filter-search-mobile"
-              placeholder="Suche nach E-Mail, Startnummer oder Name"
-              value={filterDraft.query}
-              onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
-            />
-            <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="outline" onClick={() => setMobileFiltersOpen(true)}>
-                <Filter className="mr-2 h-4 w-4" />
-                Filter{activeFilterChips.length > 0 ? ` (${activeFilterChips.length})` : ""}
-              </Button>
-            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

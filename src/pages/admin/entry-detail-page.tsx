@@ -332,7 +332,7 @@ export function AdminEntryDetailPage() {
 
   useEffect(() => {
     const updateCompactHeader = () => {
-      setMobileHeaderCompact(window.scrollY > 72);
+      setMobileHeaderCompact(window.scrollY > 0);
     };
 
     updateCompactHeader();
@@ -420,23 +420,28 @@ export function AdminEntryDetailPage() {
           </div>
         </div>
 
-        <div className={`flex items-center justify-between gap-3 transition-[padding] duration-200 ${mobileHeaderCompact ? "py-2" : "py-2.5"}`}>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-slate-900">{detail.headline}</div>
-            <div className="truncate text-xs text-slate-500">
-              #{detail.startNumber} · {detail.classLabel}
+        <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-16 py-2 opacity-100" : "pointer-events-none max-h-0 -translate-y-1 py-0 opacity-0"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-900">{detail.headline}</div>
+              <div className="truncate text-xs text-slate-500">
+                #{detail.startNumber} · {detail.classLabel}
+              </div>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Badge
-              className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2 text-[11px] text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2 text-[11px] text-slate-700"}
-              variant="outline"
-            >
-              {confirmationMailVerified ? "Mail ok" : "Mail offen"}
-            </Badge>
-            <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2 text-[11px]`} variant="outline">
-              {acceptanceStatusLabel(status)}
-            </Badge>
+            <div className="flex shrink-0 items-center gap-2">
+              <Badge
+                className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2 text-[11px] text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2 text-[11px] text-slate-700"}
+                variant="outline"
+              >
+                {confirmationMailVerified ? "Mail ok" : "Mail offen"}
+              </Badge>
+              <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2 text-[11px]`} variant="outline">
+                {acceptanceStatusLabel(status)}
+              </Badge>
+              <Button type="button" variant="outline" size="sm" className="h-8 bg-white/90 px-2.5 text-xs" onClick={backToEntries}>
+                Zurück
+              </Button>
+            </div>
           </div>
         </div>
       </div>
