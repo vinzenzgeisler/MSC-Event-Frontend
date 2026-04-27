@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bike, Car, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,10 @@ import {
 import type { AdminEntryListItem } from "@/types/admin";
 
 const RETURN_SNAPSHOT_KEY = "admin.entries.return.v1";
+const DESKTOP_MEDIA_QUERY = "(min-width: 1280px)";
+const DESKTOP_ROW_ESTIMATE = 112;
+const DESKTOP_OVERSCAN = 8;
+
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
   canManageStatus: boolean;
@@ -94,7 +98,7 @@ function ActionButton(props: {
 
 function VehicleThumb({ src, label }: { src: string | null; label: string }) {
   if (src) {
-    return <img className="h-16 w-16 rounded-md border object-cover md:h-20 md:w-20" src={src} alt={`Fahrzeug: ${label}`} />;
+    return <img className="h-16 w-16 rounded-md border object-cover md:h-20 md:w-20" src={src} alt={`Fahrzeug: ${label}`} loading="lazy" decoding="async" />;
   }
   const isMoto = label.toLowerCase().includes("yamaha") || label.toLowerCase().includes("moto");
   return (
@@ -125,6 +129,72 @@ function EntriesTableInner({
   onSetRejected
 }: EntriesTableProps) {
   const location = useLocation();
+  const desktopScrollerRef = useRef<HTMLDivElement | null>(null);
+  const desktopScrollRafRef = useRef<number | null>(null);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(() =>
+    typeof window === "undefined" ? false : window.matchMedia(DESKTOP_MEDIA_QUERY).matches
+  );
+  const [desktopScrollTop, setDesktopScrollTop] = useState(0);
+  const [desktopViewportHeight, setDesktopViewportHeight] = useState(DESKTOP_ROW_ESTIMATE * 8);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    const handleChange = () => setIsDesktopLayout(mediaQuery.matches);
+    handleChange();
+    mediaQuery.addEventListener("change", handleChange);
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  const handleDesktopScrollContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      desktopScrollerRef.current = node;
+      desktopScrollContainerRef?.(node);
+      if (node) {
+        setDesktopViewportHeight(node.clientHeight || DESKTOP_ROW_ESTIMATE * 8);
+        setDesktopScrollTop(node.scrollTop);
+      }
+    },
+    [desktopScrollContainerRef]
+  );
+
+  useEffect(() => {
+    const node = desktopScrollerRef.current;
+    if (!isDesktopLayout || !node) {
+      return;
+    }
+
+    const updateMetrics = () => {
+      setDesktopViewportHeight(node.clientHeight || DESKTOP_ROW_ESTIMATE * 8);
+      setDesktopScrollTop(node.scrollTop);
+    };
+
+    const handleScroll = () => {
+      if (desktopScrollRafRef.current !== null) {
+        return;
+      }
+      desktopScrollRafRef.current = window.requestAnimationFrame(() => {
+        desktopScrollRafRef.current = null;
+        setDesktopScrollTop(node.scrollTop);
+      });
+    };
+
+    updateMetrics();
+    const resizeObserver = new ResizeObserver(updateMetrics);
+    resizeObserver.observe(node);
+    node.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      resizeObserver.disconnect();
+      node.removeEventListener("scroll", handleScroll);
+      if (desktopScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(desktopScrollRafRef.current);
+        desktopScrollRafRef.current = null;
+      }
+    };
+  }, [isDesktopLayout, rows.length]);
+
   const persistReturnSnapshot = () => {
     try {
       sessionStorage.setItem(
@@ -140,14 +210,18 @@ function EntriesTableInner({
       // no-op: restoration gracefully falls back when storage is unavailable
     }
   };
-  const doppelstarterCounts = new Map<string, number>();
-  rows.forEach((row) => {
-    const key = doppelstarterKey(row);
-    if (!key) {
-      return;
-    }
-    doppelstarterCounts.set(key, (doppelstarterCounts.get(key) ?? 0) + 1);
-  });
+  const doppelstarterCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    rows.forEach((row) => {
+      const key = doppelstarterKey(row);
+      if (!key) {
+        return;
+      }
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return counts;
+  }, [rows]);
+
   const isDoppelstarter = (row: AdminEntryListItem) => {
     if ((row.groupSizeRaw ?? 0) > 1) {
       return true;
@@ -172,6 +246,23 @@ function EntriesTableInner({
     return undefined;
   };
 
+  const desktopVisibleRange = useMemo(() => {
+    if (!isDesktopLayout || rows.length === 0) {
+      return { startIndex: 0, endIndex: rows.length };
+    }
+
+    const startIndex = Math.max(0, Math.floor(desktopScrollTop / DESKTOP_ROW_ESTIMATE) - DESKTOP_OVERSCAN);
+    const visibleCount = Math.ceil(desktopViewportHeight / DESKTOP_ROW_ESTIMATE) + DESKTOP_OVERSCAN * 2;
+    return {
+      startIndex,
+      endIndex: Math.min(rows.length, startIndex + visibleCount)
+    };
+  }, [desktopScrollTop, desktopViewportHeight, isDesktopLayout, rows.length]);
+
+  const desktopRows = isDesktopLayout ? rows.slice(desktopVisibleRange.startIndex, desktopVisibleRange.endIndex) : rows;
+  const desktopTopSpacerHeight = isDesktopLayout ? desktopVisibleRange.startIndex * DESKTOP_ROW_ESTIMATE : 0;
+  const desktopBottomSpacerHeight = isDesktopLayout ? Math.max(0, (rows.length - desktopVisibleRange.endIndex) * DESKTOP_ROW_ESTIMATE) : 0;
+
   if (!rows.length) {
     if (isLoadingInitial) {
       return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Nennungen werden geladen…</div>;
@@ -181,7 +272,7 @@ function EntriesTableInner({
 
   return (
     <div className="space-y-3 xl:flex xl:h-full xl:min-h-0 xl:flex-1 xl:flex-col">
-      <div className="space-y-2 xl:hidden">
+      {!isDesktopLayout && <div className="space-y-2">
         {rows.map((row) => (
           <div
             key={row.id}
@@ -277,10 +368,10 @@ function EntriesTableInner({
             <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div>
           </div>
         ))}
-      </div>
+      </div>}
 
-      <div className="hidden min-h-0 overflow-hidden rounded-xl border bg-white shadow-sm xl:flex xl:flex-1 xl:flex-col">
-        <div ref={desktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
+      {isDesktopLayout && <div className="min-h-0 overflow-hidden rounded-xl border bg-white shadow-sm xl:flex xl:flex-1 xl:flex-col">
+        <div ref={handleDesktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
               <col className="w-[32%]" />
@@ -305,7 +396,12 @@ function EntriesTableInner({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {desktopTopSpacerHeight > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={8} style={{ height: desktopTopSpacerHeight, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {desktopRows.map((row) => (
                 <tr
                   key={row.id}
                   className={`border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowBackgroundClasses(row.status) : "bg-slate-50"}`}
@@ -411,6 +507,11 @@ function EntriesTableInner({
                   </td>
                 </tr>
               ))}
+              {desktopBottomSpacerHeight > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={8} style={{ height: desktopBottomSpacerHeight, padding: 0, border: 0 }} />
+                </tr>
+              )}
             </tbody>
           </table>
           {(hasMore || isLoadingMore) && (
@@ -422,10 +523,10 @@ function EntriesTableInner({
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
-      {(hasMore || isLoadingMore) && (
-        <div className="flex flex-col items-center gap-2 py-1 xl:hidden">
+      {!isDesktopLayout && (hasMore || isLoadingMore) && (
+        <div className="flex flex-col items-center gap-2 py-1">
           <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
           <Button type="button" size="sm" variant="outline" disabled={isLoadingMore} onClick={onLoadMore}>
             {isLoadingMore ? "Lade weitere Nennungen…" : "Weitere Nennungen laden"}

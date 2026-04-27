@@ -401,7 +401,7 @@ export function AdminEntryDetailPage() {
         className="-mt-4 sticky top-[57px] z-40 border-b border-slate-200/80 bg-slate-100/95 px-3 backdrop-blur transition-[padding] duration-200 md:-mt-6 lg:static lg:mt-0 lg:hidden"
         style={{ overflowAnchor: "none" }}
       >
-        <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-0 -translate-y-1 opacity-0 pointer-events-none py-0" : "max-h-40 py-3 opacity-100"}`}>
+        <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-0 -translate-y-1 opacity-0 pointer-events-none py-0" : "max-h-96 py-3 opacity-100"}`}>
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
