@@ -20,6 +20,7 @@ import type {
   MailRecipientSearchItem,
   MailTemplate,
   MailTemplateComposerField,
+  MailLocale,
   MailTemplatePlaceholder,
   MailTemplatePreview,
   OutboxItem,
@@ -31,6 +32,7 @@ const initialForm: BroadcastForm = {
   acceptanceStatus: "all",
   registrationStatus: "all",
   paymentStatus: "all",
+  defaultLocale: "de",
   templateKey: "",
   subjectOverride: ""
 };
@@ -49,6 +51,13 @@ type RecipientTarget = { id: string; label: string; previewEntryId?: string };
 type RecipientSearchItem = MailRecipientSearchItem;
 type RecipientMode = "filter" | "individual" | "combined";
 type ToastTone = "success" | "error" | "info";
+
+const MAIL_LOCALE_LABELS: Record<MailLocale, string> = {
+  de: "Deutsch",
+  en: "Englisch",
+  cs: "Tschechisch",
+  pl: "Polnisch"
+};
 
 type OutboxGroup = {
   key: string;
@@ -431,6 +440,15 @@ export function AdminCommunicationPage() {
     }, {});
     return Object.keys(payload).length > 0 ? payload : undefined;
   }, [templateDataDraft]);
+  const previewTemplateDataValue = useMemo(() => {
+    if (templateDataValue && typeof templateDataValue.locale === "string" && templateDataValue.locale.trim()) {
+      return templateDataValue;
+    }
+    return {
+      ...(templateDataValue ?? {}),
+      locale: form.defaultLocale
+    };
+  }, [form.defaultLocale, templateDataValue]);
   const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
   const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
   const previewEntryId = useMemo(() => {
@@ -583,7 +601,7 @@ export function AdminCommunicationPage() {
         .previewTemplate({
           templateKey: form.templateKey,
           entryId: previewEntryId,
-          templateData: templateDataValue,
+          templateData: previewTemplateDataValue,
           subjectOverride: subjectOverrideValue,
           bodyOverride: bodyOverrideValue,
           bodyHtmlOverride: bodyHtmlOverrideValue,
@@ -622,7 +640,7 @@ export function AdminCommunicationPage() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [attachmentUploadIds, bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, includeEntryContext, previewEntryId, subjectOverrideValue, templateDataValue]);
+  }, [attachmentUploadIds, bodyHtmlOverrideValue, bodyOverrideValue, form.templateKey, includeEntryContext, previewEntryId, subjectOverrideValue, previewTemplateDataValue]);
 
   useEffect(() => {
     const key = form.templateKey.trim();
@@ -883,6 +901,7 @@ export function AdminCommunicationPage() {
         bodyOverride: bodyOverrideValue,
         bodyHtmlOverride: bodyHtmlOverrideValue,
         templateData: templateDataValue,
+        defaultLocale: form.defaultLocale,
         renderOptions: {
           showBadge: false,
           mailLabel: null,
@@ -1360,6 +1379,28 @@ export function AdminCommunicationPage() {
                 <span>Version {selectedTemplate.version}</span>
               </div>
             )}
+            <div className="space-y-1">
+              <Label>Fallback-Sprache</Label>
+              <Select
+                value={form.defaultLocale}
+                onValueChange={(next) => setForm((prev) => ({ ...prev, defaultLocale: next as MailLocale }))}
+                disabled={!form.templateKey}
+              >
+                <SelectTrigger className="text-base md:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(MAIL_LOCALE_LABELS) as MailLocale[]).map((locale) => (
+                    <SelectItem key={locale} value={locale}>
+                      {MAIL_LOCALE_LABELS[locale]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500">
+                Wird nur verwendet, wenn für einen Empfänger keine gespeicherte Sprache gefunden wird.
+              </p>
+            </div>
             <label className="flex items-start gap-2 rounded-md border bg-white px-3 py-2 text-sm text-slate-700">
               <input
                 type="checkbox"

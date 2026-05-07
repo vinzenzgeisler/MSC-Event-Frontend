@@ -359,10 +359,12 @@ export type BroadcastForm = {
   acceptanceStatus: "all" | AcceptanceStatus;
   registrationStatus: "all" | "submitted_unverified" | "submitted_verified";
   paymentStatus: "all" | PaymentStatus;
+  defaultLocale: MailLocale;
   templateKey: string;
   subjectOverride: string;
 };
 
+export type MailLocale = "de" | "en" | "cs" | "pl";
 export type MailTemplateStatus = "draft" | "published";
 export type MailTemplateScope = "process" | "campaign";
 export type MailTemplateChannel = "campaign" | "detail" | "quick_action";

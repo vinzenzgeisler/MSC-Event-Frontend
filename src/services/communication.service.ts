@@ -314,6 +314,7 @@ export const communicationService = {
     bodyOverride?: string;
     bodyHtmlOverride?: string;
     templateData?: Record<string, unknown>;
+    defaultLocale?: "de" | "en" | "cs" | "pl";
     renderOptions?: MailRenderOptionsInput;
     additionalEmails?: string[];
     driverPersonIds?: string[];
@@ -336,6 +337,7 @@ export const communicationService = {
         bodyOverride: payload.bodyOverride || undefined,
         bodyHtmlOverride: payload.bodyHtmlOverride || undefined,
         templateData: payload.templateData || undefined,
+        defaultLocale: payload.defaultLocale || undefined,
         renderOptions: payload.renderOptions || undefined,
         additionalEmails: payload.additionalEmails?.length ? payload.additionalEmails : undefined,
         driverPersonIds: payload.driverPersonIds?.length ? payload.driverPersonIds : undefined,
