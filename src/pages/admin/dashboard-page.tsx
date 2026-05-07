@@ -923,17 +923,61 @@ export function AdminDashboardPage() {
                 )}
                 <svg className="h-full w-full" viewBox="0 0 640 360" role="img" aria-label="Fahrer-Herkunftskarte">
                   <rect width="640" height="360" fill="#f8fafc" />
+                  <path d="M20 188 H620 M20 244 H620 M20 300 H620 M156 20 V332 M292 20 V332 M429 20 V332 M565 20 V332" fill="none" stroke="#e2e8f0" strokeWidth="1" />
                   <path
-                    d="M92 96 C142 54 214 58 255 86 C289 109 321 102 363 86 C416 66 483 86 519 132 C558 181 530 236 473 257 C415 279 371 252 323 263 C250 280 187 265 142 226 C101 191 61 143 92 96Z"
+                    d="M111 66 L156 47 L229 50 L281 69 L349 63 L424 80 L499 116 L546 169 L531 222 L471 264 L399 279 L333 258 L267 270 L204 248 L151 207 L105 151 Z"
                     fill="#e2e8f0"
                     stroke="#cbd5e1"
                     strokeWidth="2"
                   />
-                  <path d="M366 91 C390 113 392 139 377 163 C358 192 367 217 395 239" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
-                  <path d="M252 88 C246 125 260 152 291 175 C316 194 319 224 303 260" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
-                  <path d="M146 159 C196 146 246 151 297 165 C366 183 422 172 489 145" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
+                  <path
+                    d="M262 97 L288 81 L323 82 L348 98 L342 129 L316 145 L285 140 L265 120 Z"
+                    fill="#dbeafe"
+                    stroke="#93c5fd"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M288 81 L318 69 L369 76 L374 102 L348 98 L323 82 Z"
+                    fill="#eef2ff"
+                    stroke="#c7d2fe"
+                    strokeWidth="1.2"
+                  />
+                  <path
+                    d="M342 129 L383 121 L421 139 L405 167 L361 160 L316 145 Z"
+                    fill="#ecfdf5"
+                    stroke="#bbf7d0"
+                    strokeWidth="1.2"
+                  />
+                  <path
+                    d="M265 120 L236 132 L225 162 L251 181 L285 140 Z"
+                    fill="#f1f5f9"
+                    stroke="#cbd5e1"
+                    strokeWidth="1.2"
+                  />
+                  <path
+                    d="M285 140 L316 145 L361 160 L349 197 L303 201 L251 181 Z"
+                    fill="#fef3c7"
+                    stroke="#fde68a"
+                    strokeWidth="1.2"
+                  />
+                  <path d="M348 98 L383 121 M316 145 L303 201 M285 140 L262 97" fill="none" stroke="#94a3b8" strokeWidth="1" opacity="0.55" />
+                  <text x="301" y="118" fill="#1d4ed8" fontSize="16" fontWeight="700" textAnchor="middle">
+                    DE
+                  </text>
+                  <text x="345" y="91" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
+                    PL
+                  </text>
+                  <text x="371" y="151" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
+                    CZ
+                  </text>
+                  <text x="247" y="154" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
+                    FR
+                  </text>
+                  <text x="311" y="181" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
+                    AT
+                  </text>
                   <text x="28" y="334" fill="#94a3b8" fontSize="12">
-                    Europa-Ausschnitt · Marker nach Ort/PLZ
+                    Vereinfachte Europa-Karte · Marker nach Ort/PLZ
                   </text>
                   {driverLocations.map((location) => {
                     const point = projectDriverLocation(location);
