@@ -62,3 +62,98 @@ h4 {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+.driver-origin-marker {
+  align-items: center;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+}
+
+.driver-origin-marker__dot {
+  background: hsl(var(--primary));
+  border: 3px solid #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 0.22);
+  display: block;
+  height: 18px;
+  width: 18px;
+}
+
+.driver-origin-cluster {
+  align-items: center;
+  background: rgb(15 23 42 / 0.14);
+  border-radius: 9999px;
+  display: flex;
+  justify-content: center;
+}
+
+.driver-origin-cluster span {
+  align-items: center;
+  background: hsl(var(--primary));
+  border: 3px solid #ffffff;
+  border-radius: 9999px;
+  box-shadow: 0 10px 22px rgb(15 23 42 / 0.2);
+  color: #ffffff;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 0.35rem;
+}
+
+.driver-origin-cluster--medium span {
+  background: #0f766e;
+}
+
+.driver-origin-cluster--large span {
+  background: #b45309;
+}
+
+.driver-origin-popup-shell .leaflet-popup-content {
+  margin: 0;
+}
+
+.driver-origin-popup {
+  color: #0f172a;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  padding: 0.75rem;
+}
+
+.driver-origin-popup__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.15rem;
+}
+
+.driver-origin-popup__meta,
+.driver-origin-popup__row {
+  color: #475569;
+  margin-top: 0.2rem;
+}
+
+.driver-origin-popup__status {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  color: #1d4ed8;
+  display: inline-flex;
+  font-weight: 600;
+  margin-top: 0.45rem;
+  padding: 0.15rem 0.45rem;
+}
+
+.driver-origin-popup__link {
+  color: hsl(var(--primary));
+  display: block;
+  font-weight: 700;
+  margin-top: 0.55rem;
+  text-decoration: none;
+}
+
+.driver-origin-popup__link:hover {
+  text-decoration: underline;
+}

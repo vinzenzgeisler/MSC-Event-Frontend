@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Filter, Loader2, Mail, MapPin, Wallet } from "lucide-react";
+import { Filter, Loader2, Mail, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DriverOriginMap } from "@/components/features/admin/driver-origin-map";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { communicationService } from "@/services/communication.service";
 import { getAdminEventId } from "@/services/api/event-context";
 import { ApiError, getApiErrorMessage, requestJson } from "@/services/api/http-client";
 import type { AdminEntriesFilter } from "@/types/admin";
+import type { DashboardDriverLocationDriver, DashboardDriverLocationItem, DashboardDriverLocationsMeta } from "@/components/features/admin/driver-origin-map";
+import type { AcceptanceStatus, RegistrationStatus } from "@/types/common";
 
 type DashboardSummary = {
   entriesTotal: number;
@@ -47,26 +50,6 @@ type DashboardRecentEntryItem = {
 type DashboardDailyActivityItem = {
   day: string;
   count: number;
-};
-
-type DashboardDriverLocationPreview = {
-  entryId: string;
-  driverName: string;
-  className: string;
-  startNumber: string;
-  vehicleLabel: string;
-};
-
-type DashboardDriverLocationItem = {
-  locationKey: string;
-  country: string;
-  zip: string;
-  city: string;
-  lat: number;
-  lng: number;
-  driverCount: number;
-  entryCount: number;
-  driversPreview: DashboardDriverLocationPreview[];
 };
 
 type AdminDashboardSummaryResponse = {
@@ -112,12 +95,6 @@ const ACTIVITY_WINDOW_DAYS = 7;
 const CLASS_COLORS = ["#0f766e", "#2563eb", "#f59e0b", "#db2777", "#7c3aed", "#64748b"];
 const BRAND_STATS_LIMIT = 8;
 const QUICK_ACTION_PAGE_LIMIT = 100;
-const DRIVER_MAP_BOUNDS = {
-  minLng: -12,
-  maxLng: 32,
-  minLat: 35,
-  maxLat: 60
-};
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -283,6 +260,14 @@ function normalizeDailyActivity(activity: unknown): DashboardDailyActivityItem[]
     .filter((item): item is DashboardDailyActivityItem => Boolean(item));
 }
 
+function normalizeAcceptanceStatus(value: unknown): AcceptanceStatus {
+  return value === "shortlist" || value === "accepted" || value === "rejected" ? value : "pending";
+}
+
+function normalizeRegistrationStatus(value: unknown): RegistrationStatus {
+  return value === "submitted_unverified" ? "submitted_unverified" : "submitted_verified";
+}
+
 function normalizeDriverLocations(payload: unknown): DashboardDriverLocationItem[] {
   if (!Array.isArray(payload)) {
     return [];
@@ -301,28 +286,29 @@ function normalizeDriverLocations(payload: unknown): DashboardDriverLocationItem
       if (!locationKey || lat === null || lng === null || driverCount === null) {
         return null;
       }
-      const driversPreview = Array.isArray(record.driversPreview)
-        ? record.driversPreview
-            .map((driver) => {
-              const driverRecord = toRecord(driver);
-              if (!driverRecord) {
-                return null;
-              }
-              const entryId = typeof driverRecord.entryId === "string" ? driverRecord.entryId.trim() : "";
-              const driverName = typeof driverRecord.driverName === "string" ? driverRecord.driverName.trim() : "";
-              if (!entryId || !driverName) {
-                return null;
-              }
-              return {
-                entryId,
-                driverName,
-                className: typeof driverRecord.className === "string" ? driverRecord.className.trim() : "-",
-                startNumber: typeof driverRecord.startNumber === "string" ? driverRecord.startNumber.trim() : "-",
-                vehicleLabel: typeof driverRecord.vehicleLabel === "string" ? driverRecord.vehicleLabel.trim() : "Fahrzeug"
-              };
-            })
-            .filter((driver): driver is DashboardDriverLocationPreview => Boolean(driver))
-        : [];
+      const driversPayload = Array.isArray(record.drivers) ? record.drivers : Array.isArray(record.driversPreview) ? record.driversPreview : [];
+      const drivers = driversPayload
+        .map((driver) => {
+          const driverRecord = toRecord(driver);
+          if (!driverRecord) {
+            return null;
+          }
+          const entryId = typeof driverRecord.entryId === "string" ? driverRecord.entryId.trim() : "";
+          const driverName = typeof driverRecord.driverName === "string" ? driverRecord.driverName.trim() : "";
+          if (!entryId || !driverName) {
+            return null;
+          }
+          return {
+            entryId,
+            driverName,
+            className: typeof driverRecord.className === "string" ? driverRecord.className.trim() : "-",
+            startNumber: typeof driverRecord.startNumber === "string" ? driverRecord.startNumber.trim() : "-",
+            vehicleLabel: typeof driverRecord.vehicleLabel === "string" ? driverRecord.vehicleLabel.trim() : "Fahrzeug",
+            acceptanceStatus: normalizeAcceptanceStatus(driverRecord.acceptanceStatus),
+            registrationStatus: normalizeRegistrationStatus(driverRecord.registrationStatus)
+          };
+        })
+        .filter((driver): driver is DashboardDriverLocationDriver => Boolean(driver));
 
       return {
         locationKey,
@@ -333,24 +319,10 @@ function normalizeDriverLocations(payload: unknown): DashboardDriverLocationItem
         lng,
         driverCount,
         entryCount: entryCount ?? driverCount,
-        driversPreview
+        drivers
       };
     })
     .filter((item): item is DashboardDriverLocationItem => Boolean(item));
-}
-
-function projectDriverLocation(location: Pick<DashboardDriverLocationItem, "lat" | "lng">) {
-  const lngRatio = (location.lng - DRIVER_MAP_BOUNDS.minLng) / (DRIVER_MAP_BOUNDS.maxLng - DRIVER_MAP_BOUNDS.minLng);
-  const latRatio = (DRIVER_MAP_BOUNDS.maxLat - location.lat) / (DRIVER_MAP_BOUNDS.maxLat - DRIVER_MAP_BOUNDS.minLat);
-  return {
-    x: Math.min(620, Math.max(20, 20 + lngRatio * 600)),
-    y: Math.min(300, Math.max(20, 20 + latRatio * 280))
-  };
-}
-
-function formatLocationLabel(location: Pick<DashboardDriverLocationItem, "city" | "zip" | "country">) {
-  const cityLine = [location.zip, location.city].filter(Boolean).join(" ");
-  return [cityLine, location.country].filter(Boolean).join(", ") || "Unbekannter Ort";
 }
 
 function normalizeVehicleBrand(label: string) {
@@ -399,14 +371,13 @@ export function AdminDashboardPage() {
   const [driverLocations, setDriverLocations] = useState<DashboardDriverLocationItem[]>([]);
   const [driverLocationsLoading, setDriverLocationsLoading] = useState(false);
   const [driverLocationsError, setDriverLocationsError] = useState("");
-  const [driverLocationsMeta, setDriverLocationsMeta] = useState({
+  const [driverLocationsMeta, setDriverLocationsMeta] = useState<DashboardDriverLocationsMeta>({
     totalLocations: 0,
     totalDrivers: 0,
     missingLocationsTotal: 0,
     missingEntriesTotal: 0,
     maxPoints: 0
   });
-  const [selectedDriverLocationKey, setSelectedDriverLocationKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
@@ -568,7 +539,6 @@ export function AdminDashboardPage() {
         missingEntriesTotal: toNullableCount(response.missingEntriesTotal) ?? 0,
         maxPoints: toNullableCount(response.maxPoints) ?? 0
       });
-      setSelectedDriverLocationKey((prev) => (prev && locations.some((item) => item.locationKey === prev) ? prev : locations[0]?.locationKey ?? null));
     } catch (err) {
       setDriverLocations([]);
       setDriverLocationsMeta({
@@ -578,7 +548,6 @@ export function AdminDashboardPage() {
         missingEntriesTotal: 0,
         maxPoints: 0
       });
-      setSelectedDriverLocationKey(null);
       setDriverLocationsError(getApiErrorMessage(err, "Fahrerkarte konnte nicht geladen werden."));
     } finally {
       setDriverLocationsLoading(false);
@@ -761,11 +730,6 @@ export function AdminDashboardPage() {
     const counts = (brandDistribution ?? []).map((item) => item.count);
     return counts.length ? Math.max(...counts) : 1;
   }, [brandDistribution]);
-  const maxDriverLocationCount = useMemo(() => Math.max(1, ...driverLocations.map((item) => item.driverCount)), [driverLocations]);
-  const selectedDriverLocation = useMemo(
-    () => driverLocations.find((item) => item.locationKey === selectedDriverLocationKey) ?? driverLocations[0] ?? null,
-    [driverLocations, selectedDriverLocationKey]
-  );
 
   const actionItems = useMemo(
     () =>
@@ -890,172 +854,14 @@ export function AdminDashboardPage() {
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
       <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle className="text-base">Fahrer-Herkunft</CardTitle>
-              <p className="mt-1 text-xs text-slate-500">Ort/PLZ-Cluster aus gecachten Koordinaten, getrennt vom Dashboard-Start geladen.</p>
-            </div>
-            <Button type="button" size="sm" variant="outline" disabled={driverLocationsLoading} onClick={() => void loadDriverLocations()}>
-              {driverLocationsLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Lädt…
-                </>
-              ) : (
-                "Neu laden"
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {driverLocationsError && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{driverLocationsError}</div>
-          )}
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            <div className="overflow-hidden rounded-lg border bg-slate-50">
-              <div className="relative aspect-[16/9] min-h-72">
-                {driverLocationsLoading && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 text-sm text-slate-600">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Fahrerkarte wird geladen…
-                  </div>
-                )}
-                <svg className="h-full w-full" viewBox="0 0 640 360" role="img" aria-label="Fahrer-Herkunftskarte">
-                  <rect width="640" height="360" fill="#f8fafc" />
-                  <path d="M20 188 H620 M20 244 H620 M20 300 H620 M156 20 V332 M292 20 V332 M429 20 V332 M565 20 V332" fill="none" stroke="#e2e8f0" strokeWidth="1" />
-                  <path
-                    d="M111 66 L156 47 L229 50 L281 69 L349 63 L424 80 L499 116 L546 169 L531 222 L471 264 L399 279 L333 258 L267 270 L204 248 L151 207 L105 151 Z"
-                    fill="#e2e8f0"
-                    stroke="#cbd5e1"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M262 97 L288 81 L323 82 L348 98 L342 129 L316 145 L285 140 L265 120 Z"
-                    fill="#dbeafe"
-                    stroke="#93c5fd"
-                    strokeWidth="1.5"
-                  />
-                  <path
-                    d="M288 81 L318 69 L369 76 L374 102 L348 98 L323 82 Z"
-                    fill="#eef2ff"
-                    stroke="#c7d2fe"
-                    strokeWidth="1.2"
-                  />
-                  <path
-                    d="M342 129 L383 121 L421 139 L405 167 L361 160 L316 145 Z"
-                    fill="#ecfdf5"
-                    stroke="#bbf7d0"
-                    strokeWidth="1.2"
-                  />
-                  <path
-                    d="M265 120 L236 132 L225 162 L251 181 L285 140 Z"
-                    fill="#f1f5f9"
-                    stroke="#cbd5e1"
-                    strokeWidth="1.2"
-                  />
-                  <path
-                    d="M285 140 L316 145 L361 160 L349 197 L303 201 L251 181 Z"
-                    fill="#fef3c7"
-                    stroke="#fde68a"
-                    strokeWidth="1.2"
-                  />
-                  <path d="M348 98 L383 121 M316 145 L303 201 M285 140 L262 97" fill="none" stroke="#94a3b8" strokeWidth="1" opacity="0.55" />
-                  <text x="301" y="118" fill="#1d4ed8" fontSize="16" fontWeight="700" textAnchor="middle">
-                    DE
-                  </text>
-                  <text x="345" y="91" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
-                    PL
-                  </text>
-                  <text x="371" y="151" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
-                    CZ
-                  </text>
-                  <text x="247" y="154" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
-                    FR
-                  </text>
-                  <text x="311" y="181" fill="#64748b" fontSize="11" fontWeight="600" textAnchor="middle">
-                    AT
-                  </text>
-                  <text x="28" y="334" fill="#94a3b8" fontSize="12">
-                    Vereinfachte Europa-Karte · Marker nach Ort/PLZ
-                  </text>
-                  {driverLocations.map((location) => {
-                    const point = projectDriverLocation(location);
-                    const selected = selectedDriverLocation?.locationKey === location.locationKey;
-                    const radius = Math.max(7, Math.min(24, 7 + (location.driverCount / maxDriverLocationCount) * 17));
-                    return (
-                      <g
-                        key={location.locationKey}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${formatLocationLabel(location)}: ${location.driverCount} Fahrer`}
-                        className="cursor-pointer outline-none"
-                        onClick={() => setSelectedDriverLocationKey(location.locationKey)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelectedDriverLocationKey(location.locationKey);
-                          }
-                        }}
-                      >
-                        <circle cx={point.x} cy={point.y} r={radius + 3} fill={selected ? "#f59e0b" : "#2563eb"} opacity="0.18" />
-                        <circle cx={point.x} cy={point.y} r={radius} fill={selected ? "#f59e0b" : "#2563eb"} opacity="0.82" />
-                        <circle cx={point.x} cy={point.y} r="2.5" fill="#ffffff" />
-                        <title>{`${formatLocationLabel(location)} · ${location.driverCount} Fahrer`}</title>
-                      </g>
-                    );
-                  })}
-                </svg>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-lg border bg-white p-3">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-md border bg-slate-50 p-2">
-                  <div className="text-xs text-slate-500">Orte mit Koordinaten</div>
-                  <div className="font-semibold text-slate-900">{driverLocations.length}</div>
-                </div>
-                <div className="rounded-md border bg-slate-50 p-2">
-                  <div className="text-xs text-slate-500">Fahrer auf Karte</div>
-                  <div className="font-semibold text-slate-900">{driverLocations.reduce((sum, item) => sum + item.driverCount, 0)}</div>
-                </div>
-              </div>
-              {driverLocationsMeta.missingLocationsTotal > 0 && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  {driverLocationsMeta.missingLocationsTotal} Orte mit {driverLocationsMeta.missingEntriesTotal} Fahrern haben noch keine gecachten Koordinaten.
-                </div>
-              )}
-              {!driverLocationsLoading && driverLocations.length === 0 && !driverLocationsError && (
-                <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">
-                  Noch keine Fahrerorte mit Koordinaten verfügbar.
-                </div>
-              )}
-              {selectedDriverLocation && (
-                <div className="space-y-2">
-                  <div>
-                    <div className="flex items-center gap-2 font-semibold text-slate-900">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      {formatLocationLabel(selectedDriverLocation)}
-                    </div>
-                    <div className="mt-0.5 text-xs text-slate-500">
-                      {selectedDriverLocation.driverCount} Fahrer · {selectedDriverLocation.entryCount} Nennungen
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    {selectedDriverLocation.driversPreview.map((driver) => (
-                      <Link key={driver.entryId} to={`/admin/entries/${driver.entryId}`} className="block rounded-md border p-2 text-sm transition hover:bg-slate-50">
-                        <div className="font-medium text-slate-900">{driver.driverName}</div>
-                        <div className="text-xs text-slate-600">
-                          {driver.className} · #{driver.startNumber}
-                        </div>
-                        <div className="truncate text-xs text-slate-500">{driver.vehicleLabel}</div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+        <CardContent className="p-4 sm:p-5">
+          <DriverOriginMap
+            locations={driverLocations}
+            meta={driverLocationsMeta}
+            loading={driverLocationsLoading}
+            error={driverLocationsError}
+            onReload={() => void loadDriverLocations()}
+          />
         </CardContent>
       </Card>
 
