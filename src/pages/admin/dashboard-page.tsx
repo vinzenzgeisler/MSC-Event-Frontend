@@ -370,6 +370,7 @@ export function AdminDashboardPage() {
   const [serverDailyActivity, setServerDailyActivity] = useState<DashboardDailyActivityItem[]>([]);
   const [driverLocations, setDriverLocations] = useState<DashboardDriverLocationItem[]>([]);
   const [driverLocationsLoading, setDriverLocationsLoading] = useState(false);
+  const [driverLocationsRefreshingCoordinates, setDriverLocationsRefreshingCoordinates] = useState(false);
   const [driverLocationsError, setDriverLocationsError] = useState("");
   const [driverLocationsMeta, setDriverLocationsMeta] = useState<DashboardDriverLocationsMeta>({
     totalLocations: 0,
@@ -520,14 +521,21 @@ export function AdminDashboardPage() {
     }
   }, []);
 
-  const loadDriverLocations = useCallback(async () => {
-    setDriverLocationsLoading(true);
+  const loadDriverLocations = useCallback(async (options?: { refreshCoordinates?: boolean }) => {
+    const refreshCoordinates = options?.refreshCoordinates === true;
+    if (refreshCoordinates) {
+      setDriverLocationsRefreshingCoordinates(true);
+    } else {
+      setDriverLocationsLoading(true);
+    }
     setDriverLocationsError("");
     try {
       const eventId = await getAdminEventId();
       const response = await requestJson<AdminDashboardDriverLocationsResponse>("/admin/dashboard/driver-locations", {
         query: {
-          eventId
+          eventId,
+          refresh: refreshCoordinates ? "1" : undefined,
+          refreshLimit: refreshCoordinates ? 10 : undefined
         }
       });
       const locations = normalizeDriverLocations(response.locations);
@@ -550,7 +558,11 @@ export function AdminDashboardPage() {
       });
       setDriverLocationsError(getApiErrorMessage(err, "Fahrerkarte konnte nicht geladen werden."));
     } finally {
-      setDriverLocationsLoading(false);
+      if (refreshCoordinates) {
+        setDriverLocationsRefreshingCoordinates(false);
+      } else {
+        setDriverLocationsLoading(false);
+      }
     }
   }, []);
 
@@ -859,8 +871,10 @@ export function AdminDashboardPage() {
             locations={driverLocations}
             meta={driverLocationsMeta}
             loading={driverLocationsLoading}
+            refreshingCoordinates={driverLocationsRefreshingCoordinates}
             error={driverLocationsError}
             onReload={() => void loadDriverLocations()}
+            onRefreshCoordinates={() => void loadDriverLocations({ refreshCoordinates: true })}
           />
         </CardContent>
       </Card>

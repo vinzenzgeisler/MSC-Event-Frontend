@@ -44,8 +44,10 @@ type DriverOriginMapProps = {
   locations: DashboardDriverLocationItem[];
   meta: DashboardDriverLocationsMeta;
   loading: boolean;
+  refreshingCoordinates: boolean;
   error: string;
   onReload: () => void;
+  onRefreshCoordinates: () => void;
 };
 
 type DriverMarker = DashboardDriverLocationDriver & {
@@ -153,7 +155,7 @@ function DriverMarkerClusterLayer({ markers }: { markers: DriverMarker[] }) {
   return null;
 }
 
-export function DriverOriginMap({ locations, meta, loading, error, onReload }: DriverOriginMapProps) {
+export function DriverOriginMap({ locations, meta, loading, refreshingCoordinates, error, onReload, onRefreshCoordinates }: DriverOriginMapProps) {
   const markers = useMemo<DriverMarker[]>(() => {
     return locations.flatMap((location) =>
       location.drivers.map((driver) => ({
@@ -188,19 +190,31 @@ export function DriverOriginMap({ locations, meta, loading, error, onReload }: D
         <div>
           <h2 className="text-base font-semibold text-slate-900">Fahrer-Herkunft</h2>
         </div>
-        <Button type="button" size="sm" variant="outline" disabled={loading} onClick={onReload}>
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Lädt…
-            </>
-          ) : (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Daten neu laden
-            </>
-          )}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={loading || refreshingCoordinates} onClick={onReload}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Lädt…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Daten neu laden
+              </>
+            )}
+          </Button>
+          <Button type="button" size="sm" variant="default" disabled={loading || refreshingCoordinates || meta.missingLocationsTotal === 0} onClick={onRefreshCoordinates}>
+            {refreshingCoordinates ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Aktualisiert…
+              </>
+            ) : (
+              "Koordinaten aktualisieren"
+            )}
+          </Button>
+        </div>
       </div>
 
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
@@ -215,8 +229,8 @@ export function DriverOriginMap({ locations, meta, loading, error, onReload }: D
           )}
           <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} minZoom={3} maxZoom={18} className="h-[360px] w-full sm:h-[430px]" scrollWheelZoom>
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             />
             <DriverMarkerClusterLayer markers={markers} />
           </MapContainer>
@@ -244,7 +258,7 @@ export function DriverOriginMap({ locations, meta, loading, error, onReload }: D
 
           {meta.missingEntriesTotal > 0 && (
             <div className="rounded-md border bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              {meta.missingEntriesTotal} Fahrer ohne Koordinaten
+              {meta.missingEntriesTotal} Fahrer ohne Koordinaten. Über „Koordinaten aktualisieren“ werden fehlende Orte schrittweise nachgezogen.
             </div>
           )}
 
