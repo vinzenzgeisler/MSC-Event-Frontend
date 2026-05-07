@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Filter, Loader2, Mail, Wallet } from "lucide-react";
+import { Filter, Loader2, Mail, MapPin, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -14,6 +14,9 @@ import type { AdminEntriesFilter } from "@/types/admin";
 type DashboardSummary = {
   entriesTotal: number;
   paymentsDueTotal: number;
+  paymentsPaidTotal: number;
+  paymentRelevantTotal: number;
+  entriesLast7DaysTotal: number;
   checkinPendingTotal: number;
   mailFailedTotal: number;
   mailQueuedTotal: number;
@@ -41,16 +44,55 @@ type DashboardRecentEntryItem = {
   createdAt: string;
 };
 
+type DashboardDailyActivityItem = {
+  day: string;
+  count: number;
+};
+
+type DashboardDriverLocationPreview = {
+  entryId: string;
+  driverName: string;
+  className: string;
+  startNumber: string;
+  vehicleLabel: string;
+};
+
+type DashboardDriverLocationItem = {
+  locationKey: string;
+  country: string;
+  zip: string;
+  city: string;
+  lat: number;
+  lng: number;
+  driverCount: number;
+  entryCount: number;
+  driversPreview: DashboardDriverLocationPreview[];
+};
+
 type AdminDashboardSummaryResponse = {
   ok: boolean;
   summary?: unknown;
   classDistribution?: DashboardClassDistributionItem[];
   recentEntries?: DashboardRecentEntryItem[];
+  dailyActivity?: DashboardDailyActivityItem[];
+};
+
+type AdminDashboardDriverLocationsResponse = {
+  ok: boolean;
+  locations?: unknown;
+  totalLocations?: unknown;
+  totalDrivers?: unknown;
+  missingLocationsTotal?: unknown;
+  missingEntriesTotal?: unknown;
+  maxPoints?: unknown;
 };
 
 const EMPTY_SUMMARY: DashboardSummary = {
   entriesTotal: 0,
   paymentsDueTotal: 0,
+  paymentsPaidTotal: 0,
+  paymentRelevantTotal: 0,
+  entriesLast7DaysTotal: 0,
   checkinPendingTotal: 0,
   mailFailedTotal: 0,
   mailQueuedTotal: 0,
@@ -70,6 +112,12 @@ const ACTIVITY_WINDOW_DAYS = 7;
 const CLASS_COLORS = ["#0f766e", "#2563eb", "#f59e0b", "#db2777", "#7c3aed", "#64748b"];
 const BRAND_STATS_LIMIT = 8;
 const QUICK_ACTION_PAGE_LIMIT = 100;
+const DRIVER_MAP_BOUNDS = {
+  minLng: -12,
+  maxLng: 32,
+  minLat: 35,
+  maxLat: 60
+};
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -88,6 +136,14 @@ function toDayKey(value: Date) {
 
 function formatDayLabel(value: Date) {
   return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(value);
+}
+
+function formatDayKeyLabel(value: string) {
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return formatDayLabel(parsed);
 }
 
 function formatAge(value: number | null | undefined) {
@@ -195,6 +251,9 @@ function normalizeDashboardSummary(summary: unknown): DashboardSummary {
   return {
     entriesTotal: toNullableCount(record.entriesTotal) ?? EMPTY_SUMMARY.entriesTotal,
     paymentsDueTotal: toNullableCount(record.paymentsDueTotal) ?? EMPTY_SUMMARY.paymentsDueTotal,
+    paymentsPaidTotal: toNullableCount(record.paymentsPaidTotal) ?? EMPTY_SUMMARY.paymentsPaidTotal,
+    paymentRelevantTotal: toNullableCount(record.paymentRelevantTotal) ?? EMPTY_SUMMARY.paymentRelevantTotal,
+    entriesLast7DaysTotal: toNullableCount(record.entriesLast7DaysTotal) ?? EMPTY_SUMMARY.entriesLast7DaysTotal,
     checkinPendingTotal: toNullableCount(record.checkinPendingTotal) ?? EMPTY_SUMMARY.checkinPendingTotal,
     mailFailedTotal: toNullableCount(record.mailFailedTotal) ?? EMPTY_SUMMARY.mailFailedTotal,
     mailQueuedTotal: toNullableCount(record.mailQueuedTotal) ?? EMPTY_SUMMARY.mailQueuedTotal,
@@ -202,6 +261,96 @@ function normalizeDashboardSummary(summary: unknown): DashboardSummary {
     exportsProcessingTotal: toNullableCount(record.exportsProcessingTotal) ?? EMPTY_SUMMARY.exportsProcessingTotal,
     driverAgeStats: normalizeDriverAgeStats(ageStatsSource)
   };
+}
+
+function normalizeDailyActivity(activity: unknown): DashboardDailyActivityItem[] {
+  if (!Array.isArray(activity)) {
+    return [];
+  }
+  return activity
+    .map((item) => {
+      const record = toRecord(item);
+      if (!record) {
+        return null;
+      }
+      const day = typeof record.day === "string" ? record.day.trim() : "";
+      const count = toNullableCount(record.count);
+      if (!day || count === null) {
+        return null;
+      }
+      return { day, count };
+    })
+    .filter((item): item is DashboardDailyActivityItem => Boolean(item));
+}
+
+function normalizeDriverLocations(payload: unknown): DashboardDriverLocationItem[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  return payload
+    .map((item) => {
+      const record = toRecord(item);
+      if (!record) {
+        return null;
+      }
+      const locationKey = typeof record.locationKey === "string" ? record.locationKey.trim() : "";
+      const lat = toNullableNumber(record.lat);
+      const lng = toNullableNumber(record.lng);
+      const driverCount = toNullableCount(record.driverCount);
+      const entryCount = toNullableCount(record.entryCount) ?? driverCount;
+      if (!locationKey || lat === null || lng === null || driverCount === null) {
+        return null;
+      }
+      const driversPreview = Array.isArray(record.driversPreview)
+        ? record.driversPreview
+            .map((driver) => {
+              const driverRecord = toRecord(driver);
+              if (!driverRecord) {
+                return null;
+              }
+              const entryId = typeof driverRecord.entryId === "string" ? driverRecord.entryId.trim() : "";
+              const driverName = typeof driverRecord.driverName === "string" ? driverRecord.driverName.trim() : "";
+              if (!entryId || !driverName) {
+                return null;
+              }
+              return {
+                entryId,
+                driverName,
+                className: typeof driverRecord.className === "string" ? driverRecord.className.trim() : "-",
+                startNumber: typeof driverRecord.startNumber === "string" ? driverRecord.startNumber.trim() : "-",
+                vehicleLabel: typeof driverRecord.vehicleLabel === "string" ? driverRecord.vehicleLabel.trim() : "Fahrzeug"
+              };
+            })
+            .filter((driver): driver is DashboardDriverLocationPreview => Boolean(driver))
+        : [];
+
+      return {
+        locationKey,
+        country: typeof record.country === "string" ? record.country.trim() : "",
+        zip: typeof record.zip === "string" ? record.zip.trim() : "",
+        city: typeof record.city === "string" ? record.city.trim() : "",
+        lat,
+        lng,
+        driverCount,
+        entryCount: entryCount ?? driverCount,
+        driversPreview
+      };
+    })
+    .filter((item): item is DashboardDriverLocationItem => Boolean(item));
+}
+
+function projectDriverLocation(location: Pick<DashboardDriverLocationItem, "lat" | "lng">) {
+  const lngRatio = (location.lng - DRIVER_MAP_BOUNDS.minLng) / (DRIVER_MAP_BOUNDS.maxLng - DRIVER_MAP_BOUNDS.minLng);
+  const latRatio = (DRIVER_MAP_BOUNDS.maxLat - location.lat) / (DRIVER_MAP_BOUNDS.maxLat - DRIVER_MAP_BOUNDS.minLat);
+  return {
+    x: Math.min(620, Math.max(20, 20 + lngRatio * 600)),
+    y: Math.min(300, Math.max(20, 20 + latRatio * 280))
+  };
+}
+
+function formatLocationLabel(location: Pick<DashboardDriverLocationItem, "city" | "zip" | "country">) {
+  const cityLine = [location.zip, location.city].filter(Boolean).join(" ");
+  return [cityLine, location.country].filter(Boolean).join(", ") || "Unbekannter Ort";
 }
 
 function normalizeVehicleBrand(label: string) {
@@ -246,6 +395,18 @@ export function AdminDashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
   const [classDistribution, setClassDistribution] = useState<DashboardClassDistributionItem[]>([]);
   const [recentEntries, setRecentEntries] = useState<DashboardRecentEntryItem[]>([]);
+  const [serverDailyActivity, setServerDailyActivity] = useState<DashboardDailyActivityItem[]>([]);
+  const [driverLocations, setDriverLocations] = useState<DashboardDriverLocationItem[]>([]);
+  const [driverLocationsLoading, setDriverLocationsLoading] = useState(false);
+  const [driverLocationsError, setDriverLocationsError] = useState("");
+  const [driverLocationsMeta, setDriverLocationsMeta] = useState({
+    totalLocations: 0,
+    totalDrivers: 0,
+    missingLocationsTotal: 0,
+    missingEntriesTotal: 0,
+    maxPoints: 0
+  });
+  const [selectedDriverLocationKey, setSelectedDriverLocationKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
@@ -368,10 +529,12 @@ export function AdminDashboardPage() {
       setSummary(normalizeDashboardSummary(response.summary));
       setClassDistribution(response.classDistribution ?? []);
       setRecentEntries(response.recentEntries ?? []);
+      setServerDailyActivity(normalizeDailyActivity(response.dailyActivity));
     } catch (err) {
       setSummary(EMPTY_SUMMARY);
       setClassDistribution([]);
       setRecentEntries([]);
+      setServerDailyActivity([]);
       if (err instanceof ApiError && err.status === 404 && err.code === "NOT_FOUND") {
         setError("Aktuell ist kein Event als laufendes Event markiert. Bitte im Admin unter Einstellungen ein Event als aktuell anlegen oder aktivieren.");
       } else {
@@ -386,9 +549,52 @@ export function AdminDashboardPage() {
     }
   }, []);
 
+  const loadDriverLocations = useCallback(async () => {
+    setDriverLocationsLoading(true);
+    setDriverLocationsError("");
+    try {
+      const eventId = await getAdminEventId();
+      const response = await requestJson<AdminDashboardDriverLocationsResponse>("/admin/dashboard/driver-locations", {
+        query: {
+          eventId
+        }
+      });
+      const locations = normalizeDriverLocations(response.locations);
+      setDriverLocations(locations);
+      setDriverLocationsMeta({
+        totalLocations: toNullableCount(response.totalLocations) ?? locations.length,
+        totalDrivers: toNullableCount(response.totalDrivers) ?? locations.reduce((sum, item) => sum + item.driverCount, 0),
+        missingLocationsTotal: toNullableCount(response.missingLocationsTotal) ?? 0,
+        missingEntriesTotal: toNullableCount(response.missingEntriesTotal) ?? 0,
+        maxPoints: toNullableCount(response.maxPoints) ?? 0
+      });
+      setSelectedDriverLocationKey((prev) => (prev && locations.some((item) => item.locationKey === prev) ? prev : locations[0]?.locationKey ?? null));
+    } catch (err) {
+      setDriverLocations([]);
+      setDriverLocationsMeta({
+        totalLocations: 0,
+        totalDrivers: 0,
+        missingLocationsTotal: 0,
+        missingEntriesTotal: 0,
+        maxPoints: 0
+      });
+      setSelectedDriverLocationKey(null);
+      setDriverLocationsError(getApiErrorMessage(err, "Fahrerkarte konnte nicht geladen werden."));
+    } finally {
+      setDriverLocationsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    void loadDriverLocations();
+  }, [loadDriverLocations, loading]);
 
   const recentChanges = useMemo(() => {
     return [...recentEntries]
@@ -402,10 +608,19 @@ export function AdminDashboardPage() {
       }));
   }, [recentEntries]);
 
-  const paidCount = Math.max(0, summary.entriesTotal - summary.paymentsDueTotal);
-  const paymentCompletionPercent = summary.entriesTotal > 0 ? Math.round((paidCount / summary.entriesTotal) * 100) : 0;
+  const paymentRelevantTotal = Math.max(0, summary.paymentRelevantTotal);
+  const paidCount = Math.min(Math.max(0, summary.paymentsPaidTotal), paymentRelevantTotal);
+  const paymentCompletionPercent = paymentRelevantTotal > 0 ? Math.round((paidCount / paymentRelevantTotal) * 100) : 0;
 
   const dailyActivity = useMemo(() => {
+    if (serverDailyActivity.length > 0) {
+      return serverDailyActivity.map((item) => ({
+        key: item.day,
+        label: formatDayKeyLabel(item.day),
+        count: item.count
+      }));
+    }
+
     const counts = new Map<string, number>();
     recentEntries.forEach((item) => {
       const parsed = new Date(item.createdAt);
@@ -431,9 +646,11 @@ export function AdminDashboardPage() {
     }
 
     return days;
-  }, [recentEntries]);
+  }, [recentEntries, serverDailyActivity]);
   const maxDailyCount = Math.max(1, ...dailyActivity.map((item) => item.count));
-  const newEntriesLast7Days = dailyActivity.reduce((sum, item) => sum + item.count, 0);
+  const newEntriesLast7Days = serverDailyActivity.length > 0
+    ? summary.entriesLast7DaysTotal
+    : dailyActivity.reduce((sum, item) => sum + item.count, 0);
   const medianDriverAge = summary.driverAgeStats.medianDriverAge;
   const youngestDriverAge = summary.driverAgeStats.youngestDriverAge;
   const youngestDriverLabel = summary.driverAgeStats.youngestDriverLabel?.trim() || "—";
@@ -544,6 +761,11 @@ export function AdminDashboardPage() {
     const counts = (brandDistribution ?? []).map((item) => item.count);
     return counts.length ? Math.max(...counts) : 1;
   }, [brandDistribution]);
+  const maxDriverLocationCount = useMemo(() => Math.max(1, ...driverLocations.map((item) => item.driverCount)), [driverLocations]);
+  const selectedDriverLocation = useMemo(
+    () => driverLocations.find((item) => item.locationKey === selectedDriverLocationKey) ?? driverLocations[0] ?? null,
+    [driverLocations, selectedDriverLocationKey]
+  );
 
   const actionItems = useMemo(
     () =>
@@ -587,7 +809,16 @@ export function AdminDashboardPage() {
               <p className="mt-1 text-sm text-slate-600">Statistischer Überblick mit Fokus auf operative Entscheidungen.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" variant="outline" disabled={loading || refreshing} onClick={() => void loadDashboard({ refresh: true })}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={loading || refreshing}
+                onClick={() => {
+                  void loadDashboard({ refresh: true });
+                  void loadDriverLocations();
+                }}
+              >
                 {refreshing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -636,7 +867,7 @@ export function AdminDashboardPage() {
                 <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${loading ? 0 : paymentCompletionPercent}%` }} />
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                {loading ? "…" : `${paidCount} von ${summary.entriesTotal} aktiven Nennungen bezahlt`}
+                {loading ? "…" : `${paidCount} von ${paymentRelevantTotal} zugelassenen Nennungen bezahlt`}
               </div>
             </div>
             <div className="rounded-lg border bg-white p-3">
@@ -657,6 +888,132 @@ export function AdminDashboardPage() {
       </Card>
 
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Fahrer-Herkunft</CardTitle>
+              <p className="mt-1 text-xs text-slate-500">Ort/PLZ-Cluster aus gecachten Koordinaten, getrennt vom Dashboard-Start geladen.</p>
+            </div>
+            <Button type="button" size="sm" variant="outline" disabled={driverLocationsLoading} onClick={() => void loadDriverLocations()}>
+              {driverLocationsLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Lädt…
+                </>
+              ) : (
+                "Neu laden"
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {driverLocationsError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{driverLocationsError}</div>
+          )}
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+            <div className="overflow-hidden rounded-lg border bg-slate-50">
+              <div className="relative aspect-[16/9] min-h-72">
+                {driverLocationsLoading && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 text-sm text-slate-600">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Fahrerkarte wird geladen…
+                  </div>
+                )}
+                <svg className="h-full w-full" viewBox="0 0 640 360" role="img" aria-label="Fahrer-Herkunftskarte">
+                  <rect width="640" height="360" fill="#f8fafc" />
+                  <path
+                    d="M92 96 C142 54 214 58 255 86 C289 109 321 102 363 86 C416 66 483 86 519 132 C558 181 530 236 473 257 C415 279 371 252 323 263 C250 280 187 265 142 226 C101 191 61 143 92 96Z"
+                    fill="#e2e8f0"
+                    stroke="#cbd5e1"
+                    strokeWidth="2"
+                  />
+                  <path d="M366 91 C390 113 392 139 377 163 C358 192 367 217 395 239" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
+                  <path d="M252 88 C246 125 260 152 291 175 C316 194 319 224 303 260" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
+                  <path d="M146 159 C196 146 246 151 297 165 C366 183 422 172 489 145" fill="none" stroke="#cbd5e1" strokeWidth="1.5" />
+                  <text x="28" y="334" fill="#94a3b8" fontSize="12">
+                    Europa-Ausschnitt · Marker nach Ort/PLZ
+                  </text>
+                  {driverLocations.map((location) => {
+                    const point = projectDriverLocation(location);
+                    const selected = selectedDriverLocation?.locationKey === location.locationKey;
+                    const radius = Math.max(7, Math.min(24, 7 + (location.driverCount / maxDriverLocationCount) * 17));
+                    return (
+                      <g
+                        key={location.locationKey}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${formatLocationLabel(location)}: ${location.driverCount} Fahrer`}
+                        className="cursor-pointer outline-none"
+                        onClick={() => setSelectedDriverLocationKey(location.locationKey)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedDriverLocationKey(location.locationKey);
+                          }
+                        }}
+                      >
+                        <circle cx={point.x} cy={point.y} r={radius + 3} fill={selected ? "#f59e0b" : "#2563eb"} opacity="0.18" />
+                        <circle cx={point.x} cy={point.y} r={radius} fill={selected ? "#f59e0b" : "#2563eb"} opacity="0.82" />
+                        <circle cx={point.x} cy={point.y} r="2.5" fill="#ffffff" />
+                        <title>{`${formatLocationLabel(location)} · ${location.driverCount} Fahrer`}</title>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border bg-white p-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs text-slate-500">Orte mit Koordinaten</div>
+                  <div className="font-semibold text-slate-900">{driverLocations.length}</div>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <div className="text-xs text-slate-500">Fahrer auf Karte</div>
+                  <div className="font-semibold text-slate-900">{driverLocations.reduce((sum, item) => sum + item.driverCount, 0)}</div>
+                </div>
+              </div>
+              {driverLocationsMeta.missingLocationsTotal > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {driverLocationsMeta.missingLocationsTotal} Orte mit {driverLocationsMeta.missingEntriesTotal} Fahrern haben noch keine gecachten Koordinaten.
+                </div>
+              )}
+              {!driverLocationsLoading && driverLocations.length === 0 && !driverLocationsError && (
+                <div className="rounded-md border border-dashed p-3 text-sm text-slate-500">
+                  Noch keine Fahrerorte mit Koordinaten verfügbar.
+                </div>
+              )}
+              {selectedDriverLocation && (
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center gap-2 font-semibold text-slate-900">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      {formatLocationLabel(selectedDriverLocation)}
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-500">
+                      {selectedDriverLocation.driverCount} Fahrer · {selectedDriverLocation.entryCount} Nennungen
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedDriverLocation.driversPreview.map((driver) => (
+                      <Link key={driver.entryId} to={`/admin/entries/${driver.entryId}`} className="block rounded-md border p-2 text-sm transition hover:bg-slate-50">
+                        <div className="font-medium text-slate-900">{driver.driverName}</div>
+                        <div className="text-xs text-slate-600">
+                          {driver.className} · #{driver.startNumber}
+                        </div>
+                        <div className="truncate text-xs text-slate-500">{driver.vehicleLabel}</div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
@@ -680,7 +1037,7 @@ export function AdminDashboardPage() {
                     );
                   })}
                 </div>
-                <div className="text-xs text-slate-500">Neue Nennungen pro Tag (auf Basis der letzten gemeldeten Änderungen).</div>
+                <div className="text-xs text-slate-500">Neue Nennungen pro Kalendertag.</div>
               </div>
             )}
           </CardContent>
