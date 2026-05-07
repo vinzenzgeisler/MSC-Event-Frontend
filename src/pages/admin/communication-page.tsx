@@ -451,6 +451,15 @@ export function AdminCommunicationPage() {
   }, [form.defaultLocale, templateDataValue]);
   const allowFilterRecipients = recipientMode === "filter" || recipientMode === "combined";
   const allowIndividualRecipients = recipientMode === "individual" || recipientMode === "combined";
+  const hasSpecificRecipientFilter =
+    allowFilterRecipients &&
+    (form.classId !== "all" || form.acceptanceStatus !== "all" || form.registrationStatus !== "all" || form.paymentStatus !== "all");
+  const sendAllEntries =
+    recipientMode === "filter" &&
+    form.classId === "all" &&
+    form.acceptanceStatus === "all" &&
+    form.registrationStatus === "all" &&
+    form.paymentStatus === "all";
   const previewEntryId = useMemo(() => {
     if (!allowIndividualRecipients) {
       return undefined;
@@ -472,7 +481,8 @@ export function AdminCommunicationPage() {
     });
     return fromBackend;
   }, [templatesByKey]);
-  const sendBlockedByRecipientSelection = allowIndividualRecipients && !allowFilterRecipients && selectedDriverPersonIds.length === 0 && additionalRecipients.valid.length === 0;
+  const sendBlockedByRecipientSelection =
+    !hasSpecificRecipientFilter && !sendAllEntries && selectedDriverPersonIds.length === 0 && additionalRecipients.valid.length === 0;
   const sendBlockedByMissingPlaceholders = Boolean(
     backendPreview && backendPreview.missingPlaceholders && backendPreview.missingPlaceholders.length > 0
   );
@@ -840,6 +850,7 @@ export function AdminCommunicationPage() {
     setResolvingRecipients(true);
     try {
       const result = await communicationService.resolveBroadcastRecipients({
+        allEntries: sendAllEntries,
         classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
         acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
         registrationStatus: allowFilterRecipients && form.registrationStatus !== "all" ? form.registrationStatus : undefined,
@@ -911,6 +922,7 @@ export function AdminCommunicationPage() {
         driverPersonIds: allowIndividualRecipients ? selectedDriverPersonIds : undefined,
         entryIds: allowIndividualRecipients ? selectedEntryIds : undefined,
         filters: {
+          allEntries: sendAllEntries,
           classId: allowFilterRecipients && form.classId !== "all" ? form.classId : undefined,
           acceptanceStatus: allowFilterRecipients && form.acceptanceStatus !== "all" ? form.acceptanceStatus : undefined,
           registrationStatus: allowFilterRecipients && form.registrationStatus !== "all" ? form.registrationStatus : undefined,

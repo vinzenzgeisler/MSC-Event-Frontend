@@ -1,6 +1,7 @@
 import { getAdminEventId } from "@/services/api/event-context";
 import { requestJson } from "@/services/api/http-client";
 import type {
+  ListMeta,
   MailAttachmentUploadFinalizeResponse,
   MailAttachmentUploadInitResponse,
   MailRenderOptionsInput,
@@ -35,6 +36,7 @@ function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
 type AdminOutboxListResponse = {
   ok: boolean;
   outbox: OutboxItemDto[];
+  meta: ListMeta;
 };
 
 type AdminMailQueueResponse = {
@@ -80,16 +82,29 @@ type MailSendResponse = {
 export const communicationService = {
   async listOutbox() {
     const eventId = await getAdminEventId();
-    const response = await requestJson<AdminOutboxListResponse>("/admin/mail/outbox", {
-      query: {
-        eventId,
-        limit: 100,
-        sortBy: "createdAt",
-        sortDir: "desc"
-      }
-    });
+    const outbox: OutboxItemDto[] = [];
+    let cursor: string | undefined;
+    let safety = 0;
 
-    const sortedOutbox = [...response.outbox].sort((left, right) => {
+    while (safety < 80) {
+      safety += 1;
+      const response = await requestJson<AdminOutboxListResponse>("/admin/mail/outbox", {
+        query: {
+          eventId,
+          cursor,
+          limit: 100,
+          sortBy: "createdAt",
+          sortDir: "desc"
+        }
+      });
+      outbox.push(...response.outbox);
+      if (!response.meta.hasMore || !response.meta.nextCursor) {
+        break;
+      }
+      cursor = response.meta.nextCursor;
+    }
+
+    const sortedOutbox = [...outbox].sort((left, right) => {
       const leftTs = Number(new Date(left.createdAt));
       const rightTs = Number(new Date(right.createdAt));
       return rightTs - leftTs;
@@ -291,12 +306,14 @@ export const communicationService = {
     additionalEmails?: string[];
     driverPersonIds?: string[];
     entryIds?: string[];
+    allEntries?: boolean;
   }) {
     const eventId = await getAdminEventId();
     return requestJson<ResolveRecipientsResult>("/admin/mail/broadcast/resolve-recipients", {
       method: "POST",
       body: {
         eventId,
+        allEntries: payload.allEntries || undefined,
         classId: payload.classId || undefined,
         acceptanceStatus: payload.acceptanceStatus || undefined,
         registrationStatus: payload.registrationStatus || undefined,
@@ -324,6 +341,7 @@ export const communicationService = {
       acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
       registrationStatus?: "submitted_unverified" | "submitted_verified";
       paymentStatus?: "due" | "paid";
+      allEntries?: boolean;
     };
     attachmentUploadIds?: string[];
   }) {
@@ -344,8 +362,13 @@ export const communicationService = {
         entryIds: payload.entryIds?.length ? payload.entryIds : undefined,
         filters:
           payload.filters &&
-          (payload.filters.classId || payload.filters.acceptanceStatus || payload.filters.registrationStatus || payload.filters.paymentStatus)
+          (payload.filters.allEntries ||
+            payload.filters.classId ||
+            payload.filters.acceptanceStatus ||
+            payload.filters.registrationStatus ||
+            payload.filters.paymentStatus)
             ? {
+                allEntries: payload.filters.allEntries || undefined,
                 classId: payload.filters.classId || undefined,
                 acceptanceStatus: payload.filters.acceptanceStatus || undefined,
                 registrationStatus: payload.filters.registrationStatus || undefined,
