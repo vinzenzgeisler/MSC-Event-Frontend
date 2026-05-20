@@ -2171,9 +2171,13 @@ export function AnmeldungPage() {
           )}
 
           <div className="hidden flex-wrap justify-between gap-3 border-t pt-5 md:flex">
-            <Button type="button" variant="outline" disabled={step === 1} onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
-              {m.page.back}
-            </Button>
+            {step > 1 ? (
+              <Button type="button" variant="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+                {m.page.back}
+              </Button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
             {step === 1 && (
               <Button type="button" onClick={goToStep2}>
                 {m.page.nextToStarts}
@@ -2190,12 +2194,14 @@ export function AnmeldungPage() {
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-0 z-20 border-t bg-white/95 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur md:hidden">
+      <div className="border-t bg-white pt-3 md:hidden">
         <div className="mx-auto max-w-6xl space-y-2">
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" className="flex-1" disabled={step === 1} onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
-              {m.page.back}
-            </Button>
+            {step > 1 && (
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+                {m.page.back}
+              </Button>
+            )}
             {step < 3 && (
               <span title={step2NextBlocked ? step2BlockedReason : undefined} className="flex-1">
                 <Button type="button" className="w-full" disabled={step2NextBlocked} onClick={handleNext}>

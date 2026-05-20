@@ -191,7 +191,6 @@ export function AdminEntryDetailPage() {
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [classDraft, setClassDraft] = useState("");
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
-  const [mobileHeaderCompact, setMobileHeaderCompact] = useState(false);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -330,19 +329,6 @@ export function AdminEntryDetailPage() {
     setIncludeDriverNoteOnReject(false);
   }, [hasDriverNote]);
 
-  useEffect(() => {
-    const updateCompactHeader = () => {
-      setMobileHeaderCompact(window.scrollY > 0);
-    };
-
-    updateCompactHeader();
-    window.addEventListener("scroll", updateCompactHeader, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", updateCompactHeader);
-    };
-  }, []);
-
   if (!hasLoadedOnce) {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung wird geladen…</div>;
   }
@@ -397,11 +383,8 @@ export function AdminEntryDetailPage() {
 
   return (
     <div className="w-full max-w-[1120px] pb-4 lg:flex lg:h-[calc(100dvh-3rem)] lg:flex-col lg:overflow-hidden lg:pb-0">
-      <div
-        className="-mt-4 sticky top-[57px] z-40 border-b border-slate-200/80 bg-slate-100/95 px-3 backdrop-blur transition-[padding] duration-200 md:-mt-6 lg:static lg:mt-0 lg:hidden"
-        style={{ overflowAnchor: "none" }}
-      >
-        <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-0 -translate-y-1 opacity-0 pointer-events-none py-0" : "max-h-96 py-3 opacity-100"}`}>
+      <div className="-mt-4 border-b border-slate-200/80 bg-slate-100 px-3 md:-mt-6 lg:hidden">
+        <div className="py-3">
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -454,30 +437,6 @@ export function AdminEntryDetailPage() {
           </div>
         </div>
 
-        <div className={`overflow-hidden transition-[max-height,opacity,transform,padding] duration-200 ${mobileHeaderCompact ? "max-h-16 py-2 opacity-100" : "pointer-events-none max-h-0 -translate-y-1 py-0 opacity-0"}`}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-900">{detail.headline}</div>
-              <div className="truncate text-xs text-slate-500">
-                #{detail.startNumber} · {detail.classLabel}
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Badge
-                className={confirmationMailVerified ? "h-6 border-emerald-300 bg-emerald-50 px-2 text-[11px] text-emerald-900" : "h-6 border-slate-300 bg-slate-100 px-2 text-[11px] text-slate-700"}
-                variant="outline"
-              >
-                {confirmationMailVerified ? "Mail ok" : "Mail offen"}
-              </Badge>
-              <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2 text-[11px]`} variant="outline">
-                {acceptanceStatusLabel(status)}
-              </Badge>
-              <Button type="button" variant="outline" size="sm" className="h-8 bg-white/90 px-2.5 text-xs" onClick={backToEntries}>
-                Zurück
-              </Button>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="hidden space-y-3 bg-slate-100 px-3 py-3 lg:flex-none lg:block" style={{ overflowAnchor: "none" }}>

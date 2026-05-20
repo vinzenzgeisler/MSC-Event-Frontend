@@ -1091,8 +1091,8 @@ export function AdminEntriesPage() {
   return (
     <div className={cn("space-y-4", useDesktopTableShell && "xl:flex xl:h-[calc(100dvh-3rem)] xl:flex-col xl:overflow-hidden xl:space-y-0")}>
       <div className={cn("space-y-4", useDesktopTableShell && "xl:flex-none xl:pb-4")}>
-        <div className="-mt-4 sticky top-[57px] z-40 md:hidden">
-          <div className="rounded-b-2xl border-b border-slate-200/80 bg-slate-100/95 px-3 pb-3 pt-3 backdrop-blur">
+        <div className="-mt-4 md:hidden">
+          <div className="rounded-b-2xl border-b border-slate-200/80 bg-slate-100 px-3 pb-3 pt-3">
             <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
             <div className="mt-3 rounded-xl border bg-white p-4 shadow-sm">
               <div className={`overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ${mobileHeaderCompact ? "pointer-events-none -translate-y-1 opacity-0 max-h-0 mb-0" : "opacity-100 max-h-72 mb-3"}`}>
