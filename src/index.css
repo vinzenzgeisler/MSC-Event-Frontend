@@ -30,11 +30,13 @@
 html {
   overflow-y: scroll;
   -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
 body {
   @apply bg-background text-foreground antialiased;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  touch-action: manipulation;
 }
 
 @media (max-width: 767px) {

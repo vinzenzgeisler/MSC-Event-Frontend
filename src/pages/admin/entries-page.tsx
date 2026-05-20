@@ -1076,83 +1076,83 @@ export function AdminEntriesPage() {
 
   return (
     <div className={cn("space-y-4", useDesktopTableShell && "xl:flex xl:h-[calc(100dvh-3rem)] xl:flex-col xl:overflow-hidden xl:space-y-0")}>
-      <div className={cn("space-y-4", useDesktopTableShell && "xl:flex-none xl:pb-4")}>
-        <div className="-mx-4 -mt-4 sticky top-[57px] z-40 border-b border-slate-200/80 bg-slate-100/95 px-3 py-2 shadow-sm backdrop-blur md:hidden">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h1 className="truncate text-base font-semibold text-slate-900">Nennungen</h1>
-                <div className="truncate text-[11px] text-slate-500">{loadedCountText}</div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 w-9 bg-white p-0"
-                  disabled={refreshing}
-                  title="Aktualisieren"
-                  aria-label="Nennungen aktualisieren"
-                  onClick={() => void refreshSnapshot(true)}
-                >
-                  <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 w-9 bg-white p-0"
-                  title="Filter zurücksetzen"
-                  aria-label="Filter zurücksetzen"
-                  onClick={() => setFilterDraft(initialFilter)}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </div>
+      <div className="-mx-4 -mt-4 sticky top-[57px] z-40 border-b border-slate-200 bg-slate-100 px-3 py-2 md:hidden">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold text-slate-900">Nennungen</h1>
+              <div className="truncate text-[11px] text-slate-500">{loadedCountText}</div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  id="admin-filter-search-mobile"
-                  className="h-10 bg-white pl-9 pr-3"
-                  placeholder="Name, E-Mail, Startnr."
-                  value={filterDraft.query}
-                  onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
-                />
-              </div>
+            <div className="flex shrink-0 items-center gap-1.5">
               <Button
                 type="button"
+                size="sm"
                 variant="outline"
-                className="relative h-10 w-10 shrink-0 bg-white p-0"
-                title="Filter öffnen"
-                aria-label={activeFilterChips.length > 0 ? `Filter öffnen, ${activeFilterChips.length} aktive Filter` : "Filter öffnen"}
-                onClick={() => setMobileFiltersOpen(true)}
+                className="h-9 w-9 bg-white p-0"
+                disabled={refreshing}
+                title="Aktualisieren"
+                aria-label="Nennungen aktualisieren"
+                onClick={() => void refreshSnapshot(true)}
               >
-                <Filter className="h-4 w-4" />
-                {activeFilterChips.length > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
-                    {activeFilterChips.length}
-                  </span>
-                )}
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 w-9 bg-white p-0"
+                title="Filter zurücksetzen"
+                aria-label="Filter zurücksetzen"
+                onClick={() => setFilterDraft(initialFilter)}
+              >
+                <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
-
-            {activeFilterChips.length > 0 && (
-              <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 scrollbar-none">
-                {activeFilterChips.map((chip) => (
-                  <button key={chip.key} type="button" className="shrink-0" onClick={() => removeFilterChip(chip.key)} aria-label={`${chip.label} entfernen`}>
-                    <Badge className="bg-white text-[11px]" variant="outline">
-                      {chip.label} ×
-                    </Badge>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
 
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                id="admin-filter-search-mobile"
+                className="h-10 bg-white pl-9 pr-3"
+                placeholder="Name, E-Mail, Startnr."
+                value={filterDraft.query}
+                onChange={(event) => setFilterDraft((prev) => ({ ...prev, query: event.target.value }))}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="relative h-10 w-10 shrink-0 bg-white p-0"
+              title="Filter öffnen"
+              aria-label={activeFilterChips.length > 0 ? `Filter öffnen, ${activeFilterChips.length} aktive Filter` : "Filter öffnen"}
+              onClick={() => setMobileFiltersOpen(true)}
+            >
+              <Filter className="h-4 w-4" />
+              {activeFilterChips.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                  {activeFilterChips.length}
+                </span>
+              )}
+            </Button>
+          </div>
+
+          {activeFilterChips.length > 0 && (
+            <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 scrollbar-none">
+              {activeFilterChips.map((chip) => (
+                <button key={chip.key} type="button" className="shrink-0" onClick={() => removeFilterChip(chip.key)} aria-label={`${chip.label} entfernen`}>
+                  <Badge className="bg-white text-[11px]" variant="outline">
+                    {chip.label} ×
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className={cn("space-y-4", useDesktopTableShell && "xl:flex-none xl:pb-4")}>
         <h1 className="hidden text-2xl font-semibold text-slate-900 md:block">Nennungen</h1>
         <div className="hidden rounded-xl border bg-white p-4 md:block">
           <div className="hidden md:block">

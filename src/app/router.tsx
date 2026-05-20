@@ -49,7 +49,7 @@ export const router = createBrowserRouter([
         path: "/admin",
         element: <AdminLayout />,
         children: [
-          { index: true, element: <Navigate to="dashboard" replace /> },
+          { index: true, element: <Navigate to="entries" replace /> },
           { path: "dashboard", element: <AdminDashboardPage /> },
           { path: "entries", element: <AdminEntriesPage /> },
           { path: "entries/:entryId", element: <AdminEntryDetailPage /> },

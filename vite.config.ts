@@ -40,8 +40,8 @@ export default defineConfig(({ mode }) => {
                 theme_color: "#0f172a",
                 background_color: "#f8fafc",
                 display: "standalone",
-                start_url: "/admin",
-                scope: "/admin",
+                start_url: "/admin/entries",
+                scope: "/admin/",
                 lang: "de",
                 icons: [
                   {
