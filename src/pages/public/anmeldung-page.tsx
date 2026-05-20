@@ -2191,27 +2191,25 @@ export function AnmeldungPage() {
               </span>
             )}
           </div>
+
+          <div className="border-t pt-5 md:hidden">
+            <div className="flex items-center gap-2">
+              {step > 1 && (
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
+                  {m.page.back}
+                </Button>
+              )}
+              {step < 3 && (
+                <span title={step2NextBlocked ? step2BlockedReason : undefined} className="flex-1">
+                  <Button type="button" className="w-full" disabled={step2NextBlocked} onClick={handleNext}>
+                    {step === 2 ? step2PrimaryLabel : m.page.next}
+                  </Button>
+                </span>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      <div className="border-t bg-white pt-3 md:hidden">
-        <div className="mx-auto max-w-6xl space-y-2">
-          <div className="flex items-center gap-2">
-            {step > 1 && (
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>
-                {m.page.back}
-              </Button>
-            )}
-            {step < 3 && (
-              <span title={step2NextBlocked ? step2BlockedReason : undefined} className="flex-1">
-                <Button type="button" className="w-full" disabled={step2NextBlocked} onClick={handleNext}>
-                  {step === 2 ? step2PrimaryLabel : m.page.next}
-                </Button>
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
 
       {showStartCompletionDialog && recentlySavedStart && (
         <div className="fixed inset-0 z-50 flex items-end bg-slate-950/50 px-3 py-4 sm:items-center sm:justify-center sm:px-6">
