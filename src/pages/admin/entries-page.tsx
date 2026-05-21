@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, Loader2, RefreshCw, RotateCcw, Search, X } from "lucide-react";
+import { Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -1095,17 +1095,6 @@ export function AdminEntriesPage() {
                 onClick={() => void refreshSnapshot(true)}
               >
                 <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 w-9 bg-white p-0"
-                title="Filter zurücksetzen"
-                aria-label="Filter zurücksetzen"
-                onClick={() => setFilterDraft(initialFilter)}
-              >
-                <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
           </div>
