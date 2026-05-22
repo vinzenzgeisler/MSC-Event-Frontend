@@ -15,7 +15,7 @@ Datei: `public/runtime-config.js` (wird als `/runtime-config.js` ausgeliefert)
 window.__MSC_RUNTIME_CONFIG__ = {
   apiBaseUrl: "https://<api-host>",
   cognitoEnabled: true,
-  cognitoDomain: "https://<domain>.auth.<region>.amazoncognito.com",
+  cognitoDomain: "https://<cognito-hosted-ui-domain>",
   cognitoClientId: "<client-id>",
   cognitoRedirectUri: "https://<your-host>/admin/login",
   cognitoLogoutUri: "https://<your-host>/admin/login",

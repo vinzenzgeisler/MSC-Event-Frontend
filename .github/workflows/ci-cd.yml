@@ -9,6 +9,9 @@ on:
     branches:
       - dev
       - main
+      - "feature/**"
+      - "fix/**"
+      - "chore/**"
 
 jobs:
   validate:

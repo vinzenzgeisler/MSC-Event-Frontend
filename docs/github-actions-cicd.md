@@ -50,7 +50,7 @@ Die Workflow-Datei verwendet bereits `environment: dev` und `environment: prod`.
 - `VITE_API_BASE_URL_PROD`
   - Öffentliche Prod-API-URL des Backends, zum Beispiel `https://api.example.tld`.
 - `VITE_COGNITO_DOMAIN_*`
-  - Hosted-UI-Basis-URL aus dem Backend/Auth-Stack, zum Beispiel `https://<prefix>.auth.eu-central-1.amazoncognito.com`.
+  - Hosted-UI-Basis-URL aus dem Backend/Auth-Stack, zum Beispiel `https://<cognito-hosted-ui-domain>`.
 - `VITE_COGNITO_CLIENT_ID_*`
   - Cognito App Client ID aus dem Backend/Auth-Stack.
 - `VITE_COGNITO_REDIRECT_URI_*`

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bike, Car, CheckCircle2, Clock3, Download, Loader2, Mail, Trash2, Wallet } from "lucide-react";
+import { Bike, Car, CheckCircle2, Clock3, Download, Loader2, Mail, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -17,6 +17,7 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
+import { adminSigningService, type SigningDevice, type SigningPrecheckInput } from "@/services/admin-signing.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
@@ -191,6 +192,20 @@ export function AdminEntryDetailPage() {
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [classDraft, setClassDraft] = useState("");
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
+  const [signingDevices, setSigningDevices] = useState<SigningDevice[]>([]);
+  const [signingDeviceId, setSigningDeviceId] = useState("");
+  const [pairingCode, setPairingCode] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [signingPrecheck, setSigningPrecheck] = useState<SigningPrecheckInput>({
+    identityChecked: false,
+    signerPresent: false,
+    medicalCertificateChecked: false,
+    guardianPresent: false,
+    guardianAuthorityChecked: false
+  });
+  const [signingSignerType, setSigningSignerType] = useState<"driver" | "guardian">("driver");
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianRelationship, setGuardianRelationship] = useState("");
+  const [signingBusy, setSigningBusy] = useState(false);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -319,6 +334,13 @@ export function AdminEntryDetailPage() {
       .catch(() => setClassOptions([]));
   }, []);
 
+  useEffect(() => {
+    if (!canCheckin) {
+      return;
+    }
+    void loadSigningDevices();
+  }, [canCheckin]);
+
   const hasDriverNote = driverNote.trim().length > 0;
 
   useEffect(() => {
@@ -379,6 +401,57 @@ export function AdminEntryDetailPage() {
       return;
     }
     navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
+  };
+
+  const loadSigningDevices = async () => {
+    try {
+      const devices = await adminSigningService.listDevices();
+      setSigningDevices(devices);
+      const preferred = devices.find((item) => item.status === "connected") ?? devices[0];
+      if (preferred && !signingDeviceId) {
+        setSigningDeviceId(preferred.id);
+      }
+    } catch {
+      setSigningDevices([]);
+    }
+  };
+
+  const createPairingCode = async () => {
+    setSigningBusy(true);
+    try {
+      const result = await adminSigningService.createPairingCode();
+      setPairingCode({ code: result.pairingCode, expiresAt: result.expiresAt });
+      await loadSigningDevices();
+      flashMessage("Pairing-Code erzeugt. Bitte am Signaturgerät eingeben.", 4200);
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Pairing-Code konnte nicht erzeugt werden."), 3200);
+    } finally {
+      setSigningBusy(false);
+    }
+  };
+
+  const startSigningOnDevice = async () => {
+    if (!detail || !signingDeviceId || signingBusy) {
+      return;
+    }
+    setSigningBusy(true);
+    try {
+      await adminSigningService.startSession({
+        deviceSessionId: signingDeviceId,
+        entryId: detail.id,
+        precheck: signingPrecheck,
+        signer: {
+          type: signingSignerType,
+          guardianName: signingSignerType === "guardian" ? guardianName.trim() || null : null,
+          guardianRelationship: signingSignerType === "guardian" ? guardianRelationship.trim() || null : null
+        }
+      });
+      flashMessage("Haftverzicht wurde an das gekoppelte Signaturgerät gesendet.", 4200);
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Signing-Session konnte nicht gestartet werden."), 4200);
+    } finally {
+      setSigningBusy(false);
+    }
   };
 
   return (
@@ -867,6 +940,121 @@ export function AdminEntryDetailPage() {
                       onClick={() => setPendingCheckinConfirm(true)}
                     />
                   )}
+                </div>
+              )}
+
+              {canCheckin && (
+                <div className="grid gap-3 border-t border-slate-200 pt-4">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Haftverzicht am Signaturgerät</div>
+                    <div className="text-xs text-slate-500">
+                      Vorprüfung hier erfassen, danach wird nur der Fahrer-/Unterzeichner-Flow ans Signaturgerät gesendet.
+                    </div>
+                  </div>
+
+                  {pairingCode ? (
+                    <div className="rounded-md border border-sky-200 bg-sky-50 p-3">
+                      <div className="text-xs font-semibold uppercase text-sky-700">Pairing-Code</div>
+                      <div className="mt-1 font-mono text-2xl font-bold tracking-widest text-sky-950">{pairingCode.code}</div>
+                      <div className="mt-1 text-xs text-sky-700">Gültig bis {new Date(pairingCode.expiresAt).toLocaleTimeString("de-DE")}</div>
+                    </div>
+                  ) : null}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={signingBusy}
+                    onClick={() => void createPairingCode()}
+                  >
+                    {signingBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TabletSmartphone className="mr-2 h-4 w-4" />}
+                    Signaturgerät koppeln
+                  </Button>
+
+                  <Select value={signingDeviceId || "__none__"} onValueChange={(value) => setSigningDeviceId(value === "__none__" ? "" : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Signaturgerät auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Kein Signaturgerät ausgewählt</SelectItem>
+                      {signingDevices.map((device) => (
+                        <SelectItem key={device.id} value={device.id}>
+                          {(device.deviceName ?? "Signing Terminal")} · {device.status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="grid gap-2 rounded-md border bg-slate-50 p-3 text-sm">
+                    {[
+                      ["identityChecked", "Identität geprüft"],
+                      ["signerPresent", "Unterzeichnende Person anwesend"],
+                      ["medicalCertificateChecked", "Ärztliches Attest geprüft, falls erforderlich"],
+                      ["guardianPresent", "Erziehungsberechtigter anwesend, falls erforderlich"],
+                      ["guardianAuthorityChecked", "Guardian-Berechtigung plausibel geprüft, falls erforderlich"]
+                    ].map(([key, label]) => (
+                      <label key={key} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(signingPrecheck[key as keyof SigningPrecheckInput])}
+                          onChange={(event) =>
+                            setSigningPrecheck((current) => ({
+                              ...current,
+                              [key]: event.target.checked
+                            }))
+                          }
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Select value={signingSignerType} onValueChange={(value) => setSigningSignerType(value === "guardian" ? "guardian" : "driver")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="driver">Fahrer unterschreibt selbst</SelectItem>
+                        <SelectItem value="guardian">Erziehungsberechtigter unterschreibt</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {signingSignerType === "guardian" ? (
+                      <>
+                        <input
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                          value={guardianName}
+                          onChange={(event) => setGuardianName(event.target.value)}
+                          placeholder="Name Erziehungsberechtigter"
+                        />
+                        <input
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm"
+                          value={guardianRelationship}
+                          onChange={(event) => setGuardianRelationship(event.target.value)}
+                          placeholder="Beziehung zum Fahrer"
+                        />
+                      </>
+                    ) : null}
+                  </div>
+
+                  <HintButton
+                    label={signingBusy ? "Session wird gesendet…" : "Haftverzicht am Signaturgerät starten"}
+                    icon={signingBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TabletSmartphone className="mr-2 h-4 w-4" />}
+                    variant="default"
+                    className={actionActiveClass}
+                    disabledReason={
+                      signingBusy
+                        ? "Signing-Aktion läuft…"
+                        : !signingDeviceId
+                          ? "Bitte zuerst ein gekoppeltes Signaturgerät auswählen."
+                          : !signingPrecheck.identityChecked || !signingPrecheck.signerPresent
+                            ? "Identität und Anwesenheit müssen bestätigt sein."
+                            : signingSignerType === "guardian" && (!guardianName.trim() || !guardianRelationship.trim())
+                              ? "Guardian-Name und Beziehung erfassen."
+                              : undefined
+                    }
+                    onClick={() => void startSigningOnDevice()}
+                  />
                 </div>
               )}
 
