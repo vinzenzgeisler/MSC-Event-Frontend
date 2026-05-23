@@ -18,6 +18,7 @@ const apiErrorMessages: Record<ApiErrorLocale, Partial<Record<string, string>>> 
     RATE_LIMITED: "Zu viele Anfragen. Bitte kurz warten und erneut versuchen.",
     INTERNAL_ERROR: "Der Vorgang konnte derzeit nicht abgeschlossen werden.",
     NETWORK_ERROR: "Die Verbindung zum Server ist gerade nicht verfügbar.",
+    INVALID_API_RESPONSE: "Die Serverantwort konnte nicht verarbeitet werden. Bitte prüfe die Verbindung zur API.",
     EVENT_NOT_OPEN: "Für dieses Event ist derzeit keine Anmeldung möglich.",
     REGISTRATION_NOT_OPEN: "Die Anmeldung ist noch nicht geöffnet.",
     REGISTRATION_CLOSED: "Die Anmeldung ist bereits geschlossen.",
@@ -62,6 +63,7 @@ const apiErrorMessages: Record<ApiErrorLocale, Partial<Record<string, string>>> 
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
     INTERNAL_ERROR: "The action could not be completed right now.",
     NETWORK_ERROR: "The connection to the server is currently unavailable.",
+    INVALID_API_RESPONSE: "The server response could not be processed. Please check the API connection.",
     EVENT_NOT_OPEN: "Registration is currently not available for this event.",
     REGISTRATION_NOT_OPEN: "Registration has not opened yet.",
     REGISTRATION_CLOSED: "Registration is already closed.",
@@ -106,6 +108,7 @@ const apiErrorMessages: Record<ApiErrorLocale, Partial<Record<string, string>>> 
     RATE_LIMITED: "Příliš mnoho požadavků. Chvíli počkejte a zkuste to znovu.",
     INTERNAL_ERROR: "Akci se teď nepodařilo dokončit.",
     NETWORK_ERROR: "Spojení se serverem je momentálně nedostupné.",
+    INVALID_API_RESPONSE: "Odpověď serveru se nepodařilo zpracovat. Zkontrolujte prosím připojení k API.",
     EVENT_NOT_OPEN: "Registrace pro tuto akci není momentálně dostupná.",
     REGISTRATION_NOT_OPEN: "Registrace ještě nebyla otevřena.",
     REGISTRATION_CLOSED: "Registrace je již uzavřena.",
@@ -150,6 +153,7 @@ const apiErrorMessages: Record<ApiErrorLocale, Partial<Record<string, string>>> 
     RATE_LIMITED: "Zbyt wiele żądań. Odczekaj chwilę i spróbuj ponownie.",
     INTERNAL_ERROR: "Nie udało się teraz zakończyć tej akcji.",
     NETWORK_ERROR: "Połączenie z serwerem jest obecnie niedostępne.",
+    INVALID_API_RESPONSE: "Nie udało się przetworzyć odpowiedzi serwera. Sprawdź połączenie z API.",
     EVENT_NOT_OPEN: "Rejestracja na to wydarzenie jest obecnie niedostępna.",
     REGISTRATION_NOT_OPEN: "Rejestracja nie została jeszcze otwarta.",
     REGISTRATION_CLOSED: "Rejestracja jest już zamknięta.",
@@ -274,3 +278,4 @@ export function resolvePlainErrorMessage(
   }
   return message || fallback;
 }
+
