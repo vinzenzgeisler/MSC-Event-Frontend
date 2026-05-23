@@ -832,7 +832,7 @@ export const adminEntriesService = {
     return { ok: true };
   },
 
-  async getEntryDocumentDownloadUrl(entryId: string, type: "waiver" | "tech_check") {
+  async getEntryDocumentDownloadUrl(entryId: string, type: "waiver" | "signed_waiver" | "tech_check") {
     const context = await resolveEntryContext(entryId);
     const response = await requestJson<{ ok: boolean; url: string }>(`/admin/documents/entry/${entryId}/download`, {
       query: {

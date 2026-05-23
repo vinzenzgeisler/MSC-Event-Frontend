@@ -56,6 +56,12 @@ export const adminSigningService = {
     return response.devices;
   },
 
+  async revokeDevice(deviceSessionId: string) {
+    return requestJson<{ ok: true; device: SigningDevice }>(`/admin/signing/devices/${deviceSessionId}`, {
+      method: "DELETE"
+    });
+  },
+
   async getRequirements(entryId: string) {
     const response = await requestJson<{ ok: true; requirements: SigningRequirements }>(
       `/admin/signing/entries/${entryId}/requirements`

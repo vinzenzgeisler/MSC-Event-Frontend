@@ -306,7 +306,7 @@ export function AdminEntryDetailPage() {
       });
   };
 
-  const handleDocumentDownload = async (type: "waiver" | "tech_check", label: string, actionKey: string) => {
+  const handleDocumentDownload = async (type: "waiver" | "signed_waiver" | "tech_check", label: string, actionKey: string) => {
     if (actionInFlight) {
       return;
     }
@@ -458,6 +458,7 @@ export function AdminEntryDetailPage() {
 
   const connectedSigningDevices = signingDevices.filter((device) => device.status === "connected");
   const selectedSigningDeviceId = signingDeviceId || connectedSigningDevices[0]?.id || "";
+  const hasSignedWaiverDocument = detail.documents.some((doc) => doc.type === "waiver_signed");
   const signingNeedsGuardian = signingRequirements?.isMinor === true;
   const signingPrecheckComplete = Boolean(
     signingRequirements &&
@@ -477,6 +478,22 @@ export function AdminEntryDetailPage() {
       flashMessage("Pairing-Code erzeugt. Bitte am Signaturgerät eingeben.", 4200);
     } catch (error) {
       flashMessage(getApiErrorMessage(error, "Pairing-Code konnte nicht erzeugt werden."), 3200);
+    } finally {
+      setSigningBusy(false);
+    }
+  };
+
+  const revokeSigningDevice = async (deviceSessionId: string) => {
+    setSigningBusy(true);
+    try {
+      await adminSigningService.revokeDevice(deviceSessionId);
+      if (signingDeviceId === deviceSessionId) {
+        setSigningDeviceId("");
+      }
+      await loadSigningDevices();
+      flashMessage("Signaturgerät wurde entkoppelt.", 2600);
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Signaturgerät konnte nicht entkoppelt werden."), 3200);
     } finally {
       setSigningBusy(false);
     }
@@ -503,6 +520,8 @@ export function AdminEntryDetailPage() {
       });
       flashMessage("Haftverzicht wurde an das gekoppelte Signaturgerät gesendet.", 4200);
       setSigningDialogOpen(false);
+      window.setTimeout(loadDetail, 3000);
+      window.setTimeout(loadDetail, 9000);
     } catch (error) {
       flashMessage(getApiErrorMessage(error, "Signing-Session konnte nicht gestartet werden."), 4200);
     } finally {
@@ -1168,7 +1187,7 @@ export function AdminEntryDetailPage() {
                   disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
-                    void handleDocumentDownload("waiver", "Haftverzicht", "download-waiver");
+                    void handleDocumentDownload(hasSignedWaiverDocument ? "signed_waiver" : "waiver", "Haftverzicht", "download-waiver");
                   }}
                 >
                   {actionInFlight === "download-waiver" ? (
@@ -1176,7 +1195,7 @@ export function AdminEntryDetailPage() {
                   ) : (
                     <Download className="mr-2 h-4 w-4" />
                   )}
-                  {actionInFlight === "download-waiver" ? "Haftverzicht wird geladen…" : "PDF Haftverzicht"}
+                  {actionInFlight === "download-waiver" ? "Haftverzicht wird geladen…" : hasSignedWaiverDocument ? "PDF unterschriebener Haftverzicht" : "PDF Haftverzicht"}
                 </Button>
                 <Button
                   type="button"
@@ -1786,6 +1805,29 @@ export function AdminEntryDetailPage() {
                     Gekoppelt: {connectedSigningDevices[0]?.deviceName ?? "Signing Terminal"}
                   </div>
                 )}
+
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <div className="text-sm font-semibold text-slate-900">Gekoppelte Geräte</div>
+                  <div className="mt-2 grid gap-2">
+                    {connectedSigningDevices.map((device) => (
+                      <div key={device.id} className="flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium text-slate-900">{device.deviceName ?? "Signing Terminal"}</div>
+                          <div className="text-xs text-slate-500">Zuletzt aktiv: {device.lastSeenAt ? formatTimestamp(device.lastSeenAt) : "-"}</div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 shrink-0"
+                          disabled={signingBusy}
+                          onClick={() => void revokeSigningDevice(device.id)}
+                        >
+                          Entkoppeln
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="grid gap-3">
                   {[
