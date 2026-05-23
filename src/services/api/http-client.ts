@@ -99,23 +99,23 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
   return baseUrl ? url.toString() : `${normalizedPath}${url.search}`;
 }
 
-async function parseResponseBody(response: Response): Promise<unknown> {
+async function parseResponseBody(response: Response): Promise<{ payload: unknown; invalidJson: boolean }> {
   const contentType = (response.headers.get("content-type") || "").toLowerCase();
   const raw = await response.text().catch(() => "");
   const text = raw.trim();
   if (!text) {
-    return null;
+    return { payload: null, invalidJson: false };
   }
 
   const looksLikeJson = text.startsWith("{") || text.startsWith("[");
   if (!contentType.includes("json") && !looksLikeJson) {
-    return null;
+    return { payload: null, invalidJson: true };
   }
 
   try {
-    return JSON.parse(text) as unknown;
+    return { payload: JSON.parse(text) as unknown, invalidJson: false };
   } catch {
-    return null;
+    return { payload: null, invalidJson: true };
   }
 }
 
@@ -145,9 +145,15 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     }
   }
 
-  const parsed = (await parseResponseBody(response)) as ApiErrorPayload | T | null;
+  const { payload: parsed, invalidJson } = (await parseResponseBody(response)) as {
+    payload: ApiErrorPayload | T | null;
+    invalidJson: boolean;
+  };
   if (!response.ok) {
     throw new ApiError(response.status, (parsed as ApiErrorPayload | null) ?? undefined);
+  }
+  if (invalidJson) {
+    throw new ApiError(502, { code: "INVALID_API_RESPONSE", message: "Invalid API response" });
   }
 
   return (parsed ?? ({} as T)) as T;
