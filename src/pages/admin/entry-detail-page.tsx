@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Bike, Car, CheckCircle2, Clock3, Download, Loader2, Mail, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
@@ -322,6 +322,17 @@ export function AdminEntryDetailPage() {
     }
   };
 
+  const loadSigningDevices = useCallback(async () => {
+    try {
+      const devices = await adminSigningService.listDevices();
+      setSigningDevices(devices);
+      const preferred = devices.find((item) => item.status === "connected") ?? devices[0];
+      setSigningDeviceId((current) => current || preferred?.id || "");
+    } catch {
+      setSigningDevices([]);
+    }
+  }, []);
+
   useEffect(() => {
     setHasLoadedOnce(false);
     loadDetail();
@@ -339,7 +350,7 @@ export function AdminEntryDetailPage() {
       return;
     }
     void loadSigningDevices();
-  }, [canCheckin]);
+  }, [canCheckin, loadSigningDevices]);
 
   const hasDriverNote = driverNote.trim().length > 0;
 
@@ -401,19 +412,6 @@ export function AdminEntryDetailPage() {
       return;
     }
     navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
-  };
-
-  const loadSigningDevices = async () => {
-    try {
-      const devices = await adminSigningService.listDevices();
-      setSigningDevices(devices);
-      const preferred = devices.find((item) => item.status === "connected") ?? devices[0];
-      if (preferred && !signingDeviceId) {
-        setSigningDeviceId(preferred.id);
-      }
-    } catch {
-      setSigningDevices([]);
-    }
   };
 
   const createPairingCode = async () => {
