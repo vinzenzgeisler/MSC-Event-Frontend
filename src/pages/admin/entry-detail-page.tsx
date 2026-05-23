@@ -17,7 +17,7 @@ import {
   paymentStatusLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
-import { adminSigningService, type SigningDevice, type SigningPrecheckInput } from "@/services/admin-signing.service";
+import { adminSigningService, type SigningDevice, type SigningPrecheckInput, type SigningRequirements } from "@/services/admin-signing.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
@@ -194,6 +194,8 @@ export function AdminEntryDetailPage() {
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
   const [signingDevices, setSigningDevices] = useState<SigningDevice[]>([]);
   const [signingDeviceId, setSigningDeviceId] = useState("");
+  const [signingDialogOpen, setSigningDialogOpen] = useState(false);
+  const [signingRequirements, setSigningRequirements] = useState<SigningRequirements | null>(null);
   const [pairingCode, setPairingCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [signingPrecheck, setSigningPrecheck] = useState<SigningPrecheckInput>({
     identityChecked: false,
@@ -206,6 +208,7 @@ export function AdminEntryDetailPage() {
   const [guardianName, setGuardianName] = useState("");
   const [guardianRelationship, setGuardianRelationship] = useState("");
   const [signingBusy, setSigningBusy] = useState(false);
+  const [signingLoading, setSigningLoading] = useState(false);
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
@@ -327,11 +330,40 @@ export function AdminEntryDetailPage() {
       const devices = await adminSigningService.listDevices();
       setSigningDevices(devices);
       const preferred = devices.find((item) => item.status === "connected") ?? devices[0];
-      setSigningDeviceId((current) => current || preferred?.id || "");
+      setSigningDeviceId((current) => (devices.some((device) => device.id === current && device.status === "connected") ? current : preferred?.id || ""));
     } catch {
       setSigningDevices([]);
     }
   }, []);
+
+  const openSigningDialog = async () => {
+    setSigningDialogOpen(true);
+    setPairingCode(null);
+    setSigningLoading(true);
+    try {
+      const [requirements] = await Promise.all([adminSigningService.getRequirements(entryId), loadSigningDevices()]);
+      setSigningRequirements(requirements);
+      setSigningSignerType(requirements.signerType);
+      setSigningPrecheck({
+        identityChecked: false,
+        signerPresent: false,
+        medicalCertificateChecked: false,
+        guardianPresent: false,
+        guardianAuthorityChecked: false
+      });
+      if (requirements.signerType === "guardian") {
+        setGuardianName(detail?.consent.guardian.fullName !== "-" ? detail?.consent.guardian.fullName ?? "" : "");
+      } else {
+        setGuardianName("");
+        setGuardianRelationship("");
+      }
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Signing-Anforderungen konnten nicht geladen werden."), 3600);
+      setSigningDialogOpen(false);
+    } finally {
+      setSigningLoading(false);
+    }
+  };
 
   useEffect(() => {
     setHasLoadedOnce(false);
@@ -414,6 +446,17 @@ export function AdminEntryDetailPage() {
     navigate(`/admin/entries${location.search}`, { state: { restoreEntriesScrollY: 0 } });
   };
 
+  const connectedSigningDevices = signingDevices.filter((device) => device.status === "connected");
+  const signingNeedsGuardian = signingRequirements?.isMinor === true;
+  const signingPrecheckComplete = Boolean(
+    signingRequirements &&
+      signingPrecheck.identityChecked &&
+      signingPrecheck.signerPresent &&
+      (!signingRequirements.requiresMedicalCertificate || signingPrecheck.medicalCertificateChecked) &&
+      (!signingRequirements.isMinor || (signingPrecheck.guardianPresent && signingPrecheck.guardianAuthorityChecked)) &&
+      (!signingRequirements.isMinor || (guardianName.trim() && guardianRelationship.trim()))
+  );
+
   const createPairingCode = async () => {
     setSigningBusy(true);
     try {
@@ -439,12 +482,13 @@ export function AdminEntryDetailPage() {
         entryId: detail.id,
         precheck: signingPrecheck,
         signer: {
-          type: signingSignerType,
-          guardianName: signingSignerType === "guardian" ? guardianName.trim() || null : null,
-          guardianRelationship: signingSignerType === "guardian" ? guardianRelationship.trim() || null : null
+          type: signingRequirements?.signerType ?? signingSignerType,
+          guardianName: signingNeedsGuardian ? guardianName.trim() || null : null,
+          guardianRelationship: signingNeedsGuardian ? guardianRelationship.trim() || null : null
         }
       });
       flashMessage("Haftverzicht wurde an das gekoppelte Signaturgerät gesendet.", 4200);
+      setSigningDialogOpen(false);
     } catch (error) {
       flashMessage(getApiErrorMessage(error, "Signing-Session konnte nicht gestartet werden."), 4200);
     } finally {
@@ -942,116 +986,14 @@ export function AdminEntryDetailPage() {
               )}
 
               {canCheckin && (
-                <div className="grid gap-3 border-t border-slate-200 pt-4">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">Haftverzicht am Signaturgerät</div>
-                    <div className="text-xs text-slate-500">
-                      Vorprüfung hier erfassen, danach wird nur der Fahrer-/Unterzeichner-Flow ans Signaturgerät gesendet.
-                    </div>
-                  </div>
-
-                  {pairingCode ? (
-                    <div className="rounded-md border border-sky-200 bg-sky-50 p-3">
-                      <div className="text-xs font-semibold uppercase text-sky-700">Pairing-Code</div>
-                      <div className="mt-1 font-mono text-2xl font-bold tracking-widest text-sky-950">{pairingCode.code}</div>
-                      <div className="mt-1 text-xs text-sky-700">Gültig bis {new Date(pairingCode.expiresAt).toLocaleTimeString("de-DE")}</div>
-                    </div>
-                  ) : null}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    disabled={signingBusy}
-                    onClick={() => void createPairingCode()}
-                  >
-                    {signingBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TabletSmartphone className="mr-2 h-4 w-4" />}
-                    Signaturgerät koppeln
-                  </Button>
-
-                  <Select value={signingDeviceId || "__none__"} onValueChange={(value) => setSigningDeviceId(value === "__none__" ? "" : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Signaturgerät auswählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Kein Signaturgerät ausgewählt</SelectItem>
-                      {signingDevices.map((device) => (
-                        <SelectItem key={device.id} value={device.id}>
-                          {(device.deviceName ?? "Signing Terminal")} · {device.status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <div className="grid gap-2 rounded-md border bg-slate-50 p-3 text-sm">
-                    {[
-                      ["identityChecked", "Identität geprüft"],
-                      ["signerPresent", "Unterzeichnende Person anwesend"],
-                      ["medicalCertificateChecked", "Ärztliches Attest geprüft, falls erforderlich"],
-                      ["guardianPresent", "Erziehungsberechtigter anwesend, falls erforderlich"],
-                      ["guardianAuthorityChecked", "Guardian-Berechtigung plausibel geprüft, falls erforderlich"]
-                    ].map(([key, label]) => (
-                      <label key={key} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(signingPrecheck[key as keyof SigningPrecheckInput])}
-                          onChange={(event) =>
-                            setSigningPrecheck((current) => ({
-                              ...current,
-                              [key]: event.target.checked
-                            }))
-                          }
-                        />
-                        <span>{label}</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Select value={signingSignerType} onValueChange={(value) => setSigningSignerType(value === "guardian" ? "guardian" : "driver")}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="driver">Fahrer unterschreibt selbst</SelectItem>
-                        <SelectItem value="guardian">Erziehungsberechtigter unterschreibt</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {signingSignerType === "guardian" ? (
-                      <>
-                        <input
-                          className="h-10 rounded-md border border-slate-300 px-3 text-sm"
-                          value={guardianName}
-                          onChange={(event) => setGuardianName(event.target.value)}
-                          placeholder="Name Erziehungsberechtigter"
-                        />
-                        <input
-                          className="h-10 rounded-md border border-slate-300 px-3 text-sm"
-                          value={guardianRelationship}
-                          onChange={(event) => setGuardianRelationship(event.target.value)}
-                          placeholder="Beziehung zum Fahrer"
-                        />
-                      </>
-                    ) : null}
-                  </div>
-
+                <div className="border-t border-slate-200 pt-4">
                   <HintButton
-                    label={signingBusy ? "Session wird gesendet…" : "Haftverzicht am Signaturgerät starten"}
-                    icon={signingBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TabletSmartphone className="mr-2 h-4 w-4" />}
+                    label="Haftverzicht starten"
+                    icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
                     variant="default"
                     className={actionActiveClass}
-                    disabledReason={
-                      signingBusy
-                        ? "Signing-Aktion läuft…"
-                        : !signingDeviceId
-                          ? "Bitte zuerst ein gekoppeltes Signaturgerät auswählen."
-                          : !signingPrecheck.identityChecked || !signingPrecheck.signerPresent
-                            ? "Identität und Anwesenheit müssen bestätigt sein."
-                            : signingSignerType === "guardian" && (!guardianName.trim() || !guardianRelationship.trim())
-                              ? "Guardian-Name und Beziehung erfassen."
-                              : undefined
-                    }
-                    onClick={() => void startSigningOnDevice()}
+                    disabledReason={signingBusy || signingLoading ? "Signing-Aktion läuft…" : undefined}
+                    onClick={() => void openSigningDialog()}
                   />
                 </div>
               )}
@@ -1752,6 +1694,140 @@ export function AdminEntryDetailPage() {
                 )}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {canCheckin && signingDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-white p-4 shadow-xl sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Haftverzicht starten</h2>
+                {signingRequirements ? (
+                  <p className="mt-1 text-sm text-slate-500">
+                    {signingRequirements.driverName} · {signingRequirements.entryCount} Nennung
+                    {signingRequirements.entryCount === 1 ? "" : "en"} · {signingRequirements.vehicleCount} Fahrzeug
+                    {signingRequirements.vehicleCount === 1 ? "" : "e"}
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 px-3"
+                disabled={signingBusy}
+                onClick={() => setSigningDialogOpen(false)}
+              >
+                Schließen
+              </Button>
+            </div>
+
+            {signingLoading ? (
+              <div className="mt-6 flex items-center gap-2 rounded-md border bg-slate-50 p-4 text-sm text-slate-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Signing-Daten werden geladen…
+              </div>
+            ) : connectedSigningDevices.length === 0 ? (
+              <div className="mt-6 space-y-4">
+                {pairingCode ? (
+                  <div className="rounded-md border border-sky-200 bg-sky-50 p-4">
+                    <div className="text-sm font-semibold text-sky-800">Pairing-Code</div>
+                    <div className="mt-2 font-mono text-4xl font-bold tracking-widest text-sky-950">{pairingCode.code}</div>
+                    <div className="mt-2 text-sm text-sky-700">Gültig bis {new Date(pairingCode.expiresAt).toLocaleTimeString("de-DE")}</div>
+                  </div>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button type="button" className="h-16 text-base" disabled={signingBusy} onClick={() => void createPairingCode()}>
+                    {signingBusy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}
+                    Gerät koppeln
+                  </Button>
+                  <Button type="button" variant="outline" className="h-16 text-base" disabled={signingBusy} onClick={() => void loadSigningDevices()}>
+                    Geräte aktualisieren
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-5">
+                {connectedSigningDevices.length > 1 ? (
+                  <Select value={signingDeviceId || "__none__"} onValueChange={(value) => setSigningDeviceId(value === "__none__" ? "" : value)}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Signaturgerät auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Signaturgerät auswählen</SelectItem>
+                      {connectedSigningDevices.map((device) => (
+                        <SelectItem key={device.id} value={device.id}>
+                          {device.deviceName ?? "Signing Terminal"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-900">
+                    Gekoppelt: {connectedSigningDevices[0]?.deviceName ?? "Signing Terminal"}
+                  </div>
+                )}
+
+                <div className="grid gap-3">
+                  {[
+                    ["identityChecked", "Identität geprüft"],
+                    ["signerPresent", signingNeedsGuardian ? "Erziehungsberechtigter ist anwesend" : "Fahrer ist anwesend"],
+                    ...(signingRequirements?.requiresMedicalCertificate ? [["medicalCertificateChecked", "Ärztliches Attest geprüft"]] : []),
+                    ...(signingRequirements?.isMinor
+                      ? [
+                          ["guardianPresent", "Erziehungsberechtigter ist anwesend"],
+                          ["guardianAuthorityChecked", "Berechtigung plausibel geprüft"]
+                        ]
+                      : [])
+                  ].map(([key, label]) => {
+                    const typedKey = key as keyof SigningPrecheckInput;
+                    const checked = Boolean(signingPrecheck[typedKey]);
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={cn(
+                          "flex min-h-16 items-center justify-between rounded-md border px-4 text-left text-base font-medium transition",
+                          checked ? "border-emerald-500 bg-emerald-50 text-emerald-950" : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                        )}
+                        onClick={() => setSigningPrecheck((current) => ({ ...current, [typedKey]: !checked }))}
+                      >
+                        <span>{label}</span>
+                        {checked ? <CheckCircle2 className="h-6 w-6 text-emerald-600" /> : <span className="h-6 w-6 rounded-full border border-slate-300" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {signingNeedsGuardian ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      className="h-14 rounded-md border border-slate-300 px-4 text-base"
+                      value={guardianName}
+                      onChange={(event) => setGuardianName(event.target.value)}
+                      placeholder="Name Erziehungsberechtigter"
+                    />
+                    <input
+                      className="h-14 rounded-md border border-slate-300 px-4 text-base"
+                      value={guardianRelationship}
+                      onChange={(event) => setGuardianRelationship(event.target.value)}
+                      placeholder="Beziehung"
+                    />
+                  </div>
+                ) : null}
+
+                <Button
+                  type="button"
+                  className="h-16 w-full text-base"
+                  disabled={signingBusy || !signingDeviceId || !signingPrecheckComplete}
+                  onClick={() => void startSigningOnDevice()}
+                >
+                  {signingBusy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}
+                  Haftverzicht am Gerät starten
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
