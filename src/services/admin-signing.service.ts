@@ -23,6 +23,22 @@ export type SigningSignerInput = {
   guardianRelationship: string | null;
 };
 
+export type SigningRequirements = {
+  entryId: string;
+  caseId: string;
+  driverName: string;
+  isMinor: boolean;
+  requiresMedicalCertificate: boolean;
+  signerType: "driver" | "guardian";
+  entryCount: number;
+  vehicleCount: number;
+  contract: {
+    locale: string;
+    version: string;
+    textHash: string;
+  };
+};
+
 export const adminSigningService = {
   async createPairingCode() {
     return requestJson<{
@@ -38,6 +54,13 @@ export const adminSigningService = {
   async listDevices() {
     const response = await requestJson<{ ok: true; devices: SigningDevice[] }>("/admin/signing/devices");
     return response.devices;
+  },
+
+  async getRequirements(entryId: string) {
+    const response = await requestJson<{ ok: true; requirements: SigningRequirements }>(
+      `/admin/signing/entries/${entryId}/requirements`
+    );
+    return response.requirements;
   },
 
   async startSession(input: {
