@@ -213,6 +213,7 @@ export function AdminEntryDetailPage() {
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
   const [signingDevices, setSigningDevices] = useState<SigningDevice[]>([]);
   const [signingDeviceId, setSigningDeviceId] = useState("");
+  const [signingSignerPersonId, setSigningSignerPersonId] = useState("");
   const [signingDialogOpen, setSigningDialogOpen] = useState(false);
   const [signingRequirements, setSigningRequirements] = useState<SigningRequirements | null>(null);
   const [pairingCode, setPairingCode] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -384,6 +385,8 @@ export function AdminEntryDetailPage() {
     try {
       const [requirements] = await Promise.all([adminSigningService.getRequirements(entryId), loadSigningDevices()]);
       setSigningRequirements(requirements);
+      const preferredSigner = requirements.signers?.find((item) => item.role === "driver") ?? requirements.signers?.[0];
+      setSigningSignerPersonId(preferredSigner?.personId ?? "");
       setActiveSigningSession(null);
       setSigningPrechecks(emptySigningPrechecks());
       setGuardianName(requirements.isMinor && detail?.consent.guardian.fullName !== "-" ? detail?.consent.guardian.fullName ?? "" : "");
@@ -451,6 +454,10 @@ export function AdminEntryDetailPage() {
         setActiveSigningSession(session);
         if (session.status === "completed") {
           loadDetail();
+          adminSigningService
+            .getRequirements(entryId)
+            .then(setSigningRequirements)
+            .catch(() => undefined);
         }
       } catch {
         // Keep the modal state; the next poll or manual close can recover.
@@ -528,16 +535,34 @@ export function AdminEntryDetailPage() {
   const selectedSigningDevice = connectedSigningDevices.find((device) => device.id === selectedSigningDeviceId) ?? null;
   const selectedSigningDeviceOnline = isSigningDeviceOnline(selectedSigningDevice);
   const signedWaiverDocument = detail.documents.find((doc) => doc.type === "waiver_signed" && doc.status === "generated");
-  const hasSignedWaiverDocument = Boolean(signedWaiverDocument);
+  const hasSignedWaiverDocument = detail.consent.waiverAccepted && Boolean(signedWaiverDocument);
   const signedWaiverAt = detail.consent.waiverAccepted ? detail.consent.consentCapturedAt : null;
   const signingRequirementEntries = signingRequirements?.entries ?? [];
-  const signingNeedsGuardian = signingRequirements?.isMinor === true;
+  const signingSignerOptions =
+    signingRequirements?.signers && signingRequirements.signers.length > 0
+      ? signingRequirements.signers
+      : signingRequirements
+        ? [{
+            personId: "",
+            role: "driver" as const,
+            label: "Fahrer",
+            name: signingRequirements.driverName,
+            isMinor: signingRequirements.isMinor,
+            requiresMedicalCertificate: signingRequirements.requiresMedicalCertificate,
+            signed: false,
+            signedAt: null,
+            documentId: null
+          }]
+        : [];
+  const selectedSigningSigner = signingSignerOptions.find((item) => item.personId === signingSignerPersonId) ?? signingSignerOptions[0] ?? null;
+  const signingNeedsGuardian = selectedSigningSigner?.isMinor === true;
+  const signingRequiresMedicalCertificate = selectedSigningSigner?.requiresMedicalCertificate === true;
   const signingPrechecksComplete = Boolean(
     signingRequirements &&
       signingPrechecks.identityCheckedAt &&
       signingPrechecks.signerPresentAt &&
-      (!signingRequirements.requiresMedicalCertificate || signingPrechecks.medicalCertificateCheckedAt) &&
-      (!signingRequirements.isMinor || (signingPrechecks.guardianPresentAt && signingPrechecks.guardianAuthorityCheckedAt && guardianName.trim() && guardianRelationship.trim()))
+      (!signingRequiresMedicalCertificate || signingPrechecks.medicalCertificateCheckedAt) &&
+      (!signingNeedsGuardian || (signingPrechecks.guardianPresentAt && signingPrechecks.guardianAuthorityCheckedAt && guardianName.trim() && guardianRelationship.trim()))
   );
 
   const createPairingCode = async () => {
@@ -587,6 +612,7 @@ export function AdminEntryDetailPage() {
       const result = await adminSigningService.startSession({
         deviceSessionId: selectedSigningDeviceId,
         entryId: detail.id,
+        signerPersonId: selectedSigningSigner?.personId || undefined,
         precheckTimestamps: signingPrechecks,
         precheck: {
           identityChecked: Boolean(signingPrechecks.identityCheckedAt),
@@ -596,9 +622,9 @@ export function AdminEntryDetailPage() {
           guardianAuthorityChecked: Boolean(signingPrechecks.guardianAuthorityCheckedAt)
         },
         signer: {
-          type: signingRequirements?.isMinor ? "guardian" : "driver",
-          guardianName: signingRequirements?.isMinor ? guardianName.trim() || null : null,
-          guardianRelationship: signingRequirements?.isMinor ? guardianRelationship.trim() || null : null
+          type: signingNeedsGuardian ? "guardian" : selectedSigningSigner?.role === "codriver" ? "codriver" : "driver",
+          guardianName: signingNeedsGuardian ? guardianName.trim() || null : null,
+          guardianRelationship: signingNeedsGuardian ? guardianRelationship.trim() || null : null
         }
       });
       window.localStorage.setItem(PREFERRED_SIGNING_DEVICE_KEY, selectedSigningDeviceId);
@@ -625,6 +651,13 @@ export function AdminEntryDetailPage() {
     } finally {
       setSigningBusy(false);
     }
+  };
+
+  const closeSigningDialog = async () => {
+    if (activeSigningSession && signingInProgress && !signingBusy) {
+      await cancelActiveSigningSession();
+    }
+    setSigningDialogOpen(false);
   };
 
   const toggleSigningPrecheck = (key: keyof SigningPrecheckTimestamps) => {
@@ -1903,7 +1936,7 @@ export function AdminEntryDetailPage() {
                 variant="outline"
                 className="h-10 px-3"
                 disabled={signingBusy}
-                onClick={() => setSigningDialogOpen(false)}
+                onClick={() => void closeSigningDialog()}
               >
                 Schließen
               </Button>
@@ -1937,7 +1970,9 @@ export function AdminEntryDetailPage() {
                     </div>
                     <div className="mt-2 grid gap-1 text-xs">
                       <div>Gerät: {selectedSigningDevice?.deviceName ?? "Signaturterminal"}</div>
-                      <div>Fahrer/Nennung: {signingRequirements?.driverName ?? detail.driver.name} · {detail.classLabel}</div>
+                      <div>Unterzeichner: {selectedSigningSigner ? `${selectedSigningSigner.label}: ${selectedSigningSigner.name}` : signingRequirements?.driverName ?? detail.driver.name}</div>
+                      <div>Nennung: {detail.classLabel}</div>
+                      {activeSigningSession.expiresAt ? <div>Automatischer Abbruch: {formatTimestamp(activeSigningSession.expiresAt)}</div> : null}
                       {activeSigningSession.signedAt ? <div>Unterschrieben: {formatTimestamp(activeSigningSession.signedAt)}</div> : null}
                       {activeSigningSession.documentId ? <div>Dokument wurde erzeugt.</div> : null}
                     </div>
@@ -1959,6 +1994,16 @@ export function AdminEntryDetailPage() {
                             <Download className="mr-2 h-4 w-4" />
                             Dokument laden
                           </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setActiveSigningSession(null);
+                              setSigningPrechecks(emptySigningPrechecks());
+                            }}
+                          >
+                            Weitere Unterschrift erfassen
+                          </Button>
                         </>
                       ) : null}
                     </div>
@@ -1969,6 +2014,37 @@ export function AdminEntryDetailPage() {
                   <div className="rounded-md border bg-slate-50 p-3 text-sm text-slate-700">
                     <div className="font-semibold text-slate-900">Vorgang</div>
                     <div className="mt-1">{signingRequirements.driverName}</div>
+                    {signingSignerOptions.length > 1 ? (
+                      <div className="mt-3">
+                        <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Unterzeichner</div>
+                        <Select
+                          value={selectedSigningSigner?.personId ?? ""}
+                          disabled={Boolean(activeSigningSession && signingInProgress)}
+                          onValueChange={(value) => {
+                            setSigningSignerPersonId(value);
+                            setSigningPrechecks(emptySigningPrechecks());
+                            setGuardianName("");
+                            setGuardianRelationship("");
+                          }}
+                        >
+                          <SelectTrigger className="h-12 bg-white">
+                            <SelectValue placeholder="Unterzeichner auswählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {signingSignerOptions.map((signer) => (
+                              <SelectItem key={signer.personId || signer.role} value={signer.personId}>
+                                {signer.label}: {signer.name}{signer.signed ? ` · unterschrieben ${signer.signedAt ? formatTimestamp(signer.signedAt) : ""}` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedSigningSigner?.role === "codriver" ? (
+                          <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                            Beifahrer unterschreiben in einem eigenen Vorgang. Diese Unterschrift ersetzt nicht die Fahrer-Unterschrift.
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div className="mt-1 text-xs">
                       Haftverzicht: {signingRequirements.contract.locale} · Version {signingRequirements.contract.version} · Hash {signingRequirements.contract.textHash}
                     </div>
@@ -2002,9 +2078,9 @@ export function AdminEntryDetailPage() {
                     <div className="mt-3 grid gap-2">
                       {([
                         ["identityCheckedAt", "Identität/Ausweis geprüft"],
-                        ["signerPresentAt", signingNeedsGuardian ? "Unterzeichnende Person ist anwesend" : "Fahrer ist persönlich anwesend"],
-                        ...(signingRequirements.requiresMedicalCertificate ? [["medicalCertificateCheckedAt", "Ärztliches Attest geprüft"]] : []),
-                        ...(signingRequirements.isMinor
+                        ["signerPresentAt", signingNeedsGuardian ? "Unterzeichnende Person ist anwesend" : selectedSigningSigner?.role === "codriver" ? "Beifahrer ist persönlich anwesend" : "Fahrer ist persönlich anwesend"],
+                        ...(signingRequiresMedicalCertificate ? [["medicalCertificateCheckedAt", "Ärztliches Attest geprüft"]] : []),
+                        ...(signingNeedsGuardian
                           ? [
                               ["guardianPresentAt", "Erziehungsberechtigter ist anwesend"],
                               ["guardianAuthorityCheckedAt", "Berechtigung des Erziehungsberechtigten plausibel geprüft"]
@@ -2116,7 +2192,7 @@ export function AdminEntryDetailPage() {
                         <Button
                           type="button"
                           className="h-16 w-full text-base"
-                          disabled={signingBusy || !selectedSigningDeviceId || !selectedSigningDeviceOnline || !signingPrechecksComplete}
+                          disabled={signingBusy || !selectedSigningSigner || !selectedSigningDeviceId || !selectedSigningDeviceOnline || !signingPrechecksComplete}
                           onClick={() => void startSigningOnDevice()}
                         >
                           {signingBusy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}

@@ -23,6 +23,17 @@ export type SigningRequirements = {
     version: string;
     textHash: string;
   };
+  signers?: Array<{
+    personId: string;
+    role: "driver" | "codriver";
+    label: string;
+    name: string;
+    isMinor: boolean;
+    requiresMedicalCertificate: boolean;
+    signed: boolean;
+    signedAt: string | null;
+    documentId: string | null;
+  }>;
   entries?: Array<{
     id: string;
     className: string;
@@ -60,6 +71,7 @@ export type SigningSessionStatus = {
   signedAt: string | null;
   documentId: string | null;
   evidenceAuditS3Key: string | null;
+  expiresAt: string;
 };
 
 export const adminSigningService = {
@@ -95,6 +107,7 @@ export const adminSigningService = {
   async startSession(input: {
     deviceSessionId: string;
     entryId: string;
+    signerPersonId?: string;
     precheck?: {
       identityChecked: boolean;
       signerPresent: boolean;
@@ -104,7 +117,7 @@ export const adminSigningService = {
     };
     precheckTimestamps?: SigningPrecheckTimestamps;
     signer?: {
-      type: "driver" | "guardian";
+      type: "driver" | "codriver" | "guardian";
       guardianName: string | null;
       guardianRelationship: string | null;
     };
