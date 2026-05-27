@@ -339,6 +339,25 @@ export function AdminEntryDetailPage() {
     }
   };
 
+  const handleDocumentDownloadById = async (documentId: string, label: string, actionKey: string) => {
+    if (actionInFlight) {
+      return;
+    }
+    setActionInFlight(actionKey);
+    try {
+      const url = await adminEntriesService.getDocumentDownloadUrl(documentId);
+      if (!url) {
+        flashMessage(`${label} nicht verfügbar.`, 2600);
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, `${label} konnte nicht geladen werden.`), 2800);
+    } finally {
+      setActionInFlight((current) => (current === actionKey ? null : current));
+    }
+  };
+
   const loadSigningDevices = useCallback(async () => {
     try {
       const devices = await adminSigningService.listDevices();
@@ -512,7 +531,7 @@ export function AdminEntryDetailPage() {
   const selectedSigningDeviceId = signingDeviceId || connectedSigningDevices[0]?.id || "";
   const selectedSigningDevice = connectedSigningDevices.find((device) => device.id === selectedSigningDeviceId) ?? null;
   const selectedSigningDeviceOnline = isSigningDeviceOnline(selectedSigningDevice);
-  const signedWaiverDocument = detail.documents.find((doc) => doc.type === "waiver_signed" && doc.status === "generated");
+  const signedWaiverDocument = detail.documents.find((doc) => doc.type === "waiver_signed" && doc.status === "generated" && doc.driverPersonId === detail.driverPersonId);
   const hasSignedWaiverDocument = detail.consent.waiverAccepted && Boolean(signedWaiverDocument);
   const signedWaiverAt = detail.consent.waiverAccepted ? detail.consent.consentCapturedAt : null;
   const signingRequirementEntries = signingRequirements?.entries ?? [];
@@ -1026,7 +1045,9 @@ export function AdminEntryDetailPage() {
                       className="mt-3 h-9 bg-white"
                       disabled={anyActionInFlight}
                       onClick={() => {
-                        void handleDocumentDownload("signed_waiver", "Unterschriebener Haftverzicht", "download-waiver");
+                        if (signedWaiverDocument) {
+                          void handleDocumentDownloadById(signedWaiverDocument.id, "Unterschriebener Haftverzicht", "download-waiver");
+                        }
                       }}
                     >
                       <Download className="mr-2 h-4 w-4" />
@@ -1321,7 +1342,11 @@ export function AdminEntryDetailPage() {
                   disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
-                    void handleDocumentDownload(hasSignedWaiverDocument ? "signed_waiver" : "waiver", "Haftverzicht", "download-waiver");
+                    if (hasSignedWaiverDocument && signedWaiverDocument) {
+                      void handleDocumentDownloadById(signedWaiverDocument.id, "Haftverzicht", "download-waiver");
+                      return;
+                    }
+                    void handleDocumentDownload("waiver", "Haftverzicht", "download-waiver");
                   }}
                 >
                   {actionInFlight === "download-waiver" ? (
@@ -1938,7 +1963,15 @@ export function AdminEntryDetailPage() {
                           }}>
                             Status aktualisieren
                           </Button>
-                          <Button type="button" variant="outline" onClick={() => void handleDocumentDownload("signed_waiver", "Unterschriebener Haftverzicht", "download-waiver")}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              activeSigningSession.documentId
+                                ? void handleDocumentDownloadById(activeSigningSession.documentId, "Unterschriebener Haftverzicht", "download-waiver")
+                                : void handleDocumentDownload("signed_waiver", "Unterschriebener Haftverzicht", "download-waiver")
+                            }
+                          >
                             <Download className="mr-2 h-4 w-4" />
                             Dokument laden
                           </Button>

@@ -240,6 +240,7 @@ function fromAdminEntryDetailDto(
   return {
     id: dto.ids.entryId,
     eventId: dto.ids.eventId,
+    driverPersonId: dto.ids.driverPersonId,
     classId: dto.ids.classId,
     headline: `${driverName} · ${vehicleLabel}`,
     classLabel: dto.className,
@@ -329,7 +330,9 @@ function fromAdminEntryDetailDto(
     documents: dto.documents.map((doc) => ({
       id: doc.id,
       type: doc.type,
-      status: doc.status
+      status: doc.status,
+      driverPersonId: doc.driverPersonId ?? null,
+      createdAt: doc.createdAt
     })),
     relatedEntryIds: dto.relatedEntryIds,
     notes: (dto.specialNotes ?? "").trim() || "Keine Hinweise",
@@ -841,6 +844,11 @@ export const adminEntriesService = {
       }
     });
 
+    return response.url;
+  },
+
+  async getDocumentDownloadUrl(documentId: string) {
+    const response = await requestJson<{ ok: boolean; url: string }>(`/admin/documents/${documentId}/download`);
     return response.url;
   },
 
