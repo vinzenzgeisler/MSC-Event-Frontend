@@ -5,7 +5,7 @@ Feature-Branches werden im Frontend lokal auf `localhost` entwickelt. Es gibt ke
 ## Standard
 
 ```bash
-npm run dev
+npm run dev:local
 ```
 
 Die lokale App nutzt:
@@ -15,6 +15,8 @@ Die lokale App nutzt:
 - Cognito Redirect/Logout auf `http://localhost:5173/admin/login`
 
 Damit bleiben Browser-Origin und API-Calls lokal sauber: die App ruft `/api/...` auf, Vite proxyt zur gemeinsamen Dev-API.
+
+`npm run dev:local` synchronisiert vorher `.env.local` mit dem aktuellen `ApiUrl`-Output des Stacks `dreiecksrennen-dev-api-stack`. Dadurch bleibt Localhost stabil, auch wenn die gemeinsame Dev-API von AWS eine neue `execute-api`-URL bekommt.
 
 ## Lokale Overrides
 
