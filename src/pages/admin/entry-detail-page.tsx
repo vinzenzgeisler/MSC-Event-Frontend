@@ -358,8 +358,10 @@ export function AdminEntryDetailPage() {
       flashMessage(getApiErrorMessage(error, "QR-Code konnte nicht erzeugt werden."), 2800);
     } finally {
       setActionInFlight((current) => (current === "inspection-qr" ? null : current));
+    }
+  };
 
-const handleDocumentDownloadById = async (documentId: string, label: string, actionKey: string) => {
+  const handleDocumentDownloadById = async (documentId: string, label: string, actionKey: string) => {
     if (actionInFlight) {
       return;
     }
