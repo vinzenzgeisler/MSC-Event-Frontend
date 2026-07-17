@@ -62,6 +62,7 @@ function eventToForm(event: AdminSettingsEvent): AdminSettingsEventForm {
     endsAt: event.endsAt,
     registrationOpenAt: toDatetimeLocal(event.registrationOpenAt),
     registrationCloseAt: toDatetimeLocal(event.registrationCloseAt),
+    paymentDueAt: toDatetimeLocal(event.paymentDueAt),
     entryConfirmationConfig: entryConfirmationConfigToForm(event.entryConfirmationConfig)
   };
 }
@@ -790,6 +791,10 @@ function validateEventDraft(form: AdminSettingsEventForm): string | null {
     }
   }
 
+  if (form.paymentDueAt && !parseDateTime(form.paymentDueAt)) {
+    return "Zahlungsfrist ist ungültig formatiert.";
+  }
+
   return null;
 }
 
@@ -858,6 +863,7 @@ export function AdminSettingsPage() {
     endsAt: "",
     registrationOpenAt: "",
     registrationCloseAt: "",
+    paymentDueAt: "",
     entryConfirmationConfig: createEmptyEntryConfirmationConfig()
   });
   const [newEventForm, setNewEventForm] = useState<AdminSettingsEventForm>({
@@ -866,6 +872,7 @@ export function AdminSettingsPage() {
     endsAt: "",
     registrationOpenAt: "",
     registrationCloseAt: "",
+    paymentDueAt: "",
     entryConfirmationConfig: createEmptyEntryConfirmationConfig()
   });
   const [classes, setClasses] = useState<AdminSettingsClass[]>([]);
@@ -1049,6 +1056,7 @@ export function AdminSettingsPage() {
             endsAt: "",
             registrationOpenAt: "",
             registrationCloseAt: "",
+            paymentDueAt: "",
             entryConfirmationConfig: createEmptyEntryConfirmationConfig()
           });
         }
@@ -1251,6 +1259,7 @@ export function AdminSettingsPage() {
         endsAt: eventForm.endsAt,
         registrationOpenAt: eventForm.registrationOpenAt,
         registrationCloseAt: eventForm.registrationCloseAt,
+        paymentDueAt: eventForm.paymentDueAt,
         entryConfirmationConfig: eventForm.entryConfirmationConfig
       });
       const nextEventForm = eventToForm(created);
@@ -1287,6 +1296,7 @@ export function AdminSettingsPage() {
         endsAt: newEventForm.endsAt,
         registrationOpenAt: newEventForm.registrationOpenAt,
         registrationCloseAt: newEventForm.registrationCloseAt,
+        paymentDueAt: newEventForm.paymentDueAt,
         entryConfirmationConfig: newEventForm.entryConfirmationConfig
       });
       setNewEventForm({
@@ -1295,6 +1305,7 @@ export function AdminSettingsPage() {
         endsAt: "",
         registrationOpenAt: "",
         registrationCloseAt: "",
+        paymentDueAt: "",
         entryConfirmationConfig: createEmptyEntryConfirmationConfig()
       });
       await loadData();
@@ -1365,6 +1376,11 @@ export function AdminSettingsPage() {
 
     if (registrationOpen >= registrationClose) {
       setEventError("Anmeldung öffnen muss vor Anmeldung schließen liegen.");
+      return;
+    }
+
+    if (eventForm.paymentDueAt && !parseDateTime(eventForm.paymentDueAt)) {
+      setEventError("Zahlungsfrist ist ungültig formatiert.");
       return;
     }
 
@@ -1888,6 +1904,15 @@ export function AdminSettingsPage() {
                           onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label>Zahlungsfrist (optional)</Label>
+                        <Input
+                          type="datetime-local"
+                          value={eventForm.paymentDueAt}
+                          disabled={!canManage}
+                          onChange={(event) => setEventForm((prev) => ({ ...prev, paymentDueAt: event.target.value }))}
+                        />
+                      </div>
                     </div>
 
                     {eventError && <div className="text-sm text-destructive">{eventError}</div>}
@@ -1955,6 +1980,17 @@ export function AdminSettingsPage() {
                               disabled={!canManage || creatingNextEvent}
                               onChange={(event) =>
                                 setNewEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Zahlungsfrist (optional)</Label>
+                            <Input
+                              type="datetime-local"
+                              value={newEventForm.paymentDueAt}
+                              disabled={!canManage || creatingNextEvent}
+                              onChange={(event) =>
+                                setNewEventForm((prev) => ({ ...prev, paymentDueAt: event.target.value }))
                               }
                             />
                           </div>
@@ -2069,6 +2105,15 @@ export function AdminSettingsPage() {
                         value={eventForm.registrationCloseAt}
                         disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, registrationCloseAt: event.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Zahlungsfrist (optional)</Label>
+                      <Input
+                        type="datetime-local"
+                        value={eventForm.paymentDueAt}
+                        disabled={!canManage || !eventState || !selectedEventIsEditable}
+                        onChange={(event) => setEventForm((prev) => ({ ...prev, paymentDueAt: event.target.value }))}
                       />
                     </div>
                   </div>

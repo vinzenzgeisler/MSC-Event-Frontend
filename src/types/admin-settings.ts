@@ -44,6 +44,7 @@ export type AdminSettingsEvent = {
   isCurrent: boolean;
   registrationOpenAt: string | null;
   registrationCloseAt: string | null;
+  paymentDueAt: string | null;
   openedAt: string | null;
   closedAt: string | null;
   archivedAt: string | null;
@@ -58,6 +59,7 @@ export type AdminSettingsEventForm = {
   endsAt: string;
   registrationOpenAt: string;
   registrationCloseAt: string;
+  paymentDueAt: string;
   entryConfirmationConfig: AdminSettingsEntryConfirmationConfig;
 };
 
