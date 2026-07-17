@@ -184,6 +184,7 @@ function mapEvent(event: Record<string, unknown>): AdminSettingsEvent {
     isCurrent: Boolean(event.isCurrent),
     registrationOpenAt: asNullableString(event.registrationOpenAt),
     registrationCloseAt: asNullableString(event.registrationCloseAt),
+    paymentDueAt: asNullableString(event.paymentDueAt),
     openedAt: asNullableString(event.openedAt),
     closedAt: asNullableString(event.closedAt),
     archivedAt: asNullableString(event.archivedAt),
@@ -311,6 +312,10 @@ export const adminSettingsService = {
       body.registrationCloseAt = new Date(payload.registrationCloseAt).toISOString();
     }
 
+    if (payload.paymentDueAt) {
+      body.paymentDueAt = new Date(payload.paymentDueAt).toISOString();
+    }
+
     const response = await requestJson<AdminEventResponse>("/admin/events", {
       method: "POST",
       body
@@ -329,6 +334,7 @@ export const adminSettingsService = {
         endsAt: payload.endsAt,
         registrationOpenAt: payload.registrationOpenAt ? new Date(payload.registrationOpenAt).toISOString() : null,
         registrationCloseAt: payload.registrationCloseAt ? new Date(payload.registrationCloseAt).toISOString() : null,
+        paymentDueAt: payload.paymentDueAt ? new Date(payload.paymentDueAt).toISOString() : null,
         entryConfirmationConfig: toEntryConfirmationPayload(payload.entryConfirmationConfig, "compact")
       }
     });
