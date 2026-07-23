@@ -249,8 +249,45 @@ jobs:
           VITE_AUTH_IDLE_TIMEOUT_MINUTES: ${{ env.MSC_AUTH_IDLE_TIMEOUT_MINUTES }}
           VITE_AUTH_MAX_SESSION_HOURS: ${{ env.MSC_AUTH_MAX_SESSION_HOURS }}
 
-      - name: Deploy to Vercel Prod
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Create staged Vercel Production deployment
+        id: deploy_prod
+        run: |
+          set -euo pipefail
+          deployment_url="$(
+            vercel deploy \
+              --prebuilt \
+              --prod \
+              --skip-domain \
+              --yes \
+              --no-color \
+              --token="${{ secrets.VERCEL_TOKEN }}"
+          )"
+          case "${deployment_url}" in
+            https://*) ;;
+            *)
+              echo "Vercel did not return a deployment URL: ${deployment_url}"
+              exit 1
+              ;;
+          esac
+          echo "deployment_url=${deployment_url}" >> "${GITHUB_OUTPUT}"
+          echo "Created staged Production deployment: ${deployment_url}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Promote Vercel deployment to current
+        run: >
+          vercel promote
+          "${{ steps.deploy_prod.outputs.deployment_url }}"
+          --yes
+          --timeout 5m
+          --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Verify no Vercel promotion is pending
+        run: vercel promote status --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

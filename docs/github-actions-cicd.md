@@ -81,7 +81,7 @@ Die Workflow-Datei verwendet bereits `environment: dev` und `environment: prod`.
 - Feature-/Dev-Commits und Pull Requests lösen keine Pipeline aus.
 - Ein Git-Tag mit Präfix `deploy-dev/` baut und deployt den markierten Commit per Vercel CLI als Preview/Dev.
 - Ein manueller `workflow_dispatch` deployt den ausgewählten Branch als Preview/Dev oder löscht alle Preview-Deployments des Projekts.
-- Push auf `main` baut und deployed per Vercel CLI als Production.
+- Push auf `main` baut zunächst ein gestagtes Production-Deployment ohne Domain-Umschaltung, promotet anschließend exakt diese Deployment-URL auf `current` und prüft, dass keine Promotion offen bleibt.
 
 ## Vercel Auto-Deploy deaktivieren
 
