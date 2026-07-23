@@ -422,7 +422,8 @@ export const registrationService = {
         id: item.id,
         name: item.name,
         vehicleType: item.vehicleType,
-        allowsCodriver: Boolean(item.allowsCodriver)
+        allowsCodriver: Boolean(item.allowsCodriver),
+        registrationClosed: Boolean(item.registrationClosed)
       }))
     };
   },

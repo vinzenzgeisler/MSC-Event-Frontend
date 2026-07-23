@@ -21,6 +21,7 @@ type PublicCurrentEventResponse = {
     name: string;
     vehicleType: VehicleType;
     allowsCodriver: boolean;
+    registrationClosed: boolean;
   }>;
   registration: {
     isOpen: boolean;
@@ -46,6 +47,7 @@ type AdminClassesResponse = {
     name: string;
     vehicleType: VehicleType;
     allowsCodriver?: boolean;
+    registrationClosed?: boolean;
   }>;
 };
 
