@@ -75,6 +75,7 @@ type AdminClassesListResponse = {
     name?: string;
     vehicleType?: VehicleType;
     allowsCodriver?: boolean;
+    registrationClosed?: boolean;
     createdAt?: string;
     updatedAt?: string;
   }>;
@@ -258,6 +259,7 @@ function mapClass(item: AdminClassesListResponse["classes"][number], eventId: st
     name: item.name,
     vehicleType: asVehicleType(item.vehicleType),
     allowsCodriver: Boolean(item.allowsCodriver),
+    registrationClosed: Boolean(item.registrationClosed),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   };

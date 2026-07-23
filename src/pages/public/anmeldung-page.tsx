@@ -12,7 +12,14 @@ import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { formatPriceRange, resolvePublicPricing } from "@/lib/public-pricing";
 import { isCountryOption, resolveCountryCode } from "@/lib/countries";
 import { registrationService } from "@/services/registration.service";
-import type { DriverForm, PublicEventOverview, RegistrationWizardForm, StartRegistrationForm, VehicleForm } from "@/types/registration";
+import type {
+  DriverForm,
+  PublicEventClass,
+  PublicEventOverview,
+  RegistrationWizardForm,
+  StartRegistrationForm,
+  VehicleForm
+} from "@/types/registration";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
 const PHONE_ALLOWED_PATTERN = /^\+?[0-9()\/\-\s.]+$/;
@@ -1019,7 +1026,8 @@ function validateStartFields(
   editingId: string | null,
   driver: DriverForm,
   locale: string,
-  m: ReturnType<typeof useAnmeldungI18n>["m"]
+  m: ReturnType<typeof useAnmeldungI18n>["m"],
+  classes: PublicEventClass[]
 ): StartFieldErrors {
   const errors: StartFieldErrors = {};
   const driverEmail = normalizeEmailForCompare(driver.email);
@@ -1029,6 +1037,10 @@ function validateStartFields(
   if (!start.classId) {
     errors.classId = m.errors.requiredClass;
   } else {
+    const selectedClass = classes.find((item) => item.id === start.classId);
+    if (selectedClass?.registrationClosed) {
+      errors.classId = m.errors.classClosed;
+    }
     const classAlreadyUsed = existingStarts.some((entry) => entry.classId === start.classId && entry.id !== editingId);
     if (classAlreadyUsed) {
       errors.classId = m.errors.classAlreadyAdded;
@@ -1610,7 +1622,7 @@ export function AnmeldungPage() {
   };
 
   const saveDraft = async ({ afterSave = "stay" }: { afterSave?: "stay" | "summary" | "decide" } = {}) => {
-    const fieldErrors = validateStartFields(draftStart, starts, editingId, driver, locale, m);
+    const fieldErrors = validateStartFields(draftStart, starts, editingId, driver, locale, m, eventOverview?.classes ?? []);
     setStartFieldErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
       setStartError(m.start.completeEntryHint);
@@ -1775,10 +1787,20 @@ export function AnmeldungPage() {
       setSubmitError("");
       return;
     }
-    const conflictingStartIndex = starts.findIndex((start) => Object.keys(validateStartFields(start, starts, start.id, driver, locale, m)).length > 0);
+    const conflictingStartIndex = starts.findIndex(
+      (start) => Object.keys(validateStartFields(start, starts, start.id, driver, locale, m, eventOverview?.classes ?? [])).length > 0
+    );
     if (conflictingStartIndex >= 0) {
       const conflictingStart = starts[conflictingStartIndex];
-      const fieldErrors = validateStartFields(conflictingStart, starts, conflictingStart.id, driver, locale, m);
+      const fieldErrors = validateStartFields(
+        conflictingStart,
+        starts,
+        conflictingStart.id,
+        driver,
+        locale,
+        m,
+        eventOverview?.classes ?? []
+      );
       setStep(2);
       editStart(conflictingStart.id);
       setStartFieldErrors(fieldErrors);

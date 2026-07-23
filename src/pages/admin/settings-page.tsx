@@ -877,7 +877,12 @@ export function AdminSettingsPage() {
   });
   const [classes, setClasses] = useState<AdminSettingsClass[]>([]);
   const [classDrafts, setClassDrafts] = useState<Record<string, AdminSettingsClassDraft>>({});
-  const [newClassDraft, setNewClassDraft] = useState<AdminSettingsClassDraft>({ name: "", vehicleType: "auto", allowsCodriver: false });
+  const [newClassDraft, setNewClassDraft] = useState<AdminSettingsClassDraft>({
+    name: "",
+    vehicleType: "auto",
+    allowsCodriver: false,
+    registrationClosed: false
+  });
   const [pricingForm, setPricingForm] = useState<AdminSettingsPricingForm>(buildDefaultPricingForm([]));
   const [iamOverview, setIamOverview] = useState<IamOverview | null>(null);
 
@@ -946,7 +951,7 @@ export function AdminSettingsPage() {
     setEventState(null);
     setClasses([]);
     setClassDrafts({});
-    setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false });
+    setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false, registrationClosed: false });
     setPricingForm(buildDefaultPricingForm([]));
     setPricingInitializedForEventId(null);
     setEventOverridesExpanded(false);
@@ -966,7 +971,17 @@ export function AdminSettingsPage() {
     setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
     setClasses(classList);
     setClassDrafts(
-      Object.fromEntries(classList.map((item) => [item.id, { name: item.name, vehicleType: item.vehicleType, allowsCodriver: item.allowsCodriver }]))
+      Object.fromEntries(
+        classList.map((item) => [
+          item.id,
+          {
+            name: item.name,
+            vehicleType: item.vehicleType,
+            allowsCodriver: item.allowsCodriver,
+            registrationClosed: item.registrationClosed
+          }
+        ])
+      )
     );
 
     const key = storageKeyForEvent(event.id);
@@ -1467,7 +1482,8 @@ export function AdminSettingsPage() {
       const created = await adminSettingsService.createClass(eventState.id, {
         name: newClassDraft.name.trim(),
         vehicleType: newClassDraft.vehicleType,
-        allowsCodriver: newClassDraft.allowsCodriver
+        allowsCodriver: newClassDraft.allowsCodriver,
+        registrationClosed: false
       });
 
       const nextClasses = [...classes, created];
@@ -1477,11 +1493,12 @@ export function AdminSettingsPage() {
         [created.id]: {
           name: created.name,
           vehicleType: created.vehicleType,
-          allowsCodriver: created.allowsCodriver
+          allowsCodriver: created.allowsCodriver,
+          registrationClosed: created.registrationClosed
         }
       }));
       setPricingForm((prev) => mergePricingWithClasses(prev, nextClasses));
-      setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false });
+      setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false, registrationClosed: false });
       showToast("Klasse angelegt.");
     } catch (error) {
       setClassError(getApiErrorMessage(error, "Klasse konnte nicht angelegt werden."));
@@ -1508,7 +1525,8 @@ export function AdminSettingsPage() {
       const updated = await adminSettingsService.updateClass(classId, {
         name: draft.name.trim(),
         vehicleType: draft.vehicleType,
-        allowsCodriver: draft.allowsCodriver
+        allowsCodriver: draft.allowsCodriver,
+        registrationClosed: draft.registrationClosed
       });
 
       const nextClasses = classes.map((item) => (item.id === classId ? { ...item, ...updated } : item));
@@ -2355,11 +2373,16 @@ export function AdminSettingsPage() {
 
                     <div className="space-y-2">
                       {classes.map((item) => {
-                        const draft = classDrafts[item.id] ?? { name: item.name, vehicleType: item.vehicleType, allowsCodriver: item.allowsCodriver };
+                        const draft = classDrafts[item.id] ?? {
+                          name: item.name,
+                          vehicleType: item.vehicleType,
+                          allowsCodriver: item.allowsCodriver,
+                          registrationClosed: item.registrationClosed
+                        };
                         const rowBusy = savingClassId === item.id;
 
                         return (
-                          <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_160px_180px_auto_auto]">
+                          <div key={item.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_140px_160px_220px_auto_auto]">
                             <Input
                               value={draft.name}
                               disabled={!canManage || rowBusy}
@@ -2410,6 +2433,31 @@ export function AdminSettingsPage() {
                                 }
                               />
                               <span>Beifahrer erlaubt</span>
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                role="switch"
+                                className="peer sr-only"
+                                checked={draft.registrationClosed}
+                                disabled={!canManage || rowBusy}
+                                onChange={(event) =>
+                                  setClassDrafts((prev) => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      ...draft,
+                                      registrationClosed: event.target.checked
+                                    }
+                                  }))
+                                }
+                              />
+                              <span
+                                aria-hidden="true"
+                                className="relative h-6 w-11 shrink-0 rounded-full bg-slate-300 transition after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:bg-amber-500 peer-checked:after:translate-x-5 peer-disabled:opacity-50"
+                              />
+                              <span className="font-medium">
+                                {draft.registrationClosed ? "Geschlossen" : "Offen"}
+                              </span>
                             </label>
                             <Button type="button" variant="outline" disabled={!canManage || rowBusy} onClick={() => void saveClass(item.id)}>
                               <Save className="mr-2 h-4 w-4" />

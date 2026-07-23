@@ -264,8 +264,20 @@ export function StartEntriesStep({
               <SelectContent>
                 <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
                 {sortedClasses.map((item) => (
-                  <SelectItem key={item.id} value={item.id} disabled={usedClassIds.has(item.id)} className="items-start whitespace-normal py-2 leading-snug">
-                    {item.name}
+                  <SelectItem
+                    key={item.id}
+                    value={item.id}
+                    disabled={usedClassIds.has(item.id) || item.registrationClosed}
+                    className="items-start whitespace-normal py-2 leading-snug"
+                  >
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{item.name}</span>
+                      {item.registrationClosed ? (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+                          {m.start.classClosedLabel}
+                        </span>
+                      ) : null}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -69,6 +69,7 @@ export type AdminSettingsClass = {
   name: string;
   vehicleType: VehicleType;
   allowsCodriver: boolean;
+  registrationClosed: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -77,6 +78,7 @@ export type AdminSettingsClassDraft = {
   name: string;
   vehicleType: VehicleType;
   allowsCodriver: boolean;
+  registrationClosed: boolean;
 };
 
 export type AdminSettingsPricingClassRule = {
