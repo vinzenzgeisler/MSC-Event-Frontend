@@ -258,10 +258,14 @@ export function StartEntriesStep({
                 }
               }}
             >
-              <SelectTrigger className="h-auto min-h-10 items-start py-2 text-base md:text-sm" data-start-field="classId" {...fieldAria(fieldErrors.classId)}>
-                <SelectValue className="line-clamp-2 whitespace-normal text-left leading-snug" placeholder={m.start.classPlaceholder} />
+              <SelectTrigger
+                className="h-auto min-h-10 items-start overflow-hidden py-2 text-base md:text-sm"
+                data-start-field="classId"
+                {...fieldAria(fieldErrors.classId)}
+              >
+                <SelectValue className="min-w-0 whitespace-normal text-left leading-snug" placeholder={m.start.classPlaceholder} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)]">
                 <SelectItem value="__placeholder__">{m.start.classPlaceholder}</SelectItem>
                 {sortedClasses.map((item) => (
                   <SelectItem
@@ -270,10 +274,10 @@ export function StartEntriesStep({
                     disabled={usedClassIds.has(item.id) || item.registrationClosed}
                     className="items-start whitespace-normal py-2 leading-snug"
                   >
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span>{item.name}</span>
+                    <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="min-w-0 break-words">{item.name}</span>
                       {item.registrationClosed ? (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+                        <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
                           {m.start.classClosedLabel}
                         </span>
                       ) : null}
