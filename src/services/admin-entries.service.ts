@@ -12,7 +12,7 @@ import type {
   AdminEntryListItemDto,
   ListMeta
 } from "@/types/admin";
-import type { AcceptanceStatus, PaymentStatus, VehicleType } from "@/types/common";
+import type { AcceptanceStatus, PaymentStatus, TechStatus, VehicleType } from "@/types/common";
 
 type EntryContext = {
   eventId: string;
@@ -185,6 +185,7 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     registrationStatus: dto.registrationStatus === "submitted_unverified" ? "submitted_unverified" : "submitted_verified",
     payment: normalizePaymentStatus(dto.paymentStatus),
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
+    techStatus: dto.techStatus ?? "pending",
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     driverNote: (dto.driverNote ?? "").trim(),
@@ -251,6 +252,9 @@ function fromAdminEntryDetailDto(
     createdAt: dto.createdAt,
     isBackupVehicle: dto.isBackupVehicle,
     checkinVerified: dto.checkin.checkinIdVerified,
+    techStatus: dto.checkin.techStatus,
+    techCheckedAt: dto.checkin.techCheckedAt,
+    techCheckedBy: dto.checkin.techCheckedBy,
     driver: {
       name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
       email: dto.person.driver.email ?? "-",
@@ -738,6 +742,34 @@ export const adminEntriesService = {
     });
 
     return { ok: true };
+  },
+
+  async setEntryTechStatus(entryId: string, techStatus: TechStatus) {
+    await requestJson(`/admin/entries/${entryId}/tech-status`, {
+      method: "PATCH",
+      body: {
+        techStatus
+      }
+    });
+
+    return { ok: true };
+  },
+
+  async getInspectionQr(entryId: string, format: "svg" | "png" = "svg") {
+    return requestJson<{ ok: true; filename: string; mimeType: string; dataBase64: string }>(
+      `/admin/entries/${entryId}/inspection-qr`,
+      { query: { format } }
+    );
+  },
+
+  async getInspectionQrSheet(eventId: string, entryIds: string[]) {
+    return requestJson<{ ok: true; filename: string; mimeType: string; dataBase64: string }>(
+      `/admin/events/${eventId}/inspection-qr-export`,
+      {
+        method: "POST",
+        body: { entryIds }
+      }
+    );
   },
 
   async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string; status?: AcceptanceStatus }) {

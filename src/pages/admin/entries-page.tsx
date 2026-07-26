@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { Download, Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -15,6 +15,7 @@ import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.s
 import { adminIamService } from "@/services/admin-iam.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
+import { getAdminEventId } from "@/services/api/event-context";
 import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
 
 const PAGE_SIZE = 12;
@@ -451,6 +452,7 @@ export function AdminEntriesPage() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [qrExporting, setQrExporting] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
@@ -477,6 +479,32 @@ export function AdminEntriesPage() {
   const classNameById = useMemo(() => {
     return new Map(classOptions.map((item) => [item.id, item.name]));
   }, [classOptions]);
+
+  const downloadVisibleInspectionQrs = async () => {
+    if (qrExporting || rows.length === 0) return;
+    setQrExporting(true);
+    try {
+      const eventId = await getAdminEventId();
+      const acceptedIds = rows.filter((row) => row.status === "accepted").slice(0, 250).map((row) => row.id);
+      if (acceptedIds.length === 0) {
+        showToast("Keine zugelassenen Nennungen in der aktuellen Ansicht.");
+        return;
+      }
+      const download = await adminEntriesService.getInspectionQrSheet(eventId, acceptedIds);
+      const bytes = Uint8Array.from(atob(download.dataBase64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: download.mimeType }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = download.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast(`${acceptedIds.length} QR-Codes heruntergeladen.`);
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "QR-Sammeldownload fehlgeschlagen."));
+    } finally {
+      setQrExporting(false);
+    }
+  };
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -1163,6 +1191,16 @@ export function AdminEntriesPage() {
               </Button>
               <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
                 Filter zurücksetzen
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={qrExporting || rows.length === 0}
+                onClick={() => void downloadVisibleInspectionQrs()}
+              >
+                {qrExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Abnahme-QRs
               </Button>
             </div>
           </div>
