@@ -801,7 +801,7 @@ function validateEventDraft(form: AdminSettingsEventForm): string | null {
 function asRoleList(value: string[]) {
   const unique = new Set<IamRole>();
   value.forEach((item) => {
-    if (item === "admin" || item === "editor" || item === "viewer") {
+    if (item === "admin" || item === "editor" || item === "viewer" || item === "technical_inspector") {
       unique.add(item);
     }
   });
@@ -908,7 +908,9 @@ export function AdminSettingsPage() {
     email: "",
     roles: ["viewer"] as IamRole[],
     temporaryPassword: "",
-    sendInvitation: true
+    sendInvitation: true,
+    inspectionValidFrom: "",
+    inspectionValidUntil: ""
   });
 
   const [pricingInitializedForEventId, setPricingInitializedForEventId] = useState<string | null>(null);
@@ -1643,6 +1645,11 @@ export function AdminSettingsPage() {
       setIamError("Mindestens eine Rolle muss gewählt werden.");
       return;
     }
+    const createsInspector = iamCreateForm.roles.includes("technical_inspector");
+    if (createsInspector && (!eventState?.id || !iamCreateForm.inspectionValidFrom || !iamCreateForm.inspectionValidUntil)) {
+      setIamError("Für technische Prüfer sind Veranstaltung und Gültigkeitszeitraum erforderlich.");
+      return;
+    }
 
     setIamCreatingUser(true);
     setIamError("");
@@ -1655,12 +1662,22 @@ export function AdminSettingsPage() {
         sendInvitation: iamCreateForm.sendInvitation
       });
 
+      if (createsInspector && eventState) {
+        await adminIamService.assignTechnicalInspector(email, {
+          eventId: eventState.id,
+          validFrom: new Date(iamCreateForm.inspectionValidFrom).toISOString(),
+          validUntil: new Date(iamCreateForm.inspectionValidUntil).toISOString()
+        });
+      }
+
       patchIamAccount(created);
       setIamCreateForm({
         email: "",
         roles: ["viewer"],
         temporaryPassword: "",
-        sendInvitation: true
+        sendInvitation: true,
+        inspectionValidFrom: "",
+        inspectionValidUntil: ""
       });
       showToast("IAM-Account angelegt.");
     } catch (error) {
@@ -2539,7 +2556,7 @@ export function AdminSettingsPage() {
                   <div className="space-y-1 md:col-span-2">
                     <Label>Rollen</Label>
                     <div className="flex flex-wrap gap-3 pt-1">
-                      {(["admin", "editor", "viewer"] as IamRole[]).map((role) => (
+                      {(["admin", "editor", "viewer", "technical_inspector"] as IamRole[]).map((role) => (
                         <label key={role} className="flex items-center gap-2 text-sm text-slate-700">
                           <input
                             type="checkbox"
@@ -2557,6 +2574,35 @@ export function AdminSettingsPage() {
                       ))}
                     </div>
                   </div>
+                  {iamCreateForm.roles.includes("technical_inspector") && (
+                    <>
+                      <div className="space-y-1">
+                        <Label>Prüferzugang gültig ab</Label>
+                        <Input
+                          type="datetime-local"
+                          value={iamCreateForm.inspectionValidFrom}
+                          disabled={!canManageIam || iamCreatingUser}
+                          onChange={(event) =>
+                            setIamCreateForm((prev) => ({ ...prev, inspectionValidFrom: event.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Prüferzugang gültig bis</Label>
+                        <Input
+                          type="datetime-local"
+                          value={iamCreateForm.inspectionValidUntil}
+                          disabled={!canManageIam || iamCreatingUser}
+                          onChange={(event) =>
+                            setIamCreateForm((prev) => ({ ...prev, inspectionValidUntil: event.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="md:col-span-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                        Zuordnung zur aktuellen Veranstaltung: {eventState?.name ?? "Keine Veranstaltung gewählt"}
+                      </div>
+                    </>
+                  )}
                   <div className="md:col-span-2">
                     <label className="flex items-center gap-2 text-sm text-slate-700">
                       <input
@@ -2592,6 +2638,7 @@ export function AdminSettingsPage() {
                         <th className="px-3 py-2">admin</th>
                         <th className="px-3 py-2">editor</th>
                         <th className="px-3 py-2">viewer</th>
+                        <th className="px-3 py-2">technical_inspector</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2601,6 +2648,7 @@ export function AdminSettingsPage() {
                           <td className="px-3 py-2">{row.admin}</td>
                           <td className="px-3 py-2">{row.editor}</td>
                           <td className="px-3 py-2">{row.viewer}</td>
+                          <td className="px-3 py-2">{row.technical_inspector}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2638,7 +2686,7 @@ export function AdminSettingsPage() {
                               <td className="px-3 py-2">{account.email || "-"}</td>
                               <td className="px-3 py-2">
                                 <div className="flex flex-wrap gap-3">
-                                  {(["admin", "editor", "viewer"] as IamRole[]).map((role) => (
+                                  {(["admin", "editor", "viewer", "technical_inspector"] as IamRole[]).map((role) => (
                                     <label key={role} className="flex items-center gap-2">
                                       <input
                                         type="checkbox"

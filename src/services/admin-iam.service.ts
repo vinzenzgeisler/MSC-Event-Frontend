@@ -41,7 +41,7 @@ type UserMutationResponse = {
 function normalizeRoles(input: string[]): IamRole[] {
   const unique = new Set<IamRole>();
   input.forEach((role) => {
-    if (role === "admin" || role === "editor" || role === "viewer") {
+    if (role === "admin" || role === "editor" || role === "viewer" || role === "technical_inspector") {
       unique.add(role);
     }
   });
@@ -144,5 +144,15 @@ export const adminIamService = {
       createdAt: response.user.createdAt,
       updatedAt: response.user.updatedAt
     };
+  },
+
+  async assignTechnicalInspector(
+    userEmail: string,
+    assignment: { eventId: string; validFrom: string; validUntil: string }
+  ) {
+    return requestJson(`/admin/iam/users/${encodeURIComponent(userEmail)}/technical-inspector-assignment`, {
+      method: "PUT",
+      body: assignment
+    });
   }
 };

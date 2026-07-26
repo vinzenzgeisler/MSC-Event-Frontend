@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ListChecks, Mail, FileDown, Settings } from "lucide-react";
+import { LayoutGrid, ListChecks, Mail, FileDown, Settings, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission, type AppPermission } from "@/app/auth/iam";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,12 @@ import { cn } from "@/lib/utils";
 const links = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid, permission: "dashboard.read" as AppPermission },
   { to: "/admin/entries", label: "Nennungen", icon: ListChecks, permission: "entries.read" as AppPermission },
+  {
+    to: "/inspection",
+    label: "Technische Abnahme",
+    icon: ShieldCheck,
+    permission: "inspection.read" as AppPermission
+  },
   { to: "/admin/communication", label: "Kommunikation", icon: Mail, permission: "communication.read" as AppPermission },
   { to: "/admin/exports", label: "Exporte", icon: FileDown, permission: "exports.read" as AppPermission },
   { to: "/admin/settings", label: "Einstellungen", icon: Settings, permission: "settings.read" as AppPermission }

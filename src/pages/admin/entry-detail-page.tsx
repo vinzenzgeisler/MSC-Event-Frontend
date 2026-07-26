@@ -307,6 +307,26 @@ export function AdminEntryDetailPage() {
     }
   };
 
+  const handleInspectionQrDownload = async () => {
+    if (actionInFlight) return;
+    setActionInFlight("inspection-qr");
+    try {
+      const download = await adminEntriesService.getInspectionQr(entryId, "svg");
+      const bytes = Uint8Array.from(atob(download.dataBase64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: download.mimeType }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = download.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      flashMessage("Abnahme-QR-Code heruntergeladen.");
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "QR-Code konnte nicht erzeugt werden."), 2800);
+    } finally {
+      setActionInFlight((current) => (current === "inspection-qr" ? null : current));
+    }
+  };
+
   useEffect(() => {
     setHasLoadedOnce(false);
     loadDetail();
@@ -752,6 +772,20 @@ export function AdminEntryDetailPage() {
                 <CardTitle>Dokumente & Einwilligung</CardTitle>
               </CardHeader>
               <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={Boolean(actionInFlight)}
+                  onClick={() => void handleInspectionQrDownload()}
+                >
+                  {actionInFlight === "inspection-qr" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Abnahme-QR-Code (SVG)
+                </Button>
                 <div className="space-y-2">
                   {detail.documents.map((doc) => (
                     <div key={doc.id} className="rounded border p-2 text-xs">

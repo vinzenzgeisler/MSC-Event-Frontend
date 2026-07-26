@@ -31,6 +31,9 @@ export type AdminEntryListItemDto = {
   acceptanceStatus: AcceptanceStatus;
   paymentStatus: PaymentStatus | null;
   checkinIdVerified: boolean;
+  techStatus: TechStatus;
+  techCheckedAt?: string | null;
+  techCheckedBy?: string | null;
   confirmationMailVerified?: boolean;
   confirmationMailSent: boolean;
   internalNote?: string | null;
@@ -75,6 +78,7 @@ export type AdminEntryListItem = {
   registrationStatus: RegistrationStatus;
   payment: PaymentStatus;
   checkin: "offen" | "bestätigt";
+  techStatus: TechStatus;
   confirmationMailSent: boolean;
   confirmationMailVerified: boolean;
   driverNote: string;
@@ -265,6 +269,9 @@ export type AdminEntryDetailViewModel = {
   createdAt: string;
   isBackupVehicle: boolean;
   checkinVerified: boolean;
+  techStatus: TechStatus;
+  techCheckedAt: string | null;
+  techCheckedBy: string | null;
   driver: {
     name: string;
     email: string;

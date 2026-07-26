@@ -1,4 +1,4 @@
-export type IamRole = "admin" | "editor" | "viewer";
+export type IamRole = "admin" | "editor" | "viewer" | "technical_inspector";
 
 export type IamAccount = {
   id: string;
@@ -29,6 +29,7 @@ export type IamPermissionMatrixRow = {
   admin: "read" | "write";
   editor: "none" | "read" | "write";
   viewer: "none" | "read" | "write";
+  technical_inspector: "none" | "read" | "write";
 };
 
 export type IamOverview = {

@@ -15,6 +15,7 @@ import { AdminLoginPage } from "@/pages/admin/login-page";
 import { AdminCommunicationPage } from "@/pages/admin/communication-page";
 import { AdminSettingsPage } from "@/pages/admin/settings-page";
 import { AdminMailDesignLabPage } from "@/pages/admin/mail-design-lab-page";
+import { AdminTechnicalInspectionPage } from "@/pages/admin/technical-inspection-page";
 
 export const router = createBrowserRouter([
   {
@@ -86,6 +87,22 @@ export const router = createBrowserRouter([
             )
           }
         ]
+      },
+      {
+        path: "/inspection",
+        element: (
+          <ProtectedRoute allowedRoles={["admin", "technical_inspector"]}>
+            <AdminTechnicalInspectionPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: "/inspection/:entryId",
+        element: (
+          <ProtectedRoute allowedRoles={["admin", "technical_inspector"]}>
+            <AdminTechnicalInspectionPage />
+          </ProtectedRoute>
+        )
       }
     ]
   },

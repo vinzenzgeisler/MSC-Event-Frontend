@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "editor" | "viewer";
+export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector";
 
 export type AppPermission =
   | "dashboard.read"
@@ -15,9 +15,11 @@ export type AppPermission =
   | "settings.read"
   | "settings.write"
   | "iam.read"
-  | "iam.write";
+  | "iam.write"
+  | "inspection.read"
+  | "inspection.write";
 
-const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer"];
+const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector"];
 
 const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   admin: [
@@ -35,7 +37,9 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "settings.read",
     "settings.write",
     "iam.read",
-    "iam.write"
+    "iam.write",
+    "inspection.read",
+    "inspection.write"
   ],
   editor: [
     "dashboard.read",
@@ -46,7 +50,8 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "entries.notes.write",
     "exports.read"
   ],
-  viewer: ["dashboard.read", "entries.read", "exports.read"]
+  viewer: ["dashboard.read", "entries.read", "exports.read"],
+  technical_inspector: ["inspection.read", "inspection.write"]
 };
 
 function normalizeRole(role: string): AppRole | null {
@@ -86,43 +91,57 @@ export function toRoleMatrix() {
       area: "Dashboard",
       admin: "read",
       editor: "read",
-      viewer: "read"
+      viewer: "read",
+      technical_inspector: "none"
     },
     {
       area: "Nennungen",
       admin: "write",
       editor: "write",
-      viewer: "read"
+      viewer: "read",
+      technical_inspector: "none"
     },
     {
       area: "Check-in",
       admin: "write",
       editor: "write",
-      viewer: "none"
+      viewer: "none",
+      technical_inspector: "none"
     },
     {
       area: "Kommunikation",
       admin: "write",
       editor: "none",
-      viewer: "none"
+      viewer: "none",
+      technical_inspector: "none"
     },
     {
       area: "Exporte",
       admin: "write",
       editor: "read",
-      viewer: "read"
+      viewer: "read",
+      technical_inspector: "none"
     },
     {
       area: "Einstellungen",
       admin: "write",
       editor: "none",
-      viewer: "none"
+      viewer: "none",
+      technical_inspector: "none"
     },
     {
       area: "IAM",
       admin: "write",
       editor: "none",
-      viewer: "none"
+      viewer: "none",
+      technical_inspector: "none"
+    },
+    {
+      area: "Technische Abnahme",
+      admin: "write",
+      editor: "none",
+      viewer: "none",
+      technical_inspector: "write"
     }
   ] as const;
 }

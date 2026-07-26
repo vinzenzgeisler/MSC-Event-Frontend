@@ -28,6 +28,9 @@ function resolvePageTitle(pathname: string) {
   if (pathname.startsWith("/admin/entries/")) {
     return "Nennungsdetails";
   }
+  if (pathname.startsWith("/inspection")) {
+    return "Technische Abnahme";
+  }
   if (pathname === "/admin/communication") {
     return "Kommunikation";
   }
@@ -89,7 +92,7 @@ export function DocumentMeta() {
 
   useEffect(() => {
     const pageTitle = resolvePageTitle(location.pathname);
-    const isAdminRoute = location.pathname.startsWith("/admin");
+    const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/inspection");
     if (location.pathname === "/" || location.pathname === "/anmeldung") {
       document.title = pageTitle;
     } else {
