@@ -4,6 +4,8 @@ export type IamAccount = {
   id: string;
   username: string;
   email: string | null;
+  firstName: string | null;
+  lastName: string | null;
   enabled: boolean;
   status: string;
   emailVerified: boolean;
@@ -14,6 +16,8 @@ export type IamAccount = {
 
 export type IamCreateUserInput = {
   email: string;
+  firstName: string;
+  lastName: string;
   roles: IamRole[];
   temporaryPassword?: string;
   sendInvitation?: boolean;
