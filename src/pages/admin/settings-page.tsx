@@ -2361,8 +2361,8 @@ export function AdminSettingsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="auto">auto</SelectItem>
-                            <SelectItem value="moto">moto</SelectItem>
+                            <SelectItem value="auto">Automobil</SelectItem>
+                            <SelectItem value="moto">Motorrad</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2430,8 +2430,8 @@ export function AdminSettingsPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="auto">auto</SelectItem>
-                                <SelectItem value="moto">moto</SelectItem>
+                                <SelectItem value="auto">Automobil</SelectItem>
+                                <SelectItem value="moto">Motorrad</SelectItem>
                               </SelectContent>
                             </Select>
                             <label className="flex items-center gap-2 text-sm text-slate-700">
