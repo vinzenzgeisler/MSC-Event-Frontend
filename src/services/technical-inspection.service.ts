@@ -60,6 +60,7 @@ export type InspectionEntry = {
   cylinders: number | null;
   brakes: string | null;
   vehicleHistory: string | null;
+  inspectionNote: string | null;
   backupVehicleId: string | null;
   backupVehicle: InspectionVehicle | null;
   techStatus: TechStatus;
