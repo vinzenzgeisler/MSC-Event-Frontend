@@ -4,7 +4,7 @@ import mscLogoUrl from "../../msc-logo.png";
 
 const BRAND_NAME = "MSC Oberlausitzer Dreiländereck";
 const APP_NAME = "Event Hub";
-const ADMIN_PWA_MANIFEST_URL = "/manifest.webmanifest";
+const ADMIN_PWA_MANIFEST_URL = "/admin.webmanifest";
 const INSPECTION_PWA_MANIFEST_URL = "/inspection.webmanifest";
 
 function resolvePageTitle(pathname: string) {
@@ -106,10 +106,10 @@ export function DocumentMeta() {
       upsertHeadLink("apple-touch-icon", "/apple-touch-icon.png");
       upsertHeadLink("manifest", isInspectionRoute ? INSPECTION_PWA_MANIFEST_URL : ADMIN_PWA_MANIFEST_URL);
       removeManagedHeadElements(`link[rel="manifest"][data-managed="msc-meta"]:not([href="${isInspectionRoute ? INSPECTION_PWA_MANIFEST_URL : ADMIN_PWA_MANIFEST_URL}"])`);
-      upsertMeta("application-name", isInspectionRoute ? "Technische Abnahme" : `${BRAND_NAME} ${APP_NAME}`);
+      upsertMeta("application-name", isInspectionRoute ? "Abnahme App" : `${BRAND_NAME} ${APP_NAME}`);
       upsertMeta("apple-mobile-web-app-capable", "yes");
       upsertMeta("apple-mobile-web-app-status-bar-style", "default");
-      upsertMeta("apple-mobile-web-app-title", isInspectionRoute ? "Abnahme" : "MSC Admin");
+      upsertMeta("apple-mobile-web-app-title", isInspectionRoute ? "Abnahme App" : "MSC Admin");
     } else {
       removeManagedHeadElements('link[rel="apple-touch-icon"][data-managed="msc-meta"]');
       removeManagedHeadElements('link[rel="manifest"][data-managed="msc-meta"]');
