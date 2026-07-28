@@ -1,0 +1,30 @@
+{
+  "id": "/admin",
+  "name": "MSC Oberlausitzer Dreiländereck Admin",
+  "short_name": "MSC Admin",
+  "description": "Admin-Oberfläche des MSC Oberlausitzer Dreiländereck e.V.",
+  "theme_color": "#0f172a",
+  "background_color": "#f8fafc",
+  "display": "standalone",
+  "start_url": "/admin/entries",
+  "scope": "/admin/",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
