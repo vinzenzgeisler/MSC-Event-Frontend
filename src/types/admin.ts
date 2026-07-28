@@ -38,6 +38,7 @@ export type AdminEntryListItemDto = {
   confirmationMailSent: boolean;
   internalNote?: string | null;
   driverNote?: string | null;
+  inspectionNote?: string | null;
   deletedAt?: string | null;
   deletedByUserId?: string | null;
   deletedByDisplay?: string | null;
@@ -228,6 +229,7 @@ export type AdminEntryDetailDto = {
   specialNotes: string | null;
   internalNote?: string | null;
   driverNote?: string | null;
+  inspectionNote?: string | null;
   consent: {
     termsAccepted: boolean;
     privacyAccepted: boolean;
@@ -358,6 +360,7 @@ export type AdminEntryDetailViewModel = {
   confirmationMailVerified: boolean;
   internalNote: string;
   driverNote: string;
+  inspectionNote: string;
   history: AdminEntryHistoryItem[];
 };
 

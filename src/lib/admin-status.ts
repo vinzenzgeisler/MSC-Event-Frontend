@@ -1,4 +1,4 @@
-import type { AcceptanceStatus, ExportJobStatus, OutboxStatus, PaymentStatus } from "@/types/common";
+import type { AcceptanceStatus, ExportJobStatus, OutboxStatus, PaymentStatus, TechStatus } from "@/types/common";
 
 export function acceptanceStatusLabel(status: AcceptanceStatus): string {
   return {
@@ -65,6 +65,22 @@ export function paymentStatusClasses(status: PaymentStatus): string {
 
 export function checkinClasses(isVerified: boolean): string {
   return isVerified ? "border-primary/35 bg-primary/10 text-primary" : "border-slate-300 bg-slate-100 text-slate-800";
+}
+
+export function techStatusLabel(status: TechStatus): string {
+  return {
+    pending: "Offen",
+    passed: "Bestanden",
+    failed: "Abgelehnt"
+  }[status];
+}
+
+export function techStatusClasses(status: TechStatus): string {
+  return {
+    pending: "border-amber-300 bg-amber-50 text-amber-900",
+    passed: "border-emerald-300 bg-emerald-50 text-emerald-900",
+    failed: "border-rose-300 bg-rose-50 text-rose-900"
+  }[status];
 }
 
 export function outboxStatusClasses(status: OutboxStatus): string {

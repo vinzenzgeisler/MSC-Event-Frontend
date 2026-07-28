@@ -8,8 +8,8 @@ import {
   acceptanceStatusClasses,
   acceptanceStatusLabel,
   acceptanceStatusRowAccentClasses,
-  checkinClasses,
-  checkinLabel,
+  techStatusClasses,
+  techStatusLabel,
   paymentStatusClasses,
   paymentStatusLabel
 } from "@/lib/admin-status";
@@ -356,8 +356,8 @@ function EntriesTableInner({
                 </Badge>
               )}
               {row.status === "accepted" ? (
-                <Badge className={`${checkinClasses(row.checkin === "bestätigt")} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
-                  {checkinLabel(row.checkin === "bestätigt")}
+                <Badge className={`${techStatusClasses(row.techStatus)} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
+                  Prüfung: {techStatusLabel(row.techStatus)}
                 </Badge>
               ) : (
                 <Badge className="h-7 whitespace-nowrap border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
@@ -390,7 +390,7 @@ function EntriesTableInner({
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">St.-Nr.</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Status</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Zahlung</th>
-                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Check-in</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Prüfstatus</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Erstellt am</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Aktion</th>
               </tr>
@@ -452,8 +452,8 @@ function EntriesTableInner({
                   </td>
                   <td className="px-3 py-3">
                     {row.status === "accepted" ? (
-                      <Badge className={`${checkinClasses(row.checkin === "bestätigt")} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
-                        {checkinLabel(row.checkin === "bestätigt")}
+                      <Badge className={`${techStatusClasses(row.techStatus)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
+                        {techStatusLabel(row.techStatus)}
                       </Badge>
                     ) : (
                       <span className="text-xs text-slate-500">Noch nicht relevant</span>
