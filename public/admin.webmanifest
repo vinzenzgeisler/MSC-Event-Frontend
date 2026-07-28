@@ -1,14 +1,13 @@
 {
-  "id": "/inspection",
-  "name": "Abnahme App – MSC Oberlausitzer Dreiländereck",
-  "short_name": "Abnahme App",
-  "description": "Mobile technische Abnahme für autorisierte Prüfer",
+  "id": "/admin",
+  "name": "MSC Oberlausitzer Dreiländereck Admin",
+  "short_name": "MSC Admin",
+  "description": "Admin-Oberfläche des MSC Oberlausitzer Dreiländereck e.V.",
   "theme_color": "#0f172a",
-  "background_color": "#f1f5f9",
+  "background_color": "#f8fafc",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "start_url": "/inspection",
-  "scope": "/",
+  "start_url": "/admin/entries",
+  "scope": "/admin/",
   "lang": "de",
   "icons": [
     {

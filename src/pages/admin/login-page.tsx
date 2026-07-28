@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  clearCognitoPwaHandoff,
   consumeCognitoReturnTo,
+  getCognitoPwaHandoff,
   getCognitoConfig,
   handleCognitoCallbackIfPresent,
   isCognitoConfigured,
+  isStandaloneWebApp,
   restoreCognitoSessionFromBridge,
   startCognitoLogin
 } from "@/app/auth/cognito";
@@ -24,6 +27,7 @@ export function AdminLoginPage() {
   const { loginWithSession } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [handoffComplete, setHandoffComplete] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = (location.state as LocationState | null)?.from?.pathname || "/admin/dashboard";
@@ -59,6 +63,13 @@ export function AdminLoginPage() {
         }
         loginWithSession(session);
         const target = consumeCognitoReturnTo(redirectTo);
+        if (getCognitoPwaHandoff() === "inspection" && target.startsWith("/inspection") && !isStandaloneWebApp()) {
+          window.history.replaceState({}, document.title, "/admin/login");
+          setHandoffComplete(true);
+          window.close();
+          return;
+        }
+        clearCognitoPwaHandoff();
         navigate(target, { replace: true });
       } catch (callbackError) {
         if (callbackError instanceof Error) {
@@ -73,6 +84,55 @@ export function AdminLoginPage() {
 
     void runCallback();
   }, [loginWithSession, navigate, redirectTo]);
+
+  useEffect(() => {
+    if (!isStandaloneWebApp()) {
+      return;
+    }
+
+    const resumeInspectionApp = async () => {
+      if (document.visibilityState === "hidden" || getCognitoPwaHandoff() !== "inspection") {
+        return;
+      }
+
+      setBusy(true);
+      const session = await restoreCognitoSessionFromBridge();
+      if (session) {
+        loginWithSession(session);
+        clearCognitoPwaHandoff();
+        navigate("/inspection", { replace: true });
+        return;
+      }
+      setBusy(false);
+    };
+
+    window.addEventListener("focus", resumeInspectionApp);
+    document.addEventListener("visibilitychange", resumeInspectionApp);
+    return () => {
+      window.removeEventListener("focus", resumeInspectionApp);
+      document.removeEventListener("visibilitychange", resumeInspectionApp);
+    };
+  }, [loginWithSession, navigate]);
+
+  if (handoffComplete) {
+    return (
+      <div className="mx-auto mt-16 max-w-md px-4">
+        <DocumentMeta />
+        <Card className="rounded-xl border bg-white shadow-sm">
+          <CardHeader>
+            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Abnahme App</div>
+            <CardTitle className="text-2xl">Anmeldung abgeschlossen</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-slate-700">
+            <p>Schließe dieses Browserfenster über das X oben links. Die Abnahme App übernimmt die Anmeldung automatisch.</p>
+            <Button type="button" className="w-full" onClick={() => window.close()}>
+              Zur Abnahme App zurück
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto mt-16 max-w-md px-4">
