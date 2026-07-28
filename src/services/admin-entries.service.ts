@@ -134,55 +134,68 @@ function lifecycleEventTypeForStatus(status: AcceptanceStatus): "preselection" |
   return "preselection";
 }
 
-function payloadToText(payload: Record<string, unknown> | null | undefined) {
-  if (!payload) {
-    return "-";
-  }
-  const knownText = payload.message;
-  if (typeof knownText === "string" && knownText.trim()) {
-    return knownText;
-  }
-  const labels: Record<string, string> = {
-    from: "Vorher",
-    to: "Nachher",
-    techStatus: "Prüfstatus",
-    target: "Fahrzeug",
-    checkinIdVerified: "Check-in",
-    internalNoteUpdated: "Interne Notiz geändert",
-    driverNoteUpdated: "Fahrer-Notiz geändert",
-    inspectionNoteUpdated: "Prüfer-Notiz geändert",
-    paymentStatus: "Zahlungsstatus"
-  };
-  const valueLabels: Record<string, string> = {
-    pending: "Offen",
-    passed: "Bestanden",
-    failed: "Abgelehnt",
-    primary: "Hauptfahrzeug",
-    backup: "Ersatzfahrzeug"
-  };
-  return Object.entries(payload)
-    .map(([key, value]) => {
-      const label = labels[key] ?? key;
-      const normalized = typeof value === "string" ? valueLabels[value] ?? value : value === true ? "Ja" : value === false ? "Nein" : String(value ?? "–");
-      return `${label}: ${normalized}`;
-    })
-    .join(" · ");
-}
+function auditLogText(action: string, payload: Record<string, unknown> | null | undefined) {
+  const data = payload ?? {};
+  const statusLabel = (value: unknown) =>
+    ({
+      pending: "Offen",
+      shortlist: "Vorauswahl",
+      accepted: "Angenommen",
+      rejected: "Abgelehnt",
+      passed: "Bestanden",
+      failed: "Abgelehnt",
+      due: "Offen",
+      paid: "Bezahlt"
+    })[String(value)] ?? String(value ?? "–");
+  const vehicleLabel = data.target === "backup" ? "Ersatzfahrzeug" : "Hauptfahrzeug";
+  const euro = (value: unknown) =>
+    typeof value === "number"
+      ? new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value / 100)
+      : "–";
 
-function auditActionLabel(action: string) {
-  return {
-    checkin_id_verified_set: "Check-in geändert",
-    entry_status_updated: "Nennungsstatus geändert",
-    entry_class_updated: "Klasse geändert",
-    entry_tech_status_updated: "Technische Abnahme geändert",
-    entry_notes_updated: "Notizen geändert",
-    entry_payment_status_set: "Zahlung bestätigt",
-    entry_payment_amounts_set: "Zahlungsbeträge geändert",
-    entry_soft_deleted: "Nennung gelöscht",
-    entry_restored: "Nennung wiederhergestellt",
-    document_generated: "Dokument erzeugt",
-    document_download_url_issued: "Dokument abgerufen"
-  }[action] ?? action.split("_").join(" ");
+  switch (action) {
+    case "checkin_id_verified_set":
+      return data.checkinIdVerified ? "Check-in bestätigt." : "Check-in zurückgesetzt.";
+    case "entry_status_updated":
+      return `Nennungsstatus von „${statusLabel(data.from)}“ auf „${statusLabel(data.to)}“ geändert.`;
+    case "entry_class_updated":
+      return data.isBackupVehicle ? "Klasse des Ersatzfahrzeugs geändert." : "Klasse der Nennung geändert.";
+    case "entry_tech_status_updated":
+      return `Technische Abnahme für ${vehicleLabel} auf „${statusLabel(data.techStatus)}“ gesetzt.`;
+    case "entry_inspection_note_updated":
+      return `Prüfernotiz für ${vehicleLabel} aktualisiert.`;
+    case "entry_notes_updated": {
+      const notes = [
+        data.internalNoteUpdated ? "interne Notiz" : null,
+        data.driverNoteUpdated ? "Fahrerhinweis" : null,
+        data.inspectionNoteUpdated ? "Prüfernotiz" : null
+      ].filter(Boolean);
+      return notes.length > 0 ? `${notes.join(", ")} aktualisiert.` : "Notizen aktualisiert.";
+    }
+    case "entry_payment_status_set":
+      return `Zahlungsstatus auf „${statusLabel(data.paymentStatus)}“ gesetzt.`;
+    case "entry_payment_amounts_set":
+      return `Zahlungsbeträge aktualisiert: Gesamt ${euro(data.totalCents)}, bezahlt ${euro(data.paidAmountCents)}, offen ${euro(data.amountOpenCents)}.`;
+    case "entry_soft_deleted":
+      return data.deleteReason ? `Nennung gelöscht. Grund: ${String(data.deleteReason)}` : "Nennung gelöscht.";
+    case "entry_restored":
+      return "Nennung wiederhergestellt.";
+    case "document_generated":
+      return "Dokument erzeugt.";
+    case "document_download_url_issued":
+      return "Dokument zum Abruf bereitgestellt.";
+    case "public_entry_created":
+      return "Nennung eingereicht.";
+    case "public_entry_verified":
+      return "E-Mail-Adresse der Nennung bestätigt.";
+    default: {
+      const message = data.message;
+      if (typeof message === "string" && message.trim()) {
+        return message.trim().replace(/[.!?]?$/, ".");
+      }
+      return `${action.split("_").join(" ")}.`;
+    }
+  }
 }
 
 function resolveImageUrl(value: string | null | undefined): string | null {
@@ -387,8 +400,8 @@ function fromAdminEntryDetailDto(
       id: item.id,
       timestamp: item.createdAt,
       actor: item.actorDisplay ?? "Unbekanntes Konto",
-      action: auditActionLabel(item.action),
-      details: payloadToText(item.payload)
+      action: item.action,
+      details: auditLogText(item.action, item.payload)
     }))
   };
 }
