@@ -142,7 +142,47 @@ function payloadToText(payload: Record<string, unknown> | null | undefined) {
   if (typeof knownText === "string" && knownText.trim()) {
     return knownText;
   }
-  return JSON.stringify(payload);
+  const labels: Record<string, string> = {
+    from: "Vorher",
+    to: "Nachher",
+    techStatus: "Prüfstatus",
+    target: "Fahrzeug",
+    checkinIdVerified: "Check-in",
+    internalNoteUpdated: "Interne Notiz geändert",
+    driverNoteUpdated: "Fahrer-Notiz geändert",
+    inspectionNoteUpdated: "Prüfer-Notiz geändert",
+    paymentStatus: "Zahlungsstatus"
+  };
+  const valueLabels: Record<string, string> = {
+    pending: "Offen",
+    passed: "Bestanden",
+    failed: "Abgelehnt",
+    primary: "Hauptfahrzeug",
+    backup: "Ersatzfahrzeug"
+  };
+  return Object.entries(payload)
+    .map(([key, value]) => {
+      const label = labels[key] ?? key;
+      const normalized = typeof value === "string" ? valueLabels[value] ?? value : value === true ? "Ja" : value === false ? "Nein" : String(value ?? "–");
+      return `${label}: ${normalized}`;
+    })
+    .join(" · ");
+}
+
+function auditActionLabel(action: string) {
+  return {
+    checkin_id_verified_set: "Check-in geändert",
+    entry_status_updated: "Nennungsstatus geändert",
+    entry_class_updated: "Klasse geändert",
+    entry_tech_status_updated: "Technische Abnahme geändert",
+    entry_notes_updated: "Notizen geändert",
+    entry_payment_status_set: "Zahlung bestätigt",
+    entry_payment_amounts_set: "Zahlungsbeträge geändert",
+    entry_soft_deleted: "Nennung gelöscht",
+    entry_restored: "Nennung wiederhergestellt",
+    document_generated: "Dokument erzeugt",
+    document_download_url_issued: "Dokument abgerufen"
+  }[action] ?? action.split("_").join(" ");
 }
 
 function resolveImageUrl(value: string | null | undefined): string | null {
@@ -224,6 +264,7 @@ function fromAdminEntryDetailDto(
     id: string;
     action: string;
     actorUserId?: string | null;
+    actorDisplay?: string | null;
     createdAt: string;
     payload?: Record<string, unknown> | null;
   }>
@@ -341,11 +382,12 @@ function fromAdminEntryDetailDto(
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     internalNote: dto.internalNote ?? "",
     driverNote: dto.driverNote ?? "",
+    inspectionNote: dto.inspectionNote ?? "",
     history: history.map((item) => ({
       id: item.id,
       timestamp: item.createdAt,
-      actor: item.actorUserId ?? "system",
-      action: item.action,
+      actor: item.actorDisplay ?? "Unbekanntes Konto",
+      action: auditActionLabel(item.action),
       details: payloadToText(item.payload)
     }))
   };
@@ -370,6 +412,7 @@ type AdminEntryDetailResponse = {
     id: string;
     action: string;
     actorUserId?: string | null;
+    actorDisplay?: string | null;
     createdAt: string;
     payload?: Record<string, unknown> | null;
   }>;
@@ -772,10 +815,11 @@ export const adminEntriesService = {
     );
   },
 
-  async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string; status?: AcceptanceStatus }) {
+  async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string; inspectionNote: string; status?: AcceptanceStatus }) {
     const body = {
       internalNote: payload.internalNote,
-      driverNote: payload.driverNote
+      driverNote: payload.driverNote,
+      inspectionNote: payload.inspectionNote
     };
 
     try {
