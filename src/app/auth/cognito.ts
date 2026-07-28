@@ -5,7 +5,9 @@ const COGNITO_VERIFIER_KEY = "msc_cognito_pkce_verifier";
 const COGNITO_RETURN_TO_KEY = "msc_cognito_return_to";
 const COGNITO_BRIDGE_REFRESH_COOKIE = "msc_cognito_bridge_refresh_token";
 const COGNITO_BRIDGE_CREATED_AT_COOKIE = "msc_cognito_bridge_created_at";
+const COGNITO_PWA_HANDOFF_COOKIE = "msc_cognito_pwa_handoff";
 const COGNITO_BRIDGE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
+const COGNITO_PWA_HANDOFF_MAX_AGE_SECONDS = 60 * 10;
 const REQUIRED_SCOPES = ["openid", "email", "profile"] as const;
 
 type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
@@ -92,6 +94,19 @@ function readBooleanConfig(envKey: string, runtimeKey: string, fallback = false)
 
 function isCognitoStorageBridgeEnabled(): boolean {
   return readBooleanConfig("VITE_COGNITO_STORAGE_BRIDGE", "cognitoStorageBridgeEnabled", false);
+}
+
+export function isStandaloneWebApp(): boolean {
+  const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return iosStandalone || window.matchMedia("(display-mode: standalone)").matches;
+}
+
+export function getCognitoPwaHandoff(): "inspection" | null {
+  return readCookie(COGNITO_PWA_HANDOFF_COOKIE) === "inspection" ? "inspection" : null;
+}
+
+export function clearCognitoPwaHandoff() {
+  clearCookie(COGNITO_PWA_HANDOFF_COOKIE);
 }
 
 function buildCookieAttributes(maxAgeSeconds: number): string {
@@ -197,6 +212,11 @@ export async function startCognitoLogin(returnTo?: string) {
   localStorage.setItem(COGNITO_STATE_KEY, state);
   localStorage.setItem(COGNITO_VERIFIER_KEY, verifier);
   localStorage.setItem(COGNITO_RETURN_TO_KEY, returnTo || "/admin/dashboard");
+  if (isCognitoStorageBridgeEnabled() && isStandaloneWebApp() && returnTo?.startsWith("/inspection")) {
+    writeCookie(COGNITO_PWA_HANDOFF_COOKIE, "inspection", COGNITO_PWA_HANDOFF_MAX_AGE_SECONDS);
+  } else {
+    clearCognitoPwaHandoff();
+  }
 
   const url = new URL(`${domain}/oauth2/authorize`);
   url.searchParams.set("response_type", "code");
