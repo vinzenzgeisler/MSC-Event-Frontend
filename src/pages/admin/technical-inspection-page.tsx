@@ -4,12 +4,13 @@ import {
   Camera,
   Car,
   CheckCircle2,
-  ChevronDown,
+  ImageOff,
   Loader2,
   LogOut,
   RotateCcw,
   Search,
   ShieldCheck,
+  UserRound,
   XCircle
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -20,8 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getVehicleTypeLabel } from "@/lib/vehicle-type";
-import { technicalInspectionService, type InspectionContext, type InspectionEntry, type InspectionHistoryItem, type InspectionListItem } from "@/services/technical-inspection.service";
-import type { TechStatus } from "@/types/common";
+import {
+  technicalInspectionService,
+  type InspectionContext,
+  type InspectionEntry,
+  type InspectionHistoryItem,
+  type InspectionListItem
+} from "@/services/technical-inspection.service";
+import type { TechStatus, VehicleType } from "@/types/common";
 
 const statusLabels: Record<TechStatus, string> = {
   pending: "Offen",
@@ -42,19 +49,90 @@ const formatDateTime = (value: string | null) =>
   value ? new Date(value).toLocaleString("de-DE") : "–";
 
 type InspectionTarget = "primary" | "backup";
-
-const motorSummary = (vehicle: {
-  cylinders: number | null;
+type VehiclePresentation = {
+  vehicleType: VehicleType;
+  make: string | null;
+  model: string | null;
+  year: number | null;
   displacementCcm: number | null;
   engineType: string | null;
-}) =>
-  [
-    vehicle.cylinders ? `${vehicle.cylinders} Zylinder` : null,
-    vehicle.displacementCcm ? `${vehicle.displacementCcm.toLocaleString("de-DE")} ccm` : null,
-    vehicle.engineType || null
-  ]
-    .filter(Boolean)
-    .join(" – ") || "Keine Motordaten";
+  cylinders: number | null;
+  imageUrl: string | null;
+};
+
+function VehicleChoice({
+  label,
+  vehicle,
+  status,
+  selected,
+  onSelect
+}: {
+  label: string;
+  vehicle: VehiclePresentation;
+  status: TechStatus;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const vehicleName = [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Fahrzeug ohne Modellangabe";
+  const facts = [
+    ["Typ", getVehicleTypeLabel(vehicle.vehicleType)],
+    ["Baujahr", vehicle.year?.toString() ?? "–"],
+    ["Motor", vehicle.engineType || "–"],
+    ["Zylinder", vehicle.cylinders?.toString() ?? "–"],
+    ["Hubraum", vehicle.displacementCcm ? `${vehicle.displacementCcm.toLocaleString("de-DE")} ccm` : "–"]
+  ];
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
+        selected
+          ? "border-slate-900 ring-2 ring-slate-900/10"
+          : "border-slate-200 hover:border-slate-400"
+      }`}
+    >
+      <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
+        {vehicle.imageUrl ? (
+          <img
+            src={vehicle.imageUrl}
+            alt={`${label}: ${vehicleName}`}
+            className="h-full w-full object-contain"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
+            <ImageOff className="h-8 w-8" />
+            <span className="text-xs font-medium">Kein Fahrzeugbild vorhanden</span>
+          </div>
+        )}
+        <span className="absolute left-3 top-3 rounded-full bg-slate-950/85 px-3 py-1 text-xs font-semibold text-white">
+          {label}
+        </span>
+      </div>
+      <div className="space-y-4 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-lg font-bold text-slate-950">{vehicleName}</div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {selected ? "Für die Entscheidung ausgewählt" : "Antippen zum Auswählen"}
+            </div>
+          </div>
+          <Badge className={`${statusClasses[status]} shrink-0`}>{statusLabels[status]}</Badge>
+        </div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
+          {facts.map(([factLabel, value]) => (
+            <div key={factLabel} className="min-w-0">
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{factLabel}</dt>
+              <dd className="mt-0.5 truncate text-sm font-semibold text-slate-800">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </button>
+  );
+}
 
 export function AdminTechnicalInspectionPage() {
   const { entryId } = useParams();
@@ -297,7 +375,7 @@ export function AdminTechnicalInspectionPage() {
         {!loading && detail && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
             <Card className="overflow-hidden">
-              <CardHeader className="border-b bg-slate-50">
+              <CardHeader className="border-b bg-white">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Startnummer</div>
@@ -314,64 +392,81 @@ export function AdminTechnicalInspectionPage() {
                     )}
                   </div>
                 </div>
-                <CardTitle className="pt-3 text-2xl">{detail.driverFirstName} {detail.driverLastName}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
-                <div className={`grid gap-3 ${detail.backupVehicle ? "sm:grid-cols-2" : ""}`}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTarget("primary")}
-                    className={`rounded-xl border p-4 text-left transition ${activeTarget === "primary" ? "border-slate-800 bg-slate-50 ring-2 ring-slate-200" : "bg-white hover:border-slate-400"}`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 font-semibold"><Car className="h-4 w-4" />Fahrzeug</div>
-                      <Badge className={statusClasses[detail.techStatus]}>{statusLabels[detail.techStatus]}</Badge>
+                <section aria-labelledby="driver-heading" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl bg-white p-2.5 text-slate-700 shadow-sm">
+                      <UserRound className="h-5 w-5" />
                     </div>
-                    <div className="mt-3 text-lg font-semibold">{detail.vehicleMake ?? "–"} {detail.vehicleModel ?? ""}</div>
-                    <div className="text-sm text-slate-600">{detail.vehicleYear ?? "Baujahr unbekannt"} – {getVehicleTypeLabel(detail.vehicleType)}</div>
-                    <div className="mt-2 border-t pt-2 text-sm text-slate-700">{motorSummary(detail)}</div>
-                  </button>
-
-                  {detail.backupVehicle && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTarget("backup")}
-                      className={`rounded-xl border p-4 text-left transition ${activeTarget === "backup" ? "border-slate-800 bg-slate-50 ring-2 ring-slate-200" : "bg-white hover:border-slate-400"}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 font-semibold"><Car className="h-4 w-4" />Ersatzfahrzeug</div>
-                        <Badge className={statusClasses[detail.backupTechStatus]}>{statusLabels[detail.backupTechStatus]}</Badge>
+                    <div className="min-w-0 flex-1">
+                      <div id="driver-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Fahrer
                       </div>
-                      <div className="mt-3 text-lg font-semibold">{detail.backupVehicle.make ?? "–"} {detail.backupVehicle.model ?? ""}</div>
-                      <div className="text-sm text-slate-600">{detail.backupVehicle.year ?? "Baujahr unbekannt"} – {getVehicleTypeLabel(detail.backupVehicle.vehicleType)}</div>
-                      <div className="mt-2 border-t pt-2 text-sm text-slate-700">{motorSummary(detail.backupVehicle)}</div>
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid gap-3 rounded-lg border bg-slate-50 p-4 sm:grid-cols-2">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-slate-500">Klasse</div>
-                    <div className="font-semibold">{detail.className}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-slate-500">Orga-Code</div>
-                    <div className="font-semibold">{detail.orgaCode || "–"}</div>
-                  </div>
-                </div>
-
-                {detail.codriver && (
-                  <details className="group rounded-lg border bg-white">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 font-semibold">
-                      Beifahrer: {detail.codriver.firstName} {detail.codriver.lastName}
-                      <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
-                    </summary>
-                    <div className="grid gap-3 border-t px-4 py-3 text-sm sm:grid-cols-2">
-                      <div><span className="text-slate-500">Geburtsdatum:</span> {detail.codriver.birthdate ? new Date(detail.codriver.birthdate).toLocaleDateString("de-DE") : "–"}</div>
-                      <div><span className="text-slate-500">Land:</span> {detail.codriver.country || "–"}</div>
+                      <div className="mt-1 text-xl font-bold text-slate-950">
+                        {detail.driverFirstName} {detail.driverLastName}
+                      </div>
                     </div>
-                  </details>
-                )}
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-4">
+                    <div>
+                      <dt className="text-xs text-slate-500">Klasse</dt>
+                      <dd className="font-semibold text-slate-900">{detail.className}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-500">Orga-Code</dt>
+                      <dd className="font-semibold text-slate-900">{detail.orgaCode || "–"}</dd>
+                    </div>
+                  </dl>
+                  {detail.codriver && (
+                    <div className="mt-4 border-t border-slate-200 pt-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Beifahrer</div>
+                      <div className="mt-1 font-semibold text-slate-900">
+                        {detail.codriver.firstName} {detail.codriver.lastName}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-600">
+                        {detail.codriver.birthdate
+                          ? new Date(detail.codriver.birthdate).toLocaleDateString("de-DE")
+                          : "Geburtsdatum unbekannt"}
+                        {detail.codriver.country ? ` · ${detail.codriver.country}` : ""}
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                <section aria-labelledby="vehicles-heading">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Car className="h-5 w-5 text-slate-600" />
+                    <h2 id="vehicles-heading" className="font-semibold text-slate-950">Fahrzeuge</h2>
+                  </div>
+                  <div className={`grid gap-4 ${detail.backupVehicle ? "md:grid-cols-2" : ""}`}>
+                    <VehicleChoice
+                      label="Fahrzeug"
+                      vehicle={{
+                        vehicleType: detail.vehicleType,
+                        make: detail.vehicleMake,
+                        model: detail.vehicleModel,
+                        year: detail.vehicleYear,
+                        displacementCcm: detail.displacementCcm,
+                        engineType: detail.engineType,
+                        cylinders: detail.cylinders,
+                        imageUrl: detail.vehicleImageUrl
+                      }}
+                      status={detail.techStatus}
+                      selected={activeTarget === "primary"}
+                      onSelect={() => setActiveTarget("primary")}
+                    />
+                    {detail.backupVehicle && (
+                      <VehicleChoice
+                        label="Ersatzfahrzeug"
+                        vehicle={detail.backupVehicle}
+                        status={detail.backupTechStatus}
+                        selected={activeTarget === "backup"}
+                        onSelect={() => setActiveTarget("backup")}
+                      />
+                    )}
+                  </div>
+                </section>
 
                 <div>
                   <label htmlFor="inspection-note" className="mb-2 block text-sm font-semibold">

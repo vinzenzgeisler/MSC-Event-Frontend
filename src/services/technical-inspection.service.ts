@@ -33,6 +33,7 @@ export type InspectionVehicle = {
   engineType: string | null;
   cylinders: number | null;
   vehicleHistory: string | null;
+  imageUrl: string | null;
 };
 
 export type InspectionEntry = {
@@ -60,6 +61,7 @@ export type InspectionEntry = {
   cylinders: number | null;
   brakes: string | null;
   vehicleHistory: string | null;
+  vehicleImageUrl: string | null;
   inspectionNote: string | null;
   backupVehicleId: string | null;
   backupVehicle: InspectionVehicle | null;
