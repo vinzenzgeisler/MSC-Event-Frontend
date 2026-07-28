@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Camera,
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getVehicleTypeLabel } from "@/lib/vehicle-type";
 import { technicalInspectionService, type InspectionContext, type InspectionEntry, type InspectionHistoryItem, type InspectionListItem } from "@/services/technical-inspection.service";
 import type { TechStatus } from "@/types/common";
 
@@ -67,11 +68,13 @@ export function AdminTechnicalInspectionPage() {
   const [notes, setNotes] = useState<Record<InspectionTarget, string>>({ primary: "", backup: "" });
   const [activeTarget, setActiveTarget] = useState<InspectionTarget>("primary");
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const searchRequestRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -109,7 +112,7 @@ export function AdminTechnicalInspectionPage() {
         setDetail(entry);
         setHistory(items);
         setNotes({
-          primary: items.find((item) => item.target === "primary")?.note ?? "",
+          primary: items.find((item) => item.target === "primary")?.note ?? entry.inspectionNote ?? "",
           backup: items.find((item) => item.target === "backup")?.note ?? ""
         });
         setActiveTarget("primary");
@@ -125,21 +128,43 @@ export function AdminTechnicalInspectionPage() {
     };
   }, [entryId]);
 
-  const searchEntries = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setLoading(true);
+  const executeSearch = useCallback(async (searchQuery: string, openSingleResult = false) => {
+    const normalizedQuery = searchQuery.trim();
+    if (!normalizedQuery) {
+      searchRequestRef.current += 1;
+      setResults([]);
+      setSearched(false);
+      setSearching(false);
+      return;
+    }
+    const requestId = ++searchRequestRef.current;
+    setSearching(true);
     setError("");
     setSearched(true);
     try {
-      const entries = await technicalInspectionService.search(query.trim());
+      const entries = await technicalInspectionService.search(normalizedQuery);
+      if (requestId !== searchRequestRef.current) return;
       setResults(entries);
-      if (entries.length === 1) navigate(`/inspection/${entries[0].id}`);
+      if (openSingleResult && entries.length === 1) navigate(`/inspection/${entries[0].id}`);
     } catch (searchError) {
+      if (requestId !== searchRequestRef.current) return;
       setError(messageFromError(searchError));
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestRef.current) setSearching(false);
     }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (entryId) return;
+    const timeout = window.setTimeout(() => {
+      void executeSearch(query);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [entryId, executeSearch, query]);
+
+  const searchEntries = (event: FormEvent) => {
+    event.preventDefault();
+    void executeSearch(query, true);
   };
 
   const updateStatus = async (techStatus: TechStatus) => {
@@ -210,8 +235,8 @@ export function AdminTechnicalInspectionPage() {
                 aria-label="Nennung suchen"
                 className="h-11 rounded-xl border-slate-300 bg-slate-50 px-3 text-sm shadow-inner placeholder:text-xs focus-visible:bg-white sm:placeholder:text-sm"
               />
-              <Button type="submit" className="h-11 rounded-xl px-4" disabled={loading || !query.trim()}>
-                {loading && !entryId ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
+              <Button type="submit" className="h-11 rounded-xl px-4" disabled={searching || !query.trim()}>
+                {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                 <span className="ml-2 hidden sm:inline">Suchen</span>
               </Button>
               <Button
@@ -265,7 +290,7 @@ export function AdminTechnicalInspectionPage() {
           </div>
         )}
 
-        {searched && !loading && !entryId && results.length === 0 && (
+        {searched && !searching && !entryId && results.length === 0 && (
           <Card><CardContent className="py-10 text-center text-slate-600">Keine angenommene Nennung gefunden.</CardContent></Card>
         )}
 
@@ -280,7 +305,7 @@ export function AdminTechnicalInspectionPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <Badge className={`${statusClasses[detail.techStatus]} px-3 py-1.5 text-sm`}>
-                      Fahrzeug: {statusLabels[detail.techStatus]}
+                      Status: {statusLabels[detail.techStatus]}
                     </Badge>
                     {detail.backupVehicle && (
                       <Badge className={`${statusClasses[detail.backupTechStatus]} px-3 py-1 text-xs`}>
@@ -292,7 +317,7 @@ export function AdminTechnicalInspectionPage() {
                 <CardTitle className="pt-3 text-2xl">{detail.driverFirstName} {detail.driverLastName}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className={`grid gap-3 ${detail.backupVehicle ? "sm:grid-cols-2" : ""}`}>
                   <button
                     type="button"
                     onClick={() => setActiveTarget("primary")}
@@ -303,11 +328,11 @@ export function AdminTechnicalInspectionPage() {
                       <Badge className={statusClasses[detail.techStatus]}>{statusLabels[detail.techStatus]}</Badge>
                     </div>
                     <div className="mt-3 text-lg font-semibold">{detail.vehicleMake ?? "–"} {detail.vehicleModel ?? ""}</div>
-                    <div className="text-sm text-slate-600">{detail.vehicleYear ?? "Baujahr unbekannt"} – {detail.vehicleType}</div>
+                    <div className="text-sm text-slate-600">{detail.vehicleYear ?? "Baujahr unbekannt"} – {getVehicleTypeLabel(detail.vehicleType)}</div>
                     <div className="mt-2 border-t pt-2 text-sm text-slate-700">{motorSummary(detail)}</div>
                   </button>
 
-                  {detail.backupVehicle ? (
+                  {detail.backupVehicle && (
                     <button
                       type="button"
                       onClick={() => setActiveTarget("backup")}
@@ -318,13 +343,9 @@ export function AdminTechnicalInspectionPage() {
                         <Badge className={statusClasses[detail.backupTechStatus]}>{statusLabels[detail.backupTechStatus]}</Badge>
                       </div>
                       <div className="mt-3 text-lg font-semibold">{detail.backupVehicle.make ?? "–"} {detail.backupVehicle.model ?? ""}</div>
-                      <div className="text-sm text-slate-600">{detail.backupVehicle.year ?? "Baujahr unbekannt"} – {detail.backupVehicle.vehicleType}</div>
+                      <div className="text-sm text-slate-600">{detail.backupVehicle.year ?? "Baujahr unbekannt"} – {getVehicleTypeLabel(detail.backupVehicle.vehicleType)}</div>
                       <div className="mt-2 border-t pt-2 text-sm text-slate-700">{motorSummary(detail.backupVehicle)}</div>
                     </button>
-                  ) : (
-                    <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">
-                      Kein Ersatzfahrzeug für diese Nennung hinterlegt.
-                    </div>
                   )}
                 </div>
 
@@ -389,13 +410,16 @@ export function AdminTechnicalInspectionPage() {
               <CardContent className="space-y-3">
                 {history.length === 0 && <div className="text-sm text-slate-500">Noch keine Entscheidung.</div>}
                 {history.map((item) => (
-                  <div key={item.id} className="rounded-lg border p-3 text-sm">
-                    <div className="flex items-center justify-between gap-2">
+                  <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <Badge className={statusClasses[item.status]}>{statusLabels[item.status]}</Badge>
                       <span className="text-xs font-medium text-slate-500">{item.target === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}</span>
                     </div>
-                    <div className="mt-2 text-slate-700">{item.note || "Keine Notiz"}</div>
-                    <div className="mt-2 text-xs text-slate-500">{item.inspectorEmail || item.inspectorUserId} · {formatDateTime(item.createdAt)}</div>
+                    <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-2 text-slate-700">{item.note || "Keine Notiz"}</div>
+                    <div className="mt-2 flex flex-col gap-0.5 text-xs text-slate-500">
+                      <span className="font-medium text-slate-600">Prüfer: {item.inspectorEmail || "Unbekanntes Prüferkonto"}</span>
+                      <time>{formatDateTime(item.createdAt)}</time>
+                    </div>
                   </div>
                 ))}
               </CardContent>
