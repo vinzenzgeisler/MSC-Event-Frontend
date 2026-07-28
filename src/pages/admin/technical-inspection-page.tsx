@@ -10,7 +10,6 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
-  UserRound,
   XCircle
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -55,7 +54,6 @@ type VehiclePresentation = {
   model: string | null;
   year: number | null;
   displacementCcm: number | null;
-  engineType: string | null;
   cylinders: number | null;
   imageUrl: string | null;
 };
@@ -63,13 +61,11 @@ type VehiclePresentation = {
 function VehicleChoice({
   label,
   vehicle,
-  status,
   selected,
   onSelect
 }: {
   label: string;
   vehicle: VehiclePresentation;
-  status: TechStatus;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -77,7 +73,6 @@ function VehicleChoice({
   const facts = [
     ["Typ", getVehicleTypeLabel(vehicle.vehicleType)],
     ["Baujahr", vehicle.year?.toString() ?? "–"],
-    ["Motor", vehicle.engineType || "–"],
     ["Zylinder", vehicle.cylinders?.toString() ?? "–"],
     ["Hubraum", vehicle.displacementCcm ? `${vehicle.displacementCcm.toLocaleString("de-DE")} ccm` : "–"]
   ];
@@ -87,10 +82,8 @@ function VehicleChoice({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
-        selected
-          ? "border-slate-900 ring-2 ring-slate-900/10"
-          : "border-slate-200 hover:border-slate-400"
+      className={`overflow-hidden rounded-2xl bg-white text-left shadow-sm transition ${
+        selected ? "bg-slate-50 shadow-md" : "hover:bg-slate-50 hover:shadow-md"
       }`}
     >
       <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
@@ -119,9 +112,8 @@ function VehicleChoice({
               {selected ? "Für die Entscheidung ausgewählt" : "Antippen zum Auswählen"}
             </div>
           </div>
-          <Badge className={`${statusClasses[status]} shrink-0`}>{statusLabels[status]}</Badge>
         </div>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4">
           {facts.map(([factLabel, value]) => (
             <div key={factLabel} className="min-w-0">
               <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{factLabel}</dt>
@@ -395,17 +387,12 @@ export function AdminTechnicalInspectionPage() {
               </CardHeader>
               <CardContent className="space-y-5 pt-5">
                 <section aria-labelledby="driver-heading" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-white p-2.5 text-slate-700 shadow-sm">
-                      <UserRound className="h-5 w-5" />
+                  <div className="min-w-0">
+                    <div id="driver-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Fahrer
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div id="driver-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Fahrer
-                      </div>
-                      <div className="mt-1 text-xl font-bold text-slate-950">
-                        {detail.driverFirstName} {detail.driverLastName}
-                      </div>
+                    <div className="mt-1 text-xl font-bold text-slate-950">
+                      {detail.driverFirstName} {detail.driverLastName}
                     </div>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-4">
@@ -448,11 +435,9 @@ export function AdminTechnicalInspectionPage() {
                         model: detail.vehicleModel,
                         year: detail.vehicleYear,
                         displacementCcm: detail.displacementCcm,
-                        engineType: detail.engineType,
                         cylinders: detail.cylinders,
                         imageUrl: detail.vehicleImageUrl
                       }}
-                      status={detail.techStatus}
                       selected={activeTarget === "primary"}
                       onSelect={() => setActiveTarget("primary")}
                     />
@@ -460,7 +445,6 @@ export function AdminTechnicalInspectionPage() {
                       <VehicleChoice
                         label="Ersatzfahrzeug"
                         vehicle={detail.backupVehicle}
-                        status={detail.backupTechStatus}
                         selected={activeTarget === "backup"}
                         onSelect={() => setActiveTarget("backup")}
                       />
@@ -470,8 +454,11 @@ export function AdminTechnicalInspectionPage() {
 
                 <div>
                   <label htmlFor="inspection-note" className="mb-2 block text-sm font-semibold">
-                    Notiz für {activeTarget === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}
+                    Prüfernotiz für {activeTarget === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}
                   </label>
+                  <p className="mb-2 text-xs text-slate-500">
+                    Wird getrennt von internen Orga-Notizen und Fahrerhinweisen gespeichert.
+                  </p>
                   <textarea
                     id="inspection-note"
                     value={notes[activeTarget]}
