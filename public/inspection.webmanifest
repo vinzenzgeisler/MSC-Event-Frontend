@@ -1,7 +1,7 @@
 {
   "id": "/inspection",
-  "name": "Technische Abnahme – MSC Oberlausitzer Dreiländereck",
-  "short_name": "Abnahme",
+  "name": "Abnahme App – MSC Oberlausitzer Dreiländereck",
+  "short_name": "Abnahme App",
   "description": "Mobile technische Abnahme für autorisierte Prüfer",
   "theme_color": "#0f172a",
   "background_color": "#f1f5f9",
