@@ -38,10 +38,25 @@ function installZoomGuards() {
 
 installZoomGuards();
 
-if (window.location.pathname.startsWith("/admin")) {
-  void navigator.serviceWorker.register("/sw.js", { scope: "/admin/" }).catch(() => {
-    // Ignore failed SW registration outside supported environments.
+const pwaScope = window.location.pathname.startsWith("/inspection") ? "/inspection" : window.location.pathname.startsWith("/admin") ? "/admin/" : null;
+
+if (pwaScope && "serviceWorker" in navigator) {
+  const hadServiceWorkerController = Boolean(navigator.serviceWorker.controller);
+  let reloadPending = false;
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (hadServiceWorkerController && !reloadPending) {
+      reloadPending = true;
+      window.location.reload();
+    }
   });
+
+  void navigator.serviceWorker
+    .register("/sw.js", { scope: pwaScope })
+    .then((registration) => registration.update())
+    .catch(() => {
+      // Ignore failed SW registration outside supported environments.
+    });
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

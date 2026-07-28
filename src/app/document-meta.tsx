@@ -5,6 +5,7 @@ import mscLogoUrl from "../../msc-logo.png";
 const BRAND_NAME = "MSC Oberlausitzer Dreiländereck";
 const APP_NAME = "Event Hub";
 const ADMIN_PWA_MANIFEST_URL = "/manifest.webmanifest";
+const INSPECTION_PWA_MANIFEST_URL = "/inspection.webmanifest";
 
 function resolvePageTitle(pathname: string) {
   if (pathname === "/" || pathname === "/anmeldung") {
@@ -92,7 +93,8 @@ export function DocumentMeta() {
 
   useEffect(() => {
     const pageTitle = resolvePageTitle(location.pathname);
-    const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/inspection");
+    const isInspectionRoute = location.pathname.startsWith("/inspection");
+    const isAdminRoute = location.pathname.startsWith("/admin");
     if (location.pathname === "/" || location.pathname === "/anmeldung") {
       document.title = pageTitle;
     } else {
@@ -100,13 +102,14 @@ export function DocumentMeta() {
     }
 
     upsertHeadLink("icon", mscLogoUrl, "image/png");
-    if (isAdminRoute) {
+    if (isInspectionRoute || isAdminRoute) {
       upsertHeadLink("apple-touch-icon", "/apple-touch-icon.png");
-      upsertHeadLink("manifest", ADMIN_PWA_MANIFEST_URL);
-      upsertMeta("application-name", `${BRAND_NAME} ${APP_NAME}`);
+      upsertHeadLink("manifest", isInspectionRoute ? INSPECTION_PWA_MANIFEST_URL : ADMIN_PWA_MANIFEST_URL);
+      removeManagedHeadElements(`link[rel="manifest"][data-managed="msc-meta"]:not([href="${isInspectionRoute ? INSPECTION_PWA_MANIFEST_URL : ADMIN_PWA_MANIFEST_URL}"])`);
+      upsertMeta("application-name", isInspectionRoute ? "Technische Abnahme" : `${BRAND_NAME} ${APP_NAME}`);
       upsertMeta("apple-mobile-web-app-capable", "yes");
       upsertMeta("apple-mobile-web-app-status-bar-style", "default");
-      upsertMeta("apple-mobile-web-app-title", "MSC Admin");
+      upsertMeta("apple-mobile-web-app-title", isInspectionRoute ? "Abnahme" : "MSC Admin");
     } else {
       removeManagedHeadElements('link[rel="apple-touch-icon"][data-managed="msc-meta"]');
       removeManagedHeadElements('link[rel="manifest"][data-managed="msc-meta"]');
