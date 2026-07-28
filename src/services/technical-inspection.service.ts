@@ -19,7 +19,20 @@ export type InspectionListItem = {
   vehicleMake: string | null;
   vehicleModel: string | null;
   techStatus: TechStatus;
+  backupVehicleId: string | null;
+  backupTechStatus: TechStatus;
   techCheckedAt: string | null;
+};
+
+export type InspectionVehicle = {
+  vehicleType: VehicleType;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  displacementCcm: number | null;
+  engineType: string | null;
+  cylinders: number | null;
+  vehicleHistory: string | null;
 };
 
 export type InspectionEntry = {
@@ -30,6 +43,13 @@ export type InspectionEntry = {
   acceptanceStatus: string;
   driverFirstName: string;
   driverLastName: string;
+  codriverPersonId: string | null;
+  codriver: {
+    firstName: string;
+    lastName: string;
+    birthdate: string | null;
+    country: string | null;
+  } | null;
   className: string;
   vehicleType: VehicleType;
   vehicleMake: string | null;
@@ -40,14 +60,20 @@ export type InspectionEntry = {
   cylinders: number | null;
   brakes: string | null;
   vehicleHistory: string | null;
+  backupVehicleId: string | null;
+  backupVehicle: InspectionVehicle | null;
   techStatus: TechStatus;
   techCheckedAt: string | null;
   techCheckedBy: string | null;
+  backupTechStatus: TechStatus;
+  backupTechCheckedAt: string | null;
+  backupTechCheckedBy: string | null;
 };
 
 export type InspectionHistoryItem = {
   id: string;
   status: TechStatus;
+  target: "primary" | "backup";
   note: string | null;
   inspectorUserId: string;
   inspectorEmail: string | null;
@@ -78,11 +104,12 @@ export const technicalInspectionService = {
     return response.history;
   },
 
-  async update(entryId: string, techStatus: TechStatus, note: string) {
+  async update(entryId: string, techStatus: TechStatus, note: string, target: "primary" | "backup" = "primary") {
     return requestJson(`/inspection/entries/${entryId}`, {
       method: "PATCH",
       body: {
         techStatus,
+        target,
         note: note.trim() || null
       }
     });
