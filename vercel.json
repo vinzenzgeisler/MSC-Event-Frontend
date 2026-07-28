@@ -5,6 +5,22 @@
   },
   "rewrites": [
     {
+      "source": "/inspection",
+      "destination": "/inspection.html"
+    },
+    {
+      "source": "/inspection/(.*)",
+      "destination": "/inspection.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/admin.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
