@@ -63,6 +63,7 @@ export type InspectionEntry = {
   vehicleHistory: string | null;
   vehicleImageUrl: string | null;
   inspectionNote: string | null;
+  backupInspectionNote: string | null;
   backupVehicleId: string | null;
   backupVehicle: InspectionVehicle | null;
   techStatus: TechStatus;
@@ -80,6 +81,7 @@ export type InspectionHistoryItem = {
   note: string | null;
   inspectorUserId: string;
   inspectorEmail: string | null;
+  inspectorDisplay: string | null;
   createdAt: string;
 };
 
@@ -112,6 +114,16 @@ export const technicalInspectionService = {
       method: "PATCH",
       body: {
         techStatus,
+        target,
+        note: note.trim() || null
+      }
+    });
+  },
+
+  async saveNote(entryId: string, note: string, target: "primary" | "backup" = "primary") {
+    return requestJson(`/inspection/entries/${entryId}/note`, {
+      method: "PATCH",
+      body: {
         target,
         note: note.trim() || null
       }
