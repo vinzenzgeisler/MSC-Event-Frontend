@@ -2251,7 +2251,7 @@ export function AnmeldungPage() {
                 </div>
                 <div className="mt-1 text-sm text-slate-700">{recentStartVehicleLine}</div>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-                  <span>{recentlySavedStart.vehicleType === "moto" ? "Motorrad" : "Auto"}</span>
+                  <span>{recentlySavedStart.vehicleType === "moto" ? "Motorrad" : "Automobil"}</span>
                   {recentlySavedStart.codriverEnabled && <span>· {m.start.codriverBadge}</span>}
                   {recentlySavedStart.backupVehicleEnabled && <span>· {m.start.backupBadge}</span>}
                 </div>
