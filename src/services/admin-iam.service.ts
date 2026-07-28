@@ -11,6 +11,8 @@ type UserDto = {
   id: string;
   username: string;
   email: string | null;
+  firstName: string | null;
+  lastName: string | null;
   enabled: boolean;
   status: string;
   emailVerified: boolean;
@@ -64,6 +66,8 @@ export const adminIamService = {
         id: item.id,
         username: item.username,
         email: item.email,
+        firstName: item.firstName,
+        lastName: item.lastName,
         enabled: item.enabled,
         status: item.status,
         emailVerified: item.emailVerified,
@@ -85,6 +89,8 @@ export const adminIamService = {
       method: "POST",
       body: {
         email: payload.email,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
         roles: payload.roles,
         temporaryPassword: payload.temporaryPassword || undefined,
         sendInvitation: payload.sendInvitation ?? true
@@ -95,6 +101,8 @@ export const adminIamService = {
       id: response.user.id,
       username: response.user.username,
       email: response.user.email,
+      firstName: response.user.firstName,
+      lastName: response.user.lastName,
       enabled: response.user.enabled,
       status: response.user.status,
       emailVerified: response.user.emailVerified,
@@ -116,6 +124,8 @@ export const adminIamService = {
       id: response.user.id,
       username: response.user.username,
       email: response.user.email,
+      firstName: response.user.firstName,
+      lastName: response.user.lastName,
       enabled: response.user.enabled,
       status: response.user.status,
       emailVerified: response.user.emailVerified,
@@ -137,6 +147,29 @@ export const adminIamService = {
       id: response.user.id,
       username: response.user.username,
       email: response.user.email,
+      firstName: response.user.firstName,
+      lastName: response.user.lastName,
+      enabled: response.user.enabled,
+      status: response.user.status,
+      emailVerified: response.user.emailVerified,
+      roles: normalizeRoles(response.user.roles),
+      createdAt: response.user.createdAt,
+      updatedAt: response.user.updatedAt
+    };
+  },
+
+  async updateUserProfile(userId: string, firstName: string, lastName: string) {
+    const response = await requestJson<UserMutationResponse>(`/admin/iam/users/${userId}/profile`, {
+      method: "PATCH",
+      body: { firstName, lastName }
+    });
+
+    return {
+      id: response.user.id,
+      username: response.user.username,
+      email: response.user.email,
+      firstName: response.user.firstName,
+      lastName: response.user.lastName,
       enabled: response.user.enabled,
       status: response.user.status,
       emailVerified: response.user.emailVerified,
