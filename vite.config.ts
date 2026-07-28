@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
             VitePWA({
               registerType: "autoUpdate",
               injectRegister: false,
-              includeAssets: ["apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png", "maskable-icon-512x512.png"],
+              includeAssets: ["apple-touch-icon.png", "inspection.webmanifest", "pwa-192x192.png", "pwa-512x512.png", "maskable-icon-512x512.png"],
               manifest: {
                 name: "MSC Oberlausitzer Dreilaendereck Admin",
                 short_name: "MSC Admin",
@@ -65,6 +65,8 @@ export default defineConfig(({ mode }) => {
               workbox: {
                 globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
                 cleanupOutdatedCaches: true,
+                skipWaiting: true,
+                clientsClaim: true,
                 navigateFallbackDenylist: [/^\/api\//],
                 runtimeCaching: [
                   {
