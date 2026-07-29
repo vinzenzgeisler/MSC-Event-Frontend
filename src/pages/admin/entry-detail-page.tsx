@@ -824,14 +824,15 @@ export function AdminEntryDetailPage() {
               <CardTitle>Historie</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
+              {historyItems.length === 0 && <div className="text-slate-500">Noch keine Änderungen protokolliert.</div>}
               {historyItems.map((item) => (
                 <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="font-semibold text-slate-900">{item.action}</div>
-                    <time className="shrink-0 text-xs text-slate-500">{new Date(item.timestamp).toLocaleString("de-DE")}</time>
+                  <div className="font-medium text-slate-900">{item.details}</div>
+                  <div className="mt-2 flex flex-wrap gap-x-2 text-xs text-slate-500">
+                    <time>{formatTimestamp(item.timestamp)}</time>
+                    <span aria-hidden="true">·</span>
+                    <span>Bearbeitet von {item.actor}</span>
                   </div>
-                  <div className="mt-2 break-words rounded-md bg-slate-50 px-2.5 py-2 text-sm">{item.details}</div>
-                  <div className="mt-2 text-xs font-medium text-slate-600">Konto: {item.actor}</div>
                 </div>
               ))}
               {hiddenHistoryCount > 0 && !historyExpanded && (

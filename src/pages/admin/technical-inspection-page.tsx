@@ -108,9 +108,6 @@ function VehicleChoice({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-lg font-bold text-slate-950">{vehicleName}</div>
-            <div className="mt-0.5 text-xs text-slate-500">
-              {selected ? "Für die Entscheidung ausgewählt" : "Antippen zum Auswählen"}
-            </div>
           </div>
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4">
@@ -140,11 +137,14 @@ export function AdminTechnicalInspectionPage() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [noteSaveState, setNoteSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   const searchRequestRef = useRef(0);
+  const lastSavedNotesRef = useRef<Record<InspectionTarget, string>>({ primary: "", backup: "" });
+  const noteSaveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -181,10 +181,13 @@ export function AdminTechnicalInspectionPage() {
         if (!active) return;
         setDetail(entry);
         setHistory(items);
-        setNotes({
-          primary: items.find((item) => item.target === "primary")?.note ?? entry.inspectionNote ?? "",
-          backup: items.find((item) => item.target === "backup")?.note ?? ""
-        });
+        const loadedNotes = {
+          primary: entry.inspectionNote ?? "",
+          backup: entry.backupInspectionNote ?? ""
+        };
+        setNotes(loadedNotes);
+        lastSavedNotesRef.current = loadedNotes;
+        setNoteSaveState("idle");
         setActiveTarget("primary");
       })
       .catch((loadError) => {
@@ -234,8 +237,53 @@ export function AdminTechnicalInspectionPage() {
 
   const searchEntries = (event: FormEvent) => {
     event.preventDefault();
+    if (entryId) {
+      navigate("/inspection");
+      return;
+    }
     void executeSearch(query, true);
   };
+
+  const persistNotes = useCallback(
+    async (targets: InspectionTarget[]) => {
+      if (!detail || targets.length === 0) return;
+      setNoteSaveState("saving");
+      try {
+        await Promise.all(
+          targets.map(async (target) => {
+            await technicalInspectionService.saveNote(detail.id, notes[target], target);
+            lastSavedNotesRef.current[target] = notes[target];
+          })
+        );
+        setNoteSaveState("saved");
+      } catch (saveError) {
+        setNoteSaveState("idle");
+        setError(messageFromError(saveError));
+      }
+    },
+    [detail, notes]
+  );
+
+  useEffect(() => {
+    if (!detail) return;
+    const changedTargets = (["primary", "backup"] as InspectionTarget[]).filter(
+      (target) => notes[target] !== lastSavedNotesRef.current[target]
+    );
+    if (changedTargets.length === 0) return;
+
+    setNoteSaveState("idle");
+    noteSaveTimeoutRef.current = window.setTimeout(() => {
+      noteSaveTimeoutRef.current = null;
+      void persistNotes(changedTargets);
+    }, 700);
+
+    return () => {
+      if (noteSaveTimeoutRef.current !== null) {
+        window.clearTimeout(noteSaveTimeoutRef.current);
+        noteSaveTimeoutRef.current = null;
+      }
+    };
+  }, [detail, notes, persistNotes]);
 
   const updateStatus = async (techStatus: TechStatus) => {
     if (!detail || saving) return;
@@ -255,6 +303,7 @@ export function AdminTechnicalInspectionPage() {
       ]);
       setDetail(updated);
       setHistory(updatedHistory);
+      lastSavedNotesRef.current[activeTarget] = note;
       setSuccess(`${activeTarget === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}: ${statusLabels[techStatus]}`);
     } catch (saveError) {
       setError(messageFromError(saveError));
@@ -284,7 +333,7 @@ export function AdminTechnicalInspectionPage() {
               <ShieldCheck className="h-5 w-5" />
               Technische Abnahme
             </div>
-            <div className="text-xs text-slate-500">{context?.event.name ?? "Veranstaltung wird geladen"}</div>
+            {context?.event.name && <div className="text-xs text-slate-500">{context.event.name}</div>}
           </div>
           <Button type="button" size="sm" variant="outline" onClick={logout}>
             <LogOut className="mr-2 h-4 w-4" />
@@ -305,7 +354,11 @@ export function AdminTechnicalInspectionPage() {
                 aria-label="Nennung suchen"
                 className="h-11 rounded-xl border-slate-300 bg-slate-50 px-3 text-sm shadow-inner placeholder:text-xs focus-visible:bg-white sm:placeholder:text-sm"
               />
-              <Button type="submit" className="h-11 rounded-xl px-4" disabled={searching || !query.trim()}>
+              <Button
+                type="submit"
+                className="h-11 rounded-xl px-4"
+                disabled={searching || (!entryId && !query.trim())}
+              >
                 {searching ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
                 <span className="ml-2 hidden sm:inline">Suchen</span>
               </Button>
@@ -375,7 +428,7 @@ export function AdminTechnicalInspectionPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <Badge className={`${statusClasses[detail.techStatus]} px-3 py-1.5 text-sm`}>
-                      Status: {statusLabels[detail.techStatus]}
+                      {statusLabels[detail.techStatus]}
                     </Badge>
                     {detail.backupVehicle && (
                       <Badge className={`${statusClasses[detail.backupTechStatus]} px-3 py-1 text-xs`}>
@@ -456,19 +509,29 @@ export function AdminTechnicalInspectionPage() {
                   <label htmlFor="inspection-note" className="mb-2 block text-sm font-semibold">
                     Prüfernotiz für {activeTarget === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}
                   </label>
-                  <p className="mb-2 text-xs text-slate-500">
-                    Wird getrennt von internen Orga-Notizen und Fahrerhinweisen gespeichert.
-                  </p>
                   <textarea
                     id="inspection-note"
                     value={notes[activeTarget]}
                     onChange={(event) => setNotes((current) => ({ ...current, [activeTarget]: event.target.value }))}
+                    onBlur={() => {
+                      if (noteSaveTimeoutRef.current !== null) {
+                        window.clearTimeout(noteSaveTimeoutRef.current);
+                        noteSaveTimeoutRef.current = null;
+                      }
+                      if (notes[activeTarget] !== lastSavedNotesRef.current[activeTarget]) {
+                        void persistNotes([activeTarget]);
+                      }
+                    }}
                     maxLength={2000}
                     rows={4}
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200"
-                    placeholder="Bei Ablehnung verpflichtend"
+                    placeholder="Notiz"
                   />
-                  <div className="mt-1 text-right text-xs text-slate-500">{notes[activeTarget].length}/2000</div>
+                  {noteSaveState !== "idle" && (
+                    <div className="mt-1 text-right text-xs text-slate-500">
+                      {noteSaveState === "saving" ? "Speichert…" : "Gespeichert"}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -499,7 +562,9 @@ export function AdminTechnicalInspectionPage() {
                     </div>
                     <div className="mt-2 rounded-md bg-slate-50 px-2.5 py-2 text-slate-700">{item.note || "Keine Notiz"}</div>
                     <div className="mt-2 flex flex-col gap-0.5 text-xs text-slate-500">
-                      <span className="font-medium text-slate-600">Prüfer: {item.inspectorEmail || "Unbekanntes Prüferkonto"}</span>
+                      <span className="font-medium text-slate-600">
+                        {item.inspectorDisplay || item.inspectorEmail || "Unbekannte Person"}
+                      </span>
                       <time>{formatDateTime(item.createdAt)}</time>
                     </div>
                   </div>

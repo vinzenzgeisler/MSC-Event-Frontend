@@ -904,8 +904,11 @@ export function AdminSettingsPage() {
   const [iamBusyUserId, setIamBusyUserId] = useState<string | null>(null);
   const [iamCreatingUser, setIamCreatingUser] = useState(false);
   const [iamRoleDrafts, setIamRoleDrafts] = useState<Record<string, IamRole[]>>({});
+  const [iamNameDrafts, setIamNameDrafts] = useState<Record<string, { firstName: string; lastName: string }>>({});
   const [iamCreateForm, setIamCreateForm] = useState({
     email: "",
+    firstName: "",
+    lastName: "",
     roles: ["viewer"] as IamRole[],
     temporaryPassword: "",
     sendInvitation: true,
@@ -929,6 +932,17 @@ export function AdminSettingsPage() {
     );
   };
 
+  const syncIamNameDrafts = (accounts: IamAccount[]) => {
+    setIamNameDrafts(
+      Object.fromEntries(
+        accounts.map((account) => [
+          account.id,
+          { firstName: account.firstName ?? "", lastName: account.lastName ?? "" }
+        ])
+      )
+    );
+  };
+
   const patchIamAccount = (updated: IamAccount) => {
     setIamOverview((prev) => {
       if (!prev) {
@@ -946,6 +960,10 @@ export function AdminSettingsPage() {
     setIamRoleDrafts((prev) => ({
       ...prev,
       [updated.id]: asRoleList(updated.roles)
+    }));
+    setIamNameDrafts((prev) => ({
+      ...prev,
+      [updated.id]: { firstName: updated.firstName ?? "", lastName: updated.lastName ?? "" }
     }));
   };
 
@@ -1032,9 +1050,11 @@ export function AdminSettingsPage() {
       if (iamResult.status === "fulfilled") {
         setIamOverview(iamResult.value);
         syncIamRoleDrafts(iamResult.value.accounts);
+        syncIamNameDrafts(iamResult.value.accounts);
       } else {
         setIamOverview(null);
         setIamRoleDrafts({});
+        setIamNameDrafts({});
         setIamError(getApiErrorMessage(iamResult.reason, "IAM-Übersicht konnte nicht geladen werden."));
       }
 
@@ -1640,6 +1660,12 @@ export function AdminSettingsPage() {
       setIamError("E-Mail ist erforderlich.");
       return;
     }
+    const firstName = iamCreateForm.firstName.trim();
+    const lastName = iamCreateForm.lastName.trim();
+    if (!firstName || !lastName) {
+      setIamError("Vor- und Nachname sind erforderlich.");
+      return;
+    }
 
     if (iamCreateForm.roles.length === 0) {
       setIamError("Mindestens eine Rolle muss gewählt werden.");
@@ -1657,6 +1683,8 @@ export function AdminSettingsPage() {
     try {
       const created = await adminIamService.createUser({
         email,
+        firstName,
+        lastName,
         roles: iamCreateForm.roles,
         temporaryPassword: iamCreateForm.temporaryPassword.trim() || undefined,
         sendInvitation: iamCreateForm.sendInvitation
@@ -1673,6 +1701,8 @@ export function AdminSettingsPage() {
       patchIamAccount(created);
       setIamCreateForm({
         email: "",
+        firstName: "",
+        lastName: "",
         roles: ["viewer"],
         temporaryPassword: "",
         sendInvitation: true,
@@ -1684,6 +1714,31 @@ export function AdminSettingsPage() {
       setIamError(getIamCreateUserErrorMessage(error));
     } finally {
       setIamCreatingUser(false);
+    }
+  };
+
+  const saveIamProfile = async (userId: string) => {
+    if (!canManageIam || !iamOverview) {
+      return;
+    }
+    const draft = iamNameDrafts[userId];
+    const firstName = draft?.firstName.trim() ?? "";
+    const lastName = draft?.lastName.trim() ?? "";
+    if (!firstName || !lastName) {
+      setIamError("Vor- und Nachname sind erforderlich.");
+      return;
+    }
+
+    setIamBusyUserId(userId);
+    setIamError("");
+    try {
+      const updated = await adminIamService.updateUserProfile(userId, firstName, lastName);
+      patchIamAccount(updated);
+      showToast("Person gespeichert.");
+    } catch (error) {
+      setIamError(getApiErrorMessage(error, "Person konnte nicht gespeichert werden."));
+    } finally {
+      setIamBusyUserId(null);
     }
   };
 
@@ -2528,6 +2583,32 @@ export function AdminSettingsPage() {
                 <h3 className="mb-2 text-sm font-semibold text-slate-900">Account anlegen</h3>
                 <div className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
                   <div className="space-y-1">
+                    <Label>Vorname</Label>
+                    <Input
+                      value={iamCreateForm.firstName}
+                      disabled={!canManageIam || iamCreatingUser}
+                      onChange={(event) =>
+                        setIamCreateForm((prev) => ({
+                          ...prev,
+                          firstName: event.target.value
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Nachname</Label>
+                    <Input
+                      value={iamCreateForm.lastName}
+                      disabled={!canManageIam || iamCreatingUser}
+                      onChange={(event) =>
+                        setIamCreateForm((prev) => ({
+                          ...prev,
+                          lastName: event.target.value
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
                     <Label>E-Mail</Label>
                     <Input
                       value={iamCreateForm.email}
@@ -2667,6 +2748,7 @@ export function AdminSettingsPage() {
                     <table className="min-w-full text-sm">
                       <thead className="bg-slate-50 text-left text-slate-600">
                         <tr>
+                          <th className="px-3 py-2">Person</th>
                           <th className="px-3 py-2">Username</th>
                           <th className="px-3 py-2">E-Mail</th>
                           <th className="px-3 py-2">Rollen</th>
@@ -2679,9 +2761,44 @@ export function AdminSettingsPage() {
                           const rowBusy = iamBusyUserId === account.id;
                           const draftRoles = asRoleList(iamRoleDrafts[account.id] ?? account.roles);
                           const rolesChanged = !rolesEqual(draftRoles, asRoleList(account.roles));
+                          const draftName = iamNameDrafts[account.id] ?? {
+                            firstName: account.firstName ?? "",
+                            lastName: account.lastName ?? ""
+                          };
+                          const nameChanged =
+                            draftName.firstName.trim() !== (account.firstName ?? "").trim() ||
+                            draftName.lastName.trim() !== (account.lastName ?? "").trim();
 
                           return (
                             <tr key={account.id} className="border-t align-top">
+                              <td className="min-w-52 px-3 py-2">
+                                <div className="grid gap-2">
+                                  <Input
+                                    aria-label="Vorname"
+                                    placeholder="Vorname"
+                                    value={draftName.firstName}
+                                    disabled={!canManageIam || rowBusy}
+                                    onChange={(event) =>
+                                      setIamNameDrafts((prev) => ({
+                                        ...prev,
+                                        [account.id]: { ...draftName, firstName: event.target.value }
+                                      }))
+                                    }
+                                  />
+                                  <Input
+                                    aria-label="Nachname"
+                                    placeholder="Nachname"
+                                    value={draftName.lastName}
+                                    disabled={!canManageIam || rowBusy}
+                                    onChange={(event) =>
+                                      setIamNameDrafts((prev) => ({
+                                        ...prev,
+                                        [account.id]: { ...draftName, lastName: event.target.value }
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              </td>
                               <td className="px-3 py-2">{account.username}</td>
                               <td className="px-3 py-2">{account.email || "-"}</td>
                               <td className="px-3 py-2">
@@ -2710,6 +2827,21 @@ export function AdminSettingsPage() {
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={
+                                      !canManageIam ||
+                                      rowBusy ||
+                                      !nameChanged ||
+                                      !draftName.firstName.trim() ||
+                                      !draftName.lastName.trim()
+                                    }
+                                    onClick={() => void saveIamProfile(account.id)}
+                                  >
+                                    Person speichern
+                                  </Button>
                                   <Button
                                     type="button"
                                     variant="outline"
