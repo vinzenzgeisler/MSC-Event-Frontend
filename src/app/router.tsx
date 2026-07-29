@@ -1,47 +1,101 @@
+import { lazy } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/app/auth/guards";
 import { AdminLayout } from "@/app/layouts/admin-layout";
 import { PublicLayout } from "@/app/layouts/public-layout";
 import { HomePage } from "@/pages/home-page";
-import { AnmeldungPage } from "@/pages/public/anmeldung-page";
-import { AnmeldungVerifyPage } from "@/pages/public/anmeldung-verify-page";
-import { LegalPlaceholderPage } from "@/pages/public/legal-placeholder-page";
-import { AdminDashboardPage } from "@/pages/admin/dashboard-page";
-import { AdminEntriesPage } from "@/pages/admin/entries-page";
-import { AdminEntryDetailPage } from "@/pages/admin/entry-detail-page";
-import { AdminExportsPage } from "@/pages/admin/exports-page";
-import { ForbiddenPage } from "@/pages/admin/forbidden-page";
-import { AdminLoginPage } from "@/pages/admin/login-page";
-import { AdminCommunicationPage } from "@/pages/admin/communication-page";
-import { AdminSettingsPage } from "@/pages/admin/settings-page";
-import { AdminMailDesignLabPage } from "@/pages/admin/mail-design-lab-page";
-import { AdminTechnicalInspectionPage } from "@/pages/admin/technical-inspection-page";
+
+const AnmeldungPage = lazy(() =>
+  import("@/pages/public/anmeldung-page").then((module) => ({
+    default: module.AnmeldungPage,
+  })),
+);
+const AnmeldungVerifyPage = lazy(() =>
+  import("@/pages/public/anmeldung-verify-page").then((module) => ({
+    default: module.AnmeldungVerifyPage,
+  })),
+);
+const LegalPlaceholderPage = lazy(() =>
+  import("@/pages/public/legal-placeholder-page").then((module) => ({
+    default: module.LegalPlaceholderPage,
+  })),
+);
+const AdminDashboardPage = lazy(() =>
+  import("@/pages/admin/dashboard-page").then((module) => ({
+    default: module.AdminDashboardPage,
+  })),
+);
+const AdminEntriesPage = lazy(() =>
+  import("@/pages/admin/entries-page").then((module) => ({
+    default: module.AdminEntriesPage,
+  })),
+);
+const AdminEntryDetailPage = lazy(() =>
+  import("@/pages/admin/entry-detail-page").then((module) => ({
+    default: module.AdminEntryDetailPage,
+  })),
+);
+const AdminExportsPage = lazy(() =>
+  import("@/pages/admin/exports-page").then((module) => ({
+    default: module.AdminExportsPage,
+  })),
+);
+const ForbiddenPage = lazy(() =>
+  import("@/pages/admin/forbidden-page").then((module) => ({
+    default: module.ForbiddenPage,
+  })),
+);
+const AdminLoginPage = lazy(() =>
+  import("@/pages/admin/login-page").then((module) => ({
+    default: module.AdminLoginPage,
+  })),
+);
+const AdminCommunicationPage = lazy(() =>
+  import("@/pages/admin/communication-page").then((module) => ({
+    default: module.AdminCommunicationPage,
+  })),
+);
+const AdminSettingsPage = lazy(() =>
+  import("@/pages/admin/settings-page").then((module) => ({
+    default: module.AdminSettingsPage,
+  })),
+);
+const AdminMailDesignLabPage = lazy(() =>
+  import("@/pages/admin/mail-design-lab-page").then((module) => ({
+    default: module.AdminMailDesignLabPage,
+  })),
+);
+const AdminTechnicalInspectionPage = lazy(() =>
+  import("@/pages/admin/technical-inspection-page").then((module) => ({
+    default: module.AdminTechnicalInspectionPage,
+  })),
+);
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <HomePage />
+    element: <HomePage />,
   },
   {
     element: <PublicLayout />,
     children: [
       {
         path: "/anmeldung",
-        element: <AnmeldungPage />
+        element: <AnmeldungPage />,
       },
       {
         path: "/anmeldung/verify",
-        element: <AnmeldungVerifyPage />
+        element: <AnmeldungVerifyPage />,
       },
       {
         path: "/anmeldung/rechtliches/:docId",
-        element: <LegalPlaceholderPage />
-      }
-    ]
+        element: <LegalPlaceholderPage />,
+      },
+    ],
   },
   {
     path: "/admin/login",
-    element: <AdminLoginPage />
+    element: <AdminLoginPage />,
   },
   {
     element: <ProtectedRoute />,
@@ -60,7 +114,7 @@ export const router = createBrowserRouter([
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminCommunicationPage />
               </ProtectedRoute>
-            )
+            ),
           },
           {
             path: "communication/design-lab",
@@ -68,7 +122,7 @@ export const router = createBrowserRouter([
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminMailDesignLabPage />
               </ProtectedRoute>
-            )
+            ),
           },
           {
             path: "exports",
@@ -76,7 +130,7 @@ export const router = createBrowserRouter([
               <ProtectedRoute allowedRoles={["admin", "editor", "viewer"]}>
                 <AdminExportsPage />
               </ProtectedRoute>
-            )
+            ),
           },
           {
             path: "settings",
@@ -84,9 +138,9 @@ export const router = createBrowserRouter([
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminSettingsPage />
               </ProtectedRoute>
-            )
-          }
-        ]
+            ),
+          },
+        ],
       },
       {
         path: "/inspection",
@@ -94,7 +148,7 @@ export const router = createBrowserRouter([
           <ProtectedRoute allowedRoles={["admin", "technical_inspector"]}>
             <AdminTechnicalInspectionPage />
           </ProtectedRoute>
-        )
+        ),
       },
       {
         path: "/inspection/:entryId",
@@ -102,12 +156,12 @@ export const router = createBrowserRouter([
           <ProtectedRoute allowedRoles={["admin", "technical_inspector"]}>
             <AdminTechnicalInspectionPage />
           </ProtectedRoute>
-        )
-      }
-    ]
+        ),
+      },
+    ],
   },
   {
     path: "/admin/forbidden",
-    element: <ForbiddenPage />
-  }
+    element: <ForbiddenPage />,
+  },
 ]);
