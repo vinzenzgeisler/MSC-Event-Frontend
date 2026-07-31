@@ -224,6 +224,7 @@ export type AdminEntryDetailDto = {
     id: Id;
     type: string;
     status: string;
+    driverPersonId: Id | null;
     createdAt: string;
   }>;
   specialNotes: string | null;
@@ -260,6 +261,7 @@ export type AdminEntryHistoryItem = {
 export type AdminEntryDetailViewModel = {
   id: Id;
   eventId: Id;
+  driverPersonId: Id;
   classId: Id;
   headline: string;
   classLabel: string;
@@ -353,6 +355,8 @@ export type AdminEntryDetailViewModel = {
     id: string;
     type: string;
     status: string;
+    driverPersonId: string | null;
+    createdAt: string;
   }>;
   relatedEntryIds: Id[];
   notes: string;
