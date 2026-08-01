@@ -1,6 +1,8 @@
 import { lazy } from "react";
 import { createBrowserRouter, isRouteErrorResponse, Navigate, useRouteError } from "react-router-dom";
 import { ProtectedRoute } from "@/app/auth/guards";
+import { useAuth } from "@/app/auth/auth-context";
+import { hasPermission } from "@/app/auth/iam";
 import { AdminLayout } from "@/app/layouts/admin-layout";
 import { PublicLayout } from "@/app/layouts/public-layout";
 import { HomePage } from "@/pages/home-page";
@@ -75,6 +77,11 @@ const AdminSigningPage = lazy(() =>
     default: module.AdminSigningPage,
   })),
 );
+const AdminMarshalsPage = lazy(() =>
+  import("@/pages/admin/marshals-page").then((module) => ({
+    default: module.AdminMarshalsPage,
+  })),
+);
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -103,6 +110,14 @@ function RouteErrorPage() {
       </section>
     </main>
   );
+}
+
+function AdminIndexRedirect() {
+  const { roles } = useAuth();
+  if (hasPermission(roles, "entries.read")) return <Navigate to="entries" replace />;
+  if (hasPermission(roles, "marshals.read")) return <Navigate to="marshals" replace />;
+  if (hasPermission(roles, "inspection.read")) return <Navigate to="/inspection" replace />;
+  return <Navigate to="/admin/forbidden" replace />;
 }
 
 export const router = createBrowserRouter([
@@ -140,7 +155,7 @@ export const router = createBrowserRouter([
         path: "/admin",
         element: <AdminLayout />,
         children: [
-          { index: true, element: <Navigate to="entries" replace /> },
+          { index: true, element: <AdminIndexRedirect /> },
           { path: "dashboard", element: <AdminDashboardPage /> },
           { path: "entries", element: <AdminEntriesPage /> },
           { path: "entries/:entryId", element: <AdminEntryDetailPage /> },
@@ -179,6 +194,14 @@ export const router = createBrowserRouter([
           {
             path: "signing",
             element: <AdminSigningPage />,
+          },
+          {
+            path: "marshals",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "marshal_manager"]}>
+                <AdminMarshalsPage />
+              </ProtectedRoute>
+            ),
           },
         ],
       },
