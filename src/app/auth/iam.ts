@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector";
+export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector" | "marshal_manager";
 
 export type AppPermission =
   | "dashboard.read"
@@ -17,9 +17,12 @@ export type AppPermission =
   | "iam.read"
   | "iam.write"
   | "inspection.read"
-  | "inspection.write";
+  | "inspection.write"
+  | "marshals.read"
+  | "marshals.write"
+  | "marshals.export";
 
-const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector"];
+const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager"];
 
 const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   admin: [
@@ -39,7 +42,10 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "iam.read",
     "iam.write",
     "inspection.read",
-    "inspection.write"
+    "inspection.write",
+    "marshals.read",
+    "marshals.write",
+    "marshals.export"
   ],
   editor: [
     "dashboard.read",
@@ -51,7 +57,8 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "exports.read"
   ],
   viewer: ["dashboard.read", "entries.read", "exports.read"],
-  technical_inspector: ["inspection.read", "inspection.write"]
+  technical_inspector: ["inspection.read", "inspection.write"],
+  marshal_manager: ["marshals.read", "marshals.write", "marshals.export"]
 };
 
 function normalizeRole(role: string): AppRole | null {
@@ -92,56 +99,72 @@ export function toRoleMatrix() {
       admin: "read",
       editor: "read",
       viewer: "read",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "Nennungen",
       admin: "write",
       editor: "write",
       viewer: "read",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "Check-in",
       admin: "write",
       editor: "write",
       viewer: "none",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "Kommunikation",
       admin: "write",
       editor: "none",
       viewer: "none",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "Exporte",
       admin: "write",
       editor: "read",
       viewer: "read",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "Einstellungen",
       admin: "write",
       editor: "none",
       viewer: "none",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "IAM",
       admin: "write",
       editor: "none",
       viewer: "none",
-      technical_inspector: "none"
+      technical_inspector: "none",
+      marshal_manager: "none"
     },
     {
       area: "Technische Abnahme",
       admin: "write",
       editor: "none",
       viewer: "none",
-      technical_inspector: "write"
+      technical_inspector: "write",
+      marshal_manager: "none"
+    },
+    {
+      area: "Streckenposten",
+      admin: "write",
+      editor: "none",
+      viewer: "none",
+      technical_inspector: "none",
+      marshal_manager: "write"
     }
   ] as const;
 }

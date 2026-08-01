@@ -43,7 +43,7 @@ type UserMutationResponse = {
 function normalizeRoles(input: string[]): IamRole[] {
   const unique = new Set<IamRole>();
   input.forEach((role) => {
-    if (role === "admin" || role === "editor" || role === "viewer" || role === "technical_inspector") {
+    if (role === "admin" || role === "editor" || role === "viewer" || role === "technical_inspector" || role === "marshal_manager") {
       unique.add(role);
     }
   });
