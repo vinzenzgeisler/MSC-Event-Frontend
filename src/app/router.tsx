@@ -70,6 +70,11 @@ const AdminTechnicalInspectionPage = lazy(() =>
     default: module.AdminTechnicalInspectionPage,
   })),
 );
+const AdminSigningPage = lazy(() =>
+  import("@/pages/admin/signing-page").then((module) => ({
+    default: module.AdminSigningPage,
+  })),
+);
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -170,6 +175,10 @@ export const router = createBrowserRouter([
                 <AdminSettingsPage />
               </ProtectedRoute>
             ),
+          },
+          {
+            path: "signing",
+            element: <AdminSigningPage />,
           },
         ],
       },

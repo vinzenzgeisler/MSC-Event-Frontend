@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { Shield, Users, Save, Plus, Trash2, StopCircle, Archive, PlayCircle, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Shield, Users, Save, Plus, Trash2, StopCircle, Archive, PlayCircle, RotateCcw, PenLine } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
-import { hasPermission } from "@/app/auth/iam";
+import { hasPermission, type AppPermission } from "@/app/auth/iam";
+import { adminSigningService, type SigningDevice } from "@/services/admin-signing.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -918,6 +919,13 @@ export function AdminSettingsPage() {
 
   const [pricingInitializedForEventId, setPricingInitializedForEventId] = useState<string | null>(null);
   const [eventOverridesExpanded, setEventOverridesExpanded] = useState(false);
+
+  // Signing devices state
+  const [signingDevices, setSigningDevices] = useState<SigningDevice[]>([]);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [pairingExpiry, setPairingExpiry] = useState<Date | null>(null);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [pairingLoading, setPairingLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("event");
   const selectedEventIsEditable = Boolean(eventState && (eventState.status === "draft" || eventState.status === "open"));
 
@@ -1122,6 +1130,45 @@ export function AdminSettingsPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const loadSigningDevices = useCallback(async () => {
+    setDevicesLoading(true);
+    try {
+      const devices = await adminSigningService.listDevices();
+      setSigningDevices(devices);
+    } catch {
+      setSigningDevices([]);
+    } finally {
+      setDevicesLoading(false);
+    }
+  }, []);
+
+  const generatePairingCode = async () => {
+    setPairingLoading(true);
+    try {
+      const result = await adminSigningService.generatePairingCode();
+      setPairingCode(result.pairingCode);
+      setPairingExpiry(new Date(result.expiresAt));
+      await loadSigningDevices();
+    } catch {
+      // ignore
+    } finally {
+      setPairingLoading(false);
+    }
+  };
+
+  const revokeSigningDevice = async (deviceId: string) => {
+    try {
+      await adminSigningService.revokeDevice(deviceId);
+      await loadSigningDevices();
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    void loadSigningDevices();
+  }, [loadSigningDevices]);
 
   useEffect(() => {
     if (!eventState || pricingInitializedForEventId !== eventState.id) {
@@ -2876,6 +2923,71 @@ export function AdminSettingsPage() {
             </Card>
           )}
         </>
+      )}
+
+      {hasPermission(roles, "entries.checkin.write" as AppPermission) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PenLine className="h-5 w-5" />
+              Signaturgeräte (Signing Terminal)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void generatePairingCode()}
+                disabled={pairingLoading}
+              >
+                {pairingLoading ? "Generiere …" : "Neues Pairing-Gerät"}
+              </Button>
+              {pairingCode && pairingExpiry && (
+                <div className="rounded-md border bg-slate-50 px-4 py-2 text-center">
+                  <p className="text-xs text-slate-500">
+                    Pairing-Code (gültig bis {pairingExpiry.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })})
+                  </p>
+                  <p className="mt-1 font-mono text-3xl font-bold tracking-widest">{pairingCode}</p>
+                </div>
+              )}
+            </div>
+            {devicesLoading ? (
+              <p className="text-sm text-slate-400">Lade Geräte …</p>
+            ) : signingDevices.length === 0 ? (
+              <p className="text-sm text-slate-400">Keine verbundenen Geräte.</p>
+            ) : (
+              <div className="space-y-2">
+                {signingDevices.map((device) => (
+                  <div key={device.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium">{device.deviceName ?? "Unbenanntes Gerät"}</p>
+                      <p className="text-xs text-slate-500">
+                        {device.status === "connected"
+                          ? "✓ Verbunden"
+                          : device.status === "pairing"
+                            ? "⏳ Wartet auf Pairing"
+                            : device.status}
+                        {device.lastSeenAt &&
+                          ` · Zuletzt ${new Date(device.lastSeenAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`}
+                      </p>
+                    </div>
+                    {device.status === "connected" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => void revokeSigningDevice(device.id)}
+                      >
+                        Trennen
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {toastMessage && (

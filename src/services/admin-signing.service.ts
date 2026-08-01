@@ -1,3 +1,4 @@
+import { getAuthToken } from "@/app/auth/auth-store";
 import { requestJson } from "@/services/api/http-client";
 
 export type SigningDevice = {
@@ -74,6 +75,27 @@ export type SigningSessionStatus = {
   expiresAt: string;
 };
 
+export type SigningSessionListItem = {
+  id: string;
+  status: "pending" | "displayed" | "completed" | "cancelled" | "failed";
+  eventId: string;
+  eventName: string | null;
+  sourceEntryId: string | null;
+  deviceName: string | null;
+  operatorDisplay: string | null;
+  signerName: string | null;
+  signerRole: "driver" | "codriver" | null;
+  signedAt: string | null;
+  createdAt: string;
+  documentId: string | null;
+  errorLast: string | null;
+};
+
+export type SigningSessionsListResponse = {
+  sessions: SigningSessionListItem[];
+  total: number;
+};
+
 export const adminSigningService = {
   async createPairingCode() {
     return requestJson<{
@@ -139,5 +161,33 @@ export const adminSigningService = {
       method: "POST"
     });
     return response.session;
+  },
+
+  // Alias used in settings page
+  async generatePairingCode() {
+    return adminSigningService.createPairingCode();
+  },
+
+  async listSessions(opts?: { limit?: number; offset?: number; status?: string }): Promise<SigningSessionsListResponse> {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.offset) params.set("offset", String(opts.offset));
+    if (opts?.status) params.set("status", opts.status);
+    const qs = params.toString();
+    return requestJson<SigningSessionsListResponse>(`/admin/signing/sessions${qs ? `?${qs}` : ""}`);
+  },
+
+  async downloadSignedWaiver(entryId: string): Promise<Blob> {
+    const token = getAuthToken();
+    const runtimeConfig = (window as Window & { __MSC_RUNTIME_CONFIG__?: Record<string, string | boolean | null | undefined> }).__MSC_RUNTIME_CONFIG__;
+    const baseUrl = String(runtimeConfig?.apiBaseUrl ?? runtimeConfig?.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+    const url = `${baseUrl}/admin/signing/entries/${entryId}/signed-waiver`;
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+    return response.blob();
   }
 };
