@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Download, FileSpreadsheet, Plus, RefreshCw, Save, UsersRound } from "lucide-react";
+import { Download, Plus, RefreshCw, Save, UsersRound } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { adminMarshalsService } from "@/services/admin-marshals.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
-import type { MarshalCommitmentStatus, MarshalImportPreview, MarshalPerson, MarshalWorkspace } from "@/types/admin-marshals";
+import type { MarshalCommitmentStatus, MarshalPerson, MarshalWorkspace } from "@/types/admin-marshals";
 
-type View = "people" | "saturday" | "sunday" | "prints" | "training" | "config" | "import";
+type View = "people" | "saturday" | "sunday" | "prints" | "training" | "config";
 type MarshalEvent = { id: string; name: string; startsAt: string; endsAt: string; status: string; isCurrent: boolean };
 const statusLabels: Record<MarshalCommitmentStatus, string> = { not_asked: "Nicht angefragt", pending: "Offen", accepted: "Zugesagt", declined: "Abgesagt", tentative: "Vielleicht" };
 const inputClass = "h-9 rounded-md border bg-white px-2 text-sm";
@@ -37,9 +37,7 @@ export function AdminMarshalsPage() {
   const [editingPerson, setEditingPerson] = useState<MarshalPerson | null>(null);
   const [selectedTrainingId, setSelectedTrainingId] = useState("");
   const [trainingDraft, setTrainingDraft] = useState({ sessionType: "training" as "training" | "briefing", title: "", sessionDate: "", location: "" });
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importData, setImportData] = useState("");
-  const [importPreview, setImportPreview] = useState<MarshalImportPreview | null>(null);
+
   const [postTargets, setPostTargets] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
@@ -114,23 +112,6 @@ export function AdminMarshalsPage() {
     finally { setBusy(false); }
   }
 
-  async function previewImport() {
-    if (!importFile) return;
-    if (!eventId) { setError("Bitte zuerst eine Veranstaltung wählen."); return; }
-    setBusy(true); setError(""); setNotice("");
-    try { const result = await adminMarshalsService.previewImport(eventId, importFile); setImportPreview(result.response); setImportData(result.dataBase64); }
-    catch (cause) { setError(getApiErrorMessage(cause, "Excel-Vorschau konnte nicht erstellt werden.")); }
-    finally { setBusy(false); }
-  }
-
-  async function commitImport() {
-    if (!importFile || !importPreview || !importData) return;
-    setBusy(true); setError("");
-    try { await adminMarshalsService.commitImport(eventId, importFile.name, importData, importPreview.sha256); setNotice("Excel-Import vollständig übernommen."); setImportPreview(null); setImportData(""); await load(); }
-    catch (cause) { setError(getApiErrorMessage(cause, "Excel-Import konnte nicht übernommen werden.")); }
-    finally { setBusy(false); }
-  }
-
   async function saveConfig() {
     if (!workspace) return;
     setBusy(true); setError("");
@@ -148,7 +129,6 @@ export function AdminMarshalsPage() {
     ["prints", "Drucklisten"],
     ["training", "Schulungen"],
     ["config", "Konfiguration"],
-    ["import", "Excel-Import"],
   ] as Array<[View, string]>, [selectedEvent]);
 
   return (
@@ -558,54 +538,6 @@ export function AdminMarshalsPage() {
         </Card>
       )}
 
-      {/* EXCEL-IMPORT */}
-      {view === "import" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5" />Excel-Import
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-slate-600">Die Arbeitsmappe wird zuerst nur analysiert. Erst nach Prüfung der Zusammenfassung wird sie idempotent übernommen.</p>
-            {!eventId && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Bitte zuerst oben eine Veranstaltung wählen.
-              </div>
-            )}
-            <Input
-              type="file"
-              accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
-              onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportPreview(null); setImportData(""); }}
-            />
-            {canWrite && (
-              <Button onClick={() => void previewImport()} disabled={!importFile || !eventId || busy}>
-                Dry-run starten
-              </Button>
-            )}
-            {importPreview && (
-              <div className="rounded-md border bg-slate-50 p-4">
-                <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-                  <Metric label="Personen" value={importPreview.summary.people} />
-                  <Metric label="Neu" value={importPreview.summary.newPeople} />
-                  <Metric label="Aktualisiert" value={importPreview.summary.updatedPeople} />
-                  <Metric label="Teilnahmen" value={importPreview.summary.eventParticipations} />
-                  <Metric label="Termine" value={importPreview.summary.trainings} />
-                  <Metric label="Prüffälle" value={importPreview.summary.conflicts} />
-                </div>
-                {importPreview.conflicts.length > 0 && (
-                  <ul className="mt-3 max-h-40 overflow-auto text-sm text-amber-800">
-                    {importPreview.conflicts.map((item, i) => (
-                      <li key={`${item.sheet}-${item.row}-${i}`}>{item.sheet}, Zeile {item.row}: {item.message}</li>
-                    ))}
-                  </ul>
-                )}
-                <Button className="mt-4" onClick={() => void commitImport()} disabled={busy}>Geprüften Import übernehmen</Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
