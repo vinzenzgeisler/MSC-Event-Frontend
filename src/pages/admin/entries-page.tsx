@@ -825,6 +825,17 @@ export function AdminEntriesPage() {
   }, []);
 
   useEffect(() => {
+    if (filterDraft.classId === "all" || classOptions.length === 0) {
+      return;
+    }
+    if (classOptions.some((item) => item.id === filterDraft.classId)) {
+      return;
+    }
+    setFilterDraft((prev) => ({ ...prev, classId: "all" }));
+    showToast("Der Klassenfilter stammte aus einem alten Dev-Event und wurde zurückgesetzt.");
+  }, [classOptions, filterDraft.classId]);
+
+  useEffect(() => {
     if (viewScope !== "deleted" || !canDeleteEntries || !canReadIam || actorLookupLoaded) {
       return;
     }

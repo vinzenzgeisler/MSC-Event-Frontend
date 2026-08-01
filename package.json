@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:sync": "powershell -ExecutionPolicy Bypass -File scripts/sync-dev-env.ps1",
+    "dev:local": "npm run dev:sync && vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

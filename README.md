@@ -25,7 +25,7 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 
 - `VITE_API_BASE_URL` API-Basis-URL
 - `VITE_COGNITO_ENABLED` `true|false`
-- `VITE_COGNITO_DOMAIN` z. B. `https://<domain>.auth.<region>.amazoncognito.com`
+- `VITE_COGNITO_DOMAIN` z. B. `https://<cognito-hosted-ui-domain>`
 - `VITE_COGNITO_CLIENT_ID` Cognito App Client ID (ohne Secret)
 - `VITE_COGNITO_REDIRECT_URI` OAuth Redirect (typisch `/admin/login`)
 - `VITE_COGNITO_LOGOUT_URI` Logout Redirect
@@ -40,5 +40,15 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 ## Notes
 
 - API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.
+
+## Feature-Branch Entwicklung
+
+Feature-Branches laufen lokal gegen die gemeinsame Dev-API:
+
+```bash
+npm run dev
+```
+
+Details und lokale Overrides: `docs/feature-branch-local-dev.md`.
 - IAM/Rollen im Frontend: `admin`, `editor`, `viewer` (Legacy-Claim `checkin` wird auf `editor` gemappt).
 - Gelöschte Nennungen: im Nennungen-Filter über „Ansicht“ (nur für Admin) mit Wiederherstellen-Action.

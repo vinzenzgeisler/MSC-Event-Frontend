@@ -1,4 +1,5 @@
-import { getAuthToken, refreshAuthSession } from "@/app/auth/auth-store";
+import { parseJwtPayload } from "@/app/auth/jwt";
+import { getAuthSession, getAuthToken, refreshAuthSession } from "@/app/auth/auth-store";
 import { resolveApiErrorMessage, resolvePlainErrorMessage, type ApiErrorLocale } from "@/services/api/api-error-resolver";
 
 type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
@@ -42,6 +43,7 @@ export class ApiError extends Error {
 type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   auth?: boolean;
+  includeAdminEmailHeader?: boolean;
   query?: Record<string, string | number | boolean | undefined | null>;
   body?: unknown;
   headers?: Record<string, string>;
@@ -83,6 +85,21 @@ function resolveBaseUrl(): string {
 
 const baseUrl = resolveBaseUrl();
 
+function getAuthenticatedEmailHeader(): string | null {
+  const session = getAuthSession();
+  const candidates = [session?.idToken, session?.apiToken, session?.roleToken].filter((token): token is string =>
+    Boolean(token)
+  );
+  for (const token of candidates) {
+    const payload = parseJwtPayload(token);
+    const email = typeof payload?.email === "string" ? payload.email.trim() : "";
+    if (email.includes("@")) {
+      return email;
+    }
+  }
+  return null;
+}
+
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(`${baseUrl}${normalizedPath}`, window.location.origin);
@@ -99,31 +116,33 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
   return baseUrl ? url.toString() : `${normalizedPath}${url.search}`;
 }
 
-async function parseResponseBody(response: Response): Promise<unknown> {
+async function parseResponseBody(response: Response): Promise<{ payload: unknown; invalidJson: boolean }> {
   const contentType = (response.headers.get("content-type") || "").toLowerCase();
   const raw = await response.text().catch(() => "");
   const text = raw.trim();
   if (!text) {
-    return null;
+    return { payload: null, invalidJson: false };
   }
 
   const looksLikeJson = text.startsWith("{") || text.startsWith("[");
   if (!contentType.includes("json") && !looksLikeJson) {
-    return null;
+    return { payload: null, invalidJson: true };
   }
 
   try {
-    return JSON.parse(text) as unknown;
+    return { payload: JSON.parse(text) as unknown, invalidJson: false };
   } catch {
-    return null;
+    return { payload: null, invalidJson: true };
   }
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const sendRequest = async (token: string | null) => {
+    const adminEmail = token && options.includeAdminEmailHeader ? getAuthenticatedEmailHeader() : null;
     const headers: Record<string, string> = {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(adminEmail ? { "X-MSC-Admin-Email": adminEmail } : {}),
       ...(options.headers ?? {})
     };
 
@@ -145,9 +164,15 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     }
   }
 
-  const parsed = (await parseResponseBody(response)) as ApiErrorPayload | T | null;
+  const { payload: parsed, invalidJson } = (await parseResponseBody(response)) as {
+    payload: ApiErrorPayload | T | null;
+    invalidJson: boolean;
+  };
   if (!response.ok) {
     throw new ApiError(response.status, (parsed as ApiErrorPayload | null) ?? undefined);
+  }
+  if (invalidJson) {
+    throw new ApiError(502, { code: "INVALID_API_RESPONSE", message: "Invalid API response" });
   }
 
   return (parsed ?? ({} as T)) as T;

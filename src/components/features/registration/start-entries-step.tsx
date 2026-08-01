@@ -145,7 +145,7 @@ export function StartEntriesStep({
         ? "Pokud vozidlo neni ve vlastnictvi jezdce, pri registraci je nutne predlozit podepsane prohlaseni vlastnika o zrizeni se naroku (formular na klubovem webu)."
         : locale === "pl"
           ? "Jesli pojazd nie jest wlasnoscia kierowcy, przy rejestracji nalezy przedlozyc podpisane oswiadczenie wlasciciela o zrzeczeniu roszczen (formularz na stronie klubu)."
-          : "Bei fremdem Fahrzeug ist eine unterschriebene Eigentuemer-Verzichtserklaerung bei Anmeldung vorzulegen (Formular auf Vereins-Website).";
+          : "Bei fremdem Fahrzeug ist eine unterschriebene Eigentümer-Verzichtserklärung bei Anmeldung vorzulegen (Formular auf Vereins-Website).";
   const toggleHintOnTouch = (setter: Dispatch<SetStateAction<boolean>>) => {
     if (typeof window !== "undefined" && window.matchMedia("(hover: none)").matches) {
       setter((prev) => !prev);
