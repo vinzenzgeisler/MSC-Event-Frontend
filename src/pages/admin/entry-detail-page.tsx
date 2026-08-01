@@ -1973,73 +1973,122 @@ export function AdminEntryDetailPage() {
                 Signing-Daten werden geladen…
               </div>
             ) : (
-              <div className="mt-6 space-y-5">
-                {activeSigningSession ? (
-                  <div className={cn(
-                    "rounded-md border p-4 text-sm",
-                    activeSigningSession.status === "completed"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-                      : activeSigningSession.status === "cancelled" || activeSigningSession.status === "failed"
-                        ? "border-amber-200 bg-amber-50 text-amber-950"
-                        : "border-sky-200 bg-sky-50 text-sky-950"
-                  )}>
-                    <div className="flex items-center gap-2 font-semibold">
-                      {signingInProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                      {activeSigningSession.status === "completed"
-                        ? "Vorgang erfolgreich abgeschlossen"
-                        : activeSigningSession.status === "cancelled"
-                          ? "Vorgang abgebrochen"
-                          : activeSigningSession.status === "failed"
-                            ? "Vorgang fehlgeschlagen"
-                            : "Warte auf Unterschrift am iPad"}
-                    </div>
-                    <div className="mt-2 grid gap-1 text-xs">
-                      <div>Gerät: {selectedSigningDevice?.deviceName ?? "Signaturterminal"}</div>
-                      <div>Unterzeichner: {selectedSigningSigner ? `${selectedSigningSigner.label}: ${selectedSigningSigner.name}` : signingRequirements?.driverName ?? detail.driver.name}</div>
-                      <div>Nennung: {detail.classLabel}</div>
-                      {activeSigningSession.expiresAt ? <div>Automatischer Abbruch: {formatTimestamp(activeSigningSession.expiresAt)}</div> : null}
-                      {activeSigningSession.signedAt ? <div>Unterschrieben: {formatTimestamp(activeSigningSession.signedAt)}</div> : null}
-                      {activeSigningSession.documentId ? <div>Dokument wurde erzeugt.</div> : null}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {signingInProgress ? (
-                        <Button type="button" variant="outline" disabled={signingBusy} onClick={() => void cancelActiveSigningSession()}>
-                          Abbrechen
-                        </Button>
-                      ) : null}
-                      {activeSigningSession.status === "completed" ? (
+              <div className="mt-4 space-y-5">
+                {/* Step indicator */}
+                {(() => {
+                  const currentStep = activeSigningSession?.status === "completed" ? 3 : signingInProgress ? 2 : 1;
+                  const steps = [
+                    { n: 1, label: "Vorprüfung" },
+                    { n: 2, label: "Unterschrift" },
+                    { n: 3, label: "Abgeschlossen" },
+                  ];
+                  return (
+                    <div className="flex items-center gap-1">
+                      {steps.map((step, idx) => (
                         <>
-                          <Button type="button" onClick={() => {
-                            loadDetail();
-                            setSigningDialogOpen(false);
-                          }}>
-                            Status aktualisieren
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                              activeSigningSession.documentId
-                                ? void handleDocumentDownloadById(activeSigningSession.documentId, "Unterschriebener Haftverzicht", "download-waiver")
-                                : void handleDocumentDownload("signed_waiver", "Unterschriebener Haftverzicht", "download-waiver")
-                            }
+                          <div
+                            key={step.n}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
+                              step.n === currentStep
+                                ? "bg-slate-900 text-white"
+                                : step.n < currentStep
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-slate-100 text-slate-400"
+                            )}
                           >
-                            <Download className="mr-2 h-4 w-4" />
-                            Dokument laden
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setActiveSigningSession(null);
-                              setSigningPrechecks(emptySigningPrechecks());
-                            }}
-                          >
-                            Weitere Unterschrift erfassen
-                          </Button>
+                            {step.n < currentStep ? (
+                              <CheckCircle2 className="h-3 w-3" />
+                            ) : (
+                              <span className="h-3.5 w-3.5 text-center leading-none">{step.n}</span>
+                            )}
+                            {step.label}
+                          </div>
+                          {idx < steps.length - 1 && (
+                            <div className="h-px flex-1 bg-slate-200" />
+                          )}
                         </>
-                      ) : null}
+                      ))}
                     </div>
+                  );
+                })()}
+
+                {activeSigningSession?.status === "completed" ? (
+                  /* Step 3: Success screen */
+                  <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-6 text-center">
+                    <div className="flex justify-center">
+                      <div className="rounded-full bg-emerald-100 p-4">
+                        <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+                      </div>
+                    </div>
+                    <h3 className="mt-4 text-xl font-bold text-emerald-900">Erfolgreich unterzeichnet</h3>
+                    <p className="mt-1 text-sm text-emerald-700">
+                      {selectedSigningSigner?.name ?? signingRequirements?.driverName ?? detail.driver.name}
+                      {activeSigningSession.signedAt ? ` · ${formatTimestamp(activeSigningSession.signedAt)}` : ""}
+                    </p>
+                    <div className="mt-2 text-xs text-emerald-600">
+                      Gerät: {selectedSigningDevice?.deviceName ?? "Signaturterminal"}
+                      {activeSigningSession.documentId ? " · Dokument erzeugt" : ""}
+                    </div>
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                      <Button type="button" onClick={() => {
+                        loadDetail();
+                        setSigningDialogOpen(false);
+                      }}>
+                        Status aktualisieren & schließen
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          activeSigningSession.documentId
+                            ? void handleDocumentDownloadById(activeSigningSession.documentId, "Unterschriebener Haftverzicht", "download-waiver")
+                            : void handleDocumentDownload("signed_waiver", "Unterschriebener Haftverzicht", "download-waiver")
+                        }
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Dokument laden
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setActiveSigningSession(null);
+                          setSigningPrechecks(emptySigningPrechecks());
+                        }}
+                      >
+                        Weitere Unterschrift erfassen
+                      </Button>
+                    </div>
+                  </div>
+                ) : signingInProgress ? (
+                  /* Step 2: Wait screen */
+                  <div className="rounded-xl border-2 border-sky-200 bg-sky-50 p-6 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-pulse rounded-full bg-sky-100 p-5">
+                        <TabletSmartphone className="h-12 w-12 text-sky-600" />
+                      </div>
+                    </div>
+                    <h3 className="mt-4 text-xl font-bold text-sky-900">Bitte auf dem Terminal unterschreiben</h3>
+                    <p className="mt-1 text-sm text-sky-700">
+                      {selectedSigningDevice?.deviceName ?? "Signaturterminal"} · {selectedSigningSigner?.name ?? signingRequirements?.driverName ?? detail.driver.name}
+                    </p>
+                    {activeSigningSession?.expiresAt ? (
+                      <p className="mt-1 text-xs text-sky-500">Session läuft · Abbruch um {new Date(activeSigningSession.expiresAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</p>
+                    ) : null}
+                    <div className="mt-5">
+                      <Button type="button" variant="outline" disabled={signingBusy} onClick={() => void cancelActiveSigningSession()}>
+                        Session abbrechen
+                      </Button>
+                    </div>
+                  </div>
+                ) : activeSigningSession?.status === "cancelled" || activeSigningSession?.status === "failed" ? (
+                  /* Cancelled/failed notice */
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                    <div className="font-semibold">
+                      {activeSigningSession.status === "cancelled" ? "Vorgang abgebrochen" : "Vorgang fehlgeschlagen"}
+                    </div>
+                    <div className="mt-1 text-xs text-amber-700">Du kannst einen neuen Vorgang starten.</div>
                   </div>
                 ) : null}
 
@@ -2126,13 +2175,22 @@ export function AdminEntryDetailPage() {
                             key={key}
                             type="button"
                             className={cn(
-                              "flex min-h-14 items-center justify-between rounded-md border px-3 text-left text-sm font-medium transition",
-                              checked ? "border-emerald-500 bg-emerald-50 text-emerald-950" : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                              "flex min-h-16 w-full cursor-pointer items-center justify-between rounded-lg border-2 px-4 text-left transition",
+                              checked
+                                ? "border-emerald-400 bg-emerald-50"
+                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                             )}
                             onClick={() => toggleSigningPrecheck(key)}
                           >
-                            <span>{label}</span>
-                            <span className="text-xs">{checked ? formatTimestamp(signingPrechecks[key] ?? "") : "Offen"}</span>
+                            <span className={cn("text-sm font-medium", checked ? "text-emerald-900" : "text-slate-900")}>{label}</span>
+                            <span className={cn(
+                              "ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition",
+                              checked
+                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                : "border-slate-300 bg-white text-transparent"
+                            )}>
+                              <CheckCircle2 className="h-4 w-4" />
+                            </span>
                           </button>
                         );
                       })}

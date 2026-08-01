@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { AppProviders } from "@/app/providers";
@@ -11,7 +11,9 @@ function installZoomGuards() {
   };
 
   document.addEventListener("gesturestart", preventDefault, { passive: false });
-  document.addEventListener("gesturechange", preventDefault, { passive: false });
+  document.addEventListener("gesturechange", preventDefault, {
+    passive: false,
+  });
   document.addEventListener(
     "wheel",
     (event) => {
@@ -19,7 +21,7 @@ function installZoomGuards() {
         event.preventDefault();
       }
     },
-    { passive: false }
+    { passive: false },
   );
 
   let lastTouchEnd = 0;
@@ -32,16 +34,22 @@ function installZoomGuards() {
       }
       lastTouchEnd = now;
     },
-    { passive: false }
+    { passive: false },
   );
 }
 
 installZoomGuards();
 
-const pwaScope = window.location.pathname.startsWith("/inspection") ? "/inspection" : window.location.pathname.startsWith("/admin") ? "/admin/" : null;
+const pwaScope = window.location.pathname.startsWith("/inspection")
+  ? "/inspection"
+  : window.location.pathname.startsWith("/admin")
+    ? "/admin/"
+    : null;
 
 if (pwaScope && "serviceWorker" in navigator) {
-  const hadServiceWorkerController = Boolean(navigator.serviceWorker.controller);
+  const hadServiceWorkerController = Boolean(
+    navigator.serviceWorker.controller,
+  );
   let reloadPending = false;
 
   navigator.serviceWorker.addEventListener("controllerchange", () => {
@@ -62,7 +70,9 @@ if (pwaScope && "serviceWorker" in navigator) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AppProviders>
-      <RouterProvider router={router} />
+      <Suspense fallback={null}>
+        <RouterProvider router={router} />
+      </Suspense>
     </AppProviders>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
