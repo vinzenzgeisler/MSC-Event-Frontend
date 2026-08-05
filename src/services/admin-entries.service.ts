@@ -98,10 +98,13 @@ function parseName(first: string | null | undefined, last: string | null | undef
 }
 
 function normalizeAcceptanceStatus(value: unknown): AcceptanceStatus {
-  return value === "shortlist" || value === "accepted" || value === "rejected" || value === "pending" ? value : "pending";
+  return value === "shortlist" || value === "accepted" || value === "rejected" || value === "withdrawn" || value === "pending" ? value : "pending";
 }
 
-function normalizePaymentStatus(value: unknown): PaymentStatus {
+function normalizePaymentStatus(value: unknown): PaymentStatus | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
   return value === "paid" ? "paid" : "due";
 }
 
@@ -142,6 +145,7 @@ function auditLogText(action: string, payload: Record<string, unknown> | null | 
       shortlist: "Vorauswahl",
       accepted: "Angenommen",
       rejected: "Abgelehnt",
+      withdrawn: "Abgesagt",
       passed: "Bestanden",
       failed: "Abgelehnt",
       due: "Offen",
@@ -156,8 +160,12 @@ function auditLogText(action: string, payload: Record<string, unknown> | null | 
   switch (action) {
     case "checkin_id_verified_set":
       return data.checkinIdVerified ? "Check-in bestätigt." : "Check-in zurückgesetzt.";
-    case "entry_status_updated":
-      return `Nennungsstatus von „${statusLabel(data.from)}“ auf „${statusLabel(data.to)}“ geändert.`;
+    case "entry_status_updated": {
+      const reason = typeof data.withdrawalReason === "string" && data.withdrawalReason.trim()
+        ? ` Grund: ${data.withdrawalReason.trim()}`
+        : "";
+      return `Nennungsstatus von „${statusLabel(data.from)}“ auf „${statusLabel(data.to)}“ geändert.${reason}`;
+    }
     case "entry_class_updated":
       return data.isBackupVehicle ? "Klasse des Ersatzfahrzeugs geändert." : "Klasse der Nennung geändert.";
     case "entry_tech_status_updated":
@@ -301,8 +309,11 @@ function fromAdminEntryDetailDto(
     classLabel: dto.className,
     startNumber: dto.startNumberNorm ?? "-",
     orgaCode: (dto.orgaCode ?? "").trim(),
-    status: dto.acceptanceStatus,
+    status: normalizeAcceptanceStatus(dto.acceptanceStatus),
     paymentStatus: dto.payment.paymentStatus,
+    withdrawnReason: (dto.withdrawnReason ?? "").trim(),
+    withdrawnAt: dto.withdrawnAt ?? null,
+    withdrawnBy: (dto.withdrawnBy ?? "").trim(),
     registrationStatus: dto.registrationStatus,
     createdAt: dto.createdAt,
     isBackupVehicle: dto.isBackupVehicle,
@@ -618,14 +629,15 @@ export const adminEntriesService = {
 
   async setEntryStatus(
     entryId: string,
-    transition: "to_shortlist" | "to_accepted" | "to_rejected",
-    options?: { includeDriverNoteInLifecycleMail?: boolean }
+    transition: "to_shortlist" | "to_accepted" | "to_rejected" | "to_withdrawn",
+    options?: { includeDriverNoteInLifecycleMail?: boolean; withdrawalReason?: string }
   ) {
     const statusMap: Record<typeof transition, { status: AcceptanceStatus; lifecycleEventType: string; sendLifecycleMail: boolean }> = {
       to_shortlist: { status: "shortlist", lifecycleEventType: "preselection", sendLifecycleMail: false },
       // Accepted mails are queued explicitly after status change to support intentional resends.
       to_accepted: { status: "accepted", lifecycleEventType: "accepted_open_payment", sendLifecycleMail: false },
-      to_rejected: { status: "rejected", lifecycleEventType: "rejected", sendLifecycleMail: true }
+      to_rejected: { status: "rejected", lifecycleEventType: "rejected", sendLifecycleMail: true },
+      to_withdrawn: { status: "withdrawn", lifecycleEventType: "preselection", sendLifecycleMail: false }
     };
 
     const mapped = statusMap[transition];
@@ -671,7 +683,8 @@ export const adminEntriesService = {
       includeDriverNoteInLifecycleMail:
         mapped.sendLifecycleMail && typeof options?.includeDriverNoteInLifecycleMail === "boolean"
           ? options.includeDriverNoteInLifecycleMail
-          : undefined
+          : undefined,
+      withdrawalReason: mapped.status === "withdrawn" ? options?.withdrawalReason?.trim() : undefined
     };
 
     try {

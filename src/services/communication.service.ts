@@ -227,7 +227,7 @@ export const communicationService = {
   async searchRecipients(payload: {
     query?: string;
     classId?: string;
-    acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+    acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
     paymentStatus?: "due" | "paid";
     limit?: number;
   }) {
@@ -300,7 +300,7 @@ export const communicationService = {
 
   async resolveBroadcastRecipients(payload: {
     classId?: string;
-    acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+    acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
     registrationStatus?: "submitted_unverified" | "submitted_verified";
     paymentStatus?: "due" | "paid";
     additionalEmails?: string[];
@@ -338,7 +338,7 @@ export const communicationService = {
     entryIds?: string[];
     filters?: {
       classId?: string;
-      acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected";
+      acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
       registrationStatus?: "submitted_unverified" | "submitted_verified";
       paymentStatus?: "due" | "paid";
       allEntries?: boolean;

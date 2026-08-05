@@ -35,6 +35,7 @@ type EntriesTableProps = {
   onSetShortlist: (entryId: string) => void;
   onSetAccepted: (entryId: string) => void;
   onSetRejected: (entryId: string) => void;
+  onSetWithdrawn: (entryId: string) => void;
 };
 
 function doppelstarterKey(row: AdminEntryListItem) {
@@ -58,7 +59,8 @@ function acceptanceStatusRowBackgroundClasses(status: AdminEntryListItem["status
     pending: "bg-amber-50/25",
     shortlist: "bg-primary/5",
     accepted: "bg-primary/5",
-    rejected: "bg-rose-50/25"
+    rejected: "bg-rose-50/25",
+    withdrawn: "bg-slate-50"
   }[status];
 }
 
@@ -67,7 +69,8 @@ function acceptanceStatusRowBorderClasses(status: AdminEntryListItem["status"]):
     pending: "border-l-4 border-l-amber-400",
     shortlist: "border-l-4 border-l-primary/70",
     accepted: "border-l-4 border-l-primary/70",
-    rejected: "border-l-4 border-l-rose-400"
+    rejected: "border-l-4 border-l-rose-400",
+    withdrawn: "border-l-4 border-l-slate-400"
   }[status];
 }
 
@@ -126,7 +129,8 @@ function EntriesTableInner({
   resolveScrollOffset,
   onSetShortlist,
   onSetAccepted,
-  onSetRejected
+  onSetRejected,
+  onSetWithdrawn
 }: EntriesTableProps) {
   const location = useLocation();
   const desktopScrollerRef = useRef<HTMLDivElement | null>(null);
@@ -338,6 +342,14 @@ function EntriesTableInner({
                       disabledReason={statusDisabledReason(row, "rejected")}
                       onClick={() => onSetRejected(row.id)}
                     />
+                    <ActionButton
+                      label="Absagen"
+                      wrapperClassName="h-8 w-full"
+                      className="px-3.5"
+                      variant="outline"
+                      disabledReason={statusDisabledReason(row, "withdrawn")}
+                      onClick={() => onSetWithdrawn(row.id)}
+                    />
                   </>
                 )}
               </div>
@@ -347,12 +359,12 @@ function EntriesTableInner({
                 {acceptanceStatusLabel(row.status)}
               </Badge>
               {row.status === "accepted" ? (
-                <Badge className={`${paymentStatusClasses(row.payment)} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
-                  {paymentStatusLabel(row.payment)}
+                <Badge className={`${paymentStatusClasses(row.payment ?? "due")} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
+                  {paymentStatusLabel(row.payment ?? "due")}
                 </Badge>
               ) : (
                 <Badge className="h-7 whitespace-nowrap border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-500" variant="outline">
-                  {paymentStatusLabel(row.payment)}
+                  Nicht relevant
                 </Badge>
               )}
               {row.status === "accepted" ? (
@@ -441,12 +453,12 @@ function EntriesTableInner({
                   </td>
                   <td className="px-3 py-3">
                     {row.status === "accepted" ? (
-                      <Badge className={`${paymentStatusClasses(row.payment)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
-                        {paymentStatusLabel(row.payment)}
+                      <Badge className={`${paymentStatusClasses(row.payment ?? "due")} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
+                        {paymentStatusLabel(row.payment ?? "due")}
                       </Badge>
                     ) : (
                       <Badge className="h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap border-slate-200 bg-slate-100 px-2 py-1 text-xs leading-tight text-slate-500" variant="outline">
-                        {paymentStatusLabel(row.payment)}
+                        Nicht relevant
                       </Badge>
                     )}
                   </td>
@@ -492,6 +504,14 @@ function EntriesTableInner({
                             variant="outline"
                             disabledReason={statusDisabledReason(row, "rejected")}
                             onClick={() => onSetRejected(row.id)}
+                          />
+                          <ActionButton
+                            label="Absagen"
+                            wrapperClassName="h-8 w-full"
+                            className="px-3.5"
+                            variant="outline"
+                            disabledReason={statusDisabledReason(row, "withdrawn")}
+                            onClick={() => onSetWithdrawn(row.id)}
                           />
                           <ActionButton
                             label="Zulassen"

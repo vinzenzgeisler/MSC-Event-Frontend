@@ -5,7 +5,8 @@ export function acceptanceStatusLabel(status: AcceptanceStatus): string {
     pending: "Offen",
     shortlist: "Vorauswahl",
     accepted: "Zugelassen",
-    rejected: "Abgelehnt"
+    rejected: "Abgelehnt",
+    withdrawn: "Abgesagt"
   }[status];
 }
 
@@ -43,7 +44,8 @@ export function acceptanceStatusClasses(status: AcceptanceStatus): string {
     pending: "border-amber-300 bg-amber-50 text-amber-900",
     shortlist: "border-primary/35 bg-primary/10 text-primary",
     accepted: "border-primary/35 bg-primary/10 text-primary",
-    rejected: "border-rose-300 bg-rose-50 text-rose-900"
+    rejected: "border-rose-300 bg-rose-50 text-rose-900",
+    withdrawn: "border-slate-300 bg-slate-100 text-slate-700"
   }[status];
 }
 
@@ -52,7 +54,8 @@ export function acceptanceStatusRowAccentClasses(status: AcceptanceStatus): stri
     pending: "border-l-4 border-l-amber-400 bg-amber-50/25",
     shortlist: "border-l-4 border-l-primary/70 bg-primary/5",
     accepted: "border-l-4 border-l-primary/70 bg-primary/5",
-    rejected: "border-l-4 border-l-rose-400 bg-rose-50/25"
+    rejected: "border-l-4 border-l-rose-400 bg-rose-50/25",
+    withdrawn: "border-l-4 border-l-slate-400 bg-slate-50"
   }[status];
 }
 
