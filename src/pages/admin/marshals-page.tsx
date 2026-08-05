@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ClipboardCheck,
@@ -7,6 +7,7 @@ import {
   GraduationCap,
   List,
   Map,
+  MapPinned,
   Plus,
   RefreshCw,
   Save,
@@ -40,6 +41,8 @@ import { cn } from "@/lib/utils";
 import {
   getPostMapCoordinates,
   MarshalPlanningMap,
+  MarshalPlanningOverview,
+  getPostTarget,
   type PlanningTargetMode,
 } from "@/components/features/admin/marshal-planning-map";
 
@@ -84,6 +87,29 @@ const emptyPerson = {
   note: "",
 };
 
+type PersonDraft = typeof emptyPerson;
+const personFieldDefinitions: Array<{
+  key: keyof PersonDraft;
+  label: string;
+  placeholder: string;
+  type?: "date" | "number" | "email" | "tel";
+  help?: string;
+}> = [
+  { key: "helperNumber", label: "Helfernummer", placeholder: "z. B. 123", type: "number" },
+  { key: "firstName", label: "Vorname", placeholder: "Vorname" },
+  { key: "lastName", label: "Nachname", placeholder: "Nachname" },
+  { key: "street", label: "Straße und Hausnummer", placeholder: "Musterstraße 1" },
+  { key: "zip", label: "Postleitzahl", placeholder: "12345" },
+  { key: "city", label: "Ort", placeholder: "Wohnort" },
+  { key: "birthdate", label: "Geburtsdatum", placeholder: "", type: "date" },
+  { key: "phone", label: "Telefon", placeholder: "+49 …", type: "tel" },
+  { key: "email", label: "E-Mail-Adresse", placeholder: "name@beispiel.de", type: "email" },
+  { key: "shirtSize", label: "Shirtgröße", placeholder: "z. B. L" },
+  { key: "licenseNumber", label: "DMSB-Lizenznummer", placeholder: "Lizenznummer (falls vorhanden)" },
+  { key: "activityAreas", label: "Einsatzbereiche", placeholder: "z. B. Strecke, Fahrerlager", help: "Mehrere Bereiche mit Komma oder Semikolon trennen." },
+  { key: "note", label: "Hinweis", placeholder: "Interne Hinweise zur Person" },
+];
+
 export function AdminMarshalsPage() {
   const { roles } = useAuth();
   const canWrite = hasPermission(roles, "marshals.write");
@@ -94,6 +120,16 @@ export function AdminMarshalsPage() {
   const [view, setView] = useState<View>("people");
   const [search, setSearch] = useState("");
   const [area, setArea] = useState("Strecke");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [daySearch, setDaySearch] = useState("");
+  const [dayStatusFilter, setDayStatusFilter] = useState("all");
+  const [dayAssignmentFilter, setDayAssignmentFilter] = useState("all");
+  const [daySectionFilter, setDaySectionFilter] = useState("all");
+  const [trainingSearch, setTrainingSearch] = useState("");
+  const [attendanceFilter, setAttendanceFilter] = useState("all");
+  const [postSearch, setPostSearch] = useState("");
+  const [postSectionFilter, setPostSectionFilter] = useState("all");
+  const [postStaffingFilter, setPostStaffingFilter] = useState("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -116,8 +152,8 @@ export function AdminMarshalsPage() {
   const [emergencyPostTargets, setEmergencyPostTargets] = useState<
     Record<string, number>
   >({});
-  const [planningDisplay, setPlanningDisplay] = useState<"map" | "list">(
-    "map",
+  const [planningDisplay, setPlanningDisplay] = useState<"overview" | "map" | "list">(
+    "overview",
   );
   const [planningTargetMode, setPlanningTargetMode] =
     useState<PlanningTargetMode>("normal");
@@ -200,13 +236,44 @@ export function AdminMarshalsPage() {
     (item) => item.id === selectedTrainingId,
   );
   const people = workspace?.people ?? [];
+  const filteredPeople = people.filter((person) =>
+    activeFilter === "all" ? true : activeFilter === "active" ? person.isActive : !person.isActive,
+  );
+  const filteredDayPeople = people.filter((person) => {
+    const assignment = person.assignments.find((item) => item.dayId === day?.id);
+    const term = daySearch.trim().toLocaleLowerCase("de");
+    const matchesSearch = !term || `${person.helperNumber} ${person.firstName} ${person.lastName} ${person.zip ?? ""} ${person.city ?? ""}`.toLocaleLowerCase("de").includes(term);
+    const matchesStatus = dayStatusFilter === "all" || (assignment?.commitmentStatus ?? "not_asked") === dayStatusFilter;
+    const assigned = Boolean(assignment?.postId || assignment?.sectionId || assignment?.functionCode);
+    const matchesAssignment = dayAssignmentFilter === "all" || (dayAssignmentFilter === "assigned" ? assigned : !assigned);
+    const matchesSection = daySectionFilter === "all" || assignment?.sectionId === daySectionFilter;
+    return matchesSearch && matchesStatus && matchesAssignment && matchesSection;
+  });
+  const filteredTrainingPeople = people.filter((person) => {
+    const participant = workspace?.trainingParticipants.find((item) => item.sessionId === selectedTrainingId && item.personId === person.id);
+    const attendance = participant?.attendanceStatus ?? "registered";
+    const term = trainingSearch.trim().toLocaleLowerCase("de");
+    return (!term || `${person.helperNumber} ${person.firstName} ${person.lastName} ${person.licenseNumber ?? ""}`.toLocaleLowerCase("de").includes(term)) && (attendanceFilter === "all" || attendance === attendanceFilter);
+  });
+
+  function postMatchesConfigFilters(post: NonNullable<typeof workspace>["posts"][number]) {
+    if (!workspace) return false;
+    const term = postSearch.trim().toLocaleLowerCase("de");
+    if (term && !`${post.code} ${post.description ?? ""}`.toLocaleLowerCase("de").includes(term)) return false;
+    if (postSectionFilter !== "all" && post.sectionId !== postSectionFilter) return false;
+    if (postStaffingFilter === "all") return true;
+    const target = postTargets[post.id] ?? post.targetStaff;
+    const counts = workspace.days.map((configDay) => people.filter((person) => person.assignments.some((assignment) => assignment.dayId === configDay.id && assignment.postId === post.id && assignment.commitmentStatus === "accepted")).length);
+    return counts.some((count) => postStaffingFilter === "under" ? count < target : postStaffingFilter === "over" ? count > target : count === target);
+  }
 
   async function saveDay(
     person: MarshalPerson,
     commitmentStatus: MarshalCommitmentStatus,
     assignmentValue: string,
-  ) {
-    if (!day) return;
+    reloadAfter = true,
+  ): Promise<boolean> {
+    if (!day) return false;
     const clearedAssignmentValue =
       commitmentStatus === "declined" || commitmentStatus === "not_asked"
         ? ""
@@ -244,12 +311,61 @@ export function AdminMarshalsPage() {
           },
         ],
       });
-      setNotice("Einsatz gespeichert.");
-      await load();
+      if (reloadAfter) setNotice("Einsatz gespeichert.");
+      if (reloadAfter) await load();
+      return true;
     } catch (cause) {
       setError(
         getApiErrorMessage(cause, "Einsatz konnte nicht gespeichert werden."),
       );
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function replacePostHelper(currentPerson: MarshalPerson, replacementPerson: MarshalPerson, postId: string) {
+    if (!day) return false;
+    const currentAssignment = currentPerson.assignments.find((item) => item.dayId === day.id);
+    const replacementAssignment = replacementPerson.assignments.find((item) => item.dayId === day.id);
+    if (!currentAssignment || !replacementAssignment) return false;
+    const originalReplacementAssignment = getAssignmentValue(replacementAssignment);
+    setNotice("");
+    // Assign first: if the second write fails, the existing helper is not lost.
+    const assigned = await saveDay(replacementPerson, replacementAssignment.commitmentStatus, `post:${postId}`, false);
+    if (!assigned) return false;
+    const removed = await saveDay(currentPerson, currentAssignment.commitmentStatus, "", false);
+    if (!removed) {
+      const rolledBack = await saveDay(
+        replacementPerson,
+        replacementAssignment.commitmentStatus,
+        originalReplacementAssignment === "none" ? "" : originalReplacementAssignment,
+        false,
+      );
+      await load();
+      setNotice("");
+      setError(
+        rolledBack
+          ? "Helfer konnte nicht ersetzt werden. Der ursprüngliche Zustand wurde wiederhergestellt."
+          : "Helfer konnte nicht ersetzt und die ursprüngliche Zuweisung des Ersatzhelfers nicht wiederhergestellt werden. Manuelle Prüfung erforderlich.",
+      );
+      return false;
+    }
+    await load();
+    setNotice("Helfer ersetzt.");
+    return true;
+  }
+
+  async function saveAttendance(person: MarshalPerson, value: AttendanceStatus) {
+    if (!selectedTrainingId || !person.isActive || !canWrite) return;
+    setBusy(true);
+    setError("");
+    try {
+      await adminMarshalsService.saveTrainingParticipant(selectedTrainingId, person.id, value);
+      setNotice("Anwesenheitsstatus gespeichert.");
+      await load();
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, "Anwesenheitsstatus konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
@@ -304,6 +420,21 @@ export function AdminMarshalsPage() {
       setError(
         getApiErrorMessage(cause, "Helfer konnte nicht gespeichert werden."),
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function togglePersonActive(person: MarshalPerson) {
+    if (!canWrite) return;
+    setBusy(true);
+    setError("");
+    try {
+      await adminMarshalsService.updatePerson(person.id, { isActive: !person.isActive });
+      setNotice(person.isActive ? "Helfer wurde deaktiviert." : "Helfer wurde aktiviert.");
+      await load();
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, "Aktivstatus konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
@@ -599,8 +730,10 @@ export function AdminMarshalsPage() {
                   {people.length} Datensätze in der gewählten Veranstaltung
                 </p>
               </div>
-              <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_180px] lg:w-auto lg:min-w-[480px]">
+              <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[860px] xl:grid-cols-4">
+                <Label className="sr-only" htmlFor="marshal-people-search">Helfer suchen</Label>
                 <Input
+                  id="marshal-people-search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Name oder Helfernummer"
@@ -615,6 +748,15 @@ export function AdminMarshalsPage() {
                     <SelectItem value="all">Alle Bereiche</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={activeFilter} onValueChange={setActiveFilter}>
+                  <SelectTrigger className="h-11 w-full" aria-label="Aktivstatus filtern"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Aktiv und inaktiv</SelectItem>
+                    <SelectItem value="active">Nur aktive Helfer</SelectItem>
+                    <SelectItem value="inactive">Nur inaktive Helfer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" className="h-11" onClick={() => { setSearch(""); setArea("Strecke"); setActiveFilter("all"); }}>Filter zurücksetzen</Button>
               </div>
             </div>
           </CardHeader>
@@ -628,27 +770,19 @@ export function AdminMarshalsPage() {
                     Öffnen
                   </span>
                 </summary>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  {Object.entries(personDraft).map(([key, value]) => (
-                    <Input
-                      className="h-11"
-                      key={key}
-                      type={
-                        key === "birthdate"
-                          ? "date"
-                          : key === "helperNumber"
-                            ? "number"
-                            : "text"
-                      }
-                      value={value}
-                      placeholder={key}
-                      onChange={(event) =>
-                        setPersonDraft((current) => ({
-                          ...current,
-                          [key]: event.target.value,
-                        }))
-                      }
-                    />
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {personFieldDefinitions.map(({ key, label, placeholder, type = "text", help }) => (
+                    <label key={key} className={cn("grid gap-1 text-xs font-medium text-slate-600", key === "note" && "sm:col-span-2")}>
+                      {label}
+                      <Input
+                        className="h-11 text-sm font-normal text-slate-950"
+                        type={type}
+                        value={personDraft[key]}
+                        placeholder={placeholder}
+                        onChange={(event) => setPersonDraft((current) => ({ ...current, [key]: event.target.value }))}
+                      />
+                      {help && <span className="font-normal text-slate-500">{help}</span>}
+                    </label>
                   ))}
                   <Button
                     className="h-11 sm:col-span-2 xl:col-span-1"
@@ -684,7 +818,8 @@ export function AdminMarshalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {people.map((person) => (
+                  {filteredPeople.map((person) => (
+                    <Fragment key={person.id}>
                     <tr
                       key={person.id}
                       className={cn(
@@ -716,7 +851,11 @@ export function AdminMarshalsPage() {
                         {person.note ?? "–"}
                       </td>
                       <td className="p-3">
-                        {person.isActive ? (
+                        {canWrite ? (
+                          <button type="button" className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" disabled={busy || editingPerson?.id === person.id} aria-label={`${person.firstName} ${person.lastName} ${person.isActive ? "deaktivieren" : "aktivieren"}`} onClick={() => void togglePersonActive(person)}>
+                            {person.isActive ? <Badge className="bg-emerald-100 text-emerald-900">Aktiv</Badge> : <Badge className="bg-red-100 text-red-900">Inaktiv · kein Einsatz mehr</Badge>}
+                          </button>
+                        ) : person.isActive ? (
                           <Badge className="bg-emerald-100 text-emerald-900">Aktiv</Badge>
                         ) : (
                           <Badge className="bg-red-100 text-red-900">Inaktiv · kein Einsatz mehr</Badge>
@@ -734,12 +873,16 @@ export function AdminMarshalsPage() {
                         )}
                       </td>
                     </tr>
+                    {editingPerson?.id === person.id && (
+                      <tr><td colSpan={11} className="border-b p-3"><PersonEditor person={editingPerson} busy={busy} onChange={setEditingPerson} onClose={() => setEditingPerson(null)} onSave={() => void savePerson()} /></td></tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="grid gap-3 md:hidden">
-              {people.map((person) => (
+              {filteredPeople.map((person) => (
                 <div
                   key={person.id}
                   className={cn(
@@ -799,6 +942,9 @@ export function AdminMarshalsPage() {
                     </p>
                   )}
                   {canWrite && (
+                    <Button type="button" size="sm" variant="ghost" className="mt-2 w-full" disabled={busy || editingPerson?.id === person.id} onClick={() => void togglePersonActive(person)}>{person.isActive ? "Helfer deaktivieren" : "Helfer aktivieren"}</Button>
+                  )}
+                  {canWrite && (
                     <Button
                       className="mt-4 w-full"
                       variant="outline"
@@ -807,169 +953,13 @@ export function AdminMarshalsPage() {
                       Bearbeiten
                     </Button>
                   )}
+                  {editingPerson?.id === person.id && (
+                    <div className="mt-4"><PersonEditor person={editingPerson} busy={busy} onChange={setEditingPerson} onClose={() => setEditingPerson(null)} onSave={() => void savePerson()} /></div>
+                  )}
                 </div>
               ))}
             </div>
-            {editingPerson && (
-              <div className="rounded-xl border bg-slate-50 p-4 sm:p-5">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <strong>
-                      {editingPerson.firstName} {editingPerson.lastName}
-                    </strong>
-                    <p className="text-xs text-slate-500">
-                      Stammdaten bearbeiten
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditingPerson(null)}
-                  >
-                    Schließen
-                  </Button>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  <Input
-                    className="h-11"
-                    value={editingPerson.firstName}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        firstName: event.target.value,
-                      })
-                    }
-                    placeholder="Vorname"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.lastName}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        lastName: event.target.value,
-                      })
-                    }
-                    placeholder="Nachname"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.street ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        street: event.target.value,
-                      })
-                    }
-                    placeholder="Straße"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.zip ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        zip: event.target.value,
-                      })
-                    }
-                    placeholder="PLZ"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.city ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        city: event.target.value,
-                      })
-                    }
-                    placeholder="Ort"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.phone ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        phone: event.target.value,
-                      })
-                    }
-                    placeholder="Telefon"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.email ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        email: event.target.value,
-                      })
-                    }
-                    placeholder="E-Mail"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.shirtSize ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        shirtSize: event.target.value,
-                      })
-                    }
-                    placeholder="Shirt"
-                  />
-                  <Input
-                    className="h-11"
-                    value={editingPerson.licenseNumber ?? ""}
-                    onChange={(event) =>
-                      setEditingPerson({
-                        ...editingPerson,
-                        licenseNumber: event.target.value,
-                      })
-                    }
-                    placeholder="DMSB-Lizenz"
-                  />
-                  <label className="grid gap-1 text-xs font-medium text-slate-500 sm:col-span-2">
-                    Hinweis zur Person
-                    <textarea
-                      className="min-h-24 rounded-md border bg-white px-3 py-2 text-sm text-slate-900"
-                      value={editingPerson.note ?? ""}
-                      onChange={(event) =>
-                        setEditingPerson({
-                          ...editingPerson,
-                          note: event.target.value,
-                        })
-                      }
-                    />
-                  </label>
-                  <label
-                    className={cn(
-                      "flex min-h-11 items-center gap-2 rounded-md border bg-white px-3 text-sm",
-                      !editingPerson.isActive && "border-red-300 bg-red-50 text-red-900",
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={editingPerson.isActive}
-                      onChange={(event) =>
-                        setEditingPerson({
-                          ...editingPerson,
-                          isActive: event.target.checked,
-                        })
-                      }
-                    />
-                    Aktiv und für Einsätze verfügbar
-                  </label>
-                  <Button
-                    className="h-11 sm:col-span-2 xl:col-span-1"
-                    onClick={() => void savePerson()}
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    Änderungen speichern
-                  </Button>
-                </div>
-              </div>
-            )}
+            {filteredPeople.length === 0 && <EmptyResults label="Keine Helfer entsprechen den Filtern." onClear={() => { setSearch(""); setArea("Strecke"); setActiveFilter("all"); }} />}
           </CardContent>
         </Card>
       )}
@@ -988,6 +978,12 @@ export function AdminMarshalsPage() {
               </div>
               <div className="flex flex-col gap-2 sm:flex-row" aria-label="Planungsansicht">
                 <div className="inline-flex rounded-lg border bg-slate-50 p-1" role="group" aria-label="Darstellung">
+                  <PlanningToggleButton
+                    active={planningDisplay === "overview"}
+                    onClick={() => setPlanningDisplay("overview")}
+                  >
+                    <MapPinned className="mr-1.5 h-4 w-4" /> Übersicht
+                  </PlanningToggleButton>
                   <PlanningToggleButton
                     active={planningDisplay === "map"}
                     onClick={() => setPlanningDisplay("map")}
@@ -1018,17 +1014,34 @@ export function AdminMarshalsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-            {planningDisplay === "map" && workspace && day ? (
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+            {planningDisplay === "list" && (
+              <FilterBar onClear={() => { setDaySearch(""); setDayStatusFilter("all"); setDayAssignmentFilter("all"); setDaySectionFilter("all"); }}>
+                <label className="grid gap-1 text-xs font-medium text-slate-600">Helfer suchen<Input className="h-10" value={daySearch} onChange={(event) => setDaySearch(event.target.value)} placeholder="Name, Nummer oder Ort" /></label>
+                <FilterSelect label="Zusage" value={dayStatusFilter} onChange={setDayStatusFilter} options={[{ value: "all", label: "Alle Zusagen" }, ...Object.entries(statusLabels).map(([value, label]) => ({ value, label }))]} />
+                <FilterSelect label="Zuweisung" value={dayAssignmentFilter} onChange={setDayAssignmentFilter} options={[{ value: "all", label: "Alle Zuweisungen" }, { value: "assigned", label: "Zugewiesen" }, { value: "unassigned", label: "Nicht zugewiesen" }]} />
+                <FilterSelect label="Abschnitt" value={daySectionFilter} onChange={setDaySectionFilter} options={[{ value: "all", label: "Alle Abschnitte" }, ...(workspace?.sections.map((section) => ({ value: section.id, label: section.name })) ?? [])]} />
+              </FilterBar>
+            )}
+            {planningDisplay === "overview" && workspace && day ? (
+              <MarshalPlanningOverview
+                workspace={workspace}
+                day={day}
+                targetMode={planningTargetMode}
+                canWrite={canWrite}
+                busy={busy}
+                onAssign={saveDay}
+                onReplace={replacePostHelper}
+              />
+            ) : planningDisplay === "map" && workspace && day ? (
               <MarshalPlanningMap
                 workspace={workspace}
                 day={day}
                 targetMode={planningTargetMode}
                 canWrite={canWrite}
                 busy={busy}
-                onAssign={(person, status, assignmentValue) =>
-                  void saveDay(person, status, assignmentValue)
-                }
+                onAssign={saveDay}
+                onReplace={replacePostHelper}
               />
             ) : (
               <>
@@ -1045,7 +1058,7 @@ export function AdminMarshalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {people.map((person) => {
+                  {filteredDayPeople.map((person) => {
                     const assignment = person.assignments.find(
                       (item) => item.dayId === day?.id,
                     );
@@ -1094,6 +1107,9 @@ export function AdminMarshalsPage() {
                           <AssignmentSelect
                             value={selected}
                             workspace={workspace}
+                            dayId={day?.id}
+                            targetMode={planningTargetMode}
+                            currentPersonId={person.id}
                             disabled={
                               !canWrite ||
                               busy ||
@@ -1125,7 +1141,7 @@ export function AdminMarshalsPage() {
               </table>
             </div>
             <div className="grid gap-3 md:hidden">
-              {people.map((person) => {
+              {filteredDayPeople.map((person) => {
                 const assignment = person.assignments.find(
                   (item) => item.dayId === day?.id,
                 );
@@ -1178,6 +1194,9 @@ export function AdminMarshalsPage() {
                         <AssignmentSelect
                           value={selected}
                           workspace={workspace}
+                          dayId={day?.id}
+                          targetMode={planningTargetMode}
+                          currentPersonId={person.id}
                           disabled={
                             !canWrite ||
                             busy ||
@@ -1207,6 +1226,7 @@ export function AdminMarshalsPage() {
                 );
               })}
             </div>
+            {filteredDayPeople.length === 0 && <EmptyResults label="Keine Helfer entsprechen den Listenfiltern." onClear={() => { setDaySearch(""); setDayStatusFilter("all"); setDayAssignmentFilter("all"); setDaySectionFilter("all"); }} />}
               </>
             )}
           </CardContent>
@@ -1328,39 +1348,15 @@ export function AdminMarshalsPage() {
                       <SelectItem value="briefing">Einweisung</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    className="h-11"
-                    value={trainingDraft.title}
-                    onChange={(event) =>
-                      setTrainingDraft({
-                        ...trainingDraft,
-                        title: event.target.value,
-                      })
-                    }
-                    placeholder="Titel"
-                  />
-                  <Input
-                    className="h-11"
-                    type="date"
-                    value={trainingDraft.sessionDate}
-                    onChange={(event) =>
-                      setTrainingDraft({
-                        ...trainingDraft,
-                        sessionDate: event.target.value,
-                      })
-                    }
-                  />
-                  <Input
-                    className="h-11"
-                    value={trainingDraft.location}
-                    onChange={(event) =>
-                      setTrainingDraft({
-                        ...trainingDraft,
-                        location: event.target.value,
-                      })
-                    }
-                    placeholder="Ort"
-                  />
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">Titel
+                    <Input className="h-11 text-sm font-normal" value={trainingDraft.title} onChange={(event) => setTrainingDraft({ ...trainingDraft, title: event.target.value })} placeholder="Bezeichnung des Termins" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">Datum
+                    <Input className="h-11 text-sm font-normal" type="date" value={trainingDraft.sessionDate} onChange={(event) => setTrainingDraft({ ...trainingDraft, sessionDate: event.target.value })} />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">Ort
+                    <Input className="h-11 text-sm font-normal" value={trainingDraft.location} onChange={(event) => setTrainingDraft({ ...trainingDraft, location: event.target.value })} placeholder="Veranstaltungsort" />
+                  </label>
                   <Button
                     className="h-11 w-full"
                     onClick={() => void createTraining()}
@@ -1378,7 +1374,11 @@ export function AdminMarshalsPage() {
             <CardHeader className="p-4 sm:p-6">
               <CardTitle>Teilnehmer und Lizenzstatus</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+              <FilterBar onClear={() => { setTrainingSearch(""); setAttendanceFilter("all"); }}>
+                <label className="grid gap-1 text-xs font-medium text-slate-600">Teilnehmer suchen<Input className="h-10" value={trainingSearch} onChange={(event) => setTrainingSearch(event.target.value)} placeholder="Name, Nummer oder Lizenz" /></label>
+                <FilterSelect label="Anwesenheit" value={attendanceFilter} onChange={setAttendanceFilter} options={[{ value: "all", label: "Alle Status" }, { value: "registered", label: "Angemeldet" }, { value: "attended", label: "Anwesend" }, { value: "absent", label: "Nicht anwesend" }, { value: "excused", label: "Entschuldigt" }]} />
+              </FilterBar>
               <div className="hidden overflow-x-auto md:block">
                 <table className="min-w-full text-sm">
                   <thead>
@@ -1389,7 +1389,7 @@ export function AdminMarshalsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {people.map((person) => {
+                    {filteredTrainingPeople.map((person) => {
                       const participant = workspace?.trainingParticipants.find(
                         (item) =>
                           item.sessionId === selectedTrainingId &&
@@ -1399,6 +1399,7 @@ export function AdminMarshalsPage() {
                         <tr key={person.id} className="border-b">
                           <td className="p-3 font-medium">
                             {person.firstName} {person.lastName}
+                            {!person.isActive && <span className="ml-2 text-xs text-red-700">Inaktiv</span>}
                           </td>
                           <td className="p-3">
                             {getLicense(person, workspace)}
@@ -1408,16 +1409,8 @@ export function AdminMarshalsPage() {
                               value={
                                 participant?.attendanceStatus ?? "registered"
                               }
-                              disabled={!canWrite || !selectedTrainingId}
-                              onChange={(value) =>
-                                void adminMarshalsService
-                                  .saveTrainingParticipant(
-                                    selectedTrainingId,
-                                    person.id,
-                                    value,
-                                  )
-                                  .then(load)
-                              }
+                              disabled={!canWrite || !selectedTrainingId || busy || !person.isActive}
+                              onChange={(value) => void saveAttendance(person, value)}
                             />
                           </td>
                         </tr>
@@ -1427,7 +1420,7 @@ export function AdminMarshalsPage() {
                 </table>
               </div>
               <div className="grid gap-3 md:hidden">
-                {people.map((person) => {
+                {filteredTrainingPeople.map((person) => {
                   const participant = workspace?.trainingParticipants.find(
                     (item) =>
                       item.sessionId === selectedTrainingId &&
@@ -1438,6 +1431,7 @@ export function AdminMarshalsPage() {
                       <div className="font-semibold">
                         {person.firstName} {person.lastName}
                       </div>
+                      {!person.isActive && <div className="mt-1 text-xs font-semibold text-red-700">Inaktiv · Statusänderung gesperrt</div>}
                       <div className="mt-1 text-xs text-slate-500">
                         DMSB-Lizenz: {getLicense(person, workspace)}
                       </div>
@@ -1445,22 +1439,15 @@ export function AdminMarshalsPage() {
                         Anwesenheit
                         <AttendanceSelect
                           value={participant?.attendanceStatus ?? "registered"}
-                          disabled={!canWrite || !selectedTrainingId}
-                          onChange={(value) =>
-                            void adminMarshalsService
-                              .saveTrainingParticipant(
-                                selectedTrainingId,
-                                person.id,
-                                value,
-                              )
-                              .then(load)
-                          }
+                          disabled={!canWrite || !selectedTrainingId || busy || !person.isActive}
+                          onChange={(value) => void saveAttendance(person, value)}
                         />
                       </label>
                     </div>
                   );
                 })}
               </div>
+              {filteredTrainingPeople.length === 0 && <EmptyResults label="Keine Teilnehmer entsprechen den Filtern." onClear={() => { setTrainingSearch(""); setAttendanceFilter("all"); }} />}
             </CardContent>
           </Card>
         </div>
@@ -1488,8 +1475,14 @@ export function AdminMarshalsPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 p-4 pt-0 sm:p-6 sm:pt-0 xl:grid-cols-2">
-            {workspace?.sections.map((section) => (
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+            <FilterBar onClear={() => { setPostSearch(""); setPostSectionFilter("all"); setPostStaffingFilter("all"); }}>
+              <label className="grid gap-1 text-xs font-medium text-slate-600">Posten suchen<Input className="h-10" value={postSearch} onChange={(event) => setPostSearch(event.target.value)} placeholder="Nummer oder Beschreibung" /></label>
+              <FilterSelect label="Abschnitt" value={postSectionFilter} onChange={setPostSectionFilter} options={[{ value: "all", label: "Alle Abschnitte" }, ...(workspace?.sections.map((section) => ({ value: section.id, label: section.name })) ?? [])]} />
+              <FilterSelect label="Besetzung" value={postStaffingFilter} onChange={setPostStaffingFilter} options={[{ value: "all", label: "Alle Besetzungen" }, { value: "under", label: "Mindestens ein Tag unter Soll" }, { value: "met", label: "Mindestens ein Tag im Soll" }, { value: "over", label: "Mindestens ein Tag über Soll" }]} />
+            </FilterBar>
+            <div className="grid gap-4 xl:grid-cols-2">
+            {workspace?.sections.filter((section) => workspace.posts.some((post) => post.sectionId === section.id && postMatchesConfigFilters(post))).map((section) => (
               <div key={section.id} className="rounded-xl border p-4">
                 <div className="mb-3 flex justify-between">
                   <strong>{section.name}</strong>
@@ -1497,7 +1490,7 @@ export function AdminMarshalsPage() {
                 </div>
                 <div className="divide-y">
                   {workspace.posts
-                    .filter((post) => post.sectionId === section.id)
+                    .filter((post) => post.sectionId === section.id && postMatchesConfigFilters(post))
                     .map((post) => {
                       const target = postTargets[post.id] ?? post.targetStaff;
                       const emergencyTarget = Math.min(
@@ -1604,6 +1597,8 @@ export function AdminMarshalsPage() {
                 </div>
               </div>
             ))}
+            </div>
+            {workspace && !workspace.posts.some(postMatchesConfigFilters) && <EmptyResults label="Keine Posten entsprechen den Filtern." onClear={() => { setPostSearch(""); setPostSectionFilter("all"); setPostStaffingFilter("all"); }} />}
           </CardContent>
         </Card>
       )}
@@ -1689,6 +1684,72 @@ export function AdminMarshalsPage() {
       )}
     </div>
   );
+}
+
+function PersonEditor({ person, busy, onChange, onClose, onSave }: {
+  person: MarshalPerson;
+  busy: boolean;
+  onChange: (person: MarshalPerson) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const fields: Array<{ key: "firstName" | "lastName" | "street" | "zip" | "city" | "birthdate" | "phone" | "email" | "shirtSize" | "licenseNumber"; label: string; type?: string }> = [
+    { key: "firstName", label: "Vorname" }, { key: "lastName", label: "Nachname" },
+    { key: "street", label: "Straße und Hausnummer" }, { key: "zip", label: "Postleitzahl" },
+    { key: "city", label: "Ort" }, { key: "birthdate", label: "Geburtsdatum", type: "date" },
+    { key: "phone", label: "Telefon", type: "tel" }, { key: "email", label: "E-Mail-Adresse", type: "email" },
+    { key: "shirtSize", label: "Shirtgröße" }, { key: "licenseNumber", label: "DMSB-Lizenznummer" },
+  ];
+  return (
+    <section className="rounded-xl border border-primary/30 bg-slate-50 p-4 sm:p-5" aria-label={`${person.firstName} ${person.lastName} bearbeiten`}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div><strong>{person.firstName} {person.lastName}</strong><p className="text-xs text-slate-500">Stammdaten bearbeiten</p></div>
+        <Button type="button" size="sm" variant="outline" onClick={onClose}>Schließen</Button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {fields.map(({ key, label, type = "text" }, index) => (
+          <label key={key} className="grid gap-1 text-xs font-medium text-slate-600">{label}
+            <Input autoFocus={index === 0} className="h-11 text-sm font-normal text-slate-950" type={type} value={person[key] ?? ""} onChange={(event) => onChange({ ...person, [key]: event.target.value })} />
+          </label>
+        ))}
+        <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">Einsatzbereiche
+          <Input className="h-11 text-sm font-normal text-slate-950" value={person.activityAreas.join(", ")} onChange={(event) => onChange({ ...person, activityAreas: event.target.value.split(/[;,]/).map((value) => value.trim()).filter(Boolean) })} />
+          <span className="font-normal text-slate-500">Mehrere Bereiche mit Komma oder Semikolon trennen.</span>
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">Hinweis zur Person
+          <textarea className="min-h-24 rounded-md border bg-white px-3 py-2 text-sm font-normal text-slate-950" value={person.note ?? ""} onChange={(event) => onChange({ ...person, note: event.target.value })} />
+        </label>
+        <label className={cn("flex min-h-11 items-center gap-2 rounded-md border bg-white px-3 text-sm", !person.isActive && "border-red-300 bg-red-50 text-red-900")}>
+          <input type="checkbox" checked={person.isActive} onChange={(event) => onChange({ ...person, isActive: event.target.checked })} />
+          Aktiv und für Einsätze verfügbar
+        </label>
+        <Button className="h-11" type="button" disabled={busy || !person.firstName || !person.lastName} onClick={onSave}><Save className="mr-2 h-4 w-4" />Änderungen speichern</Button>
+      </div>
+    </section>
+  );
+}
+
+function FilterBar({ children, onClear }: { children: ReactNode; onClear: () => void }) {
+  return (
+    <div className="grid gap-2 rounded-xl border bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+      {children}
+      <div className="flex items-end"><Button type="button" variant="outline" className="h-10 w-full" onClick={onClear}>Filter zurücksetzen</Button></div>
+    </div>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
+  return (
+    <label className="grid gap-1 text-xs font-medium text-slate-600">{label}
+      <select className="h-10 w-full rounded-md border bg-white px-3 text-sm font-normal text-slate-950" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function EmptyResults({ label, onClear }: { label: string; onClear: () => void }) {
+  return <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500"><p>{label}</p><Button type="button" size="sm" variant="outline" className="mt-3" onClick={onClear}>Filter zurücksetzen</Button></div>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
@@ -1780,11 +1841,17 @@ function CommitmentSelect({
 function AssignmentSelect({
   value,
   workspace,
+  dayId,
+  targetMode,
+  currentPersonId,
   disabled,
   onChange,
 }: {
   value: string;
   workspace: MarshalWorkspace | null;
+  dayId?: string;
+  targetMode: PlanningTargetMode;
+  currentPersonId: string;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
@@ -1801,17 +1868,16 @@ function AssignmentSelect({
           {section.leaderCode} – {section.name}
         </option>
       ))}
-      {workspace?.posts.map((post) => (
-        <option
-          key={`post:${post.id}`}
-          value={`post:${post.id}`}
-          disabled={!post.isActive}
-        >
-          {post.code}
-          {post.description ? ` – ${post.description}` : ""}
-          {!post.isActive ? " (inaktiv)" : ""}
-        </option>
-      ))}
+      {workspace?.posts.map((post) => {
+        const assignedPeople = dayId ? workspace.people.filter((person) => person.assignments.some((assignment) => assignment.dayId === dayId && assignment.postId === post.id)) : [];
+        const currentIsAssigned = assignedPeople.some((person) => person.id === currentPersonId);
+        const full = assignedPeople.length >= getPostTarget(post, targetMode) && !currentIsAssigned;
+        return (
+          <option key={`post:${post.id}`} value={`post:${post.id}`} disabled={!post.isActive || full}>
+            {post.code}{post.description ? ` – ${post.description}` : ""}{!post.isActive ? " (inaktiv)" : full ? " (Sollplätze belegt)" : ""}
+          </option>
+        );
+      })}
     </select>
   );
 }
