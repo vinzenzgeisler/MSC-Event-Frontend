@@ -38,6 +38,10 @@ export function checkinLabel(isVerified: boolean): string {
   return isVerified ? "Bestätigt" : "Ausstehend";
 }
 
+export function waiverSignedLabel(isSigned: boolean): string {
+  return isSigned ? "Unterschrieben" : "Ausstehend";
+}
+
 export function acceptanceStatusClasses(status: AcceptanceStatus): string {
   return {
     pending: "border-amber-300 bg-amber-50 text-amber-900",
@@ -65,6 +69,10 @@ export function paymentStatusClasses(status: PaymentStatus): string {
 
 export function checkinClasses(isVerified: boolean): string {
   return isVerified ? "border-primary/35 bg-primary/10 text-primary" : "border-slate-300 bg-slate-100 text-slate-800";
+}
+
+export function waiverSignedClasses(isSigned: boolean): string {
+  return isSigned ? "border-primary/35 bg-primary/10 text-primary" : "border-slate-300 bg-slate-100 text-slate-800";
 }
 
 export function outboxStatusClasses(status: OutboxStatus): string {

@@ -9,6 +9,12 @@ import type {
   VehicleType
 } from "@/types/common";
 
+export type WaiverSignedStatus = {
+  signed: boolean;
+  signedAt: string | null;
+  documentId: Id | null;
+};
+
 export type AdminEntryListItemDto = {
   id: Id;
   eventId?: Id;
@@ -33,6 +39,7 @@ export type AdminEntryListItemDto = {
   checkinIdVerified: boolean;
   confirmationMailVerified?: boolean;
   confirmationMailSent: boolean;
+  waiverSigned?: WaiverSignedStatus;
   internalNote?: string | null;
   driverNote?: string | null;
   deletedAt?: string | null;
@@ -75,6 +82,7 @@ export type AdminEntryListItem = {
   registrationStatus: RegistrationStatus;
   payment: PaymentStatus;
   checkin: "offen" | "bestätigt";
+  waiverSigned: WaiverSignedStatus;
   confirmationMailSent: boolean;
   confirmationMailVerified: boolean;
   driverNote: string;
@@ -144,6 +152,7 @@ export type AdminEntryDetailDto = {
   vehicleThumbUrl?: string | null;
   confirmationMailSent?: boolean;
   confirmationMailVerified?: boolean;
+  waiverSigned?: WaiverSignedStatus;
   person: {
     driver: {
       firstName: string | null;
@@ -267,6 +276,7 @@ export type AdminEntryDetailViewModel = {
   createdAt: string;
   isBackupVehicle: boolean;
   checkinVerified: boolean;
+  waiverSigned: WaiverSignedStatus;
   driver: {
     name: string;
     email: string;

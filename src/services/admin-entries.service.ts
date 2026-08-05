@@ -105,6 +105,14 @@ function normalizePaymentStatus(value: unknown): PaymentStatus {
   return value === "paid" ? "paid" : "due";
 }
 
+function normalizeWaiverSignedStatus(value?: { signed?: boolean; signedAt?: string | null; documentId?: string | null } | null) {
+  return {
+    signed: Boolean(value?.signed),
+    signedAt: value?.signedAt ?? null,
+    documentId: value?.documentId ?? null
+  };
+}
+
 function isTransitionNotAllowedError(error: unknown): boolean {
   if (!(error instanceof ApiError)) {
     return false;
@@ -185,6 +193,7 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     registrationStatus: dto.registrationStatus === "submitted_unverified" ? "submitted_unverified" : "submitted_verified",
     payment: normalizePaymentStatus(dto.paymentStatus),
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
+    waiverSigned: normalizeWaiverSignedStatus(dto.waiverSigned),
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     driverNote: (dto.driverNote ?? "").trim(),
@@ -252,6 +261,7 @@ function fromAdminEntryDetailDto(
     createdAt: dto.createdAt,
     isBackupVehicle: dto.isBackupVehicle,
     checkinVerified: dto.checkin.checkinIdVerified,
+    waiverSigned: normalizeWaiverSignedStatus(dto.waiverSigned),
     driver: {
       name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
       email: dto.person.driver.email ?? "-",
