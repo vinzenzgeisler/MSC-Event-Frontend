@@ -29,6 +29,9 @@ export type AdminEntryListItemDto = {
   vehicleThumbUrl: string | null;
   registrationStatus: RegistrationStatus;
   acceptanceStatus: AcceptanceStatus;
+  withdrawnReason?: string | null;
+  withdrawnAt?: string | null;
+  withdrawnBy?: string | null;
   paymentStatus: PaymentStatus | null;
   checkinIdVerified: boolean;
   techStatus: TechStatus;
@@ -77,7 +80,7 @@ export type AdminEntryListItem = {
   vehicleThumbUrl: string | null;
   status: AcceptanceStatus;
   registrationStatus: RegistrationStatus;
-  payment: PaymentStatus;
+  payment: PaymentStatus | null;
   checkin: "offen" | "bestätigt";
   techStatus: TechStatus;
   confirmationMailSent: boolean;
@@ -105,7 +108,7 @@ export type AdminDeletedEntryListItem = {
   startNumber: string;
   vehicleLabel: string;
   status: AcceptanceStatus;
-  payment: PaymentStatus;
+  payment: PaymentStatus | null;
   deletedAt: string;
   deletedBy: string;
   deleteReason: string;
@@ -141,6 +144,9 @@ export type AdminEntryDetailDto = {
   className: string;
   registrationStatus: RegistrationStatus;
   acceptanceStatus: AcceptanceStatus;
+  withdrawnReason?: string | null;
+  withdrawnAt?: string | null;
+  withdrawnBy?: string | null;
   orgaCode?: string | null;
   startNumberNorm: string | null;
   isBackupVehicle: boolean;
@@ -207,10 +213,10 @@ export type AdminEntryDetailDto = {
   } | null;
   backupVehicleThumbUrl?: string | null;
   payment: {
-    totalCents: number;
-    paidAmountCents: number;
-    amountOpenCents: number;
-    paymentStatus: PaymentStatus;
+    totalCents: number | null;
+    paidAmountCents: number | null;
+    amountOpenCents: number | null;
+    paymentStatus: PaymentStatus | null;
   };
   checkin: {
     checkinIdVerified: boolean;
@@ -268,7 +274,10 @@ export type AdminEntryDetailViewModel = {
   startNumber: string;
   orgaCode: string;
   status: AcceptanceStatus;
-  paymentStatus: PaymentStatus;
+  paymentStatus: PaymentStatus | null;
+  withdrawnReason: string;
+  withdrawnAt: string | null;
+  withdrawnBy: string;
   registrationStatus: RegistrationStatus;
   createdAt: string;
   isBackupVehicle: boolean;
@@ -330,10 +339,10 @@ export type AdminEntryDetailViewModel = {
     vehicleHistory: string;
   };
   payment: {
-    totalCents: number;
-    paidAmountCents: number;
-    amountOpenCents: number;
-    status: PaymentStatus;
+    totalCents: number | null;
+    paidAmountCents: number | null;
+    amountOpenCents: number | null;
+    status: PaymentStatus | null;
   };
   consent: {
     termsAccepted: boolean;

@@ -6,6 +6,7 @@ import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
@@ -183,7 +184,7 @@ export function AdminEntryDetailPage() {
   const location = useLocation();
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected">("accepted");
+  const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected" | "withdrawn">("accepted");
   const [paid, setPaid] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
   const [confirmationMailSent, setConfirmationMailSent] = useState(false);
@@ -197,6 +198,8 @@ export function AdminEntryDetailPage() {
   const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
   const [pendingAcceptConfirm, setPendingAcceptConfirm] = useState(false);
   const [pendingRejectConfirm, setPendingRejectConfirm] = useState(false);
+  const [pendingWithdrawConfirm, setPendingWithdrawConfirm] = useState(false);
+  const [withdrawalReasonDraft, setWithdrawalReasonDraft] = useState("");
   const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
   const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState(false);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
@@ -505,7 +508,8 @@ export function AdminEntryDetailPage() {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung nicht gefunden.</div>;
   }
 
-  const paymentState = paid ? "paid" : "due";
+  const paymentApplicable = status !== "rejected" && status !== "withdrawn" && detail.payment.status !== null;
+  const paymentState = paymentApplicable ? (paid ? "paid" : "due") : null;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const changedAt = detail.history.reduce((latest, item) => {
@@ -521,10 +525,10 @@ export function AdminEntryDetailPage() {
   }, detail.createdAt);
   const anyActionInFlight = actionInFlight !== null;
   const statusActionInFlight =
-    actionInFlight === "status-shortlist" || actionInFlight === "status-accepted" || actionInFlight === "status-rejected";
+    actionInFlight === "status-shortlist" || actionInFlight === "status-accepted" || actionInFlight === "status-rejected" || actionInFlight === "status-withdrawn";
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
   const actionActiveClass = "border-primary bg-primary text-primary-foreground hover:bg-primary/90";
-  const statusDisabledReason = (target: "pending" | "shortlist" | "accepted" | "rejected") => {
+  const statusDisabledReason = (target: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn") => {
     if (anyActionInFlight) {
       return "Aktion wird verarbeitet…";
     }
@@ -720,9 +724,15 @@ export function AdminEntryDetailPage() {
               <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
                 Status: {acceptanceStatusLabel(status)}
               </Badge>
-              <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
-                Zahlung: {paymentStatusLabel(paymentState)}
-              </Badge>
+              {paymentState ? (
+                <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
+                  Zahlung: {paymentStatusLabel(paymentState)}
+                </Badge>
+              ) : (
+                <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+                  Zahlung: Nicht relevant
+                </Badge>
+              )}
               {status === "accepted" ? (
                 <Badge className={`${techStatusClasses(detail.techStatus)} h-6 px-2.5 text-xs`} variant="outline">
                   Prüfung: {techStatusLabel(detail.techStatus)}
@@ -773,9 +783,15 @@ export function AdminEntryDetailPage() {
             <Badge className={`${acceptanceStatusClasses(status)} h-6 px-2.5 text-xs`} variant="outline">
               Status: {acceptanceStatusLabel(status)}
             </Badge>
-            <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
-              Zahlung: {paymentStatusLabel(paymentState)}
-            </Badge>
+            {paymentState ? (
+              <Badge className={`${paymentStatusClasses(paymentState)} h-6 px-2.5 text-xs`} variant="outline">
+                Zahlung: {paymentStatusLabel(paymentState)}
+              </Badge>
+            ) : (
+              <Badge className="h-6 border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-600" variant="outline">
+                Zahlung: Nicht relevant
+              </Badge>
+            )}
             {status === "accepted" ? (
               <Badge className={`${techStatusClasses(detail.techStatus)} h-6 px-2.5 text-xs`} variant="outline">
                 Prüfung: {techStatusLabel(detail.techStatus)}
@@ -1006,6 +1022,15 @@ export function AdminEntryDetailPage() {
                 <CardTitle>Zahlung</CardTitle>
               </CardHeader>
               <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
+                {!paymentState ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-100 p-4 text-slate-600">
+                    <div className="font-semibold text-slate-800">Nicht relevant</div>
+                    <div className="mt-1 text-sm">
+                      Für {status === "withdrawn" ? "abgesagte" : "abgelehnte"} Nennungen werden keine Gebühren fällig. Vorhandene Zahlungshistorie bleibt in der Finanzverwaltung erhalten.
+                    </div>
+                  </div>
+                ) : (
+                <>
                 <div
                   className={cn(
                     "flex flex-wrap items-center gap-3 rounded-xl border p-4",
@@ -1042,17 +1067,19 @@ export function AdminEntryDetailPage() {
                     <div className="text-xs uppercase text-slate-500">
                       {status === "accepted" ? "Nennungsbetrag" : "Vorgesehener Betrag"}
                     </div>
-                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.totalCents)}</div>
+                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.totalCents ?? 0)}</div>
                   </div>
                   <div className="rounded-md border bg-slate-50 p-3">
                     <div className="text-xs uppercase text-slate-500">Bereits bezahlt</div>
-                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.paidAmountCents)}</div>
+                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.paidAmountCents ?? 0)}</div>
                   </div>
                   <div className="rounded-md border bg-slate-50 p-3">
                     <div className="text-xs uppercase text-slate-500">Offen</div>
-                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.amountOpenCents)}</div>
+                    <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.amountOpenCents ?? 0)}</div>
                   </div>
                 </div>
+                </>
+                )}
               </CardContent>
             </Card>
 
@@ -1193,6 +1220,17 @@ export function AdminEntryDetailPage() {
                         className={status === "rejected" ? actionActiveClass : actionOutlineClass}
                         disabledReason={statusDisabledReason("rejected")}
                         onClick={() => setPendingRejectConfirm(true)}
+                      />
+                      <HintButton
+                        label={actionInFlight === "status-withdrawn" ? "Status wird gesetzt…" : "Als Abgesagt markieren"}
+                        icon={actionInFlight === "status-withdrawn" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
+                        variant={status === "withdrawn" ? "default" : "outline"}
+                        className={status === "withdrawn" ? actionActiveClass : actionOutlineClass}
+                        disabledReason={statusDisabledReason("withdrawn")}
+                        onClick={() => {
+                          setWithdrawalReasonDraft("");
+                          setPendingWithdrawConfirm(true);
+                        }}
                       />
                     </>
                   )}
@@ -1369,8 +1407,8 @@ export function AdminEntryDetailPage() {
                     className={actionOutlineClass}
                     disabledReason={anyActionInFlight ? "Aktion wird verarbeitet…" : undefined}
                     onClick={() => {
-                      setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents));
-                      setPaymentPaidInput(status === "accepted" ? euroInputFromCents(detail.payment.paidAmountCents) : "0,00");
+                      setPaymentTotalInput(euroInputFromCents(detail.payment.totalCents ?? 0));
+                      setPaymentPaidInput(status === "accepted" ? euroInputFromCents(detail.payment.paidAmountCents ?? 0) : "0,00");
                       setPaymentEditorOpen(true);
                     }}
                   />
@@ -1749,6 +1787,53 @@ export function AdminEntryDetailPage() {
                 ) : (
                   "Ja, ablehnen"
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canSetStatus && pendingWithdrawConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Teilnahme absagen?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Die historische Startnummer bleibt sichtbar, wird aber für andere Teilnehmer freigegeben.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-slate-800" htmlFor="withdrawal-reason-detail">
+              Grund der Absage
+            </label>
+            <Input
+              id="withdrawal-reason-detail"
+              className="mt-1"
+              value={withdrawalReasonDraft}
+              maxLength={2000}
+              placeholder="z. B. Fahrer hat seine Teilnahme abgesagt"
+              onChange={(event) => setWithdrawalReasonDraft(event.target.value)}
+            />
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" disabled={actionInFlight === "status-withdrawn"} onClick={() => setPendingWithdrawConfirm(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={actionInFlight === "status-withdrawn" || !withdrawalReasonDraft.trim()}
+                onClick={async () => {
+                  const reason = withdrawalReasonDraft.trim();
+                  if (!reason) {
+                    return;
+                  }
+                  setPendingWithdrawConfirm(false);
+                  await runAction(
+                    "status-withdrawn",
+                    () => adminEntriesService.setEntryStatus(detail.id, "to_withdrawn", { withdrawalReason: reason }),
+                    "Status auf Abgesagt gesetzt.",
+                    "Status konnte nicht geändert werden."
+                  );
+                }}
+              >
+                {actionInFlight === "status-withdrawn" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Wird gesetzt…</> : "Ja, als abgesagt markieren"}
               </Button>
             </div>
           </div>

@@ -4,7 +4,7 @@ export type VehicleType = "auto" | "moto";
 
 export type RegistrationStatus = "submitted_unverified" | "submitted_verified";
 
-export type AcceptanceStatus = "pending" | "shortlist" | "accepted" | "rejected";
+export type AcceptanceStatus = "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
 
 export type PaymentStatus = "due" | "paid";
 

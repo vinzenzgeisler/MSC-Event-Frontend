@@ -96,6 +96,7 @@ export function EntriesFilterBar({
             <SelectItem value="shortlist">Vorauswahl</SelectItem>
             <SelectItem value="accepted">Zugelassen</SelectItem>
             <SelectItem value="rejected">Abgelehnt</SelectItem>
+            <SelectItem value="withdrawn">Abgesagt</SelectItem>
             {allowDeletedStatusOption && <SelectItem value={DELETED_SCOPE_VALUE}>Gelöschte</SelectItem>}
           </SelectContent>
         </Select>

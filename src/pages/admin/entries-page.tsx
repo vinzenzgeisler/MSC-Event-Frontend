@@ -46,7 +46,7 @@ const EMPTY_META: ListMeta = {
   nextCursor: null
 };
 
-const ACCEPTANCE_VALUES: AdminEntriesFilter["acceptanceStatus"][] = ["all", "pending", "shortlist", "accepted", "rejected"];
+const ACCEPTANCE_VALUES: AdminEntriesFilter["acceptanceStatus"][] = ["all", "pending", "shortlist", "accepted", "rejected", "withdrawn"];
 const REGISTRATION_VALUES: AdminEntriesFilter["registrationStatus"][] = ["all", "submitted_unverified", "submitted_verified"];
 const PAYMENT_VALUES: AdminEntriesFilter["paymentStatus"][] = ["all", "due", "paid"];
 const SORT_BY_VALUES: AdminEntriesFilter["sortBy"][] = ["createdAt", "updatedAt", "driverLastName", "driverFirstName", "className", "startNumberNorm"];
@@ -456,12 +456,14 @@ export function AdminEntriesPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
+  const [pendingWithdrawEntryId, setPendingWithdrawEntryId] = useState<string | null>(null);
+  const [withdrawalReasonDraft, setWithdrawalReasonDraft] = useState("");
   const [pendingRestoreEntryId, setPendingRestoreEntryId] = useState<string | null>(null);
   const [includeDriverNoteOnAccept, setIncludeDriverNoteOnAccept] = useState(true);
   const [includeDriverNoteOnReject, setIncludeDriverNoteOnReject] = useState(true);
   const [actorLabelById, setActorLabelById] = useState<Map<string, string>>(new Map());
   const [actorLookupLoaded, setActorLookupLoaded] = useState(false);
-  const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" }>(null);
+  const [statusActionBusy, setStatusActionBusy] = useState<null | { entryId: string; action: "shortlist" | "accepted" | "rejected" | "withdrawn" }>(null);
   const [mobileLoadMoreNode, setMobileLoadMoreNode] = useState<HTMLDivElement | null>(null);
   const [desktopLoadMoreNode, setDesktopLoadMoreNode] = useState<HTMLDivElement | null>(null);
   const [activeTableScrollContainerNode, setActiveTableScrollContainerNode] = useState<HTMLDivElement | null>(null);
@@ -1065,6 +1067,7 @@ export function AdminEntriesPage() {
   const shownTotal = viewScope === "deleted" ? deletedMeta.total : meta.total;
   const pendingAcceptRow = pendingAcceptEntryId ? rows.find((item) => item.id === pendingAcceptEntryId) : null;
   const pendingRejectRow = pendingRejectEntryId ? rows.find((item) => item.id === pendingRejectEntryId) : null;
+  const pendingWithdrawRow = pendingWithdrawEntryId ? rows.find((item) => item.id === pendingWithdrawEntryId) : null;
   const hasAcceptDriverNote = Boolean(pendingAcceptRow?.driverNote);
   const hasRejectDriverNote = Boolean(pendingRejectRow?.driverNote);
   const useDesktopTableShell = viewScope === "active";
@@ -1258,9 +1261,13 @@ export function AdminEntriesPage() {
                           </Badge>
                         </td>
                         <td className="px-3 py-2">
-                          <Badge className={paymentStatusClasses(row.payment)} variant="outline">
-                            {paymentStatusLabel(row.payment)}
-                          </Badge>
+                          {row.payment ? (
+                            <Badge className={paymentStatusClasses(row.payment)} variant="outline">
+                              {paymentStatusLabel(row.payment)}
+                            </Badge>
+                          ) : (
+                            <Badge className="border-slate-200 bg-slate-100 text-slate-500" variant="outline">Nicht relevant</Badge>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-slate-700">{row.deletedAt}</td>
                         <td className="px-3 py-2 text-slate-700">{resolveActorLabel(row.deletedBy)}</td>
@@ -1355,6 +1362,22 @@ export function AdminEntriesPage() {
             setIncludeDriverNoteOnReject(Boolean(row?.driverNote?.trim()));
             setPendingRejectEntryId(entryId);
           }}
+          onSetWithdrawn={(entryId) => {
+            if (statusActionBusy) {
+              return;
+            }
+            if (!canManageStatus) {
+              showToast("Nur Admin-Rollen dürfen den Status ändern.");
+              return;
+            }
+            const row = rows.find((item) => item.id === entryId);
+            if (row?.status === "withdrawn") {
+              showToast("Nennung ist bereits abgesagt.");
+              return;
+            }
+            setWithdrawalReasonDraft("");
+            setPendingWithdrawEntryId(entryId);
+          }}
         />
       )}
       </div>
@@ -1437,6 +1460,10 @@ export function AdminEntriesPage() {
                       includeDriverNoteInLifecycleMail: hasAcceptDriverNote ? includeDriverNoteOnAccept : false
                     });
                     applyLocalStatusUpdate(entryId, "accepted");
+                    await replaceActiveRows(appliedFilter, {
+                      minimumRows: Math.max(rows.length, PAGE_SIZE),
+                      silentError: true
+                    });
                     showToast(`${formatEntryHeadline(pendingAcceptRow)} wurde zugelassen.`);
                     setPendingAcceptEntryId(null);
                   } catch (error) {
@@ -1514,6 +1541,61 @@ export function AdminEntriesPage() {
                 ) : (
                   "Ja, ablehnen"
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canManageStatus && pendingWithdrawEntryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-lg border bg-white p-4 shadow-lg">
+            <h2 className="text-lg font-semibold text-slate-900">Teilnahme absagen?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Die Nennung wird auf „Abgesagt“ gesetzt. Die Startnummer bleibt sichtbar, wird aber wieder freigegeben.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-slate-800" htmlFor="withdrawal-reason-list">
+              Grund der Absage
+            </label>
+            <Input
+              id="withdrawal-reason-list"
+              className="mt-1"
+              value={withdrawalReasonDraft}
+              maxLength={2000}
+              placeholder="z. B. Fahrer hat seine Teilnahme abgesagt"
+              onChange={(event) => setWithdrawalReasonDraft(event.target.value)}
+            />
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingWithdrawEntryId(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={statusActionBusy !== null || !withdrawalReasonDraft.trim()}
+                onClick={async () => {
+                  const entryId = pendingWithdrawEntryId;
+                  const reason = withdrawalReasonDraft.trim();
+                  if (!entryId || !reason || statusActionBusy) {
+                    return;
+                  }
+                  setStatusActionBusy({ entryId, action: "withdrawn" });
+                  try {
+                    await adminEntriesService.setEntryStatus(entryId, "to_withdrawn", { withdrawalReason: reason });
+                    applyLocalStatusUpdate(entryId, "withdrawn");
+                    showToast(`${formatEntryHeadline(pendingWithdrawRow)} wurde als abgesagt markiert.`);
+                    setPendingWithdrawEntryId(null);
+                    setWithdrawalReasonDraft("");
+                  } catch (error) {
+                    showToast(getApiErrorMessage(error, "Nennung konnte nicht abgesagt werden."));
+                  } finally {
+                    setStatusActionBusy(null);
+                  }
+                }}
+              >
+                {statusActionBusy?.entryId === pendingWithdrawEntryId && statusActionBusy.action === "withdrawn" ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Wird gesetzt…</>
+                ) : "Ja, als abgesagt markieren"}
               </Button>
             </div>
           </div>
