@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ClipboardCheck,
   Download,
   FileSpreadsheet,
   GraduationCap,
+  List,
+  Map,
   Plus,
   RefreshCw,
   Save,
@@ -35,6 +37,11 @@ import type {
   MarshalWorkspace,
 } from "@/types/admin-marshals";
 import { cn } from "@/lib/utils";
+import {
+  getPostMapCoordinates,
+  MarshalPlanningMap,
+  type PlanningTargetMode,
+} from "@/components/features/admin/marshal-planning-map";
 
 type View =
   | "people"
@@ -106,6 +113,14 @@ export function AdminMarshalsPage() {
   const [importPreview, setImportPreview] =
     useState<MarshalImportPreview | null>(null);
   const [postTargets, setPostTargets] = useState<Record<string, number>>({});
+  const [emergencyPostTargets, setEmergencyPostTargets] = useState<
+    Record<string, number>
+  >({});
+  const [planningDisplay, setPlanningDisplay] = useState<"map" | "list">(
+    "map",
+  );
+  const [planningTargetMode, setPlanningTargetMode] =
+    useState<PlanningTargetMode>("normal");
 
   const load = useCallback(async () => {
     if (!eventId) return;
@@ -114,13 +129,26 @@ export function AdminMarshalsPage() {
     try {
       const data = await adminMarshalsService.getWorkspace(
         eventId,
-        search || undefined,
-        area === "all" ? undefined : area,
+        view === "people" ? search || undefined : undefined,
+        view === "people" && area !== "all" ? area : undefined,
       );
       setWorkspace(data);
       setPostTargets(
         Object.fromEntries(
           data.posts.map((post) => [post.id, post.targetStaff]),
+        ),
+      );
+      setEmergencyPostTargets(
+        Object.fromEntries(
+          data.posts.map((post) => [
+            post.id,
+            Math.min(
+              post.targetStaff,
+              typeof post.emergencyTargetStaff === "number"
+                ? post.emergencyTargetStaff
+                : post.targetStaff,
+            ),
+          ]),
         ),
       );
       if (!selectedTrainingId && data.trainings[0])
@@ -135,7 +163,7 @@ export function AdminMarshalsPage() {
     } finally {
       setBusy(false);
     }
-  }, [area, eventId, search, selectedTrainingId]);
+  }, [area, eventId, search, selectedTrainingId, view]);
 
   useEffect(() => {
     adminMarshalsService
@@ -165,7 +193,6 @@ export function AdminMarshalsPage() {
     if (eventId) localStorage.setItem("msc_marshal_event_id", eventId);
   }, [eventId]);
 
-  const selectedEvent = events.find((item) => item.id === eventId);
   const day = workspace?.days.find(
     (item) => item.dayKey === (view === "sunday" ? "sunday" : "saturday"),
   );
@@ -180,11 +207,15 @@ export function AdminMarshalsPage() {
     assignmentValue: string,
   ) {
     if (!day) return;
+    const clearedAssignmentValue =
+      commitmentStatus === "declined" || commitmentStatus === "not_asked"
+        ? ""
+        : assignmentValue;
     const post = workspace?.posts.find(
-      (item) => `post:${item.id}` === assignmentValue,
+      (item) => `post:${item.id}` === clearedAssignmentValue,
     );
     const section = workspace?.sections.find(
-      (item) => `leader:${item.id}` === assignmentValue,
+      (item) => `leader:${item.id}` === clearedAssignmentValue,
     );
     setBusy(true);
     setError("");
@@ -204,7 +235,7 @@ export function AdminMarshalsPage() {
               ? "marshal"
               : section
                 ? "section_leader"
-                : assignmentValue
+                : clearedAssignmentValue
                   ? "special"
                   : null,
             sectionId: post?.sectionId ?? section?.id ?? null,
@@ -376,7 +407,20 @@ export function AdminMarshalsPage() {
               ?.code ?? "4",
           code: post.code,
           description: post.description,
-          targetStaff: postTargets[post.id] ?? post.targetStaff,
+          targetStaff: Math.max(
+            1,
+            postTargets[post.id] ?? post.targetStaff,
+          ),
+          emergencyTargetStaff: Math.min(
+            Math.max(1, postTargets[post.id] ?? post.targetStaff),
+            Math.max(
+              1,
+              emergencyPostTargets[post.id] ??
+                post.emergencyTargetStaff ??
+                post.targetStaff,
+            ),
+          ),
+          ...getPostMapCoordinates(post),
           isActive: post.isActive,
           sortOrder: post.sortOrder,
         })),
@@ -407,31 +451,31 @@ export function AdminMarshalsPage() {
         {
           key: "saturday",
           label: "Samstag",
-          detail: selectedEvent?.startsAt.slice(0, 4) ?? "Einsatz",
+          detail: "Zusagen & Einsatz",
           icon: CalendarDays,
         },
         {
           key: "sunday",
           label: "Sonntag",
-          detail: selectedEvent?.startsAt.slice(0, 4) ?? "Einsatz",
+          detail: "Zusagen & Einsatz",
           icon: CalendarDays,
         },
         {
           key: "prints",
           label: "Drucklisten",
-          detail: "A4 quer",
+          detail: "Anwesenheit & Abschnitte",
           icon: ClipboardCheck,
         },
         {
           key: "training",
           label: "Schulungen",
-          detail: "Lizenzen",
+          detail: "Termine & Lizenzen",
           icon: GraduationCap,
         },
         {
           key: "config",
           label: "Posten",
-          detail: "Konfiguration",
+          detail: "Besetzung & Hinweise",
           icon: Settings2,
         },
         {
@@ -446,7 +490,7 @@ export function AdminMarshalsPage() {
         detail: string;
         icon: typeof UserRound;
       }>,
-    [selectedEvent],
+    [],
   );
 
   return (
@@ -634,6 +678,8 @@ export function AdminMarshalsPage() {
                     <th className="p-3">Shirt</th>
                     <th className="p-3">Bereiche</th>
                     <th className="p-3">Lizenz</th>
+                    <th className="p-3">Hinweis</th>
+                    <th className="p-3">Status</th>
                     <th className="p-3"></th>
                   </tr>
                 </thead>
@@ -641,7 +687,10 @@ export function AdminMarshalsPage() {
                   {people.map((person) => (
                     <tr
                       key={person.id}
-                      className="border-b align-top transition hover:bg-slate-50/70"
+                      className={cn(
+                        "border-b align-top transition hover:bg-slate-50/70",
+                        !person.isActive && "bg-red-50 text-red-900 hover:bg-red-100/70",
+                      )}
                     >
                       <td className="p-3 text-slate-500">
                         {person.helperNumber}
@@ -663,6 +712,16 @@ export function AdminMarshalsPage() {
                       <td className="p-3">{person.shirtSize ?? "–"}</td>
                       <td className="p-3">{person.activityAreas.join(", ")}</td>
                       <td className="p-3">{person.licenseNumber ?? "–"}</td>
+                      <td className="max-w-64 whitespace-pre-wrap p-3 text-slate-600">
+                        {person.note ?? "–"}
+                      </td>
+                      <td className="p-3">
+                        {person.isActive ? (
+                          <Badge className="bg-emerald-100 text-emerald-900">Aktiv</Badge>
+                        ) : (
+                          <Badge className="bg-red-100 text-red-900">Inaktiv · kein Einsatz mehr</Badge>
+                        )}
+                      </td>
                       <td className="p-3">
                         {canWrite && (
                           <Button
@@ -683,7 +742,10 @@ export function AdminMarshalsPage() {
               {people.map((person) => (
                 <div
                   key={person.id}
-                  className="rounded-xl border bg-white p-4 shadow-sm"
+                  className={cn(
+                    "rounded-xl border bg-white p-4 shadow-sm",
+                    !person.isActive && "border-red-300 bg-red-50 text-red-900",
+                  )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -698,6 +760,9 @@ export function AdminMarshalsPage() {
                       <Badge variant="secondary">
                         Shirt {person.shirtSize}
                       </Badge>
+                    )}
+                    {!person.isActive && (
+                      <Badge className="bg-red-100 text-red-900">Inaktiv</Badge>
                     )}
                   </div>
                   <dl className="mt-3 grid gap-2 text-sm">
@@ -726,7 +791,13 @@ export function AdminMarshalsPage() {
                         value={person.licenseNumber}
                       />
                     </div>
+                    <MobileField label="Hinweis" value={person.note} />
                   </dl>
+                  {!person.isActive && (
+                    <p className="mt-3 text-sm font-semibold text-red-800">
+                      Kein Einsatz mehr
+                    </p>
+                  )}
                   {canWrite && (
                     <Button
                       className="mt-4 w-full"
@@ -858,6 +929,37 @@ export function AdminMarshalsPage() {
                     }
                     placeholder="DMSB-Lizenz"
                   />
+                  <label className="grid gap-1 text-xs font-medium text-slate-500 sm:col-span-2">
+                    Hinweis zur Person
+                    <textarea
+                      className="min-h-24 rounded-md border bg-white px-3 py-2 text-sm text-slate-900"
+                      value={editingPerson.note ?? ""}
+                      onChange={(event) =>
+                        setEditingPerson({
+                          ...editingPerson,
+                          note: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label
+                    className={cn(
+                      "flex min-h-11 items-center gap-2 rounded-md border bg-white px-3 text-sm",
+                      !editingPerson.isActive && "border-red-300 bg-red-50 text-red-900",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editingPerson.isActive}
+                      onChange={(event) =>
+                        setEditingPerson({
+                          ...editingPerson,
+                          isActive: event.target.checked,
+                        })
+                      }
+                    />
+                    Aktiv und für Einsätze verfügbar
+                  </label>
                   <Button
                     className="h-11 sm:col-span-2 xl:col-span-1"
                     onClick={() => void savePerson()}
@@ -875,14 +977,61 @@ export function AdminMarshalsPage() {
       {(view === "saturday" || view === "sunday") && (
         <Card>
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle>
-              {day?.label ?? "Tag"}: Zusagen und Einsatzplanung
-            </CardTitle>
-            <p className="mt-1 text-sm text-slate-600">
-              Status und Posten können direkt je Helfer geändert werden.
-            </p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>
+                  {day?.label ?? "Tag"}: Zusagen und Einsatzplanung
+                </CardTitle>
+                <p className="mt-1 text-sm text-slate-600">
+                  Bestätigte Besetzung und vorläufig geplante Helfer im Blick.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row" aria-label="Planungsansicht">
+                <div className="inline-flex rounded-lg border bg-slate-50 p-1" role="group" aria-label="Darstellung">
+                  <PlanningToggleButton
+                    active={planningDisplay === "map"}
+                    onClick={() => setPlanningDisplay("map")}
+                  >
+                    <Map className="mr-1.5 h-4 w-4" /> Karte
+                  </PlanningToggleButton>
+                  <PlanningToggleButton
+                    active={planningDisplay === "list"}
+                    onClick={() => setPlanningDisplay("list")}
+                  >
+                    <List className="mr-1.5 h-4 w-4" /> Liste
+                  </PlanningToggleButton>
+                </div>
+                <div className="inline-flex rounded-lg border bg-slate-50 p-1" role="group" aria-label="Sollbesetzung">
+                  <PlanningToggleButton
+                    active={planningTargetMode === "normal"}
+                    onClick={() => setPlanningTargetMode("normal")}
+                  >
+                    Normal
+                  </PlanningToggleButton>
+                  <PlanningToggleButton
+                    active={planningTargetMode === "emergency"}
+                    onClick={() => setPlanningTargetMode("emergency")}
+                  >
+                    Notfall
+                  </PlanningToggleButton>
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            {planningDisplay === "map" && workspace && day ? (
+              <MarshalPlanningMap
+                workspace={workspace}
+                day={day}
+                targetMode={planningTargetMode}
+                canWrite={canWrite}
+                busy={busy}
+                onAssign={(person, status, assignmentValue) =>
+                  void saveDay(person, status, assignmentValue)
+                }
+              />
+            ) : (
+              <>
             <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
@@ -904,13 +1053,21 @@ export function AdminMarshalsPage() {
                     return (
                       <tr
                         key={person.id}
-                        className="border-b transition hover:bg-slate-50/70"
+                        className={cn(
+                          "border-b transition hover:bg-slate-50/70",
+                          !person.isActive && "bg-red-50 text-red-900 hover:bg-red-100/70",
+                        )}
                       >
                         <td className="p-3 text-slate-500">
                           {person.helperNumber}
                         </td>
                         <td className="p-3 font-medium">
                           {person.firstName} {person.lastName}
+                          {!person.isActive && (
+                            <span className="mt-1 block text-xs font-semibold text-red-700">
+                              Inaktiv · kein Einsatz mehr
+                            </span>
+                          )}
                         </td>
                         <td className="p-3">
                           {person.zip} {person.city}
@@ -923,7 +1080,7 @@ export function AdminMarshalsPage() {
                         <td className="p-3">
                           <CommitmentSelect
                             value={assignment?.commitmentStatus ?? "not_asked"}
-                            disabled={!canWrite || busy}
+                            disabled={!canWrite || busy || !person.isActive}
                             onChange={(value) =>
                               void saveDay(
                                 person,
@@ -937,7 +1094,14 @@ export function AdminMarshalsPage() {
                           <AssignmentSelect
                             value={selected}
                             workspace={workspace}
-                            disabled={!canWrite || busy}
+                            disabled={
+                              !canWrite ||
+                              busy ||
+                              !person.isActive ||
+                              !assignment ||
+                              assignment.commitmentStatus === "declined" ||
+                              assignment.commitmentStatus === "not_asked"
+                            }
                             onChange={(value) =>
                               void saveDay(
                                 person,
@@ -946,6 +1110,13 @@ export function AdminMarshalsPage() {
                               )
                             }
                           />
+                          {selected !== "none" &&
+                            (assignment?.commitmentStatus === "pending" ||
+                              assignment?.commitmentStatus === "tentative") && (
+                              <p className="mt-1.5 text-xs font-semibold text-amber-700">
+                                Vorläufig – zählt nicht zur bestätigten Besetzung
+                              </p>
+                            )}
                         </td>
                       </tr>
                     );
@@ -962,7 +1133,10 @@ export function AdminMarshalsPage() {
                 return (
                   <div
                     key={person.id}
-                    className="rounded-xl border bg-white p-4 shadow-sm"
+                    className={cn(
+                      "rounded-xl border bg-white p-4 shadow-sm",
+                      !person.isActive && "border-red-300 bg-red-50 text-red-900",
+                    )}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -972,6 +1146,11 @@ export function AdminMarshalsPage() {
                         <div className="mt-0.5 text-xs text-slate-500">
                           Nr. {person.helperNumber} · {person.zip} {person.city}
                         </div>
+                        {!person.isActive && (
+                          <div className="mt-1 text-xs font-semibold text-red-700">
+                            Inaktiv · kein Einsatz mehr
+                          </div>
+                        )}
                       </div>
                       <Badge variant="secondary">
                         {person.participation.shirtSizeSnapshot ??
@@ -984,7 +1163,7 @@ export function AdminMarshalsPage() {
                         Zusage
                         <CommitmentSelect
                           value={assignment?.commitmentStatus ?? "not_asked"}
-                          disabled={!canWrite || busy}
+                          disabled={!canWrite || busy || !person.isActive}
                           onChange={(value) =>
                             void saveDay(
                               person,
@@ -999,7 +1178,14 @@ export function AdminMarshalsPage() {
                         <AssignmentSelect
                           value={selected}
                           workspace={workspace}
-                          disabled={!canWrite || busy}
+                          disabled={
+                            !canWrite ||
+                            busy ||
+                            !person.isActive ||
+                            !assignment ||
+                            assignment.commitmentStatus === "declined" ||
+                            assignment.commitmentStatus === "not_asked"
+                          }
                           onChange={(value) =>
                             void saveDay(
                               person,
@@ -1008,12 +1194,21 @@ export function AdminMarshalsPage() {
                             )
                           }
                         />
+                        {selected !== "none" &&
+                          (assignment?.commitmentStatus === "pending" ||
+                            assignment?.commitmentStatus === "tentative") && (
+                            <span className="text-xs font-semibold text-amber-700">
+                              Vorläufig – zählt nicht zur bestätigten Besetzung
+                            </span>
+                          )}
                       </label>
                     </div>
                   </div>
                 );
               })}
             </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1021,7 +1216,7 @@ export function AdminMarshalsPage() {
       {view === "prints" && (
         <Card>
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle>Drucklisten (A4 quer)</CardTitle>
+            <CardTitle>Drucklisten</CardTitle>
             <p className="mt-1 text-sm text-slate-600">
               Anwesenheits- und Abschnittslisten für jeden Veranstaltungstag.
             </p>
@@ -1305,6 +1500,12 @@ export function AdminMarshalsPage() {
                     .filter((post) => post.sectionId === section.id)
                     .map((post) => {
                       const target = postTargets[post.id] ?? post.targetStaff;
+                      const emergencyTarget = Math.min(
+                        target,
+                        emergencyPostTargets[post.id] ??
+                          post.emergencyTargetStaff ??
+                          target,
+                      );
                       const counts = workspace.days.map(
                         (configDay) =>
                           people.filter((person) =>
@@ -1319,7 +1520,7 @@ export function AdminMarshalsPage() {
                       return (
                         <div
                           key={post.id}
-                          className="grid gap-3 py-3 sm:grid-cols-[64px_minmax(0,1fr)_auto_72px] sm:items-center"
+                          className="grid gap-3 py-3 sm:grid-cols-[64px_minmax(0,1fr)_auto_176px] sm:items-center"
                         >
                           <span className="font-semibold">{post.code}</span>
                           <span className="text-sm text-slate-600">
@@ -1342,24 +1543,61 @@ export function AdminMarshalsPage() {
                               </Badge>
                             ))}
                           </span>
-                          <label className="flex items-center gap-2 text-xs text-slate-500 sm:block">
-                            <span className="sm:sr-only">Soll</span>
-                            <Input
-                              className="h-10 w-20"
-                              aria-label={`Sollbesetzung ${post.code}`}
-                              type="number"
-                              min={1}
-                              max={20}
-                              value={target}
-                              disabled={!canWrite}
-                              onChange={(event) =>
-                                setPostTargets((current) => ({
-                                  ...current,
-                                  [post.id]: Number(event.target.value),
-                                }))
-                              }
-                            />
-                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="grid gap-1 text-xs text-slate-500">
+                              Normal
+                              <Input
+                                className="h-10 w-full"
+                                aria-label={`Normale Sollbesetzung ${post.code}`}
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={target}
+                                disabled={!canWrite}
+                                onChange={(event) => {
+                                  const value = Math.max(
+                                    1,
+                                    Number(event.target.value) || 1,
+                                  );
+                                  setPostTargets((current) => ({
+                                    ...current,
+                                    [post.id]: value,
+                                  }));
+                                  setEmergencyPostTargets((current) => ({
+                                    ...current,
+                                    [post.id]: Math.min(
+                                      current[post.id] ?? emergencyTarget,
+                                      value,
+                                    ),
+                                  }));
+                                }}
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs text-slate-500">
+                              Notfall
+                              <Input
+                                className="h-10 w-full"
+                                aria-label={`Notfall-Sollbesetzung ${post.code}`}
+                                type="number"
+                                min={1}
+                                max={target}
+                                value={emergencyTarget}
+                                disabled={!canWrite}
+                                onChange={(event) =>
+                                  setEmergencyPostTargets((current) => ({
+                                    ...current,
+                                    [post.id]: Math.min(
+                                      target,
+                                      Math.max(
+                                        1,
+                                        Number(event.target.value) || 1,
+                                      ),
+                                    ),
+                                  }))
+                                }
+                              />
+                            </label>
+                          </div>
                         </div>
                       );
                     })}
@@ -1462,6 +1700,32 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
+function PlanningToggleButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        active
+          ? "bg-white text-slate-950 shadow-sm"
+          : "text-slate-500 hover:text-slate-900",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function MobileField({
   label,
   value,
@@ -1538,9 +1802,14 @@ function AssignmentSelect({
         </option>
       ))}
       {workspace?.posts.map((post) => (
-        <option key={`post:${post.id}`} value={`post:${post.id}`}>
+        <option
+          key={`post:${post.id}`}
+          value={`post:${post.id}`}
+          disabled={!post.isActive}
+        >
           {post.code}
           {post.description ? ` – ${post.description}` : ""}
+          {!post.isActive ? " (inaktiv)" : ""}
         </option>
       ))}
     </select>
