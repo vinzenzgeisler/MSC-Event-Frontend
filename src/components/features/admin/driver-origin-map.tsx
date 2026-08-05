@@ -64,8 +64,8 @@ type DriverMarker = DashboardDriverLocationDriver & {
 const DEFAULT_CENTER: L.LatLngExpression = [51.1, 10.4];
 const DEFAULT_ZOOM = 5;
 
-function escapeHtml(value: string) {
-  return value
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -76,6 +76,22 @@ function escapeHtml(value: string) {
 function formatLocationLabel(location: Pick<DashboardDriverLocationItem, "city" | "zip" | "country">) {
   const cityLine = [location.zip, location.city].filter(Boolean).join(" ");
   return [cityLine, location.country].filter(Boolean).join(", ") || "Unbekannter Ort";
+}
+
+function formatCountryLabel(value: string) {
+  const normalized = value.trim().toUpperCase();
+  const labels: Record<string, string> = {
+    DE: "Deutschland",
+    D: "Deutschland",
+    GER: "Deutschland",
+    CZ: "Tschechien",
+    CZE: "Tschechien",
+    PL: "Polen",
+    POL: "Polen",
+    AT: "Österreich",
+    AUT: "Österreich"
+  };
+  return (labels[normalized] ?? value.trim()) || "Unbekannt";
 }
 
 function createDriverIcon() {
@@ -101,7 +117,7 @@ function createClusterIcon(cluster: L.MarkerCluster) {
 
 function popupHtml(marker: DriverMarker) {
   const location = formatLocationLabel(marker);
-  const status = acceptanceStatusLabel(marker.acceptanceStatus);
+  const status = acceptanceStatusLabel(marker.acceptanceStatus) || "Offen";
   const startNumber = marker.startNumber && marker.startNumber !== "-" ? `#${escapeHtml(marker.startNumber)} · ` : "";
   return `
     <div class="driver-origin-popup">
@@ -129,7 +145,7 @@ function DriverMarkerClusterLayer({ markers }: { markers: DriverMarker[] }) {
     });
 
     markers.forEach((driver) => {
-      const marker = L.marker([driver.lat, driver.lng], { icon: createDriverIcon(), title: driver.driverName });
+      const marker = L.marker([driver.lat, driver.lng], { icon: createDriverIcon(), title: driver.driverName || "Fahrer" });
       marker.bindPopup(popupHtml(driver), {
         className: "driver-origin-popup-shell",
         maxWidth: 260,
@@ -185,6 +201,21 @@ export function DriverOriginMap({ locations, meta, loading, refreshingCoordinate
 
   const driversOnMap = markers.length;
   const totalDrivers = Math.max(meta.totalDrivers, driversOnMap + meta.missingEntriesTotal);
+  const coveragePercent = totalDrivers > 0 ? Math.round((driversOnMap / totalDrivers) * 100) : 0;
+  const pendingDrivers = Math.max(0, meta.missingEntriesTotal);
+  const pendingLocations = Math.max(0, meta.pendingGeocodeTotal ?? meta.missingLocationsTotal);
+  const countryStats = useMemo(() => {
+    const counts = new Map<string, number>();
+    locations.forEach((location) => {
+      const label = formatCountryLabel(location.country);
+      counts.set(label, (counts.get(label) ?? 0) + location.driverCount);
+    });
+    return Array.from(counts.entries())
+      .map(([country, count]) => ({ country, count }))
+      .sort((left, right) => right.count - left.count || left.country.localeCompare(right.country))
+      .slice(0, 6);
+  }, [locations]);
+  const maxCountryCount = Math.max(1, ...countryStats.map((item) => item.count));
 
   return (
     <div className="space-y-3">
@@ -220,32 +251,56 @@ export function DriverOriginMap({ locations, meta, loading, refreshingCoordinate
           </MapContainer>
         </div>
 
-        <aside className="space-y-3 rounded-lg border bg-white p-3">
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
-            <div className="rounded-md border bg-slate-50 p-2">
-              <div className="text-xs text-slate-500">Fahrer gesamt</div>
-              <div className="font-semibold text-slate-900">{totalDrivers}</div>
+        <aside className="space-y-4 rounded-lg border bg-white p-3">
+          <div className="rounded-md border bg-slate-50 p-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase text-slate-500">Kartenabdeckung</div>
+                <div className="mt-1 text-2xl font-semibold text-slate-900">{coveragePercent}%</div>
+              </div>
+              <div className="text-right text-xs text-slate-500">
+                <div>{driversOnMap}/{totalDrivers}</div>
+                <div>Fahrer</div>
+              </div>
             </div>
-            <div className="rounded-md border bg-slate-50 p-2">
-              <div className="text-xs text-slate-500">Fahrer auf Karte</div>
-              <div className="font-semibold text-slate-900">{driversOnMap}</div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${coveragePercent}%` }} />
             </div>
-            <div className="rounded-md border bg-slate-50 p-2">
-              <div className="text-xs text-slate-500">Ohne Koordinaten</div>
-              <div className="font-semibold text-slate-900">{meta.missingEntriesTotal}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-md border bg-white p-2">
+              <div className="text-xs text-slate-500">Offen</div>
+              <div className="font-semibold text-slate-900">{pendingDrivers}</div>
             </div>
-            <div className="rounded-md border bg-slate-50 p-2">
+            <div className="rounded-md border bg-white p-2">
+              <div className="text-xs text-slate-500">Orte offen</div>
+              <div className="font-semibold text-slate-900">{pendingLocations}</div>
+            </div>
+            <div className="rounded-md border bg-white p-2">
+              <div className="text-xs text-slate-500">Orte auf Karte</div>
+              <div className="font-semibold text-slate-900">{locations.length}</div>
+            </div>
+            <div className="rounded-md border bg-white p-2">
               <div className="text-xs text-slate-500">Länder</div>
               <div className="font-semibold text-slate-900">{countryCount}</div>
             </div>
           </div>
 
-          {locations.slice(0, 5).map((location) => (
-            <div key={location.locationKey} className="rounded-md border p-2 text-xs">
-              <div className="font-medium text-slate-800">{formatLocationLabel(location)}</div>
-              <div className="text-slate-500">{location.driverCount} Fahrer</div>
-            </div>
-          ))}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase text-slate-500">Herkunftsländer</div>
+            {countryStats.map((item) => (
+              <div key={item.country} className="space-y-1">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-slate-700">{item.country}</span>
+                  <span className="shrink-0 font-medium text-slate-900">{item.count}</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(6, Math.round((item.count / maxCountryCount) * 100))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </aside>
       </div>
     </div>

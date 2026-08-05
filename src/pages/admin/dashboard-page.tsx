@@ -231,7 +231,7 @@ export function AdminDashboardPage() {
     try {
       const currentEventId = eventId || (await getAdminEventId());
       if (!eventId) setEventId(currentEventId);
-      const result = await adminDashboardService.getDriverLocations(currentEventId, { refresh: options?.refresh, refreshLimit: options?.refresh ? 10 : 3 });
+      const result = await adminDashboardService.getDriverLocations(currentEventId, { refresh: options?.refresh, refreshLimit: 10 });
       setLocations(result.locations);
       setMapMeta(result.meta);
     } catch (err) {
