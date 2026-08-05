@@ -311,7 +311,7 @@ export function AdminMarshalsPage() {
           },
         ],
       });
-      setNotice("Einsatz gespeichert.");
+      if (reloadAfter) setNotice("Einsatz gespeichert.");
       if (reloadAfter) await load();
       return true;
     } catch (cause) {
@@ -329,12 +329,31 @@ export function AdminMarshalsPage() {
     const currentAssignment = currentPerson.assignments.find((item) => item.dayId === day.id);
     const replacementAssignment = replacementPerson.assignments.find((item) => item.dayId === day.id);
     if (!currentAssignment || !replacementAssignment) return false;
+    const originalReplacementAssignment = getAssignmentValue(replacementAssignment);
+    setNotice("");
     // Assign first: if the second write fails, the existing helper is not lost.
     const assigned = await saveDay(replacementPerson, replacementAssignment.commitmentStatus, `post:${postId}`, false);
     if (!assigned) return false;
     const removed = await saveDay(currentPerson, currentAssignment.commitmentStatus, "", false);
+    if (!removed) {
+      const rolledBack = await saveDay(
+        replacementPerson,
+        replacementAssignment.commitmentStatus,
+        originalReplacementAssignment === "none" ? "" : originalReplacementAssignment,
+        false,
+      );
+      await load();
+      setNotice("");
+      setError(
+        rolledBack
+          ? "Helfer konnte nicht ersetzt werden. Der ursprüngliche Zustand wurde wiederhergestellt."
+          : "Helfer konnte nicht ersetzt und die ursprüngliche Zuweisung des Ersatzhelfers nicht wiederhergestellt werden. Manuelle Prüfung erforderlich.",
+      );
+      return false;
+    }
     await load();
-    return removed;
+    setNotice("Helfer ersetzt.");
+    return true;
   }
 
   async function saveAttendance(person: MarshalPerson, value: AttendanceStatus) {
