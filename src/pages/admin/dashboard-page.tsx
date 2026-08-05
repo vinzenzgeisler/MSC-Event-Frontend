@@ -312,8 +312,7 @@ export function AdminDashboardPage() {
                 <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
                 <Badge variant="outline" className="bg-white">{event?.name ?? "Aktuelles Event"}</Badge>
               </div>
-              <p className="mt-1 text-sm text-slate-600">Operatives Lagebild mit Statistiken, Warnungen, Fehlern und Systemzustand.</p>
-              <p className="mt-1 text-xs text-slate-500">Letzter Stand: {formatDateTime(overview?.generatedAt)}</p>
+              <p className="mt-1 text-xs text-slate-500">{formatDateTime(overview?.generatedAt)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -346,7 +345,6 @@ export function AdminDashboardPage() {
                   </div>
                 </div>
               </div>
-              <Badge variant="outline" className="bg-white/80">Auto-Refresh 60s</Badge>
             </div>
           </div>
 
@@ -405,7 +403,7 @@ export function AdminDashboardPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle className="text-base">Nice-to-know</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Weitere Kennzahlen</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm text-slate-700">
               <div>Median-Alter: <span className="font-semibold text-slate-900">{String((overview?.niceToKnow.driverAgeStats as Record<string, unknown> | undefined)?.medianDriverAge ?? "-")}</span></div>
               <div>Fahrer auf Karte: <span className="font-semibold text-slate-900">{numberValue(overview?.map, "resolvedLocationTotal")} Orte gepflegt</span></div>
@@ -454,7 +452,7 @@ export function AdminDashboardPage() {
 
       {activeTab === "drivers" && (
         <section className="space-y-4">
-          <Card><CardContent className="p-4 sm:p-5"><DriverOriginMap locations={locations} meta={mapMeta} loading={mapLoading} refreshingCoordinates={mapRefreshing} error={mapError} onReload={() => void loadLocations()} onRefreshCoordinates={() => void loadLocations({ refresh: true })} /></CardContent></Card>
+          <Card><CardContent className="p-4 sm:p-5"><DriverOriginMap locations={locations} meta={mapMeta} loading={mapLoading} refreshingCoordinates={mapRefreshing} error={mapError} /></CardContent></Card>
           <section className="grid gap-4 xl:grid-cols-3">
             <Card><CardHeader><CardTitle className="text-base">Fahrerstatistik</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Fahrer" value={numberValue(drivers, "driverTotal")} /><Metric label="International" value={numberValue(drivers, "internationalTotal")} /><Metric label="U18" value={numberValue(drivers, "under18Total")} /><Metric label="Median-Alter" value={String(drivers?.medianAge ?? "-")} /></CardContent></Card>
             <Card><CardHeader><CardTitle className="text-base">Länder</CardTitle></CardHeader><CardContent><BarList rows={rowsValue(drivers, "countries")} labelKey="country" /></CardContent></Card>
