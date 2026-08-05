@@ -37,6 +37,11 @@ export type DashboardDriverLocationsMeta = {
   totalDrivers: number;
   missingLocationsTotal: number;
   missingEntriesTotal: number;
+  pendingGeocodeTotal?: number;
+  geocodeAttemptedTotal?: number;
+  geocodeResolvedTotal?: number;
+  autoRefreshTriggered?: boolean;
+  hasPendingGeocoding?: boolean;
   maxPoints: number;
 };
 
@@ -211,7 +216,7 @@ export function DriverOriginMap({ locations, meta, loading, refreshingCoordinate
                 Aktualisiert…
               </>
             ) : (
-              "Koordinaten aktualisieren"
+              "Koordinaten neu prüfen"
             )}
           </Button>
         </div>
@@ -256,9 +261,15 @@ export function DriverOriginMap({ locations, meta, loading, refreshingCoordinate
             </div>
           </div>
 
+          {(meta.autoRefreshTriggered || refreshingCoordinates) && (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Automatik aktiv: {meta.geocodeAttemptedTotal ?? 0} Orte geprüft, {meta.geocodeResolvedTotal ?? 0} neu gepflegt.
+            </div>
+          )}
+
           {meta.missingEntriesTotal > 0 && (
             <div className="rounded-md border bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              {meta.missingEntriesTotal} Fahrer ohne Koordinaten. Über „Koordinaten aktualisieren“ werden fehlende Orte schrittweise nachgezogen.
+              {meta.missingEntriesTotal} Fahrer ohne Koordinaten. Fehlende Orte werden automatisch in kleinen Batches nachgezogen; der Button startet nur eine manuelle Sofortprüfung.
             </div>
           )}
 
