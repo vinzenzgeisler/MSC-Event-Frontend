@@ -2,7 +2,22 @@ export type MarshalCommitmentStatus = "not_asked" | "pending" | "accepted" | "de
 
 export type MarshalDay = { id: string; eventId: string; dayKey: "saturday" | "sunday"; label: string; eventDate: string };
 export type MarshalSection = { id: string; eventId: string; code: string; name: string; leaderCode: string; sortOrder: number };
-export type MarshalPost = { id: string; eventId: string; sectionId: string; code: string; description: string | null; targetStaff: number; isActive: boolean; sortOrder: number };
+export type MarshalPost = {
+  id: string;
+  eventId: string;
+  sectionId: string;
+  code: string;
+  description: string | null;
+  targetStaff: number;
+  /** Optional until every backend environment exposes the planning fields. */
+  emergencyTargetStaff?: number;
+  /** Schematic coordinate (0–1000); null uses the deterministic fallback. */
+  mapX?: number | null;
+  /** Schematic coordinate (0–1000); null uses the deterministic fallback. */
+  mapY?: number | null;
+  isActive: boolean;
+  sortOrder: number;
+};
 export type MarshalAssignment = {
   id: string; participationId: string; dayId: string; commitmentStatus: MarshalCommitmentStatus;
   role: "marshal" | "section_leader" | "special" | null; sectionId: string | null; postId: string | null;

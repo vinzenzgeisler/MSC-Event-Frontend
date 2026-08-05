@@ -37,7 +37,11 @@ export const adminMarshalsService = {
   async saveConfig(payload: {
     eventId: string;
     sections: Array<{ code: string; name: string; leaderCode: string; sortOrder: number }>;
-    posts: Array<{ sectionCode: string; code: string; description: string | null; targetStaff: number; isActive: boolean; sortOrder: number }>;
+    posts: Array<{
+      sectionCode: string; code: string; description: string | null; targetStaff: number;
+      emergencyTargetStaff: number; mapX: number | null; mapY: number | null;
+      isActive: boolean; sortOrder: number;
+    }>;
   }) {
     return requestJson<OkResponse>("/admin/marshals/config", { method: "PUT", body: payload });
   },
