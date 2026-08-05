@@ -159,3 +159,53 @@ h4 {
 .driver-origin-popup__link:hover {
   text-decoration: underline;
 }
+
+.marshal-section-label {
+  background: rgb(255 255 255 / 88%);
+  border: 1px solid #cbd5e1;
+  box-shadow: none;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 700;
+  max-width: 150px;
+  overflow-wrap: anywhere;
+  padding: 0.2rem 0.4rem;
+  text-align: center;
+  white-space: normal;
+}
+
+.marshal-section-label::before {
+  display: none;
+}
+
+.marshal-plan-marker-shell {
+  background: transparent;
+  border: 0;
+}
+
+.marshal-plan-marker {
+  align-items: center;
+  background: #059669;
+  border: 4px solid white;
+  border-radius: 9999px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 28%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  height: 58px;
+  justify-content: center;
+  line-height: 1.05;
+  text-align: center;
+  width: 58px;
+}
+
+.marshal-plan-marker small {
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-top: 0.15rem;
+}
+
+.marshal-plan-marker--unfilled { background: #d97706; }
+.marshal-plan-marker--overfilled { background: #dc2626; }
+.marshal-plan-marker--selected { border-color: #2563eb; box-shadow: 0 0 0 3px white, 0 0 0 6px #2563eb; }
+.marshal-plan-marker--fallback { border-style: dashed; }
