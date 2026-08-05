@@ -924,13 +924,10 @@ export function AdminEntriesPage() {
 
   useEffect(() => {
     if (viewScope === "deleted") {
-      setDeletedRows([]);
-      setDeletedMeta((prev) => ({ ...prev, hasMore: false, nextCursor: null }));
-
       void replaceDeletedRows(appliedFilter, {
         minimumRows: 0,
-        showLoader: true,
-        showRefreshing: false,
+        showLoader: loadingInitial,
+        showRefreshing: !loadingInitial,
         silentError: false
       });
       return;
@@ -943,15 +940,10 @@ export function AdminEntriesPage() {
     const minimumRows =
       typeof restoreMinimumRows === "number" ? Math.max(restoreMinimumRows, keepCachedRows ? rowsRef.current.length : 0) : keepCachedRows ? rowsRef.current.length : 0;
 
-    if (!keepCachedRows) {
-      setRows([]);
-      setMeta((prev) => ({ ...prev, hasMore: false, nextCursor: null }));
-    }
-
     void replaceActiveRows(appliedFilter, {
       minimumRows,
-      showLoader: !keepCachedRows,
-      showRefreshing: false,
+      showLoader: !keepCachedRows && loadingInitial,
+      showRefreshing: keepCachedRows || !loadingInitial,
       silentError: false
     });
   }, [appliedFilter, replaceActiveRows, replaceDeletedRows, viewScope]);
@@ -1079,7 +1071,7 @@ export function AdminEntriesPage() {
   const loadedCountText =
     shownTotal > 0
       ? `${shownTotal} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${shownCount < shownTotal ? ` · ${shownCount} geladen` : ""}${refreshing ? " · aktualisiere…" : ""}`
-      : `${shownCount} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${loadingInitial ? " · lädt…" : ""}`;
+      : `${shownCount} ${viewScope === "deleted" ? "gelöschte Nennungen" : "Treffer in aktueller Filterung"}${refreshing ? " · aktualisiere…" : loadingInitial ? " · lädt…" : ""}`;
 
   const resolveActorLabel = (rawValue: string) => {
     const raw = rawValue.trim();
