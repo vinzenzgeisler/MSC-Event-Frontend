@@ -11,7 +11,9 @@ import {
   techStatusClasses,
   techStatusLabel,
   paymentStatusClasses,
-  paymentStatusLabel
+  paymentStatusLabel,
+  waiverSignedClasses,
+  waiverSignedLabel
 } from "@/lib/admin-status";
 import type { AdminEntryListItem } from "@/types/admin";
 
@@ -376,6 +378,9 @@ function EntriesTableInner({
                   Noch nicht relevant
                 </Badge>
               )}
+              <Badge className={`${waiverSignedClasses(row.waiverSigned.signed)} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
+                Haftverzicht: {waiverSignedLabel(row.waiverSigned.signed)}
+              </Badge>
             </div>
             <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div>
           </div>
@@ -386,14 +391,15 @@ function EntriesTableInner({
         <div ref={handleDesktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[32%]" />
-              <col className="w-[10%]" />
+              <col className="w-[28%]" />
+              <col className="w-[9%]" />
               <col className="w-[7%]" />
-              <col className="w-[11%]" />
               <col className="w-[10%]" />
               <col className="w-[9%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
               <col className="w-[8%]" />
-              <col className="w-[19%]" />
+              <col className="w-[16%]" />
             </colgroup>
             <thead className="bg-slate-100 text-left text-slate-700">
               <tr>
@@ -403,6 +409,7 @@ function EntriesTableInner({
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Status</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Zahlung</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Prüfstatus</th>
+                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Haftverzicht</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Erstellt am</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Aktion</th>
               </tr>
@@ -410,7 +417,7 @@ function EntriesTableInner({
             <tbody>
               {desktopTopSpacerHeight > 0 && (
                 <tr aria-hidden="true">
-                  <td colSpan={8} style={{ height: desktopTopSpacerHeight, padding: 0, border: 0 }} />
+                  <td colSpan={9} style={{ height: desktopTopSpacerHeight, padding: 0, border: 0 }} />
                 </tr>
               )}
               {desktopRows.map((row) => (
@@ -471,6 +478,11 @@ function EntriesTableInner({
                       <span className="text-xs text-slate-500">Noch nicht relevant</span>
                     )}
                   </td>
+                  <td className="px-3 py-3">
+                    <Badge className={`${waiverSignedClasses(row.waiverSigned.signed)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
+                      {waiverSignedLabel(row.waiverSigned.signed)}
+                    </Badge>
+                  </td>
                   <td className="px-3 py-3.5 text-slate-700">
                     <span className="block leading-tight">{row.createdAt}</span>
                   </td>
@@ -529,7 +541,7 @@ function EntriesTableInner({
               ))}
               {desktopBottomSpacerHeight > 0 && (
                 <tr aria-hidden="true">
-                  <td colSpan={8} style={{ height: desktopBottomSpacerHeight, padding: 0, border: 0 }} />
+                  <td colSpan={9} style={{ height: desktopBottomSpacerHeight, padding: 0, border: 0 }} />
                 </tr>
               )}
             </tbody>
