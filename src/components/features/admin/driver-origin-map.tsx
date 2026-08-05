@@ -234,7 +234,7 @@ export function DriverOriginMap({ locations, meta, loading, refreshingCoordinate
 
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="space-y-3">
         <div className="relative min-h-[360px] overflow-hidden rounded-lg border bg-slate-50 sm:min-h-[430px]">
           {loading && (
             <div className="absolute inset-0 z-[500] flex items-center justify-center bg-white/75 text-sm text-slate-600">
@@ -251,57 +251,72 @@ export function DriverOriginMap({ locations, meta, loading, refreshingCoordinate
           </MapContainer>
         </div>
 
-        <aside className="space-y-4 rounded-lg border bg-white p-3">
-          <div className="rounded-md border bg-slate-50 p-3">
-            <div className="flex items-end justify-between gap-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+          <section className="rounded-lg border bg-white p-3">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs uppercase text-slate-500">Kartenabdeckung</div>
-                <div className="mt-1 text-2xl font-semibold text-slate-900">{coveragePercent}%</div>
+                <div className="text-xs font-semibold uppercase text-slate-500">Kartenabdeckung</div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-3xl font-semibold text-slate-900">{coveragePercent}%</span>
+                  <span className="text-sm text-slate-500">{driversOnMap}/{totalDrivers}</span>
+                </div>
               </div>
-              <div className="text-right text-xs text-slate-500">
-                <div>{driversOnMap}/{totalDrivers}</div>
-                <div>Fahrer</div>
-              </div>
+              {refreshingCoordinates && <Loader2 className="mt-1 h-4 w-4 animate-spin text-slate-400" />}
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
               <div className="h-full rounded-full bg-emerald-500" style={{ width: `${coveragePercent}%` }} />
             </div>
-          </div>
+          </section>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-md border bg-white p-2">
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-lg border bg-white p-3">
               <div className="text-xs text-slate-500">Offen</div>
-              <div className="font-semibold text-slate-900">{pendingDrivers}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900">{pendingDrivers}</div>
             </div>
-            <div className="rounded-md border bg-white p-2">
+            <div className="rounded-lg border bg-white p-3">
               <div className="text-xs text-slate-500">Orte offen</div>
-              <div className="font-semibold text-slate-900">{pendingLocations}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900">{pendingLocations}</div>
             </div>
-            <div className="rounded-md border bg-white p-2">
+            <div className="rounded-lg border bg-white p-3">
               <div className="text-xs text-slate-500">Orte auf Karte</div>
-              <div className="font-semibold text-slate-900">{locations.length}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900">{locations.length}</div>
             </div>
-            <div className="rounded-md border bg-white p-2">
+            <div className="rounded-lg border bg-white p-3">
               <div className="text-xs text-slate-500">Länder</div>
-              <div className="font-semibold text-slate-900">{countryCount}</div>
+              <div className="mt-1 text-xl font-semibold text-slate-900">{countryCount}</div>
+            </div>
+          </section>
+        </div>
+
+        <section className="rounded-lg border bg-white p-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-2 xl:col-span-2">
+              <div className="text-xs font-semibold uppercase text-slate-500">Herkunftsländer</div>
+              {countryStats.map((item) => (
+                <div key={item.country} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="truncate text-slate-700">{item.country}</span>
+                    <span className="shrink-0 font-medium text-slate-900">{item.count}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(6, Math.round((item.count / maxCountryCount) * 100))}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">Geocoding-Versuche</div>
+                <div className="mt-1 font-semibold text-slate-900">{meta.geocodeAttemptedTotal ?? 0}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">Neu aufgelöst</div>
+                <div className="mt-1 font-semibold text-slate-900">{meta.geocodeResolvedTotal ?? 0}</div>
+              </div>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase text-slate-500">Herkunftsländer</div>
-            {countryStats.map((item) => (
-              <div key={item.country} className="space-y-1">
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate text-slate-700">{item.country}</span>
-                  <span className="shrink-0 font-medium text-slate-900">{item.count}</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(6, Math.round((item.count / maxCountryCount) * 100))}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </aside>
+        </section>
       </div>
     </div>
   );
