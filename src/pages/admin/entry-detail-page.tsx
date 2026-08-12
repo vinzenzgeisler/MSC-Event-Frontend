@@ -215,6 +215,7 @@ export function AdminEntryDetailPage() {
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [classDraft, setClassDraft] = useState("");
+  const [backupClassDraft, setBackupClassDraft] = useState("");
   const [classChangeIncludeBackup, setClassChangeIncludeBackup] = useState(true);
   const [signingDevices, setSigningDevices] = useState<SigningDevice[]>([]);
   const [signingDeviceId, setSigningDeviceId] = useState("");
@@ -317,6 +318,7 @@ export function AdminEntryDetailPage() {
           setInspectionNote(result.inspectionNote);
           setHistoryExpanded(false);
           setClassDraft(result.classId);
+          setBackupClassDraft(result.backupClassId ?? result.classId);
           setClassChangeIncludeBackup(Boolean(result.backupVehicle.assigned));
         }
       })
@@ -987,6 +989,10 @@ export function AdminEntryDetailPage() {
                   />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-md border bg-white p-2">
+                      <div className="text-xs uppercase text-slate-500">Klasse</div>
+                      <div className="font-medium text-slate-900">{detail.backupVehicle.className}</div>
+                    </div>
+                    <div className="rounded-md border bg-white p-2">
                       <div className="text-xs uppercase text-slate-500">Fahrzeugtyp</div>
                       <div className="font-medium text-slate-900">{detail.backupVehicle.type === "moto" ? "Motorrad" : "Automobil"}</div>
                     </div>
@@ -1570,15 +1576,47 @@ export function AdminEntryDetailPage() {
                 </Select>
               </div>
               {detail.backupVehicle.assigned && (
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={classChangeIncludeBackup}
-                    onChange={(event) => setClassChangeIncludeBackup(event.target.checked)}
-                    disabled={!canChangeClass || anyActionInFlight}
-                  />
-                  Auch Ersatzfahrzeug auf Zielklasse umstellen
-                </label>
+                <>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={classChangeIncludeBackup}
+                      onChange={(event) => setClassChangeIncludeBackup(event.target.checked)}
+                      disabled={!canChangeClass || anyActionInFlight}
+                    />
+                    Auch verknüpfte Ersatznennung auf Zielklasse umstellen
+                  </label>
+                  <div className="space-y-2 rounded-md border bg-slate-50 p-3">
+                    <div className="text-sm font-medium text-slate-900">Klasse des Ersatzfahrzeugs</div>
+                    <Select value={backupClassDraft || "__none__"} onValueChange={(next) => setBackupClassDraft(next === "__none__" ? "" : next)}>
+                      <SelectTrigger><SelectValue placeholder="Ersatzklasse wählen" /></SelectTrigger>
+                      <SelectContent>
+                        {classOptions
+                          .filter((option) => !option.registrationClosed && (option.runGroupId ?? option.id) === (classOptions.find((item) => item.id === detail.classId)?.runGroupId ?? detail.classId))
+                          .map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={anyActionInFlight || !backupClassDraft || backupClassDraft === detail.backupClassId}
+                      onClick={async () => {
+                        setActionInFlight("backup-class-change");
+                        try {
+                          await adminEntriesService.changeEntryBackupClass(detail.id, backupClassDraft);
+                          flashMessage("Ersatzklasse wurde aktualisiert.");
+                          loadDetail();
+                        } catch (error) {
+                          flashMessage(getLocalizedActionError(error, "Ersatzklasse konnte nicht geändert werden."), 3200);
+                        } finally {
+                          setActionInFlight((current) => current === "backup-class-change" ? null : current);
+                        }
+                      }}
+                    >
+                      {actionInFlight === "backup-class-change" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Wird geändert…</> : "Ersatzklasse speichern"}
+                    </Button>
+                  </div>
+                </>
               )}
               <Button
                 type="button"

@@ -6,6 +6,8 @@ export type AdminClassOption = {
   name: string;
   vehicleType: VehicleType;
   allowsCodriver: boolean;
+  registrationClosed: boolean;
+  runGroupId: string | null;
 };
 
 export const adminMetaService = {

@@ -54,6 +54,9 @@ export type StartRegistrationForm = {
   classId: Id;
   classLabel: string;
   vehicleType: VehicleType;
+  backupClassId: Id;
+  backupClassLabel: string;
+  backupVehicleType: VehicleType;
   startNumber: string;
   vehicle: VehicleForm;
   codriverEnabled: boolean;
@@ -85,6 +88,7 @@ export type PublicEventClass = {
   vehicleType: VehicleType;
   allowsCodriver: boolean;
   registrationClosed: boolean;
+  selectionGroupKey: Id;
 };
 
 export type PublicPricingClassRule = {
@@ -136,6 +140,7 @@ export type StartNumberValidationResult = {
 
 export type PublicCreateEntryRequestDto = {
   classId: Id;
+  backupClassId?: Id;
   driver: {
     email: string;
     firstName: string;
@@ -217,6 +222,7 @@ export type PublicCreateEntriesBatchRequestDto = {
   consent: PublicCreateEntryRequestDto["consent"];
   entries: Array<{
     classId: Id;
+    backupClassId?: Id;
     codriverEnabled?: boolean;
     codriver?: PublicCreateEntryRequestDto["codriver"];
     vehicle: PublicCreateEntryRequestDto["vehicle"];

@@ -13,6 +13,7 @@ import type { PublicEventClass, StartRegistrationForm } from "@/types/registrati
 type StartNumberState = "idle" | "checking" | "available" | "invalid" | "taken";
 type StartFieldKey =
   | "classId"
+  | "backupClassId"
   | "startNumber"
   | "make"
   | "model"
@@ -117,7 +118,16 @@ export function StartEntriesStep({
     });
     return [...classes].sort((left, right) => collator.compare(left.name, right.name));
   }, [classes, locale]);
-  const usedClassIds = new Set(starts.filter((item) => item.id !== editingId).map((item) => item.classId));
+  const effectiveClassKey = (item: PublicEventClass | undefined) => item?.selectionGroupKey ?? item?.id ?? "";
+  const usedEffectiveClassKeys = new Set(
+    starts
+      .filter((item) => item.id !== editingId)
+      .map((item) => effectiveClassKey(classes.find((clazz) => clazz.id === item.classId)))
+  );
+  const selectedPrimaryClass = classes.find((item) => item.id === draft.classId);
+  const backupClassOptions = sortedClasses.filter(
+    (item) => !item.registrationClosed && effectiveClassKey(item) === effectiveClassKey(selectedPrimaryClass)
+  );
   const ownerPlaceholder =
     locale === "en"
       ? "Team name / Owner name"
@@ -271,7 +281,7 @@ export function StartEntriesStep({
                   <SelectItem
                     key={item.id}
                     value={item.id}
-                    disabled={usedClassIds.has(item.id) || item.registrationClosed}
+                    disabled={usedEffectiveClassKeys.has(effectiveClassKey(item)) || item.registrationClosed}
                     className="items-start whitespace-normal py-2 leading-snug"
                   >
                     <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
@@ -525,6 +535,24 @@ export function StartEntriesStep({
             </label>
             {draft.backupVehicleEnabled && (
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label>{m.start.backupClass}</Label>
+                  <Select
+                    value={draft.backupClassId || draft.classId || "__placeholder__"}
+                    onValueChange={(next) => {
+                      const selected = classes.find((item) => item.id === next);
+                      onDraftChange("backupClassId", next === "__placeholder__" ? "" : next);
+                      onDraftChange("backupClassLabel", selected?.name ?? "");
+                      if (selected) onDraftChange("backupVehicleType", selected.vehicleType);
+                    }}
+                  >
+                    <SelectTrigger data-start-field="backupClassId" aria-invalid={fieldErrors.backupClassId ? "true" : "false"}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {backupClassOptions.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FieldError message={fieldErrors.backupClassId} />
+                </div>
                 <div className="space-y-2">
                   <Label>{m.start.backupMake}</Label>
                   <Input data-start-field="backupMake" value={draft.backupVehicle.make} onChange={(event) => onBackupFieldChange("make", event.target.value)} placeholder="BMW" {...fieldAria(fieldErrors.backupMake)} />

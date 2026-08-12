@@ -130,6 +130,7 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
   const specialNotes = buildSpecialNotes(form.driver.specialNotes);
   return {
     classId: start.classId,
+    backupClassId: start.backupVehicleEnabled ? start.backupClassId || start.classId : undefined,
     driver: {
       email: normalizeEmail(form.driver.email),
       firstName: form.driver.firstName,
@@ -172,7 +173,7 @@ function toCreateEntryRequestDto(form: RegistrationWizardForm, startIndex: numbe
     },
     backupVehicle: start.backupVehicleEnabled
       ? {
-          ...mapVehicle(start.vehicleType, start.backupVehicle),
+          ...mapVehicle(start.backupVehicleType, start.backupVehicle),
           ownerName: start.backupVehicle.ownerName || `${form.driver.firstName} ${form.driver.lastName}`.trim()
         }
       : undefined,
@@ -395,6 +396,7 @@ function toBatchRequestDto(form: RegistrationWizardForm, clientSubmissionKey: st
     consent: first.consent,
     entries: entryPayloads.map((entry) => ({
       classId: entry.classId,
+      backupClassId: entry.backupClassId,
       codriverEnabled: entry.codriverEnabled,
       codriver: entry.codriver,
       vehicle: entry.vehicle,
@@ -423,7 +425,8 @@ export const registrationService = {
         name: item.name,
         vehicleType: item.vehicleType,
         allowsCodriver: Boolean(item.allowsCodriver),
-        registrationClosed: Boolean(item.registrationClosed)
+        registrationClosed: Boolean(item.registrationClosed),
+        selectionGroupKey: item.selectionGroupKey
       }))
     };
   },
