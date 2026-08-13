@@ -89,6 +89,7 @@ export type PublicEventClass = {
   allowsCodriver: boolean;
   registrationClosed: boolean;
   selectionGroupKey: Id;
+  inviteAllowed?: boolean;
 };
 
 export type PublicPricingClassRule = {
@@ -116,6 +117,11 @@ export type PublicEventOverview = {
   registrationCloseAt: string | null;
   pricingRules: PublicPricingRules | null;
   classes: PublicEventClass[];
+  invitation: {
+    recipientName: string | null;
+    recipientEmail: string | null;
+    expiresAt: string;
+  } | null;
 };
 
 export type PublicLegalConsentMeta = {
@@ -139,6 +145,7 @@ export type StartNumberValidationResult = {
 };
 
 export type PublicCreateEntryRequestDto = {
+  inviteToken?: string;
   classId: Id;
   backupClassId?: Id;
   driver: {
@@ -217,6 +224,7 @@ export type PublicCreateEntryRequestDto = {
 };
 
 export type PublicCreateEntriesBatchRequestDto = {
+  inviteToken?: string;
   clientSubmissionKey: string;
   driver: PublicCreateEntryRequestDto["driver"];
   consent: PublicCreateEntryRequestDto["consent"];

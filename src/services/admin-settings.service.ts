@@ -87,6 +87,26 @@ type AdminClassesListResponse = {
 type AdminRunGroupsResponse = { ok: boolean; runGroups: AdminSettingsRunGroup[] };
 type AdminRunGroupResponse = { ok: boolean; runGroup: AdminSettingsRunGroup };
 
+export type AdminRegistrationInvitation = {
+  id: string;
+  eventId: string;
+  recipientName: string | null;
+  recipientEmail: string | null;
+  allowedClassIds: string[];
+  expiresAt: string;
+  revokedAt: string | null;
+  consumedAt: string | null;
+  consumedRegistrationGroupId: string | null;
+  createdAt: string;
+};
+
+type AdminRegistrationInvitationsResponse = { ok: boolean; invitations: AdminRegistrationInvitation[] };
+type AdminRegistrationInvitationCreateResponse = {
+  ok: boolean;
+  invitation: AdminRegistrationInvitation;
+  token: string;
+};
+
 function asVehicleType(value: unknown): VehicleType {
   return value === "moto" ? "moto" : "auto";
 }
@@ -403,6 +423,29 @@ export const adminSettingsService = {
 
   async deleteRunGroup(id: string): Promise<void> {
     await requestJson(`/admin/run-groups/${id}`, { method: "DELETE" });
+  },
+
+  async listRegistrationInvitations(eventId: string): Promise<AdminRegistrationInvitation[]> {
+    const response = await requestJson<AdminRegistrationInvitationsResponse>(
+      `/admin/events/${eventId}/registration-invitations`
+    );
+    return response.invitations ?? [];
+  },
+
+  async createRegistrationInvitation(eventId: string, payload: {
+    recipientName?: string;
+    recipientEmail?: string;
+    expiresAt: string;
+    allowedClassIds: string[];
+  }): Promise<AdminRegistrationInvitationCreateResponse> {
+    return requestJson<AdminRegistrationInvitationCreateResponse>(
+      `/admin/events/${eventId}/registration-invitations`,
+      { method: "POST", body: payload }
+    );
+  },
+
+  async revokeRegistrationInvitation(id: string): Promise<void> {
+    await requestJson(`/admin/registration-invitations/${id}/revoke`, { method: "POST" });
   },
 
   async savePricingRules(eventId: string, form: AdminSettingsPricingForm): Promise<AdminPricingRulesResponse> {

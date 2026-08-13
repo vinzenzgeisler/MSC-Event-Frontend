@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { usePublicLegal } from "@/app/legal/public-legal-context";
 import { getCountryLabel } from "@/lib/countries";
@@ -53,6 +53,7 @@ function getSummaryUiLabels(locale: string) {
 }
 
 export function SummaryStep({ form, submitError, consentError, successMessage, isSubmitting = false, onConsentChange, onSubmit }: SummaryStepProps) {
+  const location = useLocation();
   const { m, locale } = useAnmeldungI18n();
   const { texts: legalTexts, loading: legalLoading, error: legalError } = usePublicLegal();
   const ui = getSummaryUiLabels(locale);
@@ -186,7 +187,7 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
                 {(["datenschutz", "teilnahmebedingungen", "haftverzicht", "impressum"] as const).map((docId) => (
-                  <Link key={docId} className="font-medium text-primary hover:underline" to={`/anmeldung/rechtliches/${docId}`} target="_blank" rel="noreferrer">
+                  <Link key={docId} className="font-medium text-primary hover:underline" to={{ pathname: `/anmeldung/rechtliches/${docId}`, search: location.search }} target="_blank" rel="noreferrer">
                     {legalTexts?.docs[docId].summaryLinkLabel ?? docId}
                   </Link>
                 ))}

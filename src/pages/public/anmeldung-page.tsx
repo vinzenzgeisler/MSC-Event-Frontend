@@ -1275,13 +1275,22 @@ export function AnmeldungPage() {
           return;
         }
         setEventOverview(event);
+        if (event.invitation) {
+          const nameParts = event.invitation.recipientName?.trim().split(/\s+/).filter(Boolean) ?? [];
+          setDriver((prev) => ({
+            ...prev,
+            email: event.invitation?.recipientEmail || prev.email,
+            firstName: nameParts.length > 0 ? nameParts[0] : prev.firstName,
+            lastName: nameParts.length > 1 ? nameParts.slice(1).join(" ") : prev.lastName
+          }));
+        }
         setEventLoadState("ready");
       })
       .catch((error) => {
         if (!active) {
           return;
         }
-        if (error instanceof ApiError && error.status === 404) {
+        if (error instanceof ApiError && error.status === 404 && error.code !== "INVITATION_INVALID") {
           setEventLoadState("missing");
           return;
         }
