@@ -2134,7 +2134,15 @@ export function AnmeldungPage() {
 
       <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
         <CardContent className="space-y-6 p-5 md:p-8">
-          {step === 1 && <DriverStep value={driver} errors={driverErrors} showGuardianFields={isMinorDriver} onChange={handleDriverChange} />}
+          {step === 1 && (
+            <DriverStep
+              value={driver}
+              errors={driverErrors}
+              showGuardianFields={isMinorDriver}
+              isEmailBoundToInvitation={eventOverview?.invitation?.recipientEmail != null}
+              onChange={handleDriverChange}
+            />
+          )}
 
           {step === 2 && eventOverview && (
             <StartEntriesStep

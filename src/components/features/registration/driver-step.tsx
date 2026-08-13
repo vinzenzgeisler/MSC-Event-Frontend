@@ -11,6 +11,7 @@ type DriverStepProps = {
   value: DriverForm;
   errors: Partial<Record<keyof DriverForm, string>>;
   showGuardianFields: boolean;
+  isEmailBoundToInvitation: boolean;
   onChange: <K extends keyof DriverForm>(field: K, nextValue: DriverForm[K]) => void;
 };
 
@@ -32,7 +33,7 @@ function fieldAria(error?: string, errorId?: string) {
   } as const;
 }
 
-export function DriverStep({ value, errors, showGuardianFields, onChange }: DriverStepProps) {
+export function DriverStep({ value, errors, showGuardianFields, isEmailBoundToInvitation, onChange }: DriverStepProps) {
   const { m, locale } = useAnmeldungI18n();
   const countryOptions = useMemo(() => getCountrySelectOptions(locale), [locale]);
   const { texts: legalTexts } = usePublicLegal();
@@ -89,8 +90,20 @@ export function DriverStep({ value, errors, showGuardianFields, onChange }: Driv
             value={value.email}
             onChange={(event) => onChange("email", event.target.value)}
             placeholder="team@example.com"
-            {...fieldAria(errors.email, "driver-email-error")}
+            readOnly={isEmailBoundToInvitation}
+            className={isEmailBoundToInvitation ? "cursor-default bg-slate-50 text-slate-700" : undefined}
+            aria-describedby={
+              [isEmailBoundToInvitation ? "driver-email-invitation-hint" : undefined, errors.email ? "driver-email-error" : undefined]
+                .filter(Boolean)
+                .join(" ") || undefined
+            }
+            aria-invalid={errors.email ? "true" : "false"}
           />
+          {isEmailBoundToInvitation && (
+            <p id="driver-email-invitation-hint" className="text-xs text-slate-500">
+              {m.driver.invitationEmailBoundHint}
+            </p>
+          )}
           <FieldError id="driver-email-error" message={errors.email} />
         </div>
       </section>
