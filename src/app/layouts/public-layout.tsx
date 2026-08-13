@@ -314,16 +314,16 @@ function PublicLayoutContent() {
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 text-sm text-slate-600 md:flex-row md:items-center md:justify-between md:px-6">
           <p>{m.layout.footerCopyright}</p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link to="/anmeldung/rechtliches/impressum" className="hover:text-primary">
+            <Link to={{ pathname: "/anmeldung/rechtliches/impressum", search: location.search }} className="hover:text-primary">
               {legalTexts?.footerImprintLabel ?? "Impressum"}
             </Link>
-            <Link to="/anmeldung/rechtliches/datenschutz" className="hover:text-primary">
+            <Link to={{ pathname: "/anmeldung/rechtliches/datenschutz", search: location.search }} className="hover:text-primary">
               {legalTexts?.footerPrivacyLabel ?? "Datenschutz"}
             </Link>
-            <Link to="/anmeldung/rechtliches/teilnahmebedingungen" className="hover:text-primary">
+            <Link to={{ pathname: "/anmeldung/rechtliches/teilnahmebedingungen", search: location.search }} className="hover:text-primary">
               {legalTexts?.footerTermsLabel ?? "Teilnahmebedingungen"}
             </Link>
-            <Link to="/anmeldung/rechtliches/haftverzicht" className="hover:text-primary">
+            <Link to={{ pathname: "/anmeldung/rechtliches/haftverzicht", search: location.search }} className="hover:text-primary">
               {legalTexts?.footerWaiverLabel ?? "Haftverzicht"}
             </Link>
             {headerWebsiteUrl && (

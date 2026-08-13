@@ -52,7 +52,13 @@ const apiErrorMessages: Record<ApiErrorLocale, Partial<Record<string, string>>> 
     UPLOAD_EXPIRED: "Der Bild-Upload ist abgelaufen. Bitte das Bild erneut hochladen.",
     UPLOAD_OBJECT_MISSING: "Das hochgeladene Bild wurde nicht gefunden. Bitte das Bild erneut hochladen.",
     UNSUPPORTED_IMAGE_TYPE: "Dateityp nicht unterstützt. Bitte JPG, PNG oder WEBP verwenden.",
-    UPLOAD_PUT_FAILED: "Bild-Upload fehlgeschlagen. Bitte erneut versuchen."
+    UPLOAD_PUT_FAILED: "Bild-Upload fehlgeschlagen. Bitte erneut versuchen.",
+    INVITATION_INVALID: "Der persönliche Einladungslink ist ungültig.",
+    INVITATION_EXPIRED: "Der persönliche Einladungslink ist abgelaufen.",
+    INVITATION_REVOKED: "Der persönliche Einladungslink wurde widerrufen.",
+    INVITATION_USED: "Der persönliche Einladungslink wurde bereits verwendet.",
+    INVITATION_EMAIL_MISMATCH: "Bitte verwende die E-Mail-Adresse, für die dieser persönliche Link erstellt wurde.",
+    INVITATION_CLASS_NOT_ALLOWED: "Die gewählte Klasse ist mit diesem persönlichen Link nicht erlaubt."
   },
   en: {
     VALIDATION_ERROR: "Please check your entries.",
@@ -278,4 +284,3 @@ export function resolvePlainErrorMessage(
   }
   return message || fallback;
 }
-

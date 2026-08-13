@@ -22,12 +22,19 @@ type PublicCurrentEventResponse = {
     vehicleType: VehicleType;
     allowsCodriver: boolean;
     registrationClosed: boolean;
+    inviteAllowed?: boolean;
     selectionGroupKey: string;
   }>;
   registration: {
     isOpen: boolean;
     reason: string | null;
   };
+  invitation?: {
+    recipientName: string | null;
+    recipientEmail: string | null;
+    expiresAt: string;
+    allowedClassIds: string[];
+  } | null;
   pricingRules?: unknown;
   pricing?: unknown;
 };
@@ -54,20 +61,26 @@ type AdminClassesResponse = {
 };
 
 let publicEventCache: PublicCurrentEventResponse | null = null;
+let publicEventCacheInvite: string | null = null;
 let adminEventCache: AdminCurrentEventResponse | null = null;
 let adminClassesCache: Array<{ id: string; name: string; vehicleType: VehicleType; allowsCodriver: boolean; registrationClosed: boolean; runGroupId: string | null }> | null = null;
 
-export async function getPublicCurrentEvent() {
-  if (publicEventCache) {
+export async function getPublicCurrentEvent(invite?: string) {
+  const normalizedInvite = invite?.trim() || null;
+  if (publicEventCache && publicEventCacheInvite === normalizedInvite) {
     return publicEventCache;
   }
-  const response = await requestJson<PublicCurrentEventResponse>("/public/events/current", { auth: false });
+  const response = await requestJson<PublicCurrentEventResponse>("/public/events/current", {
+    auth: false,
+    query: { invite: normalizedInvite }
+  });
   publicEventCache = response;
+  publicEventCacheInvite = normalizedInvite;
   return response;
 }
 
-export async function getPublicEventId() {
-  const response = await getPublicCurrentEvent();
+export async function getPublicEventId(invite?: string) {
+  const response = await getPublicCurrentEvent(invite);
   return response.event.id;
 }
 
@@ -124,6 +137,7 @@ export async function getAdminClassOptions() {
 
 export function resetEventContextCache() {
   publicEventCache = null;
+  publicEventCacheInvite = null;
   adminEventCache = null;
   adminClassesCache = null;
 }

@@ -16,6 +16,11 @@ import type {
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
 
+function getInviteToken(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return new URLSearchParams(window.location.search).get("invite")?.trim() || undefined;
+}
+
 function parseCylinders(value: string): number {
   const digits = value.replace(/\D/g, "");
   const parsed = Number(digits);
@@ -249,7 +254,8 @@ type PublicVerifyResendResponse = {
 
 async function submitWizardFallbackSingle(
   eventId: string,
-  normalizedForm: RegistrationWizardForm
+  normalizedForm: RegistrationWizardForm,
+  inviteToken?: string
 ): Promise<RegistrationSubmitResult> {
   const attemptedEntries = normalizedForm.starts.length;
   const createdEntryIds: string[] = [];
@@ -263,7 +269,7 @@ async function submitWizardFallbackSingle(
       const entryResponse = await requestJson<PublicCreateEntryResponse>(`/public/events/${eventId}/entries`, {
         method: "POST",
         auth: false,
-        body: entryPayload
+        body: { ...entryPayload, inviteToken }
       });
       createdEntryIds.push(entryResponse.entryId);
       lastStatus = entryResponse.registrationStatus;
@@ -409,7 +415,11 @@ function toBatchRequestDto(form: RegistrationWizardForm, clientSubmissionKey: st
 
 export const registrationService = {
   async getCurrentEvent(): Promise<PublicEventOverview> {
-    const response = await getPublicCurrentEvent();
+    const inviteToken = getInviteToken();
+    const response = await getPublicCurrentEvent(inviteToken);
+    const classes = response.invitation
+      ? response.classes.filter((item) => item.inviteAllowed).map((item) => ({ ...item, registrationClosed: false }))
+      : response.classes;
     return {
       id: response.event.id,
       name: response.event.name,
@@ -420,14 +430,20 @@ export const registrationService = {
       registrationOpenAt: response.event.registrationOpenAt,
       registrationCloseAt: response.event.registrationCloseAt,
       pricingRules: extractPublicPricingRules(response),
-      classes: response.classes.map((item) => ({
+      classes: classes.map((item) => ({
         id: item.id,
         name: item.name,
         vehicleType: item.vehicleType,
         allowsCodriver: Boolean(item.allowsCodriver),
         registrationClosed: Boolean(item.registrationClosed),
-        selectionGroupKey: item.selectionGroupKey
-      }))
+        selectionGroupKey: item.selectionGroupKey,
+        inviteAllowed: Boolean(item.inviteAllowed)
+      })),
+      invitation: response.invitation ? {
+        recipientName: response.invitation.recipientName,
+        recipientEmail: response.invitation.recipientEmail,
+        expiresAt: response.invitation.expiresAt
+      } : null
     };
   },
 
@@ -457,11 +473,13 @@ export const registrationService = {
       };
     }
 
-    const eventId = await getPublicEventId();
+    const inviteToken = getInviteToken();
+    const eventId = await getPublicEventId(inviteToken);
     const response = await requestJson<PublicStartNumberValidateResponse>(`/public/events/${eventId}/start-number/validate`, {
       method: "POST",
       auth: false,
       body: {
+        inviteToken,
         classId,
         startNumber: normalized
       }
@@ -496,9 +514,10 @@ export const registrationService = {
       }
     };
 
-    const eventId = await getPublicEventId();
+    const inviteToken = getInviteToken();
+    const eventId = await getPublicEventId(inviteToken);
     const clientSubmissionKey = options?.clientSubmissionKey?.trim() || buildClientSubmissionKey();
-    const batchPayload = toBatchRequestDto(normalizedForm, clientSubmissionKey);
+    const batchPayload = { ...toBatchRequestDto(normalizedForm, clientSubmissionKey), inviteToken };
     let batchResponse: PublicCreateEntriesBatchResponse;
     try {
       batchResponse = await requestJson<PublicCreateEntriesBatchResponse>(`/public/events/${eventId}/entries/batch`, {
@@ -511,7 +530,7 @@ export const registrationService = {
       if (error instanceof ApiError) {
         const status = Number(error.status);
         if (status === 404 || status === 405 || status === 501) {
-          return submitWizardFallbackSingle(eventId, normalizedForm);
+          return submitWizardFallbackSingle(eventId, normalizedForm, inviteToken);
         }
       }
       throw error;
@@ -537,12 +556,14 @@ export const registrationService = {
       throw new ApiError(422, { code: "UPLOAD_FILE_TOO_LARGE" });
     }
 
-    const eventId = await getPublicEventId();
+    const inviteToken = getInviteToken();
+    const eventId = await getPublicEventId(inviteToken);
     const initResponse = await requestJson<PublicVehicleImageUploadInitResponse>("/public/uploads/vehicle-image/init", {
       method: "POST",
       auth: false,
       body: {
         eventId,
+        inviteToken,
         contentType: file.type,
         fileName: file.name,
         fileSizeBytes: file.size

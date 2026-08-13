@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Shield, Users, Save, Plus, Trash2, StopCircle, Archive, PlayCircle, RotateCcw, PenLine } from "lucide-react";
+import { Shield, Users, Save, Plus, Trash2, StopCircle, Archive, PlayCircle, RotateCcw, PenLine, Copy, Link2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission, type AppPermission } from "@/app/auth/iam";
 import { adminSigningService, type SigningDevice } from "@/services/admin-signing.service";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { adminIamService } from "@/services/admin-iam.service";
-import { adminSettingsService } from "@/services/admin-settings.service";
+import { adminSettingsService, type AdminRegistrationInvitation } from "@/services/admin-settings.service";
 import type { IamAccount, IamOverview, IamRole } from "@/types/admin-iam";
 import type {
   AdminSettingsClass,
@@ -847,7 +847,7 @@ function getIamCreateUserErrorMessage(error: unknown) {
   return getApiErrorMessage(error, "IAM-Account konnte nicht angelegt werden.");
 }
 
-type SettingsTab = "event" | "confirmation" | "classes" | "iam";
+type SettingsTab = "event" | "confirmation" | "classes" | "invitations" | "iam";
 
 export function AdminSettingsPage() {
   const { roles } = useAuth();
@@ -880,6 +880,16 @@ export function AdminSettingsPage() {
   });
   const [classes, setClasses] = useState<AdminSettingsClass[]>([]);
   const [runGroups, setRunGroups] = useState<AdminSettingsRunGroup[]>([]);
+  const [registrationInvitations, setRegistrationInvitations] = useState<AdminRegistrationInvitation[]>([]);
+  const [invitationDraft, setInvitationDraft] = useState({
+    recipientName: "",
+    recipientEmail: "",
+    expiresAt: toDatetimeLocal(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()),
+    allowedClassIds: [] as string[]
+  });
+  const [createdInvitationUrl, setCreatedInvitationUrl] = useState("");
+  const [invitationBusy, setInvitationBusy] = useState<string | null>(null);
+  const [invitationError, setInvitationError] = useState("");
   const [runGroupDrafts, setRunGroupDrafts] = useState<Record<string, AdminSettingsRunGroupDraft>>({});
   const [newRunGroup, setNewRunGroup] = useState<AdminSettingsRunGroupDraft>({ name: "", classIds: [] });
   const [classDrafts, setClassDrafts] = useState<Record<string, AdminSettingsClassDraft>>({});
@@ -985,6 +995,8 @@ export function AdminSettingsPage() {
     setEventState(null);
     setClasses([]);
     setRunGroups([]);
+    setRegistrationInvitations([]);
+    setCreatedInvitationUrl("");
     setRunGroupDrafts({});
     setNewRunGroup({ name: "", classIds: [] });
     setClassDrafts({});
@@ -995,10 +1007,11 @@ export function AdminSettingsPage() {
   };
 
   const applyLoadedEvent = async (event: AdminSettingsEvent) => {
-    const [classList, pricingRules, loadedRunGroups] = await Promise.all([
+    const [classList, pricingRules, loadedRunGroups, loadedInvitations] = await Promise.all([
       adminSettingsService.listClasses(event.id),
       adminSettingsService.getPricingRules(event.id).catch(() => null),
-      adminSettingsService.listRunGroups(event.id)
+      adminSettingsService.listRunGroups(event.id),
+      adminSettingsService.listRegistrationInvitations(event.id)
     ]);
 
     const nextEventForm = eventToForm(event);
@@ -1009,6 +1022,7 @@ export function AdminSettingsPage() {
     setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
     setClasses(classList);
     setRunGroups(loadedRunGroups);
+    setRegistrationInvitations(loadedInvitations);
     setRunGroupDrafts(Object.fromEntries(loadedRunGroups.map((item) => [item.id, { name: item.name, classIds: item.classIds }])));
     setClassDrafts(
       Object.fromEntries(
@@ -1136,6 +1150,46 @@ export function AdminSettingsPage() {
       setEventError(getApiErrorMessage(error, "Event konnte nicht geladen werden."));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createRegistrationInvitation = async () => {
+    if (!eventState || invitationDraft.allowedClassIds.length === 0 || !invitationDraft.expiresAt) {
+      setInvitationError("Bitte Ablaufzeit und mindestens eine erlaubte Klasse auswählen.");
+      return;
+    }
+    setInvitationBusy("create");
+    setInvitationError("");
+    try {
+      const result = await adminSettingsService.createRegistrationInvitation(eventState.id, {
+        recipientName: invitationDraft.recipientName.trim() || undefined,
+        recipientEmail: invitationDraft.recipientEmail.trim() || undefined,
+        expiresAt: new Date(invitationDraft.expiresAt).toISOString(),
+        allowedClassIds: invitationDraft.allowedClassIds
+      });
+      setRegistrationInvitations((prev) => [result.invitation, ...prev]);
+      const url = new URL("/anmeldung", window.location.origin);
+      url.searchParams.set("invite", result.token);
+      setCreatedInvitationUrl(url.toString());
+      showToast("Persönlicher Einladungslink erstellt.");
+    } catch (error) {
+      setInvitationError(getApiErrorMessage(error, "Einladungslink konnte nicht erstellt werden."));
+    } finally {
+      setInvitationBusy(null);
+    }
+  };
+
+  const revokeRegistrationInvitation = async (id: string) => {
+    setInvitationBusy(id);
+    setInvitationError("");
+    try {
+      await adminSettingsService.revokeRegistrationInvitation(id);
+      setRegistrationInvitations((prev) => prev.map((item) => item.id === id ? { ...item, revokedAt: new Date().toISOString() } : item));
+      showToast("Einladung widerrufen.");
+    } catch (error) {
+      setInvitationError(getApiErrorMessage(error, "Einladung konnte nicht widerrufen werden."));
+    } finally {
+      setInvitationBusy(null);
     }
   };
 
@@ -1969,6 +2023,7 @@ export function AdminSettingsPage() {
                 ["event", "Event"],
                 ["confirmation", "Nennbestätigung"],
                 ["classes", "Klassen"],
+                ["invitations", "Persönliche Einladungen"],
                 ["iam", "IAM"]
               ] as Array<[SettingsTab, string]>).map(([tabId, label]) => (
                 <Button
@@ -2715,6 +2770,54 @@ export function AdminSettingsPage() {
                 )}
 
                 {classError && <div className="text-sm text-destructive">{classError}</div>}
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "invitations" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Link2 className="h-4 w-4" />Persönliche Anmeldelinks</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {!eventState ? (
+                  <div className="text-sm text-slate-600">Bitte zuerst ein Event auswählen.</div>
+                ) : (
+                  <>
+                    <div className="space-y-4 rounded-md border p-4">
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-1"><Label>Empfängername (optional)</Label><Input value={invitationDraft.recipientName} disabled={!canManage} onChange={(event) => setInvitationDraft((prev) => ({ ...prev, recipientName: event.target.value }))} /></div>
+                        <div className="space-y-1"><Label>Empfänger-E-Mail (optional, bindend)</Label><Input type="email" value={invitationDraft.recipientEmail} disabled={!canManage} onChange={(event) => setInvitationDraft((prev) => ({ ...prev, recipientEmail: event.target.value }))} /></div>
+                        <div className="space-y-1"><Label>Gültig bis</Label><Input type="datetime-local" value={invitationDraft.expiresAt} disabled={!canManage} onChange={(event) => setInvitationDraft((prev) => ({ ...prev, expiresAt: event.target.value }))} /></div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Erlaubte Klassen (Haupt- und Ersatzfahrzeug)</Label>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {classes.map((clazz) => <label key={clazz.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm"><input type="checkbox" checked={invitationDraft.allowedClassIds.includes(clazz.id)} disabled={!canManage} onChange={(event) => setInvitationDraft((prev) => ({ ...prev, allowedClassIds: event.target.checked ? [...prev.allowedClassIds, clazz.id] : prev.allowedClassIds.filter((id) => id !== clazz.id) }))} />{clazz.name}{clazz.registrationClosed ? " (geschlossen)" : ""}</label>)}
+                        </div>
+                      </div>
+                      <Button type="button" disabled={!canManage || invitationBusy === "create" || classes.length === 0} onClick={() => void createRegistrationInvitation()}><Plus className="mr-2 h-4 w-4" />Link erstellen</Button>
+                    </div>
+
+                    {createdInvitationUrl && (
+                      <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4">
+                        <div className="font-medium text-emerald-900">Einmal sichtbarer persönlicher Link</div>
+                        <div className="mt-2 flex flex-col gap-2 md:flex-row"><Input readOnly value={createdInvitationUrl} /><Button type="button" variant="outline" onClick={() => void navigator.clipboard.writeText(createdInvitationUrl).then(() => showToast("Link kopiert."))}><Copy className="mr-2 h-4 w-4" />Kopieren</Button></div>
+                        <p className="mt-2 text-xs text-emerald-800">Der geheime Token wird nicht gespeichert und kann später nicht erneut angezeigt werden.</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {registrationInvitations.map((item) => {
+                        const status = item.consumedAt ? "Verwendet" : item.revokedAt ? "Widerrufen" : new Date(item.expiresAt) < new Date() ? "Abgelaufen" : "Aktiv";
+                        const revocable = status === "Aktiv";
+                        return <div key={item.id} className="flex flex-col gap-3 rounded-md border p-3 md:flex-row md:items-center md:justify-between"><div><div className="font-medium">{item.recipientName || item.recipientEmail || "Ohne Empfängerbindung"}</div><div className="text-sm text-slate-600">{item.recipientEmail || "Keine E-Mail-Bindung"} · gültig bis {new Date(item.expiresAt).toLocaleString("de-DE")} · {status}</div><div className="text-xs text-slate-500">Klassen: {item.allowedClassIds.map((id) => classes.find((clazz) => clazz.id === id)?.name ?? id).join(", ")}</div></div><Button type="button" variant="destructive" disabled={!canManage || !revocable || invitationBusy === item.id} onClick={() => void revokeRegistrationInvitation(item.id)}>Widerrufen</Button></div>;
+                      })}
+                      {registrationInvitations.length === 0 && <div className="text-sm text-slate-500">Noch keine persönlichen Einladungen vorhanden.</div>}
+                    </div>
+                  </>
+                )}
+                {invitationError && <div className="text-sm text-destructive">{invitationError}</div>}
               </CardContent>
             </Card>
           )}

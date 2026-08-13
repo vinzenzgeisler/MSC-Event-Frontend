@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { usePublicLegal } from "@/app/legal/public-legal-context";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export function LegalPlaceholderPage() {
   const { texts: legalTexts, loading } = usePublicLegal();
   const navigate = useNavigate();
+  const location = useLocation();
   const { docId = "" } = useParams();
   const normalizedDocId = docId === "haftung" ? "haftverzicht" : docId === "agb" ? "teilnahmebedingungen" : docId;
   const doc = normalizedDocId && legalTexts?.docs ? legalTexts.docs[normalizedDocId as keyof typeof legalTexts.docs] ?? legalTexts.docs.datenschutz : null;
@@ -43,7 +44,7 @@ export function LegalPlaceholderPage() {
           ))}
         </div>
         <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
-          <Button type="button" variant="outline" onClick={() => navigate("/anmeldung")}>
+          <Button type="button" variant="outline" onClick={() => navigate(`/anmeldung${location.search}`)}>
             {legalTexts?.legalPageBackLabel ?? "Zurück zur Anmeldung"}
           </Button>
         </div>
