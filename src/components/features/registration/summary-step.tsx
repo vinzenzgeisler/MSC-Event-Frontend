@@ -127,7 +127,11 @@ export function SummaryStep({ form, submitError, consentError, successMessage, i
                 {start.codriver.phone ? ` · ${start.codriver.phone}` : ""}
               </div>
             )}
-            {start.backupVehicleEnabled && <div className="text-xs text-slate-600">{m.summary.backupVehicle}</div>}
+            {start.backupVehicleEnabled && (
+              <div className="text-xs text-slate-600">
+                {m.summary.backupVehicle}: {start.backupClassLabel || start.classLabel}
+              </div>
+            )}
           </div>
         ))}
       </div>

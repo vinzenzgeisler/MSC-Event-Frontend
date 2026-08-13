@@ -20,7 +20,9 @@ import type {
   AdminSettingsEntryConfirmationScheduleItem,
   AdminSettingsEvent,
   AdminSettingsEventForm,
-  AdminSettingsPricingForm
+  AdminSettingsPricingForm,
+  AdminSettingsRunGroup,
+  AdminSettingsRunGroupDraft
 } from "@/types/admin-settings";
 import type { VehicleType } from "@/types/common";
 
@@ -877,6 +879,9 @@ export function AdminSettingsPage() {
     entryConfirmationConfig: createEmptyEntryConfirmationConfig()
   });
   const [classes, setClasses] = useState<AdminSettingsClass[]>([]);
+  const [runGroups, setRunGroups] = useState<AdminSettingsRunGroup[]>([]);
+  const [runGroupDrafts, setRunGroupDrafts] = useState<Record<string, AdminSettingsRunGroupDraft>>({});
+  const [newRunGroup, setNewRunGroup] = useState<AdminSettingsRunGroupDraft>({ name: "", classIds: [] });
   const [classDrafts, setClassDrafts] = useState<Record<string, AdminSettingsClassDraft>>({});
   const [newClassDraft, setNewClassDraft] = useState<AdminSettingsClassDraft>({
     name: "",
@@ -893,6 +898,7 @@ export function AdminSettingsPage() {
   const [creatingNextEvent, setCreatingNextEvent] = useState(false);
   const [savingClassId, setSavingClassId] = useState<string | null>(null);
   const [creatingClass, setCreatingClass] = useState(false);
+  const [savingRunGroupId, setSavingRunGroupId] = useState<string | null>(null);
   const [operationBusy, setOperationBusy] = useState<string | null>(null);
 
   const [eventError, setEventError] = useState("");
@@ -978,6 +984,9 @@ export function AdminSettingsPage() {
   const resetEventScopedState = () => {
     setEventState(null);
     setClasses([]);
+    setRunGroups([]);
+    setRunGroupDrafts({});
+    setNewRunGroup({ name: "", classIds: [] });
     setClassDrafts({});
     setNewClassDraft({ name: "", vehicleType: "auto", allowsCodriver: false, registrationClosed: false });
     setPricingForm(buildDefaultPricingForm([]));
@@ -986,9 +995,10 @@ export function AdminSettingsPage() {
   };
 
   const applyLoadedEvent = async (event: AdminSettingsEvent) => {
-    const [classList, pricingRules] = await Promise.all([
+    const [classList, pricingRules, loadedRunGroups] = await Promise.all([
       adminSettingsService.listClasses(event.id),
-      adminSettingsService.getPricingRules(event.id).catch(() => null)
+      adminSettingsService.getPricingRules(event.id).catch(() => null),
+      adminSettingsService.listRunGroups(event.id)
     ]);
 
     const nextEventForm = eventToForm(event);
@@ -998,6 +1008,8 @@ export function AdminSettingsPage() {
     setEventForm(nextEventForm);
     setEventOverridesExpanded(hasEntryConfirmationOverrides(nextEventForm.entryConfirmationConfig));
     setClasses(classList);
+    setRunGroups(loadedRunGroups);
+    setRunGroupDrafts(Object.fromEntries(loadedRunGroups.map((item) => [item.id, { name: item.name, classIds: item.classIds }])));
     setClassDrafts(
       Object.fromEntries(
         classList.map((item) => [
@@ -1633,6 +1645,66 @@ export function AdminSettingsPage() {
     } finally {
       setSavingClassId(null);
     }
+  };
+
+  const toggleRunGroupClass = (groupId: string, classId: string, checked: boolean) => {
+    setRunGroupDrafts((prev) => {
+      const draft = prev[groupId] ?? { name: "", classIds: [] };
+      return { ...prev, [groupId]: { ...draft, classIds: checked ? [...draft.classIds, classId] : draft.classIds.filter((id) => id !== classId) } };
+    });
+  };
+
+  const createRunGroup = async () => {
+    if (!eventState || !newRunGroup.name.trim()) return;
+    setSavingRunGroupId("new");
+    setClassError("");
+    try {
+      const created = await adminSettingsService.createRunGroup(eventState.id, { ...newRunGroup, name: newRunGroup.name.trim() });
+      setRunGroups((prev) => [...prev, created]);
+      setClasses((prev) => prev.map((item) => created.classIds.includes(item.id) ? { ...item, runGroupId: created.id } : item));
+      setRunGroupDrafts((prev) => ({ ...prev, [created.id]: { name: created.name, classIds: created.classIds } }));
+      setNewRunGroup({ name: "", classIds: [] });
+      showToast("Laufgruppe angelegt.");
+    } catch (error) {
+      setClassError(getApiErrorMessage(error, "Laufgruppe konnte nicht angelegt werden. Prüfe Name, Klassenzuordnung und bestehende Nennungen."));
+    } finally { setSavingRunGroupId(null); }
+  };
+
+  const saveRunGroup = async (id: string) => {
+    const draft = runGroupDrafts[id];
+    if (!draft?.name.trim()) return;
+    setSavingRunGroupId(id);
+    setClassError("");
+    try {
+      const updated = await adminSettingsService.updateRunGroup(id, { ...draft, name: draft.name.trim() });
+      setRunGroups((prev) => prev.map((item) => item.id === id ? updated : item));
+      setClasses((prev) => prev.map((item) => ({
+        ...item,
+        runGroupId: updated.classIds.includes(item.id) ? id : item.runGroupId === id ? null : item.runGroupId
+      })));
+      showToast("Laufgruppe gespeichert.");
+    } catch (error) {
+      setClassError(getApiErrorMessage(error, "Laufgruppe konnte nicht gespeichert werden. Die Auswahl kollidiert möglicherweise mit bestehenden Nennungen."));
+    } finally { setSavingRunGroupId(null); }
+  };
+
+  const removeRunGroup = async (id: string) => {
+    if (!window.confirm("Laufgruppe wirklich löschen? Die Klassen bleiben erhalten.")) return;
+    setSavingRunGroupId(id);
+    setClassError("");
+    try {
+      await adminSettingsService.deleteRunGroup(id);
+      setRunGroups((prev) => prev.filter((item) => item.id !== id));
+      setRunGroupDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setClasses((prev) => prev.map((item) => item.runGroupId === id ? { ...item, runGroupId: null } : item));
+      showToast("Laufgruppe gelöscht.");
+    } catch (error) {
+      setClassError(getApiErrorMessage(error, "Laufgruppe kann wegen bestehender Nennungen nicht gelöscht werden."));
+    } finally { setSavingRunGroupId(null); }
   };
 
   const runOperation = async (operation: "close" | "archive" | "activate") => {
@@ -2591,6 +2663,54 @@ export function AdminSettingsPage() {
                       })}
                       {classes.length === 0 && <div className="text-sm text-slate-500">Keine Klassen vorhanden.</div>}
                     </div>
+
+                    <section className="space-y-4 border-t pt-5">
+                      <div>
+                        <h3 className="font-semibold text-slate-900">Laufgruppen</h3>
+                        <p className="text-sm text-slate-600">Nur intern sichtbar. Klassen ohne Zuordnung bleiben eigenständige Startmöglichkeiten.</p>
+                      </div>
+                      <div className="rounded-md border p-3">
+                        <Label>Neue Laufgruppe</Label>
+                        <div className="mt-2 flex flex-col gap-3 md:flex-row">
+                          <Input value={newRunGroup.name} placeholder="z. B. Laufgruppe 1+2+3" onChange={(event) => setNewRunGroup((prev) => ({ ...prev, name: event.target.value }))} />
+                          <Button disabled={!canManage || savingRunGroupId === "new" || !newRunGroup.name.trim()} onClick={() => void createRunGroup()}><Plus className="mr-2 h-4 w-4" />Anlegen</Button>
+                        </div>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {classes.map((clazz) => {
+                            const assigned = runGroups.some((item) => (runGroupDrafts[item.id] ?? item).classIds.includes(clazz.id));
+                            return <label key={clazz.id} className={`flex items-center gap-2 rounded border px-3 py-2 text-sm ${assigned ? "opacity-50" : ""}`}>
+                              <input
+                                type="checkbox"
+                                checked={newRunGroup.classIds.includes(clazz.id)}
+                                disabled={!canManage || assigned}
+                                onChange={(event) => setNewRunGroup((prev) => ({
+                                  ...prev,
+                                  classIds: event.target.checked ? [...prev.classIds, clazz.id] : prev.classIds.filter((id) => id !== clazz.id)
+                                }))}
+                              />
+                              {clazz.name}
+                            </label>;
+                          })}
+                        </div>
+                      </div>
+                      {runGroups.map((group) => {
+                        const draft = runGroupDrafts[group.id] ?? { name: group.name, classIds: group.classIds };
+                        const assignedElsewhere = new Set(runGroups.filter((item) => item.id !== group.id).flatMap((item) => (runGroupDrafts[item.id] ?? item).classIds));
+                        return <div key={group.id} className="space-y-3 rounded-md border p-3">
+                          <div className="flex flex-col gap-2 md:flex-row">
+                            <Input value={draft.name} onChange={(event) => setRunGroupDrafts((prev) => ({ ...prev, [group.id]: { ...draft, name: event.target.value } }))} />
+                            <Button variant="outline" disabled={!canManage || savingRunGroupId === group.id} onClick={() => void saveRunGroup(group.id)}><Save className="mr-2 h-4 w-4" />Speichern</Button>
+                            <Button variant="destructive" disabled={!canManage || savingRunGroupId === group.id} onClick={() => void removeRunGroup(group.id)}><Trash2 className="mr-2 h-4 w-4" />Löschen</Button>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {classes.map((clazz) => <label key={clazz.id} className={`flex items-center gap-2 rounded border px-3 py-2 text-sm ${assignedElsewhere.has(clazz.id) ? "opacity-50" : ""}`}>
+                              <input type="checkbox" checked={draft.classIds.includes(clazz.id)} disabled={!canManage || assignedElsewhere.has(clazz.id)} onChange={(event) => toggleRunGroupClass(group.id, clazz.id, event.target.checked)} />
+                              {clazz.name}
+                            </label>)}
+                          </div>
+                        </div>;
+                      })}
+                    </section>
                   </>
                 )}
 

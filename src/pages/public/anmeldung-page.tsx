@@ -53,6 +53,9 @@ function createEmptyStart(): StartRegistrationForm {
     classId: "",
     classLabel: "",
     vehicleType: "auto",
+    backupClassId: "",
+    backupClassLabel: "",
+    backupVehicleType: "auto",
     startNumber: "",
     vehicle: createEmptyVehicle(),
     codriverEnabled: false,
@@ -84,6 +87,10 @@ function classAllowsCodriver(classId: string, eventOverview: PublicEventOverview
     return false;
   }
   return Boolean(eventOverview?.classes.find((item) => item.id === classId)?.allowsCodriver);
+}
+
+function effectiveClassKey(item: PublicEventClass | undefined) {
+  return item?.selectionGroupKey ?? item?.id ?? "";
 }
 
 function focusFieldBySelector(selector: string) {
@@ -154,6 +161,7 @@ function focusFirstStartError(errors: StartFieldErrors) {
     "codriverCity",
     "codriverEmail",
     "codriverPhone",
+    "backupClassId",
     "backupMake",
     "backupModel",
     "backupYear",
@@ -825,6 +833,7 @@ function hydrateDriverForm(value: Partial<DriverForm> | null | undefined): Drive
 type StartFieldErrors = Partial<
   Record<
     | "classId"
+    | "backupClassId"
     | "startNumber"
     | "make"
     | "model"
@@ -945,6 +954,9 @@ function hydrateStartForm(value: Partial<StartRegistrationForm> | undefined): St
     classId: typeof value?.classId === "string" ? value.classId : "",
     classLabel: typeof value?.classLabel === "string" ? value.classLabel : "",
     vehicleType: value?.vehicleType === "moto" ? "moto" : "auto",
+    backupClassId: typeof value?.backupClassId === "string" ? value.backupClassId : (typeof value?.classId === "string" ? value.classId : ""),
+    backupClassLabel: typeof value?.backupClassLabel === "string" ? value.backupClassLabel : (typeof value?.classLabel === "string" ? value.classLabel : ""),
+    backupVehicleType: value?.backupVehicleType === "moto" ? "moto" : (value?.vehicleType === "moto" ? "moto" : "auto"),
     startNumber: typeof value?.startNumber === "string" ? value.startNumber : "",
     codriverEnabled: Boolean(value?.codriverEnabled),
     codriver: {
@@ -1041,7 +1053,11 @@ function validateStartFields(
     if (selectedClass?.registrationClosed) {
       errors.classId = m.errors.classClosed;
     }
-    const classAlreadyUsed = existingStarts.some((entry) => entry.classId === start.classId && entry.id !== editingId);
+    const selectedEffectiveClass = effectiveClassKey(selectedClass);
+    const classAlreadyUsed = existingStarts.some((entry) => {
+      const existingClass = classes.find((item) => item.id === entry.classId);
+      return entry.id !== editingId && effectiveClassKey(existingClass) === selectedEffectiveClass;
+    });
     if (classAlreadyUsed) {
       errors.classId = m.errors.classAlreadyAdded;
     }
@@ -1133,6 +1149,11 @@ function validateStartFields(
   }
 
   if (start.backupVehicleEnabled) {
+    const primaryClass = classes.find((item) => item.id === start.classId);
+    const backupClass = classes.find((item) => item.id === (start.backupClassId || start.classId));
+    if (!backupClass || backupClass.registrationClosed || effectiveClassKey(primaryClass) !== effectiveClassKey(backupClass)) {
+      errors.backupClassId = m.errors.backupClassUnavailable;
+    }
     if (!start.backupVehicle.make.trim()) {
       errors.backupMake = m.errors.requiredBackupMake;
     }
@@ -1445,20 +1466,36 @@ export function AnmeldungPage() {
     setDraftStart((prev) => {
       if (field === "classId") {
         const nextAllowsCodriver = classAllowsCodriver(String(value), eventOverview);
+        const nextClass = eventOverview?.classes.find((item) => item.id === String(value));
         if (!nextAllowsCodriver) {
           return {
             ...prev,
             [field]: value,
+            backupClassId: String(value),
+            backupClassLabel: nextClass?.name ?? "",
+            backupVehicleType: nextClass?.vehicleType ?? prev.vehicleType,
             codriverEnabled: false,
             codriver: createEmptyStart().codriver
           };
         }
+        return {
+          ...prev,
+          [field]: value,
+          backupClassId: String(value),
+          backupClassLabel: nextClass?.name ?? "",
+          backupVehicleType: nextClass?.vehicleType ?? prev.vehicleType
+        };
       }
       return { ...prev, [field]: value };
     });
     setStartError("");
     if (field === "classId") {
       setStartFieldErrors((prev) => ({ ...prev, classId: undefined }));
+    }
+    if (field === "backupClassId") {
+      setStartFieldErrors((prev) => ({ ...prev, backupClassId: undefined, startNumber: undefined }));
+      setStartNumberState("idle");
+      setStartNumberHint("");
     }
     if (field === "classId" || field === "startNumber") {
       setStartNumberState("idle");
@@ -1496,6 +1533,7 @@ export function AnmeldungPage() {
     if (field === "backupVehicleEnabled" && !value) {
       setStartFieldErrors((prev) => ({
         ...prev,
+        backupClassId: undefined,
         backupMake: undefined,
         backupModel: undefined,
         backupYear: undefined,
@@ -1589,23 +1627,29 @@ export function AnmeldungPage() {
     }
 
     setStartNumberState("checking");
-    let validation: Awaited<ReturnType<typeof registrationService.validateStartNumber>>;
+    let validations: Array<Awaited<ReturnType<typeof registrationService.validateStartNumber>>>;
     try {
-      validation = await registrationService.validateStartNumber(draftStart.classId, normalizedStartNumber);
+      const classIds = Array.from(new Set([
+        draftStart.classId,
+        ...(draftStart.backupVehicleEnabled && draftStart.backupClassId ? [draftStart.backupClassId] : [])
+      ]));
+      validations = await Promise.all(
+        classIds.map((classId) => registrationService.validateStartNumber(classId, normalizedStartNumber))
+      );
     } catch {
       setStartNumberState("idle");
       setStartNumberHint("");
       return { ok: false, reason: "error" };
     }
 
-    if (!validation.validFormat || validation.conflictType === "invalid_format") {
+    if (validations.some((validation) => !validation.validFormat || validation.conflictType === "invalid_format")) {
       setStartNumberState("invalid");
       setStartNumberHint("");
       setStartFieldErrors((prev) => ({ ...prev, startNumber: m.errors.invalidApiStartFormat }));
       return { ok: false, reason: "invalid" };
     }
 
-    if (!validation.available || validation.conflictType === "same_class_taken") {
+    if (validations.some((validation) => !validation.available || validation.conflictType === "same_class_taken")) {
       setStartNumberState("taken");
       setStartNumberHint("");
       setStartFieldErrors((prev) => ({ ...prev, startNumber: m.errors.startTaken }));
@@ -1615,8 +1659,9 @@ export function AnmeldungPage() {
     setStartNumberState("available");
     setStartNumberHint(m.start.startAvailable);
     setStartFieldErrors((prev) => ({ ...prev, startNumber: undefined }));
-    if (validation.normalizedStartNumber) {
-      setDraftStart((prev) => ({ ...prev, startNumber: validation.normalizedStartNumber ?? prev.startNumber }));
+    const normalized = validations[0]?.normalizedStartNumber;
+    if (normalized) {
+      setDraftStart((prev) => ({ ...prev, startNumber: normalized }));
     }
     return { ok: true, reason: "ok" };
   };

@@ -148,8 +148,10 @@ export type AdminEntryDetailDto = {
     vehicleId: Id;
     backupOfEntryId?: Id | null;
     backupVehicleId?: Id | null;
+    backupClassId?: Id | null;
   };
   className: string;
+  backupClassName?: string | null;
   registrationStatus: RegistrationStatus;
   acceptanceStatus: AcceptanceStatus;
   withdrawnReason?: string | null;
@@ -278,6 +280,7 @@ export type AdminEntryDetailViewModel = {
   eventId: Id;
   driverPersonId: Id;
   classId: Id;
+  backupClassId: Id | null;
   headline: string;
   classLabel: string;
   startNumber: string;
@@ -337,6 +340,8 @@ export type AdminEntryDetailViewModel = {
   };
   backupVehicle: {
     assigned: boolean;
+    classId: Id | null;
+    className: string;
     label: string;
     thumbUrl: string | null;
     type: VehicleType;

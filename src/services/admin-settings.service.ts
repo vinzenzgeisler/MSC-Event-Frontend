@@ -7,7 +7,9 @@ import type {
   AdminSettingsEntryConfirmationScheduleItem,
   AdminSettingsEvent,
   AdminSettingsEventForm,
-  AdminSettingsPricingForm
+  AdminSettingsPricingForm,
+  AdminSettingsRunGroup,
+  AdminSettingsRunGroupDraft
 } from "@/types/admin-settings";
 import type { VehicleType } from "@/types/common";
 
@@ -78,8 +80,12 @@ type AdminClassesListResponse = {
     registrationClosed?: boolean;
     createdAt?: string;
     updatedAt?: string;
+    runGroupId?: string | null;
   }>;
 };
+
+type AdminRunGroupsResponse = { ok: boolean; runGroups: AdminSettingsRunGroup[] };
+type AdminRunGroupResponse = { ok: boolean; runGroup: AdminSettingsRunGroup };
 
 function asVehicleType(value: unknown): VehicleType {
   return value === "moto" ? "moto" : "auto";
@@ -260,6 +266,7 @@ function mapClass(item: AdminClassesListResponse["classes"][number], eventId: st
     vehicleType: asVehicleType(item.vehicleType),
     allowsCodriver: Boolean(item.allowsCodriver),
     registrationClosed: Boolean(item.registrationClosed),
+    runGroupId: item.runGroupId ?? null,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt
   };
@@ -377,6 +384,25 @@ export const adminSettingsService = {
 
     resetEventContextCache();
     return response;
+  },
+
+  async listRunGroups(eventId: string): Promise<AdminSettingsRunGroup[]> {
+    const response = await requestJson<AdminRunGroupsResponse>(`/admin/events/${eventId}/run-groups`);
+    return response.runGroups ?? [];
+  },
+
+  async createRunGroup(eventId: string, payload: AdminSettingsRunGroupDraft): Promise<AdminSettingsRunGroup> {
+    const response = await requestJson<AdminRunGroupResponse>(`/admin/events/${eventId}/run-groups`, { method: "POST", body: payload });
+    return response.runGroup;
+  },
+
+  async updateRunGroup(id: string, payload: AdminSettingsRunGroupDraft): Promise<AdminSettingsRunGroup> {
+    const response = await requestJson<AdminRunGroupResponse>(`/admin/run-groups/${id}`, { method: "PATCH", body: payload });
+    return response.runGroup;
+  },
+
+  async deleteRunGroup(id: string): Promise<void> {
+    await requestJson(`/admin/run-groups/${id}`, { method: "DELETE" });
   },
 
   async savePricingRules(eventId: string, form: AdminSettingsPricingForm): Promise<AdminPricingRulesResponse> {

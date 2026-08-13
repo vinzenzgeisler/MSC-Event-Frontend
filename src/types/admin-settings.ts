@@ -70,8 +70,21 @@ export type AdminSettingsClass = {
   vehicleType: VehicleType;
   allowsCodriver: boolean;
   registrationClosed: boolean;
+  runGroupId?: string | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type AdminSettingsRunGroup = {
+  id: string;
+  eventId: string;
+  name: string;
+  classIds: string[];
+};
+
+export type AdminSettingsRunGroupDraft = {
+  name: string;
+  classIds: string[];
 };
 
 export type AdminSettingsClassDraft = {

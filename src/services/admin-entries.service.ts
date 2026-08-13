@@ -314,6 +314,7 @@ function fromAdminEntryDetailDto(
     eventId: dto.ids.eventId,
     driverPersonId: dto.ids.driverPersonId,
     classId: dto.ids.classId,
+    backupClassId: dto.ids.backupClassId ?? null,
     headline: `${driverName} · ${vehicleLabel}`,
     classLabel: dto.className,
     startNumber: dto.startNumberNorm ?? "-",
@@ -373,6 +374,8 @@ function fromAdminEntryDetailDto(
     },
     backupVehicle: {
       assigned: Boolean(backupVehicle),
+      classId: dto.ids.backupClassId ?? null,
+      className: dto.backupClassName ?? dto.className,
       label: backupVehicleLabel,
       thumbUrl: resolveImageUrl(dto.backupVehicleThumbUrl),
       type: backupVehicle?.vehicleType ?? dto.vehicle.vehicleType,
@@ -911,6 +914,13 @@ export const adminEntriesService = {
         allowVehicleTypeChange: payload.allowVehicleTypeChange !== false ? true : undefined
       }
     });
+  },
+
+  async changeEntryBackupClass(entryId: string, backupClassId: string) {
+    return requestJson<{ ok: true; id: string; backupClassId: string; backupVehicleType: VehicleType }>(
+      `/admin/entries/${entryId}/backup-class`,
+      { method: "PATCH", body: { backupClassId } }
+    );
   },
 
   async markConfirmationMailSent(entryId: string) {
