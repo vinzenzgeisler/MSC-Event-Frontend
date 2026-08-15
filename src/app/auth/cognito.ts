@@ -1,4 +1,5 @@
 import type { AuthSession } from "@/app/auth/auth-store";
+import { isDemoMode } from "@/demo/config";
 
 const COGNITO_STATE_KEY = "msc_cognito_oauth_state";
 const COGNITO_VERIFIER_KEY = "msc_cognito_pkce_verifier";
@@ -170,7 +171,7 @@ export function getCognitoConfig() {
 }
 
 export function isCognitoConfigured() {
-  return isCognitoEnabled();
+  return !isDemoMode && isCognitoEnabled();
 }
 
 export function shouldShowManualTokenLogin() {
@@ -252,6 +253,9 @@ type OAuthTokenResponse = {
 };
 
 async function requestOAuthToken(body: URLSearchParams): Promise<OAuthTokenResponse> {
+  if (isDemoMode) {
+    throw new Error("Demo-Modus: Cognito ist deaktiviert; es wurde keine Netzwerkverbindung hergestellt.");
+  }
   const { domain } = getCognitoConfig();
   const response = await fetch(`${domain}/oauth2/token`, {
     method: "POST",

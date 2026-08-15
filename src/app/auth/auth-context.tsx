@@ -14,6 +14,7 @@ import {
 import { getEffectiveRoles } from "@/app/auth/iam";
 import { extractRoles, parseJwtPayload } from "@/app/auth/jwt";
 import { ApiError, requestJson } from "@/services/api/http-client";
+import { demoIdentity, isDemoMode } from "@/demo/config";
 
 type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
 
@@ -66,7 +67,7 @@ const IDLE_TIMEOUT_MS = readPositiveNumberConfig("VITE_AUTH_IDLE_TIMEOUT_MINUTES
 const MAX_SESSION_AGE_MS = readPositiveNumberConfig("VITE_AUTH_MAX_SESSION_HOURS", "authMaxSessionHours", DEFAULT_MAX_SESSION_HOURS) * 60 * 60 * 1000;
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
+  const [session, setSession] = useState<AuthSession | null>(() => (isDemoMode ? null : getAuthSession()));
   const [authMe, setAuthMe] = useState<AuthMeResponse | null>(null);
 
   const refreshPromiseRef = useRef<Promise<AuthSession | null> | null>(null);
@@ -200,7 +201,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return extractRoles(roleToken);
   }, [session?.apiToken, session?.roleToken]);
 
-  const resolvedRoles = authMe?.roles ?? tokenRoles;
+  const resolvedRoles = isDemoMode ? [...demoIdentity.roles] : (authMe?.roles ?? tokenRoles);
   const effectiveRoles = useMemo(() => getEffectiveRoles(resolvedRoles), [resolvedRoles]);
 
   useEffect(() => {
@@ -294,6 +295,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(
     () => {
+      if (isDemoMode) {
+        return {
+          token: demoIdentity.token,
+          provider: "manual",
+          roles: [...demoIdentity.roles],
+          isPreviewMode: true,
+          displayName: demoIdentity.displayName,
+          email: demoIdentity.email,
+          isAuthenticated: true,
+          login: () => undefined,
+          loginWithSession: () => undefined,
+          logout: () => undefined
+        };
+      }
+
       const token = session?.apiToken ?? null;
       const roleToken = session?.roleToken || token;
       const payload = roleToken ? parseJwtPayload(roleToken) : null;

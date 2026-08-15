@@ -13,6 +13,7 @@ import type {
   RegistrationWizardForm,
   StartNumberValidationResult
 } from "@/types/registration";
+import { isDemoMode } from "@/demo/config";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
 
@@ -575,14 +576,16 @@ export const registrationService = {
       uploadHeaders["Content-Type"] = file.type;
     }
 
-    const uploadResult = await fetch(initResponse.uploadUrl, {
-      method: "PUT",
-      headers: uploadHeaders,
-      body: file
-    });
+    if (!isDemoMode) {
+      const uploadResult = await fetch(initResponse.uploadUrl, {
+        method: "PUT",
+        headers: uploadHeaders,
+        body: file
+      });
 
-    if (!uploadResult.ok) {
-      throw new ApiError(uploadResult.status || 500, { code: "UPLOAD_PUT_FAILED" });
+      if (!uploadResult.ok) {
+        throw new ApiError(uploadResult.status || 500, { code: "UPLOAD_PUT_FAILED" });
+      }
     }
 
     const finalizeResponse = await requestJson<PublicVehicleImageUploadFinalizeResponse>("/public/uploads/vehicle-image/finalize", {

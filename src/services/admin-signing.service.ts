@@ -1,5 +1,6 @@
 import { getAuthToken } from "@/app/auth/auth-store";
 import { requestJson } from "@/services/api/http-client";
+import { isDemoMode } from "@/demo/config";
 
 export type SigningDevice = {
   id: string;
@@ -178,6 +179,11 @@ export const adminSigningService = {
   },
 
   async downloadSignedWaiver(entryId: string): Promise<Blob> {
+    if (isDemoMode) {
+      return new Blob([`Lokaler Demo-Haftverzicht für ${entryId}\nNicht rechtsverbindlich.`], {
+        type: "text/plain;charset=utf-8"
+      });
+    }
     const token = getAuthToken();
     const runtimeConfig = (window as Window & { __MSC_RUNTIME_CONFIG__?: Record<string, string | boolean | null | undefined> }).__MSC_RUNTIME_CONFIG__;
     const baseUrl = String(runtimeConfig?.apiBaseUrl ?? runtimeConfig?.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
