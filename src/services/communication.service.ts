@@ -13,6 +13,7 @@ import type {
   OutboxItemDto,
   ResolveRecipientsResult
 } from "@/types/admin";
+import { isDemoMode } from "@/demo/config";
 
 function fromOutboxDto(dto: OutboxItemDto): OutboxItem {
   const createdAtRaw = dto.createdAt;
@@ -394,6 +395,9 @@ export const communicationService = {
   },
 
   async uploadAttachmentBinary(uploadUrl: string, requiredHeaders: Record<string, string>, file: File) {
+    if (isDemoMode) {
+      return;
+    }
     const response = await fetch(uploadUrl, {
       method: "PUT",
       headers: requiredHeaders,

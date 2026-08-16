@@ -1,6 +1,7 @@
 import { getAuthToken } from "@/app/auth/auth-store";
 import { requestJson } from "@/services/api/http-client";
 import type { MarshalCommitmentStatus, MarshalImportPreview, MarshalWorkspace } from "@/types/admin-marshals";
+import { isDemoMode } from "@/demo/config";
 
 type OkResponse = { ok: boolean };
 
@@ -65,6 +66,12 @@ export const adminMarshalsService = {
   },
 
   async downloadPrint(params: { eventId: string; type: "attendance" | "section" | "training"; dayId?: string; sectionId?: string; trainingId?: string }) {
+    if (isDemoMode) {
+      const blob = new Blob(["Lokale Demo-Druckliste\nKeine dauerhaft gespeicherten Daten."], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = `demo-${params.type}.txt`; anchor.click(); URL.revokeObjectURL(url);
+      return;
+    }
     const query = new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])));
     const response = await fetch(`${apiBaseUrl()}/admin/marshals/print?${query.toString()}`, { headers: { Authorization: `Bearer ${getAuthToken() ?? ""}` } });
     if (!response.ok) throw new Error(`Druckliste konnte nicht erstellt werden (${response.status})`);

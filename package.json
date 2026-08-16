@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:demo": "VITE_DEMO_MODE=true vite",
     "dev:sync": "powershell -ExecutionPolicy Bypass -File scripts/sync-dev-env.ps1",
     "dev:local": "npm run dev:sync && vite",
     "build": "tsc -b && vite build",

@@ -18,6 +18,7 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 
 - `npm install`
 - `npm run dev`
+- `npm run dev:demo`
 - `npm run typecheck`
 - `npm run build`
 
@@ -40,6 +41,26 @@ Frontend für öffentliche Anmeldung (`/anmeldung`) und Admin-Verwaltung (`/admi
 ## Notes
 
 - API-Verträge liegen in `api/openapi.json` und werden über `src/types/*` + `src/services/*` vorbereitet.
+
+## Lokaler Demo-Modus
+
+Die Oberfläche kann ohne AWS, Cognito, API oder lokale Environment-Datei mit realistischen, vollständig fiktiven Beispieldaten gestartet werden:
+
+```bash
+npm ci --include=dev
+npm run dev:demo
+```
+
+Danach sind unter anderem `/anmeldung`, `/admin/dashboard`, `/admin/entries`, `/admin/settings`, `/inspection`, `/admin/marshals`, Kommunikation, Exporte und Signierung direkt erreichbar. Der Demo-Modus meldet automatisch ein lokales Administrationskonto mit allen Rollen an. Ein dauerhaft sichtbarer Hinweis kennzeichnet die lokalen Daten.
+
+Der Modus ist strikt opt-in: Nur `VITE_DEMO_MODE=true` aktiviert ihn; `npm run dev` und reguläre Builds behalten das bisherige API-/Cognito-Verhalten. Alle `requestJson`-Aufrufe werden in der Demo innerhalb des Browsers verarbeitet. Uploads, Drucklisten und Downloads werden lokal simuliert und senden keine Daten ins Netzwerk. Ein nicht implementierter Demo-API-Pfad bricht mit `DEMO_API_ROUTE_UNHANDLED` ab, damit fehlende Abdeckung sichtbar bleibt.
+
+Einschränkungen:
+
+- Änderungen existieren nur im Arbeitsspeicher und werden bei jedem Neuladen der Seite vollständig auf die Ausgangsdaten zurückgesetzt.
+- E-Mails, Exporte, Dokumente, Uploads, Drucklisten, Signaturen und IAM-Einladungen werden nur simuliert; es entsteht kein produktives Artefakt und es wird nichts versendet.
+- Kartenkacheln stammen weiterhin vom konfigurierten Kartenanbieter. Die Demo-API und direkte Dateiaktionen bleiben jedoch lokal.
+- Der Demo-Modus ist für Produkt-Erkundung und UI-Entwicklung gedacht, nicht für Integrations-, Persistenz- oder Sicherheitsprüfungen.
 
 ## Feature-Branch Entwicklung
 

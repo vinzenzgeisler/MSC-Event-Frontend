@@ -1,6 +1,7 @@
 import { parseJwtPayload } from "@/app/auth/jwt";
 import { getAuthSession, getAuthToken, refreshAuthSession } from "@/app/auth/auth-store";
 import { resolveApiErrorMessage, resolvePlainErrorMessage, type ApiErrorLocale } from "@/services/api/api-error-resolver";
+import { isDemoMode } from "@/demo/config";
 
 type RuntimeConfig = Partial<Record<string, string | boolean | null | undefined>>;
 
@@ -137,6 +138,11 @@ async function parseResponseBody(response: Response): Promise<{ payload: unknown
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (isDemoMode) {
+    const { handleDemoRequest } = await import("@/demo/handlers");
+    return (await handleDemoRequest(path, options)) as T;
+  }
+
   const sendRequest = async (token: string | null) => {
     const adminEmail = token && options.includeAdminEmailHeader ? getAuthenticatedEmailHeader() : null;
     const headers: Record<string, string> = {
