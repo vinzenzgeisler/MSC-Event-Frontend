@@ -554,7 +554,7 @@ export type OutboxItem = {
 
 export type EntryMailAction = "payment_reminder" | "registration_confirmation";
 
-export type AdminExportType = "entries_csv" | "startlist_csv" | "participants_csv" | "payments_open_csv" | "checkin_status_csv";
+export type AdminExportType = "entries_csv" | "startlist_csv" | "participants_csv" | "payments_open_csv" | "checkin_status_csv" | "programmheft_xlsx";
 
 export type ExportCreateForm = {
   type: AdminExportType;
