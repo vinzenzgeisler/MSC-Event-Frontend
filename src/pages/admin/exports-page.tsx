@@ -143,6 +143,33 @@ export function AdminExportsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Schnellexporte</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          {canCreateExports ? (
+            <Button
+              variant="outline"
+              type="button"
+              onClick={async () => {
+                try {
+                  await exportsService.createProgrammheftExport();
+                  showToast("Programmheft-Export wird erstellt…");
+                  await loadExports();
+                } catch (error) {
+                  showToast(getApiErrorMessage(error, "Export konnte nicht erstellt werden."));
+                }
+              }}
+            >
+              📋 Programmheft (Excel)
+            </Button>
+          ) : (
+            <div className="text-sm text-slate-500">Nur Admin-Rollen dürfen Exporte erstellen.</div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Exportliste</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">

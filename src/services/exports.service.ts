@@ -55,6 +55,14 @@ export const exportsService = {
     return response.exports.map(fromExportDto);
   },
 
+  async createProgrammheftExport() {
+    const eventId = await getAdminEventId();
+    return requestJson<AdminExportCreateResponse>("/admin/exports/programmheft", {
+      method: "POST",
+      body: { eventId }
+    });
+  },
+
   async getExportDownloadUrl(exportJobId: string) {
     const response = await requestJson<AdminExportDownloadResponse>(`/admin/exports/${exportJobId}/download`);
     return response.url;
