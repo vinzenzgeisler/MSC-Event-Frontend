@@ -55,11 +55,11 @@ export const exportsService = {
     return response.exports.map(fromExportDto);
   },
 
-  async createProgrammheftExport() {
+  async createProgrammheftExport(classIds?: string[]) {
     const eventId = await getAdminEventId();
     return requestJson<AdminExportCreateResponse>("/admin/exports/programmheft", {
       method: "POST",
-      body: { eventId }
+      body: { eventId, ...(classIds && classIds.length > 0 ? { classIds } : {}) }
     });
   },
 

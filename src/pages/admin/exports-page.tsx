@@ -25,6 +25,7 @@ export function AdminExportsPage() {
   const [form, setForm] = useState<ExportCreateForm>(initialForm);
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState("");
 
   const showToast = (message: string) => {
@@ -145,15 +146,56 @@ export function AdminExportsPage() {
         <CardHeader>
           <CardTitle>Schnellexporte</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
+        <CardContent className="space-y-4">
+          {classOptions.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Label className="text-sm font-medium">Klassen für Programmheft</Label>
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 underline"
+                  onClick={() =>
+                    setSelectedClassIds(
+                      selectedClassIds.length === classOptions.length ? [] : classOptions.map((c) => c.id)
+                    )
+                  }
+                >
+                  {selectedClassIds.length === classOptions.length ? "Alle abwählen" : "Alle wählen"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3">
+                {classOptions.map((cls) => (
+                  <label key={cls.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      className="accent-blue-600"
+                      checked={selectedClassIds.includes(cls.id)}
+                      onChange={(e) =>
+                        setSelectedClassIds((prev) =>
+                          e.target.checked ? [...prev, cls.id] : prev.filter((id) => id !== cls.id)
+                        )
+                      }
+                    />
+                    <span className="text-sm">{cls.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           {canCreateExports ? (
             <Button
               variant="outline"
               type="button"
               onClick={async () => {
                 try {
-                  await exportsService.createProgrammheftExport();
-                  showToast("Programmheft-Export wird erstellt…");
+                  await exportsService.createProgrammheftExport(
+                    selectedClassIds.length > 0 ? selectedClassIds : undefined
+                  );
+                  showToast(
+                    selectedClassIds.length > 0
+                      ? `Programmheft-Export (${selectedClassIds.length} Klassen) wird erstellt…`
+                      : "Programmheft-Export (alle Klassen) wird erstellt…"
+                  );
                   await loadExports();
                 } catch (error) {
                   showToast(getApiErrorMessage(error, "Export konnte nicht erstellt werden."));
