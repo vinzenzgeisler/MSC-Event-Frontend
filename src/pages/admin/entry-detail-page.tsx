@@ -13,6 +13,8 @@ import {
   acceptanceStatusLabel,
   checkinClasses,
   checkinLabel,
+  outboxStatusClasses,
+  outboxStatusLabel,
   paymentStatusClasses,
   waiverSignedClasses,
   waiverSignedLabel,
@@ -178,12 +180,16 @@ export function AdminEntryDetailPage() {
   const canPaymentWrite = hasPermission(roles, "entries.payment.write");
   const canNotesWrite = hasPermission(roles, "entries.notes.write");
   const canDeleteEntry = hasPermission(roles, "entries.delete");
+  const canReadMail = hasPermission(roles, "communication.read");
   const canSendMail = hasPermission(roles, "communication.write");
   const canChangeClass = hasPermission(roles, "entries.status.write");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
+  const [mailHistory, setMailHistory] = useState<Awaited<ReturnType<typeof adminEntriesService.listEntryMailHistory>>>([]);
+  const [mailHistoryLoading, setMailHistoryLoading] = useState(false);
+  const [mailHistoryError, setMailHistoryError] = useState("");
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected">("accepted");
   const [paid, setPaid] = useState(false);
@@ -296,6 +302,25 @@ export function AdminEntryDetailPage() {
     return getApiErrorMessage(error, fallback);
   };
 
+  const loadMailHistory = useCallback(() => {
+    if (!entryId || !canReadMail) {
+      setMailHistory([]);
+      setMailHistoryError("");
+      setMailHistoryLoading(false);
+      return;
+    }
+    setMailHistoryLoading(true);
+    setMailHistoryError("");
+    adminEntriesService
+      .listEntryMailHistory(entryId)
+      .then(setMailHistory)
+      .catch((error) => {
+        setMailHistory([]);
+        setMailHistoryError(getApiErrorMessage(error, "Mails konnten nicht geladen werden."));
+      })
+      .finally(() => setMailHistoryLoading(false));
+  }, [canReadMail, entryId]);
+
   const loadDetail = () => {
     adminEntriesService
       .getEntryDetail(entryId)
@@ -313,11 +338,15 @@ export function AdminEntryDetailPage() {
           setHistoryExpanded(false);
           setClassDraft(result.classId);
           setClassChangeIncludeBackup(Boolean(result.backupVehicle.assigned));
+          loadMailHistory();
+        } else {
+          setMailHistory([]);
         }
       })
       .catch((error) => {
         flashMessage(getApiErrorMessage(error, "Nennung konnte nicht geladen werden."), 3000);
         setDetail(null);
+        setMailHistory([]);
         setHasLoadedOnce(true);
       });
   };
@@ -504,6 +533,15 @@ export function AdminEntryDetailPage() {
     actionInFlight === "status-shortlist" || actionInFlight === "status-accepted" || actionInFlight === "status-rejected";
   const actionOutlineClass = "border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100";
   const actionActiveClass = "border-primary bg-primary text-primary-foreground hover:bg-primary/90";
+  const mailRelationLabel = (relation: (typeof mailHistory)[number]["relation"]) => {
+    if (relation === "registration_group") {
+      return "Gruppe";
+    }
+    if (relation === "entry") {
+      return "Nennung";
+    }
+    return "Zuordnung";
+  };
   const statusDisabledReason = (target: "pending" | "shortlist" | "accepted" | "rejected") => {
     if (anyActionInFlight) {
       return "Aktion wird verarbeitet…";
@@ -1090,6 +1128,90 @@ export function AdminEntryDetailPage() {
             </Card>
           </div>
 
+          {canReadMail && (
+            <Card className="min-w-0">
+              <CardHeader>
+                <CardTitle>Mails zur Nennung</CardTitle>
+              </CardHeader>
+              <CardContent className="min-w-0 space-y-3 break-words text-sm text-slate-700">
+                {mailHistoryLoading && (
+                  <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-slate-600">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Mails werden geladen…
+                  </div>
+                )}
+                {mailHistoryError && (
+                  <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-rose-800">
+                    {mailHistoryError}
+                  </div>
+                )}
+                {!mailHistoryLoading && !mailHistoryError && mailHistory.length === 0 && (
+                  <div className="rounded-md border border-dashed border-slate-300 p-4 text-slate-500">
+                    Keine zugeordneten Mails gefunden.
+                  </div>
+                )}
+                {mailHistory.map((mail) => (
+                  <details key={mail.id} className="group rounded-md border bg-white">
+                    <summary className="grid cursor-pointer gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <Badge className={`${outboxStatusClasses(mail.status)} h-6 px-2.5 text-xs`} variant="outline">
+                            {outboxStatusLabel(mail.status)}
+                          </Badge>
+                          <Badge className="h-6 border-slate-200 bg-slate-50 px-2.5 text-xs text-slate-700" variant="outline">
+                            {mailRelationLabel(mail.relation)}
+                          </Badge>
+                          <span className="text-xs text-slate-500">{mail.templateId} v{mail.templateVersion}</span>
+                        </div>
+                        <div className="break-words font-medium text-slate-900">{mail.subjectRendered}</div>
+                        <div className="break-words text-xs text-slate-500">{mail.recipient}</div>
+                      </div>
+                      <div className="text-left text-xs text-slate-500 sm:text-right">
+                        <div>Erstellt: {mail.createdAt}</div>
+                        <div>Geplant: {mail.sendAfter}</div>
+                        {mail.delivery?.sentAt && <div>Gesendet: {formatTimestamp(mail.delivery.sentAt)}</div>}
+                      </div>
+                    </summary>
+                    <div className="border-t bg-slate-50 p-3">
+                      <div className="grid gap-3 text-xs text-slate-600 sm:grid-cols-3">
+                        <div>
+                          <div className="uppercase text-slate-500">Outbox-ID</div>
+                          <div className="break-all font-mono">{mail.id}</div>
+                        </div>
+                        <div>
+                          <div className="uppercase text-slate-500">Versuche</div>
+                          <div>{mail.attemptCount} / {mail.maxAttempts}</div>
+                        </div>
+                        <div>
+                          <div className="uppercase text-slate-500">Delivery</div>
+                          <div>{mail.delivery?.status ?? "-"}</div>
+                        </div>
+                      </div>
+                      {mail.error && (
+                        <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
+                          {mail.error}
+                        </div>
+                      )}
+                      {mail.renderError && (
+                        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                          Rendering: {mail.renderError}
+                        </div>
+                      )}
+                      {(mail.warnings.length > 0 || mail.missingPlaceholders.length > 0 || mail.unknownPlaceholders.length > 0) && (
+                        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                          {[...mail.warnings, ...mail.missingPlaceholders.map((item) => `Fehlt: ${item}`), ...mail.unknownPlaceholders.map((item) => `Unbekannt: ${item}`)].join(" · ")}
+                        </div>
+                      )}
+                      <pre className="mt-3 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-md border bg-white p-3 text-xs leading-relaxed text-slate-800">
+                        {mail.bodyText || mail.bodyHtml || "Kein gerenderter Inhalt verfügbar."}
+                      </pre>
+                    </div>
+                  </details>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Historie</CardTitle>
@@ -1238,6 +1360,7 @@ export function AdminEntryDetailPage() {
                       }
                       flashMessage(`Verifizierungsmail eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
                       loadDetail();
+                      loadMailHistory();
                     } catch (error) {
                       flashMessage(getLocalizedActionError(error, "Verifizierungs-Mail konnte nicht versendet werden."), 3200);
                     } finally {
@@ -1286,6 +1409,7 @@ export function AdminEntryDetailPage() {
                           return;
                         }
                         flashMessage(`Zahlungserinnerung eingeplant (${result.outboxIds.length} Outbox-Eintrag).`, 4200);
+                        loadMailHistory();
                       } catch (error) {
                         if (error instanceof ApiError) {
                           const code = (error.code ?? "").toLowerCase();
