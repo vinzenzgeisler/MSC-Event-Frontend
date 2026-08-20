@@ -8,8 +8,6 @@ import type {
   AdminEntriesFilter,
   AdminEntryDetailDto,
   AdminEntryDetailViewModel,
-  AdminEntryMailHistoryItem,
-  AdminEntryMailHistoryItemDto,
   AdminEntryListItem,
   AdminEntryListItemDto,
   ListMeta
@@ -362,36 +360,6 @@ function fromAdminEntryDetailDto(
   };
 }
 
-function fromEntryMailHistoryDto(dto: AdminEntryMailHistoryItemDto): AdminEntryMailHistoryItem {
-  return {
-    id: dto.id,
-    recipient: dto.toEmail,
-    subject: dto.subject,
-    subjectRendered: dto.content.subjectRendered || dto.subject,
-    templateId: dto.templateId,
-    templateVersion: dto.templateVersion,
-    status: dto.status,
-    attemptCount: dto.attemptCount,
-    maxAttempts: dto.maxAttempts,
-    error: dto.errorLast ?? "",
-    sendAfter: asDateTime(dto.sendAfter),
-    sendAfterRaw: dto.sendAfter,
-    createdAt: asDateTime(dto.createdAt),
-    createdAtRaw: dto.createdAt,
-    updatedAt: asDateTime(dto.updatedAt),
-    updatedAtRaw: dto.updatedAt,
-    relation: dto.relation,
-    delivery: dto.delivery,
-    bodyText: dto.content.bodyTextRendered,
-    bodyHtml: dto.content.bodyHtmlRendered,
-    htmlDocument: dto.content.htmlDocument,
-    warnings: dto.content.warnings,
-    missingPlaceholders: dto.content.missingPlaceholders,
-    unknownPlaceholders: dto.content.unknownPlaceholders,
-    renderError: dto.content.renderError
-  };
-}
-
 type AdminEntriesListResponse = {
   ok: boolean;
   entries: AdminEntryListItemDto[];
@@ -414,13 +382,6 @@ type AdminEntryDetailResponse = {
     createdAt: string;
     payload?: Record<string, unknown> | null;
   }>;
-};
-
-type AdminEntryMailHistoryResponse = {
-  ok: boolean;
-  entryId: string;
-  eventId: string;
-  mails: AdminEntryMailHistoryItemDto[];
 };
 
 type AdminEntryDeleteResponse = {
@@ -603,17 +564,6 @@ export const adminEntriesService = {
     });
 
     return fromAdminEntryDetailDto(response.entry, response.history);
-  },
-
-  async listEntryMailHistory(entryId: string): Promise<AdminEntryMailHistoryItem[]> {
-    const eventId = await getAdminEventId();
-    const response = await requestJson<AdminEntryMailHistoryResponse>(`/admin/entries/${entryId}/mail-history`, {
-      query: { eventId }
-    });
-    if (!response.ok) {
-      return [];
-    }
-    return response.mails.map(fromEntryMailHistoryDto);
   },
 
   async setEntryStatus(
