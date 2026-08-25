@@ -1,5 +1,14 @@
 export type MarshalCommitmentStatus = "not_asked" | "pending" | "accepted" | "declined" | "tentative";
 
+export type MarshalEvent = {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  isCurrent: boolean;
+};
+
 export type MarshalDay = { id: string; eventId: string; dayKey: "saturday" | "sunday"; label: string; eventDate: string };
 export type MarshalSection = { id: string; eventId: string; code: string; name: string; leaderCode: string; sortOrder: number };
 export type MarshalPost = {
@@ -31,7 +40,7 @@ export type MarshalPerson = {
   id: string; helperNumber: number; firstName: string; lastName: string; street: string | null; zip: string | null;
   city: string | null; birthdate: string | null; phone: string | null; email: string | null; shirtSize: string | null;
   clubMember: boolean; licenseNumber: string | null; vehicleRegistration: string | null; activityAreas: string[];
-  note: string | null; isActive: boolean; participation: MarshalParticipation; assignments: MarshalAssignment[];
+  note: string | null; isActive: boolean; noDeployment: boolean; participation: MarshalParticipation; assignments: MarshalAssignment[];
 };
 export type MarshalTraining = {
   id: string; eventId: string; sessionType: "training" | "briefing"; title: string; sessionDate: string;
@@ -42,10 +51,117 @@ export type MarshalQualification = { id: string; personId: string; qualification
 export type MarshalWorkspace = {
   people: MarshalPerson[]; days: MarshalDay[]; sections: MarshalSection[]; posts: MarshalPost[];
   trainings: MarshalTraining[]; trainingParticipants: MarshalTrainingParticipant[]; qualifications: MarshalQualification[];
+  areas: MarshalHelperArea[]; areaShifts: MarshalAreaShift[]; shiftAssignments: MarshalShiftAssignment[];
+  areaAssignments: MarshalAreaAssignment[];
+};
+
+export type MarshalHelperArea = {
+  id: string;
+  eventId: string;
+  code: string;
+  name: string;
+  areaType: "setup" | "general";
+  dayScope: "saturday" | "sunday" | null;
+  sortOrder: number;
+  responsibleLabel: string | null;
+};
+
+export type MarshalAreaShift = {
+  id: string;
+  areaId: string;
+  label: string;
+  shiftDate: string;
+  sortOrder: number;
+};
+
+export type MarshalShiftAssignment = {
+  id: string;
+  participationId: string;
+  shiftId: string;
+  commitmentStatus: MarshalCommitmentStatus;
+  note: string | null;
+};
+
+export type MarshalAreaAssignment = {
+  id: string;
+  participationId: string;
+  areaId: string;
+  commitmentStatus: MarshalCommitmentStatus;
+  note: string | null;
+};
+
+export type MarshalPersonInput = {
+  helperNumber: number;
+  firstName: string;
+  lastName: string;
+  street?: string | null;
+  zip?: string | null;
+  city?: string | null;
+  birthdate?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  shirtSize?: string | null;
+  clubMember?: boolean;
+  licenseNumber?: string | null;
+  vehicleRegistration?: string | null;
+  activityAreas?: string[];
+  note?: string | null;
+  isActive?: boolean;
+  noDeployment?: boolean;
+};
+
+export type MarshalPersonPatch = Omit<Partial<MarshalPersonInput>, "helperNumber"> & {
+  isActive?: boolean;
+  noDeployment?: boolean;
+};
+
+export type MarshalDayAssignmentInput = {
+  dayId: string;
+  commitmentStatus: MarshalCommitmentStatus;
+  role?: "marshal" | "section_leader" | "special" | null;
+  sectionId?: string | null;
+  postId?: string | null;
+  functionCode?: string | null;
+  note?: string | null;
+};
+
+export type MarshalAssignmentInput = {
+  eventId: string;
+  contactOwner?: string | null;
+  wish?: string | null;
+  note?: string | null;
+  shirtSizeSnapshot?: string | null;
+  days: MarshalDayAssignmentInput[];
+};
+
+export type MarshalAreaConfigAreaInput = Omit<MarshalHelperArea, "id" | "eventId">;
+export type MarshalAreaConfigShiftInput = {
+  areaCode: string;
+  label: string;
+  shiftDate: string;
+  sortOrder: number;
+};
+
+export type MarshalAreaConfigInput = {
+  eventId: string;
+  areas: MarshalAreaConfigAreaInput[];
+  shifts: MarshalAreaConfigShiftInput[];
+};
+
+export type MarshalPostConfigInput = {
+  sectionCode: string;
+  code: string;
+  description: string | null;
+  targetStaff: number;
+  emergencyTargetStaff: number;
+  mapX: number | null;
+  mapY: number | null;
+  isActive: boolean;
+  sortOrder: number;
 };
 
 export type MarshalImportPreview = {
   sha256: string;
-  summary: { people: number; newPeople: number; updatedPeople: number; eventParticipations: number; historicalAssignments: number; trainings: number; trainingParticipants: number; conflicts: number };
+  summary: { people: number; lauferPeople?: number; newPeople: number; updatedPeople: number; eventParticipations: number; historicalAssignments: number; trainings: number; trainingParticipants: number; conflicts: number };
   conflicts: Array<{ sheet: string; row: number; message: string }>;
 };
