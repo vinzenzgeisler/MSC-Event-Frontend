@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import L from "leaflet";
-import { MapContainer, useMap } from "react-leaflet";
-import { LocateFixed, Replace, Trash2, X } from "lucide-react";
-import "leaflet/dist/leaflet.css";
+import { Replace, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MarshalTrackSvg, type TrackLeader, type TrackPost } from "@/components/features/admin/marshal-track-svg";
 import type {
   MarshalCommitmentStatus,
   MarshalDay,
@@ -107,6 +105,7 @@ export function getPostStaffingState(
   let pending = 0;
   let assigned = 0;
   for (const person of people) {
+    if (person.noDeployment) continue;
     const assignment = person.assignments.find(
       (item) => item.dayId === dayId && item.postId === postId,
     );
@@ -134,7 +133,7 @@ function positiveInteger(value: number | null | undefined, fallback: number) {
 
 function sortedPlanningData(workspace: MarshalWorkspace) {
   return {
-    posts: workspace.posts
+    posts: [...workspace.posts]
       .filter((post) => post.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code)),
     sections: [...workspace.sections].sort(
@@ -191,138 +190,38 @@ export function MarshalPlanningMap(props: PlanningProps) {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   useEffect(() => setSelectedPostId(null), [day.id]);
+  const trackPosts = posts.map((post): TrackPost => {
+    const state = getPostStaffingState(post.id, day.id, workspace.people, getPostTarget(post, targetMode));
+    return { ...post, target: state.target, staffCount: state.accepted, overfilled: state.level === "overfilled" };
+  });
+  const trackLeaders = sections.map((section): TrackLeader => ({
+    section,
+    target: 1,
+    staffCount: workspace.people.filter((person) => !person.noDeployment && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id && assignment.commitmentStatus === "accepted")).length,
+  }));
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2 text-xs text-slate-600">
-          <span>Lokaler Streckenplan · Koordinaten 0–1000</span>
+          <span>Schematischer Streckenplan · gespeicherte Koordinaten werden bevorzugt</span>
           <StaffingLegend />
         </div>
-        <div className="relative h-[420px] min-h-[360px] sm:h-[560px]">
-          <MapContainer
-            crs={L.CRS.Simple}
-            center={[500, 500]}
-            zoom={0}
-            minZoom={-1}
-            maxZoom={4}
-            maxBounds={[[-120, -120], [1120, 1120]]}
-            maxBoundsViscosity={0.7}
-            scrollWheelZoom
-            className="h-full w-full"
-            aria-label={`Zoombare Postenkarte für ${day.label}`}
-          >
-            <LocalPlanningLayer
-              posts={posts}
-              sections={sections}
-              people={workspace.people}
-              day={day}
-              targetMode={targetMode}
-              selectedPostId={selectedPostId}
-              onSelect={setSelectedPostId}
-            />
-            <FitPlanControl />
-          </MapContainer>
-        </div>
-        <p className="border-t bg-white px-3 py-2 text-xs text-slate-500">
-          Schraffierte Markierungen verwenden eine deterministische Ersatzposition, weil noch keine Koordinate gespeichert ist. Karte per Maus, Touch oder Tastatur verschieben; Plus/Minus zum Zoomen.
-        </p>
+        <MarshalTrackSvg
+          className="h-auto min-w-[720px] w-full"
+          posts={trackPosts}
+          sections={sections}
+          leaders={trackLeaders}
+          selectedMarker={selectedPostId ? `post:${selectedPostId}` : null}
+          onPostClick={(post) => setSelectedPostId(post.id)}
+        />
+        <p className="border-t bg-white px-3 py-2 text-xs text-slate-500">Posten sind per Maus, Touch, Tabulatortaste sowie Enter/Leertaste auswählbar.</p>
       </div>
       <PostPlanningPanel
         {...props}
         post={posts.find((post) => post.id === selectedPostId) ?? null}
         onClose={() => setSelectedPostId(null)}
       />
-    </div>
-  );
-}
-
-function LocalPlanningLayer({
-  posts,
-  sections,
-  people,
-  day,
-  targetMode,
-  selectedPostId,
-  onSelect,
-}: {
-  posts: MarshalPost[];
-  sections: MarshalSection[];
-  people: MarshalPerson[];
-  day: MarshalDay;
-  targetMode: PlanningTargetMode;
-  selectedPostId: string | null;
-  onSelect: (postId: string) => void;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    const layer = L.layerGroup().addTo(map);
-    const bounds: L.LatLngBoundsExpression = [[0, 0], [1000, 1000]];
-    L.rectangle(bounds, { color: "#cbd5e1", weight: 1, fillColor: "#f8fafc", fillOpacity: 1 }).addTo(layer);
-    for (let coordinate = 100; coordinate < 1000; coordinate += 100) {
-      L.polyline([[coordinate, 0], [coordinate, 1000]], { color: "#e2e8f0", weight: 1, interactive: false }).addTo(layer);
-      L.polyline([[0, coordinate], [1000, coordinate]], { color: "#e2e8f0", weight: 1, interactive: false }).addTo(layer);
-    }
-    const laneWidth = 840 / Math.max(sections.length, 1);
-    sections.forEach((section, index) => {
-      const left = 80 + laneWidth * index;
-      L.rectangle([[60, left + 6], [940, left + laneWidth - 6]], {
-        color: "#94a3b8",
-        dashArray: "8 7",
-        weight: 1,
-        fillColor: index % 2 ? "#f1f5f9" : "#eff6ff",
-        fillOpacity: 0.45,
-        interactive: false,
-      }).bindTooltip(section.name, { permanent: true, direction: "center", className: "marshal-section-label" }).addTo(layer);
-    });
-
-    posts.forEach((post) => {
-      const position = getPostMapPosition(post, sections, posts);
-      const state = getPostStaffingState(post.id, day.id, people, getPostTarget(post, targetMode));
-      const levelClass = `marshal-plan-marker--${state.level}`;
-      const marker = L.marker([1000 - position.y, position.x], {
-        title: `${post.code}: ${state.accepted} von ${state.target} zugesagt`,
-        keyboard: true,
-        icon: L.divIcon({
-          className: "marshal-plan-marker-shell",
-          html: `<span class="marshal-plan-marker ${levelClass}${position.isFallback ? " marshal-plan-marker--fallback" : ""}${selectedPostId === post.id ? " marshal-plan-marker--selected" : ""}"><strong>${escapeHtml(post.code)}</strong><small>${state.accepted}/${state.target}${state.pending ? ` +${state.pending}` : ""}</small></span>`,
-          iconSize: [58, 58],
-          iconAnchor: [29, 29],
-        }),
-      });
-      marker.on("click", () => onSelect(post.id));
-      marker.addTo(layer);
-    });
-    return () => {
-      map.removeLayer(layer);
-    };
-  }, [day.id, map, onSelect, people, posts, sections, selectedPostId, targetMode]);
-
-  return null;
-}
-
-function FitPlanControl() {
-  const map = useMap();
-  useEffect(() => {
-    map.invalidateSize();
-    map.fitBounds([[0, 0], [1000, 1000]], { padding: [24, 24], animate: false });
-  }, [map]);
-  return (
-    <div className="leaflet-top leaflet-right">
-      <div className="leaflet-control m-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="bg-white shadow"
-          aria-label="Gesamten Streckenplan einpassen"
-          title="Gesamten Plan einpassen"
-          onClick={() => map.fitBounds([[0, 0], [1000, 1000]], { padding: [24, 24], animate: false })}
-        >
-          <LocateFixed className="mr-1.5 h-4 w-4" /> Plan einpassen
-        </Button>
-      </div>
     </div>
   );
 }
@@ -359,15 +258,17 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
   }
 
   const target = getPostTarget(post, targetMode);
-  const assignments = workspace.people
+  const allAssignments = workspace.people
     .map((person) => ({ person, assignment: person.assignments.find((item) => item.dayId === day.id && item.postId === post.id) }))
     .filter((item): item is typeof item & { assignment: NonNullable<typeof item.assignment> } => Boolean(item.assignment))
     .sort((a, b) => a.person.helperNumber - b.person.helperNumber);
+  const assignments = allAssignments.filter((item) => !item.person.noDeployment);
+  const excludedAssignments = allAssignments.filter((item) => item.person.noDeployment);
   const slots = Array.from({ length: target }, (_, index) => assignments[index] ?? null);
   const overflow = assignments.slice(target);
   const eligiblePeople = workspace.people
     .filter((person) => {
-      if (!person.isActive) return false;
+      if (!person.isActive || person.noDeployment) return false;
       const assignment = person.assignments.find((item) => item.dayId === day.id);
       return Boolean(assignment && ["accepted", "pending", "tentative"].includes(assignment.commitmentStatus) && assignment.postId !== post.id);
     })
@@ -410,6 +311,15 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
           </div>
         </section>
       )}
+      {excludedAssignments.length > 0 && (
+        <section className="mt-5 rounded-xl border border-slate-300 bg-slate-50 p-3" aria-label="Historische Zuweisungen ohne Einsatzfreigabe">
+          <h4 className="font-semibold text-slate-800">Zählt nicht zur Besetzung ({excludedAssignments.length})</h4>
+          <p className="mt-1 text-xs text-slate-600">Diese historischen Zuweisungen bleiben sichtbar, belegen aber keinen Sollplatz.</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {excludedAssignments.map((item) => <FilledSlot key={item.person.id} label="Kein Einsatz" item={item} post={post} eligiblePeople={eligiblePeople} canWrite={canWrite} busy={busy} onAssign={onAssign} onReplace={onReplace} />)}
+          </div>
+        </section>
+      )}
     </aside>
   );
 }
@@ -421,12 +331,18 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
 }) {
   const [replacementId, setReplacementId] = useState("");
   const replacement = eligiblePeople.find((person) => person.id === replacementId);
-  const disabled = !canWrite || busy || !item.person.isActive;
+  const disabled = !canWrite || busy || !item.person.isActive || item.person.noDeployment;
+  useEffect(() => {
+    setReplacementId("");
+  }, [item.person.id, post.id]);
+  useEffect(() => {
+    if (replacementId && !replacement) setReplacementId("");
+  }, [replacement, replacementId]);
   return (
     <div className={cn("rounded-lg border p-3", overflow ? "border-red-300 bg-white" : "bg-slate-50", !item.person.isActive && "border-red-400 bg-red-50")}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0"><span className="text-xs font-semibold uppercase text-slate-500">{label}</span><div className="break-words font-medium">{item.person.firstName} {item.person.lastName}</div></div>
-        {!item.person.isActive && <Badge className="bg-red-100 text-red-900">Inaktiv</Badge>}
+        {item.person.noDeployment ? <Badge className="bg-red-100 text-red-900">Kein Einsatz</Badge> : !item.person.isActive && <Badge className="bg-red-100 text-red-900">Inaktiv</Badge>}
       </div>
       <label className="mt-3 grid gap-1 text-xs font-medium text-slate-600">Zusage
         <CommitmentSelect value={item.assignment.commitmentStatus} disabled={disabled} onChange={(status) => void onAssign(item.person, status, `post:${post.id}`)} />
@@ -436,7 +352,7 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
           <Button type="button" size="sm" variant="outline" className="w-full" disabled={busy} onClick={() => void onAssign(item.person, item.assignment.commitmentStatus, "")}>
             <Trash2 className="mr-1.5 h-4 w-4" /> Zuweisung entfernen
           </Button>
-          <label className="grid gap-1 text-xs font-medium text-slate-600">Helfer ersetzen
+          {!item.person.noDeployment && <><label className="grid gap-1 text-xs font-medium text-slate-600">Helfer ersetzen
             <select className="h-10 w-full rounded-md border bg-white px-2 text-sm" value={replacementId} disabled={busy || eligiblePeople.length === 0} onChange={(event) => setReplacementId(event.target.value)}>
               <option value="">Ersatz wählen</option>
               {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.helperNumber} · {person.firstName} {person.lastName}</option>)}
@@ -444,7 +360,7 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
           </label>
           <Button type="button" size="sm" className="w-full" disabled={!replacement || busy} onClick={() => replacement && void onReplace(item.person, replacement, post.id).then((saved) => saved && setReplacementId(""))}>
             <Replace className="mr-1.5 h-4 w-4" /> Ersetzen
-          </Button>
+          </Button></>}
         </div>
       )}
     </div>
@@ -455,6 +371,12 @@ function EmptySlot({ label, post, day, eligiblePeople, canWrite, busy, onAssign 
   const [helperId, setHelperId] = useState("");
   const helper = eligiblePeople.find((person) => person.id === helperId);
   const assignment = helper?.assignments.find((item) => item.dayId === day.id);
+  useEffect(() => {
+    setHelperId("");
+  }, [day.id, post.id]);
+  useEffect(() => {
+    if (helperId && !helper) setHelperId("");
+  }, [helper, helperId]);
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
       <span className="text-xs font-semibold uppercase text-slate-500">{label}</span>
@@ -484,8 +406,4 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 
 function staffingColor(level: StaffingLevel) {
   return level === "unfilled" ? "bg-amber-500" : level === "overfilled" ? "bg-red-600" : "bg-emerald-600";
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
 }

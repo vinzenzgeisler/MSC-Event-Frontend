@@ -1,6 +1,16 @@
 import { getAuthToken } from "@/app/auth/auth-store";
 import { requestJson } from "@/services/api/http-client";
-import type { MarshalCommitmentStatus, MarshalImportPreview, MarshalWorkspace } from "@/types/admin-marshals";
+import type {
+  MarshalAreaConfigInput,
+  MarshalAssignmentInput,
+  MarshalCommitmentStatus,
+  MarshalEvent,
+  MarshalImportPreview,
+  MarshalPersonInput,
+  MarshalPersonPatch,
+  MarshalPostConfigInput,
+  MarshalWorkspace,
+} from "@/types/admin-marshals";
 
 type OkResponse = { ok: boolean };
 
@@ -12,36 +22,53 @@ function apiBaseUrl() {
 
 export const adminMarshalsService = {
   async listEvents() {
-    return requestJson<{ ok: boolean; events: Array<{ id: string; name: string; startsAt: string; endsAt: string; status: string; isCurrent: boolean }> }>("/admin/marshals/events");
+    return requestJson<{ ok: boolean; events: MarshalEvent[] }>("/admin/marshals/events");
   },
 
   async getWorkspace(eventId: string, search?: string, area?: string) {
     return requestJson<OkResponse & MarshalWorkspace>("/admin/marshals/workspace", { query: { eventId, search, area } });
   },
 
-  async saveAssignment(personId: string, payload: {
-    eventId: string; contactOwner?: string | null; wish?: string | null; note?: string | null; shirtSizeSnapshot?: string | null;
-    days: Array<{ dayId: string; commitmentStatus: MarshalCommitmentStatus; role?: "marshal" | "section_leader" | "special" | null; sectionId?: string | null; postId?: string | null; functionCode?: string | null }>;
-  }) {
+  async saveAssignment(personId: string, payload: MarshalAssignmentInput) {
     return requestJson<OkResponse>(`/admin/marshals/assignments/${personId}`, { method: "PUT", body: payload });
   },
 
-  async createPerson(payload: Record<string, unknown>) {
+  async upsertAreaAssignment(personId: string, body: { eventId: string; areaId: string; commitmentStatus: MarshalCommitmentStatus; note?: string | null }) {
+    return requestJson<OkResponse>(`/admin/marshals/area-assignments/${personId}`, { method: "PUT", body });
+  },
+
+  async deleteAreaAssignment(personId: string, eventId: string, areaId: string) {
+    return requestJson<OkResponse>(`/admin/marshals/area-assignments/${personId}`, { method: "DELETE", query: { eventId, areaId } });
+  },
+
+  async upsertShiftAssignment(personId: string, body: { eventId: string; shiftId: string; commitmentStatus: MarshalCommitmentStatus; note?: string | null }) {
+    return requestJson<OkResponse>(`/admin/marshals/shift-assignments/${personId}`, { method: "PUT", body });
+  },
+
+  async deletePerson(personId: string) {
+    return requestJson<OkResponse>(`/admin/marshals/persons/${personId}`, { method: "DELETE" });
+  },
+
+  async resetEventAssignments(eventId: string) {
+    return requestJson<OkResponse>(`/admin/marshals/events/${eventId}/reset`, { method: "POST", body: { scope: "assignments" } });
+  },
+
+  async updateAreaConfig(body: MarshalAreaConfigInput) {
+    return requestJson<OkResponse>("/admin/marshals/config/areas", { method: "PUT", body });
+  },
+
+  async createPerson(payload: MarshalPersonInput) {
     return requestJson<OkResponse>("/admin/marshals/persons", { method: "POST", body: payload });
   },
 
-  async updatePerson(personId: string, payload: Record<string, unknown>) {
+  async updatePerson(personId: string, payload: MarshalPersonPatch) {
     return requestJson<OkResponse>(`/admin/marshals/persons/${personId}`, { method: "PATCH", body: payload });
   },
 
   async saveConfig(payload: {
     eventId: string;
     sections: Array<{ code: string; name: string; leaderCode: string; sortOrder: number }>;
-    posts: Array<{
-      sectionCode: string; code: string; description: string | null; targetStaff: number;
-      emergencyTargetStaff: number; mapX: number | null; mapY: number | null;
-      isActive: boolean; sortOrder: number;
-    }>;
+    posts: MarshalPostConfigInput[];
   }) {
     return requestJson<OkResponse>("/admin/marshals/config", { method: "PUT", body: payload });
   },
