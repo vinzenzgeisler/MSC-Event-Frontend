@@ -192,8 +192,12 @@ export function MarshalPlanningMap(props: PlanningProps) {
   const { workspace, day, targetMode } = props;
   const { posts, sections } = useMemo(() => sortedPlanningData(workspace), [workspace]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
 
-  useEffect(() => setSelectedPostId(null), [day.id]);
+  useEffect(() => {
+    setSelectedPostId(null);
+    setSelectedLeaderId(null);
+  }, [day.id]);
   const trackPosts = posts.map((post): TrackPost => {
     const state = getPostStaffingState(post.id, day.id, workspace.people, getPostTarget(post, targetMode));
     return { ...post, target: state.target, staffCount: state.accepted, overfilled: state.level === "overfilled" };
@@ -217,8 +221,15 @@ export function MarshalPlanningMap(props: PlanningProps) {
           posts={trackPosts}
           sections={sections}
           leaders={trackLeaders}
-          selectedMarker={selectedPostId ? `post:${selectedPostId}` : null}
-          onPostClick={(post) => setSelectedPostId(post.id)}
+          selectedMarker={selectedLeaderId ? `leader:${selectedLeaderId}` : selectedPostId ? `post:${selectedPostId}` : null}
+          onPostClick={(post) => {
+            setSelectedLeaderId(null);
+            setSelectedPostId(post.id);
+          }}
+          onLeaderClick={(leader) => {
+            setSelectedPostId(null);
+            setSelectedLeaderId(leader.section.id);
+          }}
         />
       </div>
       <PostPlanningPanel
