@@ -105,6 +105,7 @@ export function getPostStaffingState(
   let pending = 0;
   let assigned = 0;
   for (const person of people) {
+    if (person.noDeployment) continue;
     const assignment = person.assignments.find(
       (item) => item.dayId === dayId && item.postId === postId,
     );
@@ -191,12 +192,12 @@ export function MarshalPlanningMap(props: PlanningProps) {
   useEffect(() => setSelectedPostId(null), [day.id]);
   const trackPosts = posts.map((post): TrackPost => {
     const state = getPostStaffingState(post.id, day.id, workspace.people, getPostTarget(post, targetMode));
-    return { ...post, target: state.target, staffCount: state.accepted };
+    return { ...post, target: state.target, staffCount: state.accepted, overfilled: state.level === "overfilled" };
   });
   const trackLeaders = sections.map((section): TrackLeader => ({
     section,
     target: 1,
-    staffCount: workspace.people.filter((person) => person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id && assignment.commitmentStatus === "accepted")).length,
+    staffCount: workspace.people.filter((person) => !person.noDeployment && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id && assignment.commitmentStatus === "accepted")).length,
   }));
 
   return (
@@ -257,15 +258,17 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
   }
 
   const target = getPostTarget(post, targetMode);
-  const assignments = workspace.people
+  const allAssignments = workspace.people
     .map((person) => ({ person, assignment: person.assignments.find((item) => item.dayId === day.id && item.postId === post.id) }))
     .filter((item): item is typeof item & { assignment: NonNullable<typeof item.assignment> } => Boolean(item.assignment))
     .sort((a, b) => a.person.helperNumber - b.person.helperNumber);
+  const assignments = allAssignments.filter((item) => !item.person.noDeployment);
+  const excludedAssignments = allAssignments.filter((item) => item.person.noDeployment);
   const slots = Array.from({ length: target }, (_, index) => assignments[index] ?? null);
   const overflow = assignments.slice(target);
   const eligiblePeople = workspace.people
     .filter((person) => {
-      if (!person.isActive) return false;
+      if (!person.isActive || person.noDeployment) return false;
       const assignment = person.assignments.find((item) => item.dayId === day.id);
       return Boolean(assignment && ["accepted", "pending", "tentative"].includes(assignment.commitmentStatus) && assignment.postId !== post.id);
     })
@@ -308,6 +311,15 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
           </div>
         </section>
       )}
+      {excludedAssignments.length > 0 && (
+        <section className="mt-5 rounded-xl border border-slate-300 bg-slate-50 p-3" aria-label="Historische Zuweisungen ohne Einsatzfreigabe">
+          <h4 className="font-semibold text-slate-800">Zählt nicht zur Besetzung ({excludedAssignments.length})</h4>
+          <p className="mt-1 text-xs text-slate-600">Diese historischen Zuweisungen bleiben sichtbar, belegen aber keinen Sollplatz.</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {excludedAssignments.map((item) => <FilledSlot key={item.person.id} label="Kein Einsatz" item={item} post={post} eligiblePeople={eligiblePeople} canWrite={canWrite} busy={busy} onAssign={onAssign} onReplace={onReplace} />)}
+          </div>
+        </section>
+      )}
     </aside>
   );
 }
@@ -319,12 +331,18 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
 }) {
   const [replacementId, setReplacementId] = useState("");
   const replacement = eligiblePeople.find((person) => person.id === replacementId);
-  const disabled = !canWrite || busy || !item.person.isActive;
+  const disabled = !canWrite || busy || !item.person.isActive || item.person.noDeployment;
+  useEffect(() => {
+    setReplacementId("");
+  }, [item.person.id, post.id]);
+  useEffect(() => {
+    if (replacementId && !replacement) setReplacementId("");
+  }, [replacement, replacementId]);
   return (
     <div className={cn("rounded-lg border p-3", overflow ? "border-red-300 bg-white" : "bg-slate-50", !item.person.isActive && "border-red-400 bg-red-50")}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0"><span className="text-xs font-semibold uppercase text-slate-500">{label}</span><div className="break-words font-medium">{item.person.firstName} {item.person.lastName}</div></div>
-        {!item.person.isActive && <Badge className="bg-red-100 text-red-900">Inaktiv</Badge>}
+        {item.person.noDeployment ? <Badge className="bg-red-100 text-red-900">Kein Einsatz</Badge> : !item.person.isActive && <Badge className="bg-red-100 text-red-900">Inaktiv</Badge>}
       </div>
       <label className="mt-3 grid gap-1 text-xs font-medium text-slate-600">Zusage
         <CommitmentSelect value={item.assignment.commitmentStatus} disabled={disabled} onChange={(status) => void onAssign(item.person, status, `post:${post.id}`)} />
@@ -334,7 +352,7 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
           <Button type="button" size="sm" variant="outline" className="w-full" disabled={busy} onClick={() => void onAssign(item.person, item.assignment.commitmentStatus, "")}>
             <Trash2 className="mr-1.5 h-4 w-4" /> Zuweisung entfernen
           </Button>
-          <label className="grid gap-1 text-xs font-medium text-slate-600">Helfer ersetzen
+          {!item.person.noDeployment && <><label className="grid gap-1 text-xs font-medium text-slate-600">Helfer ersetzen
             <select className="h-10 w-full rounded-md border bg-white px-2 text-sm" value={replacementId} disabled={busy || eligiblePeople.length === 0} onChange={(event) => setReplacementId(event.target.value)}>
               <option value="">Ersatz wählen</option>
               {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.helperNumber} · {person.firstName} {person.lastName}</option>)}
@@ -342,7 +360,7 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
           </label>
           <Button type="button" size="sm" className="w-full" disabled={!replacement || busy} onClick={() => replacement && void onReplace(item.person, replacement, post.id).then((saved) => saved && setReplacementId(""))}>
             <Replace className="mr-1.5 h-4 w-4" /> Ersetzen
-          </Button>
+          </Button></>}
         </div>
       )}
     </div>
@@ -353,6 +371,12 @@ function EmptySlot({ label, post, day, eligiblePeople, canWrite, busy, onAssign 
   const [helperId, setHelperId] = useState("");
   const helper = eligiblePeople.find((person) => person.id === helperId);
   const assignment = helper?.assignments.find((item) => item.dayId === day.id);
+  useEffect(() => {
+    setHelperId("");
+  }, [day.id, post.id]);
+  useEffect(() => {
+    if (helperId && !helper) setHelperId("");
+  }, [helper, helperId]);
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
       <span className="text-xs font-semibold uppercase text-slate-500">{label}</span>

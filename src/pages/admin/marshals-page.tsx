@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw, UsersRound } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -9,6 +9,7 @@ import { MarshalDruckView } from "@/components/features/admin/marshal-druck-view
 import { MarshalGeneralView } from "@/components/features/admin/marshal-general-view";
 import { MarshalImportView } from "@/components/features/admin/marshal-import-view";
 import { MarshalPersonDrawer } from "@/components/features/admin/marshal-person-drawer";
+import { getPostTarget, type PlanningTargetMode } from "@/components/features/admin/marshal-planning-map";
 import { MarshalSchulungView } from "@/components/features/admin/marshal-schulung-view";
 import { MarshalSidebar, type SidebarView } from "@/components/features/admin/marshal-sidebar";
 import { MarshalStammdatenView } from "@/components/features/admin/marshal-stammdaten-view";
@@ -23,6 +24,7 @@ import { getApiErrorMessage } from "@/services/api/http-client";
 import type {
   MarshalAreaConfigAreaInput,
   MarshalAreaConfigShiftInput,
+  MarshalAssignmentInput,
   MarshalCommitmentStatus,
   MarshalEvent,
   MarshalImportPreview,
@@ -40,24 +42,34 @@ export function AdminMarshalsPage() {
   const canExport = hasPermission(roles, "marshals.export");
   const [events, setEvents] = useState<MarshalEvent[]>([]);
   const [eventId, setEventId] = useState("");
-  const [workspace, setWorkspace] = useState<MarshalWorkspace | null>(null);
+  const [loadedWorkspace, setLoadedWorkspace] = useState<{ eventId: string; data: MarshalWorkspace } | null>(null);
   const [view, setView] = useState<SidebarView>("track_saturday");
-  const [selectedPerson, setSelectedPerson] = useState<MarshalPerson | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [planningTargetMode, setPlanningTargetMode] = useState<PlanningTargetMode>("normal");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const loadSequence = useRef(0);
+  const activeEventId = useRef(eventId);
+  activeEventId.current = eventId;
+  const workspace = loadedWorkspace?.eventId === eventId ? loadedWorkspace.data : null;
 
-  const loadWorkspace = useCallback(async () => {
-    if (!eventId) return;
+  const loadWorkspace = useCallback(async (targetEventId: string) => {
+    if (!targetEventId) return;
+    const sequence = ++loadSequence.current;
     setLoading(true); setError("");
     try {
-      const data = await adminMarshalsService.getWorkspace(eventId);
-      setWorkspace({ ...data, areas: data.areas ?? [], areaShifts: data.areaShifts ?? [], shiftAssignments: data.shiftAssignments ?? [], areaAssignments: data.areaAssignments ?? [] });
+      const data = await adminMarshalsService.getWorkspace(targetEventId);
+      if (sequence !== loadSequence.current) return;
+      setLoadedWorkspace({ eventId: targetEventId, data: { ...data, areas: data.areas ?? [], areaShifts: data.areaShifts ?? [], shiftAssignments: data.shiftAssignments ?? [], areaAssignments: data.areaAssignments ?? [] } });
     } catch (cause) {
+      if (sequence !== loadSequence.current) return;
       setError(getApiErrorMessage(cause, "Helferverwaltung konnte nicht geladen werden."));
-    } finally { setLoading(false); }
-  }, [eventId]);
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -68,29 +80,119 @@ export function AdminMarshalsPage() {
       if (selected) setEventId(selected.id); else setLoading(false);
     }).catch((cause) => { setError(getApiErrorMessage(cause, "Veranstaltungen konnten nicht geladen werden.")); setLoading(false); });
   }, []);
-  useEffect(() => { if (eventId) { localStorage.setItem("msc_marshal_event_id", eventId); void loadWorkspace(); } }, [eventId, loadWorkspace]);
+  useEffect(() => { if (eventId) { localStorage.setItem("msc_marshal_event_id", eventId); void loadWorkspace(eventId); } }, [eventId, loadWorkspace]);
 
   async function runAction(action: () => Promise<unknown>, success: string, fallback: string, reload = true): Promise<boolean> {
+    const operationEventId = eventId;
     setBusy(true); setError(""); setNotice("");
-    try { await action(); setNotice(success); if (reload) await loadWorkspace(); return true; }
-    catch (cause) { setError(getApiErrorMessage(cause, fallback)); return false; }
+    try {
+      await action();
+      if (activeEventId.current !== operationEventId) return true;
+      setNotice(success);
+      if (reload) await loadWorkspace(operationEventId);
+      return true;
+    }
+    catch (cause) {
+      if (activeEventId.current === operationEventId) setError(getApiErrorMessage(cause, fallback));
+      return false;
+    }
     finally { setBusy(false); }
   }
 
-  async function saveDay(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string) {
+  function resolveDaySave(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string, allowOverfill = false) {
     if (!workspace) return false;
+    const scopedPerson = workspace.people.find((item) => item.id === person.id);
+    if (!scopedPerson) return false;
     const dayKey = view === "track_sunday" ? "sunday" : "saturday";
     const day = workspace.days.find((item) => item.dayKey === dayKey);
     if (!day) return false;
+    const existingDayAssignment = scopedPerson.assignments.find((assignment) => assignment.dayId === day.id);
     const nextStatus = statusForTargetSelection(status, assignmentValue);
     const keepAssignment = nextStatus !== "declined" && nextStatus !== "not_asked";
     const post = keepAssignment ? workspace.posts.find((item) => assignmentValue === `post:${item.id}`) : undefined;
     const section = keepAssignment ? workspace.sections.find((item) => assignmentValue === `leader:${item.id}`) : undefined;
-    return runAction(() => adminMarshalsService.saveAssignment(person.id, {
-      eventId, contactOwner: person.participation.contactOwner, wish: person.participation.wish,
-      note: person.participation.note, shirtSizeSnapshot: person.participation.shirtSizeSnapshot ?? person.shirtSize,
-      days: [{ dayId: day.id, commitmentStatus: nextStatus, role: post ? "marshal" : section ? "section_leader" : null, sectionId: post?.sectionId ?? section?.id ?? null, postId: post?.id ?? null, functionCode: section?.leaderCode ?? null }],
-    }), "Einsatz gespeichert.", "Einsatz konnte nicht gespeichert werden.");
+    if ((post || section) && (!scopedPerson.isActive || scopedPerson.noDeployment)) {
+      setError("Inaktive Personen oder Personen mit „Kein Einsatz“ können nicht neu eingeteilt werden.");
+      return false;
+    }
+    if (post && !allowOverfill) {
+      const alreadyAssigned = existingDayAssignment?.postId === post.id;
+      const assignedCount = workspace.people.filter((item) => !item.noDeployment && item.assignments.some((assignment) => assignment.dayId === day.id && assignment.postId === post.id)).length;
+      if (!alreadyAssigned && assignedCount >= getPostTarget(post, planningTargetMode)) {
+        setError(`Posten ${post.code} hat im gewählten Sollmodus keine freien Plätze.`);
+        return false;
+      }
+    }
+    if (section && !allowOverfill) {
+      const alreadyAssigned = scopedPerson.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id);
+      const occupied = workspace.people.some((item) => item.id !== scopedPerson.id && !item.noDeployment && item.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id));
+      if (!alreadyAssigned && occupied) {
+        setError(`${section.leaderCode} ist bereits besetzt.`);
+        return false;
+      }
+    }
+    return { scopedPerson, day, payload: {
+      eventId, contactOwner: scopedPerson.participation.contactOwner, wish: scopedPerson.participation.wish,
+      note: scopedPerson.participation.note, shirtSizeSnapshot: scopedPerson.participation.shirtSizeSnapshot ?? scopedPerson.shirtSize,
+      days: [{ dayId: day.id, commitmentStatus: nextStatus, role: (post ? "marshal" : section ? "section_leader" : null) as "marshal" | "section_leader" | "special" | null, sectionId: post?.sectionId ?? section?.id ?? null, postId: post?.id ?? null, functionCode: section?.leaderCode ?? null, note: existingDayAssignment?.note ?? null }],
+    } as MarshalAssignmentInput };
+  }
+
+  async function saveDay(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string) {
+    const resolved = resolveDaySave(person, status, assignmentValue);
+    if (!resolved) return false;
+    return runAction(() => adminMarshalsService.saveAssignment(resolved.scopedPerson.id, resolved.payload), "Einsatz gespeichert.", "Einsatz konnte nicht gespeichert werden.");
+  }
+
+  async function replacePostHelper(currentPerson: MarshalPerson, replacementPerson: MarshalPerson, postId: string) {
+    if (!workspace) return false;
+    const dayKey = view === "track_sunday" ? "sunday" : "saturday";
+    const day = workspace.days.find((item) => item.dayKey === dayKey);
+    const current = workspace.people.find((person) => person.id === currentPerson.id);
+    const replacement = workspace.people.find((person) => person.id === replacementPerson.id);
+    const currentAssignment = current?.assignments.find((assignment) => assignment.dayId === day?.id);
+    const replacementAssignment = replacement?.assignments.find((assignment) => assignment.dayId === day?.id);
+    if (!day || !current || !replacement || !currentAssignment || !replacementAssignment || replacement.noDeployment) return false;
+    const operationEventId = eventId;
+    const assignReplacement = resolveDaySave(replacement, replacementAssignment.commitmentStatus, `post:${postId}`, true);
+    const removeCurrent = resolveDaySave(current, currentAssignment.commitmentStatus, "", true);
+    if (!assignReplacement || !removeCurrent) return false;
+    const rollbackReplacement = { ...assignReplacement.payload, days: [{
+      dayId: replacementAssignment.dayId,
+      commitmentStatus: replacementAssignment.commitmentStatus,
+      role: replacementAssignment.role as "marshal" | "section_leader" | "special" | null | undefined,
+      sectionId: replacementAssignment.sectionId,
+      postId: replacementAssignment.postId,
+      functionCode: replacementAssignment.functionCode,
+      note: replacementAssignment.note,
+    }] };
+
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await adminMarshalsService.saveAssignment(replacement.id, assignReplacement.payload);
+      try {
+        await adminMarshalsService.saveAssignment(current.id, removeCurrent.payload);
+      } catch {
+        let rolledBack = false;
+        try {
+          await adminMarshalsService.saveAssignment(replacement.id, rollbackReplacement);
+          rolledBack = true;
+        } catch {
+          rolledBack = false;
+        }
+        await loadWorkspace(operationEventId);
+        if (activeEventId.current === operationEventId) setError(rolledBack ? "Helfer konnte nicht ersetzt werden. Der ursprüngliche Zustand wurde wiederhergestellt." : "Helfer konnte nicht ersetzt und der Ersatz nicht zurückgesetzt werden. Manuelle Prüfung erforderlich.");
+        return false;
+      }
+      await loadWorkspace(operationEventId);
+      if (activeEventId.current === operationEventId) setNotice("Helfer ersetzt.");
+      return true;
+    } catch (cause) {
+      if (activeEventId.current === operationEventId) setError(getApiErrorMessage(cause, "Helfer konnte nicht ersetzt werden."));
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
 
   function saveShift(person: MarshalPerson, shiftId: string, status: MarshalCommitmentStatus) {
@@ -98,6 +200,9 @@ export function AdminMarshalsPage() {
   }
   function saveArea(person: MarshalPerson, areaId: string, status: MarshalCommitmentStatus, note: string | null) {
     return runAction(() => adminMarshalsService.upsertAreaAssignment(person.id, { eventId, areaId, commitmentStatus: status, note }), "Bereichseinsatz gespeichert.", "Bereichseinsatz konnte nicht gespeichert werden.");
+  }
+  function removeArea(person: MarshalPerson, areaId: string) {
+    return runAction(() => adminMarshalsService.deleteAreaAssignment(person.id, eventId, areaId), "Bereichszuordnung entfernt.", "Bereichszuordnung konnte nicht entfernt werden.");
   }
   function savePerson(personId: string, patch: MarshalPersonPatch) { return runAction(() => adminMarshalsService.updatePerson(personId, patch), "Stammdaten gespeichert.", "Stammdaten konnten nicht gespeichert werden."); }
   function createPerson(input: MarshalPersonInput) { return runAction(() => adminMarshalsService.createPerson(input), "Person angelegt.", "Person konnte nicht angelegt werden."); }
@@ -121,29 +226,30 @@ export function AdminMarshalsPage() {
   function commitImport(file: File, preview: MarshalImportPreview, dataBase64: string) { return runAction(() => adminMarshalsService.commitImport(eventId, file.name, dataBase64, preview.sha256), "Excel-Import vollständig übernommen.", "Excel-Import konnte nicht übernommen werden."); }
 
   const selectedEvent = events.find((event) => event.id === eventId);
+  const selectedPerson = workspace?.people.find((person) => person.id === selectedPersonId) ?? null;
   const activeDayKey: "saturday" | "sunday" = view === "track_sunday" || view === "general_sunday" ? "sunday" : "saturday";
   const activeDay = workspace?.days.find((day) => day.dayKey === activeDayKey);
   const areaForView = workspace?.areas.find((area) => area.code === view);
 
   return <div className="mx-auto max-w-[1800px] pb-8">
-    <header className="mb-4 flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h1 className="flex items-center gap-2 text-xl font-semibold sm:text-2xl"><span className="rounded-lg bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" /></span>Helferverwaltung</h1><p className="mt-1 text-sm text-slate-600">Einteilungen, Stammdaten, Schulungen und Veranstaltungsunterlagen.</p></div><Button type="button" variant="outline" disabled={loading || busy || !eventId} onClick={() => void loadWorkspace()}><RefreshCw className={cn("mr-2 h-4 w-4", (loading || busy) && "animate-spin")} />Aktualisieren</Button></header>
+    <header className="mb-4 flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h1 className="flex items-center gap-2 text-xl font-semibold sm:text-2xl"><span className="rounded-lg bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" /></span>Helferverwaltung</h1><p className="mt-1 text-sm text-slate-600">Einteilungen, Stammdaten, Schulungen und Veranstaltungsunterlagen.</p></div><Button type="button" variant="outline" disabled={loading || busy || !eventId} onClick={() => void loadWorkspace(eventId)}><RefreshCw className={cn("mr-2 h-4 w-4", (loading || busy) && "animate-spin")} />Aktualisieren</Button></header>
     {error && <div className="mb-4" role="alert"><ErrorState title="Helferverwaltung" message={error} /></div>}
     {notice && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</div>}
     <div className="flex flex-col overflow-hidden rounded-xl border bg-slate-100/60 lg:min-h-[680px] lg:flex-row">
-      <MarshalSidebar workspace={workspace} activeView={view} onViewChange={setView} events={events} selectedEvent={eventId || null} onEventChange={(id) => { setSelectedPerson(null); setWorkspace(null); setEventId(id); }} />
+      <MarshalSidebar workspace={workspace} activeView={view} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} events={events} selectedEvent={eventId || null} onEventChange={(id) => { loadSequence.current += 1; setSelectedPersonId(null); setLoadedWorkspace(null); setLoading(true); setEventId(id); }} />
       <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-6">
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
-          {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => setView(day === "saturday" ? "track_saturday" : "track_sunday")} onPersonOpen={setSelectedPerson} onSave={saveDay} />}
-          {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={setSelectedPerson} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onSaveShift={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
-          {(view === "general_saturday" || view === "general_sunday") && (areaForView ? <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => setView(day === "saturday" ? "general_saturday" : "general_sunday")} onPersonOpen={setSelectedPerson} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} /> : <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
-          {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={setSelectedPerson} onCreate={createPerson} onDelete={deletePerson} />}
-          {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onPrint={printTraining} onPersonOpen={setSelectedPerson} />}
+          {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={saveDay} onReplace={replacePostHelper} />}
+          {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
+          {(view === "general_saturday" || view === "general_sunday") && (areaForView ? <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "general_saturday" : "general_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} onRemove={(person) => removeArea(person, areaForView.id)} /> : <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
+          {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onCreate={createPerson} onDelete={deletePerson} />}
+          {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
           {view === "druck" && <MarshalDruckView workspace={workspace} canExport={canExport} onPrint={print} />}
           {view === "import" && <MarshalImportView canWrite={canWrite} busy={busy} onPreview={previewImport} onCommit={commitImport} />}
           {view === "config" && <MarshalConfigView workspace={workspace} canWrite={canWrite} busy={busy} onSavePosts={savePostConfig} onSaveAreas={saveAreaConfig} onReset={resetAssignments} />}
         </>}
       </main>
     </div>
-    {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} onClose={() => setSelectedPerson(null)} onSave={savePerson} />}
+    {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} onClose={() => setSelectedPersonId(null)} onSave={savePerson} />}
   </div>;
 }

@@ -23,7 +23,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
   const getTrackStaffing = (dayKey: "saturday" | "sunday") => {
     const day = workspace?.days.find((item) => item.dayKey === dayKey);
     if (!workspace || !day) return { accepted: 0, total: 0 };
-    const accepted = workspace.people.reduce((sum, person) => sum + person.assignments.filter(
+    const accepted = workspace.people.filter((person) => !person.noDeployment).reduce((sum, person) => sum + person.assignments.filter(
       (assignment) => assignment.dayId === day.id && assignment.commitmentStatus === "accepted" && Boolean(assignment.postId),
     ).length, 0);
     const total = workspace.posts.filter((post) => post.isActive).reduce((sum, post) => sum + post.targetStaff, 0);
@@ -35,10 +35,11 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
     const area = workspace.areas.find((item) => item.code === areaCode);
     if (!area) return 0;
     const shiftIds = new Set(workspace.areaShifts.filter((shift) => shift.areaId === area.id).map((shift) => shift.id));
+    const eligibleParticipationIds = new Set(workspace.people.filter((person) => !person.noDeployment).map((person) => person.participation.id));
     const participationIds = new Set([
       ...workspace.areaAssignments.filter((item) => item.areaId === area.id && item.commitmentStatus === "accepted").map((item) => item.participationId),
       ...workspace.shiftAssignments.filter((item) => shiftIds.has(item.shiftId) && item.commitmentStatus === "accepted").map((item) => item.participationId),
-    ]);
+    ].filter((participationId) => eligibleParticipationIds.has(participationId)));
     return participationIds.size;
   };
 

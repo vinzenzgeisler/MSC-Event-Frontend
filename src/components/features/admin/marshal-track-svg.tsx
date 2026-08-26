@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import type { MarshalPost, MarshalSection } from "@/types/admin-marshals";
 
-export type TrackPost = MarshalPost & { staffCount: number; target: number };
+export type TrackPost = MarshalPost & { staffCount: number; target: number; overfilled?: boolean };
 export type TrackLeader = {
   section: MarshalSection;
   staffCount: number;
@@ -38,7 +38,8 @@ const AL_COORDS: Record<string, { x: number; y: number }> = {
 const SECTION_COLORS: Record<string, string> = { "1": "#3b82f6", "2": "#22c55e", "3": "#f59e0b", "4": "#a855f7" };
 const TRACK_PATH = "M700 90 C748 128 776 184 808 246 C842 312 885 386 895 455 C903 508 897 555 870 575 C820 592 738 564 669 540 C611 519 566 472 515 446 C466 421 408 417 354 398 C307 382 262 366 220 324 C198 300 219 267 264 243 C314 216 351 209 395 201 C443 190 480 195 516 182 C568 179 609 160 644 131 C667 112 685 98 700 90";
 
-function staffingColor(count: number, target: number) {
+function staffingColor(count: number, target: number, overfilled = false) {
+  if (overfilled) return "#dc2626";
   if (count === 0) return "#ef4444";
   if (count < target) return "#f59e0b";
   return "#22c55e";
@@ -94,8 +95,8 @@ export function MarshalTrackSvg({ posts, sections, leaders = [], selectedMarker,
         const sectionCode = post.code.startsWith("5/") ? "4" : post.code.split("/")[0];
         const action = onPostClick ? () => onPostClick(post) : undefined;
         return (
-          <g key={post.id} role={action ? "button" : undefined} tabIndex={action ? 0 : undefined} aria-label={`Posten ${post.code}, ${post.staffCount} von ${post.target} besetzt`} aria-pressed={action ? selected : undefined} onClick={action} onKeyDown={(event) => activate(event, action)} className={action ? "cursor-pointer outline-none focus-visible:[&>circle]:stroke-slate-950" : undefined}>
-            <circle cx={pos.x} cy={pos.y} r={selected ? 24 : 21} fill={staffingColor(post.staffCount, post.target)} opacity=".5" stroke={selected ? "#0f172a" : "white"} strokeWidth={selected ? 4 : 2} />
+          <g key={post.id} role={action ? "button" : undefined} tabIndex={action ? 0 : undefined} aria-label={`Posten ${post.code}, ${post.staffCount} von ${post.target} besetzt${post.overfilled ? ", über Soll" : ""}`} aria-pressed={action ? selected : undefined} onClick={action} onKeyDown={(event) => activate(event, action)} className={action ? "cursor-pointer outline-none focus-visible:[&>circle]:stroke-slate-950" : undefined}>
+            <circle cx={pos.x} cy={pos.y} r={selected ? 24 : 21} fill={staffingColor(post.staffCount, post.target, post.overfilled)} opacity=".5" stroke={selected ? "#0f172a" : "white"} strokeWidth={selected ? 4 : 2} />
             <circle cx={pos.x} cy={pos.y} r="13" fill={SECTION_COLORS[sectionCode] ?? "#64748b"} stroke="white" strokeWidth="2" />
             <text x={pos.x} y={pos.y + 3.5} textAnchor="middle" fontSize="8" fill="white" fontWeight="700" pointerEvents="none">{post.code}</text>
             <text x={pos.x + 22} y={pos.y - 17} fontSize="10" fill="#1e293b" fontWeight="700" pointerEvents="none">{post.staffCount}/{post.target}</text>

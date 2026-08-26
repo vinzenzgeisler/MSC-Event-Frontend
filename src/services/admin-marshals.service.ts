@@ -37,6 +37,10 @@ export const adminMarshalsService = {
     return requestJson<OkResponse>(`/admin/marshals/area-assignments/${personId}`, { method: "PUT", body });
   },
 
+  async deleteAreaAssignment(personId: string, eventId: string, areaId: string) {
+    return requestJson<OkResponse>(`/admin/marshals/area-assignments/${personId}`, { method: "DELETE", query: { eventId, areaId } });
+  },
+
   async upsertShiftAssignment(personId: string, body: { eventId: string; shiftId: string; commitmentStatus: MarshalCommitmentStatus; note?: string | null }) {
     return requestJson<OkResponse>(`/admin/marshals/shift-assignments/${personId}`, { method: "PUT", body });
   },
