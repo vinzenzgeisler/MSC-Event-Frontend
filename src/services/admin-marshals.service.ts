@@ -8,6 +8,7 @@ import type {
   MarshalImportPreview,
   MarshalPersonInput,
   MarshalPersonPatch,
+  MarshalPrintParams,
   MarshalPostConfigInput,
   MarshalWorkspace,
 } from "@/types/admin-marshals";
@@ -91,7 +92,7 @@ export const adminMarshalsService = {
     return requestJson<OkResponse>("/admin/marshals/import/commit", { method: "POST", body: { eventId, filename, dataBase64, expectedSha256 } });
   },
 
-  async downloadPrint(params: { eventId: string; type: "attendance" | "section" | "training"; dayId?: string; sectionId?: string; trainingId?: string }) {
+  async downloadPrint(params: MarshalPrintParams) {
     const query = new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])));
     const response = await fetch(`${apiBaseUrl()}/admin/marshals/print?${query.toString()}`, { headers: { Authorization: `Bearer ${getAuthToken() ?? ""}` } });
     if (!response.ok) throw new Error(`Druckliste konnte nicht erstellt werden (${response.status})`);

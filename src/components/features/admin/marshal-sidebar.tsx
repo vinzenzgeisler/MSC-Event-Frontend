@@ -44,7 +44,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
   };
 
   return (
-    <aside aria-label="Bereichsnavigation der Helferverwaltung" className="flex w-full flex-shrink-0 flex-col border-b border-slate-200 bg-white shadow-sm lg:sticky lg:top-2 lg:h-[calc(100vh-6rem)] lg:w-64 lg:border-b-0 lg:border-r">
+    <aside aria-label="Bereichsnavigation der Helferverwaltung" className="flex w-full min-w-0 flex-shrink-0 flex-col border-b border-slate-200 bg-white shadow-sm xl:sticky xl:top-2 xl:h-[calc(100vh-6rem)] xl:w-64 xl:border-b-0 xl:border-r">
       <div className="border-b border-slate-200 p-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Helferverwaltung</p>
         <Select value={selectedEvent ?? ""} onValueChange={onEventChange}>
@@ -53,7 +53,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
         </Select>
       </div>
 
-      <nav className="grid flex-1 gap-3 overflow-y-auto p-2 sm:grid-cols-2 lg:block lg:space-y-5" aria-label="Helferbereiche">
+      <nav className="grid max-h-56 flex-1 grid-cols-2 gap-2 overflow-y-auto p-2 md:max-h-64 md:grid-cols-3 xl:max-h-none xl:block xl:space-y-5" aria-label="Helferbereiche">
         <div>
           <SectionTitle>Einteilungen</SectionTitle>
           <SubTitle>Streckenposten</SubTitle>
@@ -78,7 +78,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
         </div>
       </nav>
 
-      <div className="grid grid-cols-3 gap-1 border-t border-slate-200 p-2 lg:block lg:space-y-0.5">
+      <div className="grid grid-cols-3 gap-1 border-t border-slate-200 p-2 xl:block xl:space-y-0.5">
         <NavItem active={activeView === "druck"} onClick={() => onViewChange("druck")} label="Drucken" icon={<Printer className="h-4 w-4" />} />
         <NavItem active={activeView === "import"} onClick={() => onViewChange("import")} label="Import" icon={<Import className="h-4 w-4" />} />
         <NavItem active={activeView === "config"} onClick={() => onViewChange("config")} label="Konfiguration" icon={<Settings2 className="h-4 w-4" />} />

@@ -148,6 +148,16 @@ export type MarshalAreaConfigInput = {
   shifts: MarshalAreaConfigShiftInput[];
 };
 
+export type MarshalPrintParams = {
+  eventId: string;
+  type: "attendance" | "section" | "training" | "area";
+  dayId?: string;
+  sectionId?: string;
+  trainingId?: string;
+  areaId?: string;
+  shiftId?: string;
+};
+
 export type MarshalPostConfigInput = {
   sectionCode: string;
   code: string;

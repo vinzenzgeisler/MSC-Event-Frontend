@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid, permission: "dashboard.read" as AppPermission },
   { to: "/admin/entries", label: "Nennungen", icon: ListChecks, permission: "entries.read" as AppPermission },
-  { to: "/admin/marshals", label: "Streckenposten", icon: UsersRound, permission: "marshals.read" as AppPermission },
+  { to: "/admin/marshals", label: "Helferverwaltung", icon: UsersRound, permission: "marshals.read" as AppPermission },
   {
     to: "/admin/signing",
     label: "Haftverzicht",

@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarshalTrackSvg, type TrackLeader, type TrackPost } from "@/components/features/admin/marshal-track-svg";
+import { MarshalSectionLeaderEditor, MarshalSectionLeaderGrid } from "@/components/features/admin/marshal-section-leader-editor";
+import { MarshalInfoPopover } from "@/components/features/admin/marshal-info-popover";
 import type {
   MarshalCommitmentStatus,
   MarshalDay,
@@ -35,6 +37,7 @@ type AssignmentAction = (
   person: MarshalPerson,
   status: MarshalCommitmentStatus,
   assignmentValue: string,
+  allowOccupied?: boolean,
 ) => Promise<boolean>;
 
 type ReplacementAction = (
@@ -160,6 +163,7 @@ export function MarshalPlanningOverview(props: PlanningProps) {
           {sections.map((section) => (
             <section key={section.id} className="min-w-0 rounded-xl border border-dashed border-slate-300 bg-white/80 p-3">
               <h3 className="break-words text-sm font-semibold text-slate-800">{section.name}</h3>
+              <div className="mt-2"><MarshalSectionLeaderEditor workspace={workspace} day={day} section={section} canWrite={props.canWrite} busy={props.busy} onSave={props.onAssign} /></div>
               <div className="mt-3 grid gap-2">
                 {posts.filter((post) => post.sectionId === section.id).map((post) => (
                   <PostButton
@@ -202,20 +206,20 @@ export function MarshalPlanningMap(props: PlanningProps) {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50">
+      <MarshalSectionLeaderGrid workspace={workspace} day={day} canWrite={props.canWrite} busy={props.busy} onSave={props.onAssign} />
+      <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2 text-xs text-slate-600">
-          <span>Schematischer Streckenplan · gespeicherte Koordinaten werden bevorzugt</span>
+          <MarshalInfoPopover label="Information zur Streckenkarte">Gespeicherte Postenkoordinaten werden bevorzugt.</MarshalInfoPopover>
           <StaffingLegend />
         </div>
         <MarshalTrackSvg
-          className="h-auto min-w-[720px] w-full"
+          className="h-auto w-full min-w-0"
           posts={trackPosts}
           sections={sections}
           leaders={trackLeaders}
           selectedMarker={selectedPostId ? `post:${selectedPostId}` : null}
           onPostClick={(post) => setSelectedPostId(post.id)}
         />
-        <p className="border-t bg-white px-3 py-2 text-xs text-slate-500">Posten sind per Maus, Touch, Tabulatortaste sowie Enter/Leertaste auswählbar.</p>
       </div>
       <PostPlanningPanel
         {...props}
@@ -303,7 +307,6 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
       {overflow.length > 0 && (
         <section className="mt-5 rounded-xl border border-red-300 bg-red-50 p-3" aria-label="Überbesetzung">
           <h4 className="font-semibold text-red-900">Über Soll ({overflow.length})</h4>
-          <p className="mt-1 text-xs text-red-800">Bestehende Zuweisungen bleiben erhalten, bis sie entfernt oder ersetzt werden.</p>
           <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {overflow.map((item, index) => (
               <FilledSlot key={item.person.id} label={`Überhang ${index + 1}`} item={item} post={post} eligiblePeople={eligiblePeople} canWrite={canWrite} busy={busy} onAssign={onAssign} onReplace={onReplace} overflow />
@@ -314,7 +317,6 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
       {excludedAssignments.length > 0 && (
         <section className="mt-5 rounded-xl border border-slate-300 bg-slate-50 p-3" aria-label="Historische Zuweisungen ohne Einsatzfreigabe">
           <h4 className="font-semibold text-slate-800">Zählt nicht zur Besetzung ({excludedAssignments.length})</h4>
-          <p className="mt-1 text-xs text-slate-600">Diese historischen Zuweisungen bleiben sichtbar, belegen aber keinen Sollplatz.</p>
           <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
             {excludedAssignments.map((item) => <FilledSlot key={item.person.id} label="Kein Einsatz" item={item} post={post} eligiblePeople={eligiblePeople} canWrite={canWrite} busy={busy} onAssign={onAssign} onReplace={onReplace} />)}
           </div>
