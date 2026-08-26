@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, UsersRound } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
+import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
 import { MarshalAufbauView } from "@/components/features/admin/marshal-aufbau-view";
 import { MarshalConfigView } from "@/components/features/admin/marshal-config-view";
 import { MarshalDruckView } from "@/components/features/admin/marshal-druck-view";
@@ -81,13 +82,14 @@ export function AdminMarshalsPage() {
     const dayKey = view === "track_sunday" ? "sunday" : "saturday";
     const day = workspace.days.find((item) => item.dayKey === dayKey);
     if (!day) return false;
-    const keepAssignment = status !== "declined" && status !== "not_asked";
+    const nextStatus = statusForTargetSelection(status, assignmentValue);
+    const keepAssignment = nextStatus !== "declined" && nextStatus !== "not_asked";
     const post = keepAssignment ? workspace.posts.find((item) => assignmentValue === `post:${item.id}`) : undefined;
     const section = keepAssignment ? workspace.sections.find((item) => assignmentValue === `leader:${item.id}`) : undefined;
     return runAction(() => adminMarshalsService.saveAssignment(person.id, {
       eventId, contactOwner: person.participation.contactOwner, wish: person.participation.wish,
       note: person.participation.note, shirtSizeSnapshot: person.participation.shirtSizeSnapshot ?? person.shirtSize,
-      days: [{ dayId: day.id, commitmentStatus: status, role: post ? "marshal" : section ? "section_leader" : null, sectionId: post?.sectionId ?? section?.id ?? null, postId: post?.id ?? null, functionCode: section?.leaderCode ?? null }],
+      days: [{ dayId: day.id, commitmentStatus: nextStatus, role: post ? "marshal" : section ? "section_leader" : null, sectionId: post?.sectionId ?? section?.id ?? null, postId: post?.id ?? null, functionCode: section?.leaderCode ?? null }],
     }), "Einsatz gespeichert.", "Einsatz konnte nicht gespeichert werden.");
   }
 
@@ -132,7 +134,7 @@ export function AdminMarshalsPage() {
       <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-6">
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
           {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => setView(day === "saturday" ? "track_saturday" : "track_sunday")} onPersonOpen={setSelectedPerson} onSave={saveDay} />}
-          {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={setSelectedPerson} onSave={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
+          {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={setSelectedPerson} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onSaveShift={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
           {(view === "general_saturday" || view === "general_sunday") && (areaForView ? <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => setView(day === "saturday" ? "general_saturday" : "general_sunday")} onPersonOpen={setSelectedPerson} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} /> : <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
           {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={setSelectedPerson} onCreate={createPerson} onDelete={deletePerson} />}
           {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onPrint={printTraining} onPersonOpen={setSelectedPerson} />}
