@@ -138,8 +138,8 @@ export function AdminMarshalsPage() {
     } as MarshalAssignmentInput };
   }
 
-  async function saveDay(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string) {
-    const resolved = resolveDaySave(person, status, assignmentValue);
+  async function saveDay(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string, allowOccupied = false) {
+    const resolved = resolveDaySave(person, status, assignmentValue, allowOccupied);
     if (!resolved) return false;
     return runAction(() => adminMarshalsService.saveAssignment(resolved.scopedPerson.id, resolved.payload), "Einsatz gespeichert.", "Einsatz konnte nicht gespeichert werden.");
   }
@@ -209,7 +209,7 @@ export function AdminMarshalsPage() {
   function deletePerson(person: MarshalPerson) { return runAction(() => adminMarshalsService.deletePerson(person.id), "Person und verknüpfte Daten wurden endgültig gelöscht.", "Person konnte nicht gelöscht werden."); }
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
   function saveAttendance(trainingId: string, person: MarshalPerson, status: MarshalTrainingParticipant["attendanceStatus"]) { return runAction(() => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, status), "Anwesenheit gespeichert.", "Anwesenheit konnte nicht gespeichert werden."); }
-  async function print(params: { type: "attendance" | "section"; dayId: string; sectionId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
+  async function print(params: { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
   async function printTraining(trainingId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "training", trainingId }), "Teilnehmerliste erstellt.", "Teilnehmerliste konnte nicht erstellt werden.", false); }
   function savePostConfig(posts: MarshalPostConfigInput[]) {
     if (!workspace) return Promise.resolve(false);
@@ -232,10 +232,10 @@ export function AdminMarshalsPage() {
   const areaForView = workspace?.areas.find((area) => area.code === view);
 
   return <div className="mx-auto max-w-[1800px] pb-8">
-    <header className="mb-4 flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h1 className="flex items-center gap-2 text-xl font-semibold sm:text-2xl"><span className="rounded-lg bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" /></span>Helferverwaltung</h1><p className="mt-1 text-sm text-slate-600">Einteilungen, Stammdaten, Schulungen und Veranstaltungsunterlagen.</p></div><Button type="button" variant="outline" disabled={loading || busy || !eventId} onClick={() => void loadWorkspace(eventId)}><RefreshCw className={cn("mr-2 h-4 w-4", (loading || busy) && "animate-spin")} />Aktualisieren</Button></header>
+    <header className="mb-4 flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5"><h1 className="flex items-center gap-2 text-xl font-semibold sm:text-2xl"><span className="rounded-lg bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" /></span>Helferverwaltung</h1><Button type="button" variant="outline" className="min-h-10" disabled={loading || busy || !eventId} onClick={() => void loadWorkspace(eventId)}><RefreshCw className={cn("mr-2 h-4 w-4", (loading || busy) && "animate-spin")} />Aktualisieren</Button></header>
     {error && <div className="mb-4" role="alert"><ErrorState title="Helferverwaltung" message={error} /></div>}
     {notice && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</div>}
-    <div className="flex flex-col overflow-hidden rounded-xl border bg-slate-100/60 lg:min-h-[680px] lg:flex-row">
+    <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-slate-100/60 xl:min-h-[680px] xl:flex-row">
       <MarshalSidebar workspace={workspace} activeView={view} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} events={events} selectedEvent={eventId || null} onEventChange={(id) => { loadSequence.current += 1; setSelectedPersonId(null); setLoadedWorkspace(null); setLoading(true); setEventId(id); }} />
       <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-6">
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
