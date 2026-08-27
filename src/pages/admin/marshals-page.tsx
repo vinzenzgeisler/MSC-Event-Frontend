@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshCw, UsersRound } from "lucide-react";
+import { X } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
@@ -14,9 +14,7 @@ import { MarshalSchulungView } from "@/components/features/admin/marshal-schulun
 import { MarshalSidebar, type SidebarView } from "@/components/features/admin/marshal-sidebar";
 import { MarshalStammdatenView } from "@/components/features/admin/marshal-stammdaten-view";
 import { MarshalStreckenpostenView } from "@/components/features/admin/marshal-streckenposten-view";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/state/empty-state";
-import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { cn } from "@/lib/utils";
 import { adminMarshalsService } from "@/services/admin-marshals.service";
@@ -81,6 +79,11 @@ export function AdminMarshalsPage() {
     }).catch((cause) => { setError(getApiErrorMessage(cause, "Veranstaltungen konnten nicht geladen werden.")); setLoading(false); });
   }, []);
   useEffect(() => { if (eventId) { localStorage.setItem("msc_marshal_event_id", eventId); void loadWorkspace(eventId); } }, [eventId, loadWorkspace]);
+  useEffect(() => {
+    if (!error && !notice) return;
+    const timeout = window.setTimeout(() => { setError(""); setNotice(""); }, 5000);
+    return () => window.clearTimeout(timeout);
+  }, [error, notice]);
 
   async function runAction(action: () => Promise<unknown>, success: string, fallback: string, reload = true): Promise<boolean> {
     const operationEventId = eventId;
@@ -132,9 +135,8 @@ export function AdminMarshalsPage() {
       }
     }
     return { scopedPerson, day, payload: {
-      eventId, contactOwner: scopedPerson.participation.contactOwner, wish: scopedPerson.participation.wish,
-      note: scopedPerson.participation.note, shirtSizeSnapshot: scopedPerson.participation.shirtSizeSnapshot ?? scopedPerson.shirtSize,
-      days: [{ dayId: day.id, commitmentStatus: nextStatus, role: (post ? "marshal" : section ? "section_leader" : null) as "marshal" | "section_leader" | "special" | null, sectionId: post?.sectionId ?? section?.id ?? null, postId: post?.id ?? null, functionCode: section?.leaderCode ?? null, note: existingDayAssignment?.note ?? null }],
+      eventId,
+      days: [{ dayId: day.id, commitmentStatus: nextStatus, role: (post ? "marshal" : section ? "section_leader" : null) as "marshal" | "section_leader" | "special" | null, sectionId: post?.sectionId ?? section?.id ?? null, postId: post?.id ?? null, functionCode: section?.leaderCode ?? null }],
     } as MarshalAssignmentInput };
   }
 
@@ -232,12 +234,10 @@ export function AdminMarshalsPage() {
   const areaForView = workspace?.areas.find((area) => area.code === view);
 
   return <div className="mx-auto max-w-[1800px] pb-8">
-    <header className="mb-4 flex flex-col gap-3 rounded-xl border bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5"><h1 className="flex items-center gap-2 text-xl font-semibold sm:text-2xl"><span className="rounded-lg bg-primary/10 p-2 text-primary"><UsersRound className="h-5 w-5" /></span>Helferverwaltung</h1><Button type="button" variant="outline" className="min-h-10" disabled={loading || busy || !eventId} onClick={() => void loadWorkspace(eventId)}><RefreshCw className={cn("mr-2 h-4 w-4", (loading || busy) && "animate-spin")} />Aktualisieren</Button></header>
-    {error && <div className="mb-4" role="alert"><ErrorState title="Helferverwaltung" message={error} /></div>}
-    {notice && <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</div>}
+    {(error || notice) && <div className="fixed right-4 top-4 z-[80] w-[min(24rem,calc(100vw-2rem))]" aria-live="polite" aria-atomic="true"><div className={cn("flex items-start gap-3 rounded-lg border p-3 text-sm shadow-lg", error ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-200 bg-emerald-50 text-emerald-900")} role={error ? "alert" : "status"}><span className="min-w-0 flex-1 break-words">{error || notice}</span><button type="button" className="rounded p-1 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Meldung schließen" onClick={() => { setError(""); setNotice(""); }}><X className="h-4 w-4" /></button></div></div>}
     <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-slate-100/60 xl:min-h-[680px] xl:flex-row">
       <MarshalSidebar workspace={workspace} activeView={view} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} events={events} selectedEvent={eventId || null} onEventChange={(id) => { loadSequence.current += 1; setSelectedPersonId(null); setLoadedWorkspace(null); setLoading(true); setEventId(id); }} />
-      <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-6">
+      <main className="min-w-0 flex-1 p-2 sm:p-4 lg:p-6">
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
           {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={saveDay} onReplace={replacePostHelper} />}
           {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
