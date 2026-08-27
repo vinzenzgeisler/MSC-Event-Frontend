@@ -44,8 +44,8 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
   };
 
   return (
-    <aside aria-label="Bereichsnavigation der Helferverwaltung" className="w-full min-w-0 flex-shrink-0 border-b border-slate-200 bg-white shadow-sm xl:sticky xl:top-2 xl:flex xl:h-[calc(100vh-6rem)] xl:w-64 xl:flex-col xl:border-b-0 xl:border-r">
-      <div className="grid gap-2 p-3 sm:grid-cols-2 xl:hidden">
+    <aside aria-label="Bereichsnavigation der Helferverwaltung" className="w-full min-w-0 flex-shrink-0 border-b border-slate-200 bg-white xl:sticky xl:top-2 xl:flex xl:h-[calc(100vh-6rem)] xl:w-64 xl:flex-col xl:border-b-0 xl:border-r">
+      <div className="grid grid-cols-2 gap-2 px-3 py-2 xl:hidden">
         <CompactSelect
           label="Veranstaltung"
           value={selectedEvent ?? ""}
@@ -121,9 +121,9 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
 }
 
 function CompactSelect({ label, value, onChange, disabled, children }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; children: ReactNode }) {
-  return <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+  return <label className="grid min-w-0 gap-0.5 text-[11px] font-semibold text-slate-600 sm:text-xs">
     {label}
-    <select className="h-11 min-w-0 w-full rounded-md border bg-white px-3 text-base font-normal text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+    <select className="h-10 min-w-0 w-full rounded-md border bg-white px-2 text-sm font-normal text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
       {children}
     </select>
   </label>;
