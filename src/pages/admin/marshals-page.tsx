@@ -49,6 +49,7 @@ export function AdminMarshalsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const loadSequence = useRef(0);
+  const assignmentSaves = useRef(new Set<string>());
   const activeEventId = useRef(eventId);
   activeEventId.current = eventId;
   const workspace = loadedWorkspace?.eventId === eventId ? loadedWorkspace.data : null;
@@ -146,6 +147,28 @@ export function AdminMarshalsPage() {
     return runAction(() => adminMarshalsService.saveAssignment(resolved.scopedPerson.id, resolved.payload), "Einsatz gespeichert.", "Einsatz konnte nicht gespeichert werden.");
   }
 
+  async function saveListDay(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string) {
+    const resolved = resolveDaySave(person, status, assignmentValue);
+    if (!resolved) return false;
+    const operationEventId = eventId;
+    const operationKey = `${operationEventId}:${resolved.day.id}:${resolved.scopedPerson.id}`;
+    if (assignmentSaves.current.has(operationKey)) return false;
+    assignmentSaves.current.add(operationKey);
+    setError(""); setNotice("");
+    try {
+      await adminMarshalsService.saveAssignment(resolved.scopedPerson.id, resolved.payload);
+      if (activeEventId.current !== operationEventId) return true;
+      setNotice("Einsatz gespeichert.");
+      await loadWorkspace(operationEventId);
+      return true;
+    } catch (cause) {
+      if (activeEventId.current === operationEventId) setError(getApiErrorMessage(cause, "Einsatz konnte nicht gespeichert werden."));
+      return false;
+    } finally {
+      assignmentSaves.current.delete(operationKey);
+    }
+  }
+
   async function replacePostHelper(currentPerson: MarshalPerson, replacementPerson: MarshalPerson, postId: string) {
     if (!workspace) return false;
     const dayKey = view === "track_sunday" ? "sunday" : "saturday";
@@ -235,11 +258,11 @@ export function AdminMarshalsPage() {
 
   return <div className="mx-auto max-w-[1800px] pb-8">
     {(error || notice) && <div className="fixed right-4 top-4 z-[80] w-[min(24rem,calc(100vw-2rem))]" aria-live="polite" aria-atomic="true"><div className={cn("flex items-start gap-3 rounded-lg border p-3 text-sm shadow-lg", error ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-200 bg-emerald-50 text-emerald-900")} role={error ? "alert" : "status"}><span className="min-w-0 flex-1 break-words">{error || notice}</span><button type="button" className="rounded p-1 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Meldung schließen" onClick={() => { setError(""); setNotice(""); }}><X className="h-4 w-4" /></button></div></div>}
-    <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-slate-100/60 xl:min-h-[680px] xl:flex-row">
+    <div className="flex min-w-0 flex-col sm:overflow-hidden sm:rounded-xl sm:border sm:bg-slate-100/60 xl:min-h-[680px] xl:flex-row">
       <MarshalSidebar workspace={workspace} activeView={view} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} events={events} selectedEvent={eventId || null} onEventChange={(id) => { loadSequence.current += 1; setSelectedPersonId(null); setLoadedWorkspace(null); setLoading(true); setEventId(id); }} />
-      <main className="min-w-0 flex-1 p-2 sm:p-4 lg:p-6">
+      <main className="min-w-0 flex-1 sm:p-4 lg:p-6">
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
-          {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={saveDay} onReplace={replacePostHelper} />}
+          {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onListSave={saveListDay} onSave={saveDay} onReplace={replacePostHelper} />}
           {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
           {(view === "general_saturday" || view === "general_sunday") && (areaForView ? <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "general_saturday" : "general_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} onRemove={(person) => removeArea(person, areaForView.id)} /> : <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
           {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onCreate={createPerson} onDelete={deletePerson} />}
