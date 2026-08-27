@@ -44,8 +44,41 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
   };
 
   return (
-    <aside aria-label="Bereichsnavigation der Helferverwaltung" className="flex w-full min-w-0 flex-shrink-0 flex-col border-b border-slate-200 bg-white shadow-sm xl:sticky xl:top-2 xl:h-[calc(100vh-6rem)] xl:w-64 xl:border-b-0 xl:border-r">
-      <div className="border-b border-slate-200 p-3">
+    <aside aria-label="Bereichsnavigation der Helferverwaltung" className="w-full min-w-0 flex-shrink-0 border-b border-slate-200 bg-white shadow-sm xl:sticky xl:top-2 xl:flex xl:h-[calc(100vh-6rem)] xl:w-64 xl:flex-col xl:border-b-0 xl:border-r">
+      <div className="grid gap-2 p-3 sm:grid-cols-2 xl:hidden">
+        <CompactSelect
+          label="Veranstaltung"
+          value={selectedEvent ?? ""}
+          onChange={onEventChange}
+          disabled={events.length === 0}
+        >
+          {!selectedEvent && <option value="">Event wählen</option>}
+          {events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+        </CompactSelect>
+        <CompactSelect label="Arbeitsbereich" value={activeView} onChange={(value) => onViewChange(value as SidebarView)}>
+          <optgroup label="Streckenposten">
+            <option value="track_saturday">Streckenposten · Samstag</option>
+            <option value="track_sunday">Streckenposten · Sonntag</option>
+          </optgroup>
+          <optgroup label="Aufbau">
+            <option value="setup_fl1">Aufbau · {workspace?.areas.find((area) => area.code === "setup_fl1")?.name ?? "Fahrerlager 1"}</option>
+            <option value="setup_fl2">Aufbau · {workspace?.areas.find((area) => area.code === "setup_fl2")?.name ?? "Fahrerlager 2"}</option>
+          </optgroup>
+          <optgroup label="Allgemeine Helfer">
+            <option value="general_saturday">Allgemeine Helfer · Samstag</option>
+            <option value="general_sunday">Allgemeine Helfer · Sonntag</option>
+          </optgroup>
+          <optgroup label="Verwaltung">
+            <option value="stammdaten">Stammdaten</option>
+            <option value="schulung">Schulungen</option>
+            <option value="druck">Drucken</option>
+            <option value="import">Import</option>
+            <option value="config">Konfiguration</option>
+          </optgroup>
+        </CompactSelect>
+      </div>
+
+      <div className="hidden border-b border-slate-200 p-3 xl:block">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Helferverwaltung</p>
         <Select value={selectedEvent ?? ""} onValueChange={onEventChange}>
           <SelectTrigger className="h-10 w-full text-sm"><SelectValue placeholder="Event wählen" /></SelectTrigger>
@@ -53,7 +86,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
         </Select>
       </div>
 
-      <nav className="grid max-h-56 flex-1 grid-cols-2 gap-2 overflow-y-auto p-2 md:max-h-64 md:grid-cols-3 xl:max-h-none xl:block xl:space-y-5" aria-label="Helferbereiche">
+      <nav className="hidden flex-1 overflow-y-auto p-2 xl:block xl:space-y-5" aria-label="Helferbereiche">
         <div>
           <SectionTitle>Einteilungen</SectionTitle>
           <SubTitle>Streckenposten</SubTitle>
@@ -78,13 +111,22 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
         </div>
       </nav>
 
-      <div className="grid grid-cols-3 gap-1 border-t border-slate-200 p-2 xl:block xl:space-y-0.5">
+      <div className="hidden border-t border-slate-200 p-2 xl:block xl:space-y-0.5">
         <NavItem active={activeView === "druck"} onClick={() => onViewChange("druck")} label="Drucken" icon={<Printer className="h-4 w-4" />} />
         <NavItem active={activeView === "import"} onClick={() => onViewChange("import")} label="Import" icon={<Import className="h-4 w-4" />} />
         <NavItem active={activeView === "config"} onClick={() => onViewChange("config")} label="Konfiguration" icon={<Settings2 className="h-4 w-4" />} />
       </div>
     </aside>
   );
+}
+
+function CompactSelect({ label, value, onChange, disabled, children }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; children: ReactNode }) {
+  return <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
+    {label}
+    <select className="h-11 min-w-0 w-full rounded-md border bg-white px-3 text-base font-normal text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+      {children}
+    </select>
+  </label>;
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
