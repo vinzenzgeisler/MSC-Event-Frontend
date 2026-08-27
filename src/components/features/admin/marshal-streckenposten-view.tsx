@@ -102,7 +102,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
   });
 
   return (
-    <Card>
+    <Card className="rounded-none border-0 shadow-none sm:rounded-lg sm:border sm:shadow-sm">
       <CardHeader className="p-3 sm:p-6"><div className="flex flex-col gap-4"><CardTitle>Streckenposten</CardTitle>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,0.8fr)_minmax(18rem,1.2fr)_minmax(12rem,0.8fr)]">
           <ControlGroup label="Veranstaltungstag"><div className="grid grid-cols-2 rounded-lg border bg-slate-50 p-1" role="group" aria-label="Veranstaltungstag">{(["saturday", "sunday"] as const).map((key) => <Button key={key} type="button" variant={dayKey === key ? "default" : "ghost"} className="min-h-11 px-2" aria-pressed={dayKey === key} onClick={() => onDayChange(key)}>{key === "saturday" ? "Samstag" : "Sonntag"}</Button>)}</div></ControlGroup>
