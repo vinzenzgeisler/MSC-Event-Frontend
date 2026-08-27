@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { DocumentMeta } from "@/app/document-meta";
@@ -12,7 +12,9 @@ function looksLikeOpaqueId(value: string) {
 
 export function AdminLayout() {
   const { logout, roles, displayName, email } = useAuth();
+  const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const isMarshalWorkspace = pathname.startsWith("/admin/marshals");
   const showDisplayName = Boolean(displayName && !looksLikeOpaqueId(displayName));
   const sidebarContent = (
     <>
@@ -44,7 +46,7 @@ export function AdminLayout() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className={isMarshalWorkspace ? "min-h-screen bg-white lg:bg-slate-100" : "min-h-screen bg-slate-100"}>
       <DocumentMeta />
       <div className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur lg:hidden" style={{ overflowAnchor: "none" }}>
         <div className="flex w-full items-center justify-between px-4 py-3">
@@ -64,7 +66,10 @@ export function AdminLayout() {
         />
       )}
 
-      <div className="mx-auto grid w-full max-w-[1500px] items-start gap-4 px-3 py-4 md:px-4 md:py-6 lg:grid-cols-[240px_1fr] lg:gap-6 xl:px-5 2xl:px-6">
+      <div className={[
+        "mx-auto grid w-full max-w-[1500px] items-start lg:grid-cols-[240px_1fr] lg:gap-6 lg:px-4 lg:py-6 xl:px-5 2xl:px-6",
+        isMarshalWorkspace ? "gap-0" : "gap-4 px-3 py-4 md:px-4 md:py-6",
+      ].join(" ")}>
         <div className="hidden self-start lg:sticky lg:top-6 lg:block" style={{ overflowAnchor: "none" }}>
           <aside className="rounded-lg border bg-white p-4 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
             {sidebarContent}
