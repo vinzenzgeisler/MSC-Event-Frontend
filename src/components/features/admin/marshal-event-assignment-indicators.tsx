@@ -6,6 +6,16 @@ import type {
 
 const activeStatuses = new Set(["accepted", "pending", "tentative"]);
 
+export function isConcreteEventAssignment(
+  assignment: MarshalPerson["assignments"][number],
+) {
+  return Boolean(
+    assignment.postId ||
+      assignment.sectionId ||
+      assignment.functionCode?.trim(),
+  );
+}
+
 export function dayAbbreviation(day: MarshalDay | undefined) {
   if (!day) return "?";
   return day.dayKey === "saturday" ? "Sa" : "So";
@@ -41,9 +51,7 @@ export function EventAssignmentBadges({
     .filter(
       (assignment) =>
         activeStatuses.has(assignment.commitmentStatus) &&
-        Boolean(
-          assignment.postId || assignment.sectionId || assignment.functionCode,
-        ),
+        isConcreteEventAssignment(assignment),
     )
     .map((assignment) => assignmentLabel(person, assignment, workspace));
   if (!labels.length) return null;
@@ -77,7 +85,8 @@ export function sameDayConflicts(
     .filter(
       (assignment) =>
         assignment.dayId !== excluded.dayId &&
-        activeStatuses.has(assignment.commitmentStatus),
+        activeStatuses.has(assignment.commitmentStatus) &&
+        isConcreteEventAssignment(assignment),
     )
     .forEach((assignment) => {
       const day = workspace.days.find((item) => item.id === assignment.dayId);
@@ -107,8 +116,7 @@ export function sameDayConflicts(
       const shift = workspace.areaShifts.find(
         (item) => item.id === assignment.shiftId,
       );
-      if (shift?.shiftDate === date && shift.areaId !== excluded.areaId)
-        labels.push(shift.label);
+      if (shift?.shiftDate === date) labels.push(shift.label);
     });
   workspace.areaAssignments
     .filter(

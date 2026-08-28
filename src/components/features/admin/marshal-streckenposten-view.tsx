@@ -26,6 +26,28 @@ type Props = {
 
 type SortMode = "post" | "name" | "helperNumber" | "status";
 
+type DisplayedPostAssignment = {
+  assignmentValue: string;
+  status: MarshalCommitmentStatus;
+};
+
+export function countActivePostStaffing(
+  assignments: DisplayedPostAssignment[],
+  activePostIds: ReadonlySet<string>,
+) {
+  const actualAssignments = assignments.filter((assignment) => {
+    if (["declined", "not_asked"].includes(assignment.status)) return false;
+    const [kind, postId] = assignment.assignmentValue.split(":", 2);
+    return kind === "post" && activePostIds.has(postId);
+  });
+  return {
+    assigned: actualAssignments.length,
+    accepted: actualAssignments.filter(
+      (assignment) => assignment.status === "accepted",
+    ).length,
+  };
+}
+
 export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, busy, targetMode, onTargetModeChange, onDayChange, onPersonOpen, onListSave, onSave, onReplace }: Props) {
   const [mode, setMode] = useState<"list" | "overview" | "map">("list");
   const [search, setSearch] = useState("");
@@ -149,15 +171,32 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
       return ap - bp || a.helperNumber - b.helperNumber;
     });
   const staffing = workspace.days.map((summaryDay) => {
-    const target = workspace.posts.filter((post) => post.isActive).reduce((sum, post) => sum + getPostTarget(post, targetMode), 0);
-    const assignments = workspace.people.map((person) => (summaryDay.id === day.id ? displayedAssignment(person) : serverAssignmentForDay(person, summaryDay.id))).filter((item) => item.assignmentValue !== "none" && !["declined", "not_asked"].includes(item.status));
-    const accepted = assignments.filter((item) => item.status === "accepted").length;
+    const activePosts = workspace.posts.filter((post) => post.isActive);
+    const activePostIds = new Set(activePosts.map((post) => post.id));
+    const target = activePosts.reduce(
+      (sum, post) => sum + getPostTarget(post, targetMode),
+      0,
+    );
+    const assignments = workspace.people.map((person) =>
+      summaryDay.id === day.id
+        ? displayedAssignment(person)
+        : serverAssignmentForDay(person, summaryDay.id),
+    );
+    const { assigned, accepted } = countActivePostStaffing(
+      assignments,
+      activePostIds,
+    );
     return {
       day: summaryDay,
       target,
-      assigned: assignments.length,
+      assigned,
       accepted,
-      dot: assignments.length < target ? "bg-red-500" : accepted < target ? "bg-amber-500" : "bg-emerald-500",
+      dot:
+        assigned < target
+          ? "bg-red-500"
+          : accepted < target
+            ? "bg-amber-500"
+            : "bg-emerald-500",
     };
   });
 
