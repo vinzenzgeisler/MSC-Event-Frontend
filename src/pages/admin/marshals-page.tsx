@@ -24,6 +24,7 @@ import type {
   MarshalAreaConfigShiftInput,
   MarshalAssignmentInput,
   MarshalCommitmentStatus,
+  MarshalDay,
   MarshalEvent,
   MarshalImportPreview,
   MarshalPerson,
@@ -230,6 +231,14 @@ export function AdminMarshalsPage() {
     return runAction(() => adminMarshalsService.deleteAreaAssignment(person.id, eventId, areaId), "Bereichszuordnung entfernt.", "Bereichszuordnung konnte nicht entfernt werden.");
   }
   function savePerson(personId: string, patch: MarshalPersonPatch) { return runAction(() => adminMarshalsService.updatePerson(personId, patch), "Stammdaten gespeichert.", "Stammdaten konnten nicht gespeichert werden."); }
+  function saveEventNote(person: MarshalPerson, note: string | null) {
+    return runAction(() => adminMarshalsService.saveAssignment(person.id, { eventId, note, days: [] }), "Event-Notiz gespeichert.", "Event-Notiz konnte nicht gespeichert werden.");
+  }
+  function saveDayNote(person: MarshalPerson, day: MarshalDay, note: string | null) {
+    const assignment = person.assignments.find((item) => item.dayId === day.id);
+    if (!assignment) return Promise.resolve(false);
+    return runAction(() => adminMarshalsService.saveAssignment(person.id, { eventId, days: [{ dayId: day.id, commitmentStatus: assignment.commitmentStatus, role: assignment.role, sectionId: assignment.sectionId, postId: assignment.postId, functionCode: assignment.functionCode, note }] }), "Tagesnotiz gespeichert.", "Tagesnotiz konnte nicht gespeichert werden.");
+  }
   function createPerson(input: MarshalPersonInput) { return runAction(() => adminMarshalsService.createPerson(input), "Person angelegt.", "Person konnte nicht angelegt werden."); }
   function deletePerson(person: MarshalPerson) { return runAction(() => adminMarshalsService.deletePerson(person.id), "Person und verknüpfte Daten wurden endgültig gelöscht.", "Person konnte nicht gelöscht werden."); }
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
@@ -273,6 +282,6 @@ export function AdminMarshalsPage() {
         </>}
       </main>
     </div>
-    {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} onClose={() => setSelectedPersonId(null)} onSave={savePerson} />}
+    {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} day={view === "track_saturday" || view === "track_sunday" ? activeDay ?? null : null} onClose={() => setSelectedPersonId(null)} onSave={savePerson} onSaveEventNote={saveEventNote} onSaveDayNote={saveDayNote} />}
   </div>;
 }
