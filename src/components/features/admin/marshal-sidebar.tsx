@@ -37,8 +37,8 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
     const shiftIds = new Set(workspace.areaShifts.filter((shift) => shift.areaId === area.id).map((shift) => shift.id));
     const eligibleParticipationIds = new Set(workspace.people.filter((person) => !person.noDeployment).map((person) => person.participation.id));
     const participationIds = new Set([
-      ...workspace.areaAssignments.filter((item) => item.areaId === area.id && item.commitmentStatus === "accepted").map((item) => item.participationId),
-      ...workspace.shiftAssignments.filter((item) => shiftIds.has(item.shiftId) && item.commitmentStatus === "accepted").map((item) => item.participationId),
+      ...workspace.areaAssignments.filter((item) => item.areaId === area.id).map((item) => item.participationId),
+      ...workspace.shiftAssignments.filter((item) => shiftIds.has(item.shiftId)).map((item) => item.participationId),
     ].filter((participationId) => eligibleParticipationIds.has(participationId)));
     return participationIds.size;
   };
