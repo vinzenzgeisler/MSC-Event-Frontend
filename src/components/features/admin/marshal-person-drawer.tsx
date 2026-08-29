@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/features/admin/marshal-status";
 import { canonicalizeMarshalAreas, MarshalAreaMultiSelect } from "@/components/features/admin/marshal-area-multi-select";
-import type { MarshalDay, MarshalPerson, MarshalPersonPatch, MarshalWorkspace } from "@/types/admin-marshals";
+import type { MarshalCommitmentStatus, MarshalDay, MarshalPerson, MarshalPersonPatch, MarshalWorkspace } from "@/types/admin-marshals";
 
 type Props = {
   person: MarshalPerson | null;
@@ -47,6 +47,38 @@ export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, bu
   }, [onClose, person]);
 
   if (!person || !draft) return null;
+
+  // Compact event assignment entries for the summary card
+  const einsatzEntries: Array<{ id: string; label: string; dayLabel: string; status: MarshalCommitmentStatus }> = [];
+  for (const assignment of draft.assignments) {
+    const assignDay = workspace.days.find((d) => d.id === assignment.dayId);
+    const dayShort = assignDay?.dayKey === "saturday" ? "Sa" : assignDay?.dayKey === "sunday" ? "So" : (assignDay?.label ?? "");
+    let label: string;
+    if (assignment.postId) {
+      const post = workspace.posts.find((p) => p.id === assignment.postId);
+      label = post ? `Posten ${post.code}` : "Posten";
+    } else if (assignment.role === "section_leader" && assignment.functionCode) {
+      label = assignment.functionCode;
+    } else if (assignment.sectionId) {
+      const section = workspace.sections.find((s) => s.id === assignment.sectionId);
+      label = section?.name ?? "Abschnitt";
+    } else {
+      label = "Eingeteilt";
+    }
+    einsatzEntries.push({ id: assignment.id, label, dayLabel: dayShort, status: assignment.commitmentStatus });
+  }
+  for (const aAssign of workspace.areaAssignments) {
+    if (aAssign.participationId !== draft.participation.id) continue;
+    const area = workspace.areas.find((a) => a.id === aAssign.areaId);
+    einsatzEntries.push({ id: aAssign.id, label: area?.name ?? "Bereich", dayLabel: "", status: aAssign.commitmentStatus });
+  }
+  for (const sAssign of workspace.shiftAssignments) {
+    if (sAssign.participationId !== draft.participation.id) continue;
+    const shift = workspace.areaShifts.find((s) => s.id === sAssign.shiftId);
+    const area = workspace.areas.find((a) => a.id === shift?.areaId);
+    einsatzEntries.push({ id: sAssign.id, label: area ? `${area.name}${shift ? ` ${shift.label}` : ""}` : "Schicht", dayLabel: "", status: sAssign.commitmentStatus });
+  }
+
   const dayHistory = draft.assignments.map((assignment) => {
     const day = workspace.days.find((item) => item.id === assignment.dayId);
     const post = workspace.posts.find((item) => item.id === assignment.postId);
@@ -94,7 +126,20 @@ export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, bu
           <Button ref={closeButtonRef} type="button" size="sm" variant="ghost" aria-label="Personendetails schließen" onClick={onClose}><X className="h-5 w-5" /></Button>
         </div>
         <div className="space-y-6 p-4 sm:p-6">
-          <section aria-labelledby="marshal-person-masterdata"><h3 id="marshal-person-masterdata" className="mb-3 font-semibold">Stammdaten</h3>
+          <section aria-labelledby="marshal-person-event-card" className="rounded-lg border bg-slate-50 p-3">
+            <h3 id="marshal-person-event-card" className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Event-Einsätze</h3>
+            {einsatzEntries.length === 0
+              ? <p className="text-xs text-slate-400">Noch keine Einsätze in diesem Event</p>
+              : <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 md:grid-cols-3">
+                  {einsatzEntries.map((entry) => (
+                    <li key={entry.id} className="flex min-w-0 items-center gap-1.5 rounded-md border bg-white px-2 py-1 text-xs">
+                      <span className="min-w-0 flex-1 truncate font-medium">{entry.label}{entry.dayLabel && <span className="ml-1 text-slate-400">{entry.dayLabel}</span>}</span>
+                      <StatusBadge status={entry.status} />
+                    </li>
+                  ))}
+                </ul>}
+          </section>
+          <section aria-labelledby="marshal-person-masterdata" className="border-t pt-4"><h3 id="marshal-person-masterdata" className="mb-3 font-semibold">Stammdaten</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               {fields.map(({ key, label, type = "text" }) => <label key={key} className="grid gap-1 text-xs font-medium text-slate-600">{label}<Input type={type} value={draft[key] ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} /></label>)}
               <div className="sm:col-span-2"><MarshalAreaMultiSelect areas={workspace.areas} value={draft.activityAreas} disabled={!canWrite} onChange={(activityAreas) => setDraft({ ...draft, activityAreas })} /></div>
