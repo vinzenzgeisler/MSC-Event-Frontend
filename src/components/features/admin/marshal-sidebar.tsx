@@ -5,10 +5,12 @@ import { cn } from "@/lib/utils";
 import type { MarshalEvent, MarshalWorkspace } from "@/types/admin-marshals";
 
 export type SidebarView =
+  | "readiness"
   | "track_saturday" | "track_sunday"
   | "setup_fl1" | "setup_fl2"
   | "general_saturday" | "general_sunday"
-  | "stammdaten" | "schulung" | "druck" | "import" | "config";
+  | "stammdaten" | "schulung" | "druck" | "import" | "config"
+  | `area:${string}`;
 
 type Props = {
   workspace: MarshalWorkspace | null;
@@ -56,6 +58,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
           {events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
         </CompactSelect>
         <CompactSelect label="Arbeitsbereich" value={activeView} onChange={(value) => onViewChange(value as SidebarView)}>
+          <option value="readiness">Bereitschaft</option>
           <optgroup label="Streckenposten">
             <option value="track_saturday">Streckenposten · Samstag</option>
             <option value="track_sunday">Streckenposten · Sonntag</option>
@@ -68,6 +71,13 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
             <option value="general_saturday">Allgemeine Helfer · Samstag</option>
             <option value="general_sunday">Allgemeine Helfer · Sonntag</option>
           </optgroup>
+          {workspace?.areas.some((area) => !["setup_fl1", "setup_fl2", "general_saturday", "general_sunday"].includes(area.code)) && (
+            <optgroup label="Weitere Bereiche">
+              {workspace.areas.filter((area) => !["setup_fl1", "setup_fl2", "general_saturday", "general_sunday"].includes(area.code)).map((area) => (
+                <option key={area.id} value={`area:${area.id}`}>{area.name}</option>
+              ))}
+            </optgroup>
+          )}
           <optgroup label="Verwaltung">
             <option value="stammdaten">Stammdaten</option>
             <option value="schulung">Schulungen</option>
@@ -89,6 +99,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
       <nav className="hidden flex-1 overflow-y-auto p-2 xl:block xl:space-y-5" aria-label="Helferbereiche">
         <div>
           <SectionTitle>Einteilungen</SectionTitle>
+          <NavItem active={activeView === "readiness"} onClick={() => onViewChange("readiness")} label="Bereitschaft" />
           <SubTitle>Streckenposten</SubTitle>
           <NavItem active={activeView === "track_saturday"} onClick={() => onViewChange("track_saturday")} label="Samstag" badge={<StaffingBar {...getTrackStaffing("saturday")} />} />
           <NavItem active={activeView === "track_sunday"} onClick={() => onViewChange("track_sunday")} label="Sonntag" badge={<StaffingBar {...getTrackStaffing("sunday")} />} />
