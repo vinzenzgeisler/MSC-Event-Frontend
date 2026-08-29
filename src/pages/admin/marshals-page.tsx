@@ -9,6 +9,7 @@ import { MarshalDruckView } from "@/components/features/admin/marshal-druck-view
 import { MarshalGeneralView } from "@/components/features/admin/marshal-general-view";
 import { MarshalImportView } from "@/components/features/admin/marshal-import-view";
 import { MarshalPersonDrawer } from "@/components/features/admin/marshal-person-drawer";
+import { MarshalReadinessView } from "@/components/features/admin/marshal-readiness-view";
 import { getPostTarget, type PlanningTargetMode } from "@/components/features/admin/marshal-planning-map";
 import { MarshalSchulungView } from "@/components/features/admin/marshal-schulung-view";
 import { MarshalSidebar, type SidebarView } from "@/components/features/admin/marshal-sidebar";
@@ -261,9 +262,11 @@ export function AdminMarshalsPage() {
 
   const selectedEvent = events.find((event) => event.id === eventId);
   const selectedPerson = workspace?.people.find((person) => person.id === selectedPersonId) ?? null;
-  const activeDayKey: "saturday" | "sunday" = view === "track_sunday" || view === "general_sunday" ? "sunday" : "saturday";
+  const dynamicAreaId = view.startsWith("area:") ? view.slice("area:".length) : null;
+  const fixedAreaView = ["setup_fl1", "setup_fl2", "general_saturday", "general_sunday"].includes(view) ? view : null;
+  const areaForView = workspace?.areas.find((area) => dynamicAreaId ? area.id === dynamicAreaId : area.code === fixedAreaView);
+  const activeDayKey: "saturday" | "sunday" = view === "track_sunday" || view === "general_sunday" || areaForView?.dayScope === "sunday" ? "sunday" : "saturday";
   const activeDay = workspace?.days.find((day) => day.dayKey === activeDayKey);
-  const areaForView = workspace?.areas.find((area) => area.code === view);
 
   return <div className="mx-auto min-w-0 max-w-[1800px] pb-8">
     {(error || notice) && <div className="fixed right-4 top-4 z-[80] w-[min(24rem,calc(100vw-2rem))]" aria-live="polite" aria-atomic="true"><div className={cn("flex items-start gap-3 rounded-lg border p-3 text-sm shadow-lg", error ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-200 bg-emerald-50 text-emerald-900")} role={error ? "alert" : "status"}><span className="min-w-0 flex-1 break-words">{error || notice}</span><button type="button" className="rounded p-1 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Meldung schließen" onClick={() => { setError(""); setNotice(""); }}><X className="h-4 w-4" /></button></div></div>}
@@ -271,9 +274,12 @@ export function AdminMarshalsPage() {
       <MarshalSidebar workspace={workspace} activeView={view} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} events={events} selectedEvent={eventId || null} onEventChange={(id) => { loadSequence.current += 1; setSelectedPersonId(null); setLoadedWorkspace(null); setLoading(true); setEventId(id); }} />
       <main className="min-w-0 flex-1 xl:px-6">
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
+          {view === "readiness" && <MarshalReadinessView workspace={workspace} days={workspace.days} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} />}
           {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onListSave={saveListDay} onSave={saveDay} onReplace={replacePostHelper} />}
-          {(view === "setup_fl1" || view === "setup_fl2") && (areaForView ? <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} /> : <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
-          {(view === "general_saturday" || view === "general_sunday") && (areaForView ? <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "general_saturday" : "general_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} onRemove={(person) => removeArea(person, areaForView.id)} /> : <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />)}
+          {areaForView?.areaType === "setup" && <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} />}
+          {areaForView?.areaType === "general" && <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "general_saturday" : "general_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} onRemove={(person) => removeArea(person, areaForView.id)} />}
+          {(view === "setup_fl1" || view === "setup_fl2") && !areaForView && <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />}
+          {(view === "general_saturday" || view === "general_sunday") && !areaForView && <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />}
           {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onCreate={createPerson} onDelete={deletePerson} />}
           {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
           {view === "druck" && <MarshalDruckView workspace={workspace} canExport={canExport} onPrint={print} />}
