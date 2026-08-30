@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, List, Map, MapPinned, MessageSquareText, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, List, Map, MapPinned, MessageSquareText, Pencil, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
@@ -351,24 +351,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                       </label>
                       <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                         <span className="mb-1 block text-xs font-medium text-slate-600 lg:sr-only">Stammbemerkung</span>
-                        <span className="relative block min-w-0">
-                          <MessageSquareText className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-700" />
-                          <input
-                            key={person.note ?? ""}
-                            aria-label={`Stammbemerkung für ${person.firstName} ${person.lastName}`}
-                            title={person.note ?? ""}
-                            className="h-11 w-full min-w-0 rounded-md border border-amber-200 bg-amber-50 pl-8 pr-2.5 text-sm text-amber-950 placeholder:text-amber-700/60 hover:border-amber-300 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/40 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 md:h-9"
-                            defaultValue={person.note ?? ""}
-                            disabled={noteDisabled}
-                            placeholder="Stammplatz, Partnerwunsch …"
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") event.currentTarget.blur();
-                            }}
-                            onBlur={(event) => {
-                              if (event.target.value !== (person.note ?? "")) void onPersonNoteSave(person, event.target.value.trim() || null);
-                            }}
-                          />
-                        </span>
+                        <MasterNoteEditor person={person} canEdit={!noteDisabled} onSave={onPersonNoteSave} />
                       </div>
                     </div>
                   </div>
@@ -455,6 +438,72 @@ function SortHeader({ label, sortKey, activeKey, direction, onSort }: { label: s
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return <span className="inline-flex min-h-8 items-center gap-1 rounded-full border border-blue-200 bg-blue-50 pl-2.5 pr-1 text-blue-800"><span className="max-w-52 truncate">{label}</span><button type="button" className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" aria-label={`${label} entfernen`} onClick={onRemove}><X className="h-3.5 w-3.5" /></button></span>;
+}
+
+function MasterNoteEditor({ person, canEdit, onSave }: { person: MarshalPerson; canEdit: boolean; onSave: (person: MarshalPerson, note: string | null) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(person.note ?? "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(person.note ?? "");
+  }, [editing, person.note]);
+
+  async function save() {
+    const note = draft.trim() || null;
+    if (note === (person.note ?? null)) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      if (await onSave(person, note)) setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 shadow-sm">
+        <textarea
+          autoFocus
+          rows={3}
+          aria-label={`Stammbemerkung für ${person.firstName} ${person.lastName}`}
+          className="min-h-20 w-full resize-y rounded-md border border-amber-200 bg-white px-2.5 py-2 text-sm leading-5 text-slate-950 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30"
+          value={draft}
+          disabled={saving}
+          placeholder="Stammplatz, Partnerwunsch …"
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setDraft(person.note ?? "");
+              setEditing(false);
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") event.currentTarget.blur();
+          }}
+        />
+        <p className="mt-1 text-right text-[11px] text-amber-800">{saving ? "Speichert …" : "Speichert automatisch"}</p>
+      </div>
+    );
+  }
+
+  if (!person.note) {
+    return canEdit ? (
+      <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md border border-dashed border-slate-300 px-2.5 text-left text-xs text-slate-500 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => setEditing(true)}>
+        <Pencil className="h-3.5 w-3.5 shrink-0" />Bemerkung ergänzen
+      </button>
+    ) : <span className="hidden min-h-9 items-center text-xs text-slate-400 lg:flex">Keine Stammbemerkung</span>;
+  }
+
+  return (
+    <button type="button" title={person.note} className="group flex min-h-9 w-full min-w-0 items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-left text-xs leading-4 text-amber-950 transition hover:border-amber-300 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:cursor-default" disabled={!canEdit} onClick={() => setEditing(true)}>
+      <MessageSquareText className="mt-px h-3.5 w-3.5 shrink-0 text-amber-700" />
+      <span className="line-clamp-2 min-w-0 flex-1 whitespace-pre-line">{person.note}</span>
+      {canEdit && <Pencil className="mt-px h-3.5 w-3.5 shrink-0 text-amber-700 opacity-60 group-hover:opacity-100" />}
+    </button>
+  );
 }
 
 function selectSort(key: SortMode, currentKey: SortMode, currentDirection: SortDirection, setKey: (key: SortMode) => void, setDirection: (direction: SortDirection) => void) {
