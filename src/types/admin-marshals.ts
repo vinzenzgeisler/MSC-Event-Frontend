@@ -7,6 +7,8 @@ export type MarshalEvent = {
   endsAt: string;
   status: string;
   isCurrent: boolean;
+  marshalSetupState?: "missing" | "ready";
+  marshalSourceEventId?: string | null;
 };
 
 export type MarshalDay = { id: string; eventId: string; dayKey: "saturday" | "sunday"; label: string; eventDate: string };
@@ -53,6 +55,24 @@ export type MarshalWorkspace = {
   trainings: MarshalTraining[]; trainingParticipants: MarshalTrainingParticipant[]; qualifications: MarshalQualification[];
   areas: MarshalHelperArea[]; areaShifts: MarshalAreaShift[]; shiftAssignments: MarshalShiftAssignment[];
   areaAssignments: MarshalAreaAssignment[];
+  revision?: string;
+  updatedAt?: string;
+};
+
+export type MarshalStructurePreview = {
+  sourceEvent: Pick<MarshalEvent, "id" | "name" | "startsAt" | "endsAt">;
+  targetEvent: Pick<MarshalEvent, "id" | "name" | "startsAt" | "endsAt">;
+  sections: number;
+  posts: Array<{
+    code: string;
+    sectionCode: string;
+    description: string | null;
+    targetStaff: number;
+    emergencyTargetStaff: number;
+    assignedStaff: 0;
+  }>;
+  areas: number;
+  shifts: Array<{ areaCode: string; label: string; sourceDate: string; targetDate: string }>;
 };
 
 export type MarshalHelperArea = {
@@ -156,6 +176,8 @@ export type MarshalPrintParams = {
   trainingId?: string;
   areaId?: string;
   shiftId?: string;
+  orientation?: "portrait";
+  sort?: "name" | "post_name";
 };
 
 export type MarshalPostConfigInput = {

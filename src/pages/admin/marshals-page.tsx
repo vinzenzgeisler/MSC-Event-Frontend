@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Copy, RefreshCw, X } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
@@ -17,6 +17,7 @@ import { MarshalStammdatenView } from "@/components/features/admin/marshal-stamm
 import { MarshalStreckenpostenView } from "@/components/features/admin/marshal-streckenposten-view";
 import { EmptyState } from "@/components/state/empty-state";
 import { LoadingState } from "@/components/state/loading-state";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { adminMarshalsService } from "@/services/admin-marshals.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
@@ -33,6 +34,7 @@ import type {
   MarshalPersonPatch,
   MarshalPostConfigInput,
   MarshalTrainingParticipant,
+  MarshalStructurePreview,
   MarshalWorkspace,
 } from "@/types/admin-marshals";
 
@@ -50,6 +52,7 @@ export function AdminMarshalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const loadSequence = useRef(0);
   const assignmentSaves = useRef(new Set<string>());
   const activeEventId = useRef(eventId);
@@ -64,6 +67,7 @@ export function AdminMarshalsPage() {
       const data = await adminMarshalsService.getWorkspace(targetEventId);
       if (sequence !== loadSequence.current) return;
       setLoadedWorkspace({ eventId: targetEventId, data: { ...data, areas: data.areas ?? [], areaShifts: data.areaShifts ?? [], shiftAssignments: data.shiftAssignments ?? [], areaAssignments: data.areaAssignments ?? [] } });
+      setLastUpdatedAt(new Date(data.updatedAt ?? Date.now()));
     } catch (cause) {
       if (sequence !== loadSequence.current) return;
       setError(getApiErrorMessage(cause, "Helferverwaltung konnte nicht geladen werden."));
@@ -81,7 +85,22 @@ export function AdminMarshalsPage() {
       if (selected) setEventId(selected.id); else setLoading(false);
     }).catch((cause) => { setError(getApiErrorMessage(cause, "Veranstaltungen konnten nicht geladen werden.")); setLoading(false); });
   }, []);
-  useEffect(() => { if (eventId) { localStorage.setItem("msc_marshal_event_id", eventId); void loadWorkspace(eventId); } }, [eventId, loadWorkspace]);
+  useEffect(() => {
+    if (!eventId) return;
+    localStorage.setItem("msc_marshal_event_id", eventId);
+    const storedView = localStorage.getItem(`msc_marshal_view:${eventId}`);
+    if (storedView && isSidebarView(storedView)) setView(storedView);
+    void loadWorkspace(eventId);
+  }, [eventId, loadWorkspace]);
+  useEffect(() => { if (eventId) localStorage.setItem(`msc_marshal_view:${eventId}`, view); }, [eventId, view]);
+  useEffect(() => {
+    const canRefresh = ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "druck"].includes(view) || view.startsWith("area:");
+    if (!eventId || !canRefresh || busy || selectedPersonId) return;
+    const refresh = () => { if (document.visibilityState === "visible") void loadWorkspace(eventId); };
+    const interval = window.setInterval(refresh, 30_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(interval); document.removeEventListener("visibilitychange", refresh); };
+  }, [busy, eventId, loadWorkspace, selectedPersonId, view]);
   useEffect(() => {
     if (!error && !notice) return;
     const timeout = window.setTimeout(() => { setError(""); setNotice(""); }, 5000);
@@ -244,14 +263,21 @@ export function AdminMarshalsPage() {
   function deletePerson(person: MarshalPerson) { return runAction(() => adminMarshalsService.deletePerson(person.id), "Person und verknüpfte Daten wurden endgültig gelöscht.", "Person konnte nicht gelöscht werden."); }
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
   function saveAttendance(trainingId: string, person: MarshalPerson, status: MarshalTrainingParticipant["attendanceStatus"]) { return runAction(() => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, status), "Anwesenheit gespeichert.", "Anwesenheit konnte nicht gespeichert werden."); }
-  async function print(params: { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
-  async function printTraining(trainingId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "training", trainingId }), "Teilnehmerliste erstellt.", "Teilnehmerliste konnte nicht erstellt werden.", false); }
+  async function print(params: { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params, orientation: "portrait", sort: params.type === "section" ? "post_name" : "name" }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
+  async function printTraining(trainingId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "training", trainingId, orientation: "portrait", sort: "name" }), "Teilnehmerliste erstellt.", "Teilnehmerliste konnte nicht erstellt werden.", false); }
   function savePostConfig(posts: MarshalPostConfigInput[]) {
     if (!workspace) return Promise.resolve(false);
     return runAction(() => adminMarshalsService.saveConfig({ eventId, sections: workspace.sections.map(({ code, name, leaderCode, sortOrder }) => ({ code, name, leaderCode, sortOrder })), posts }), "Postenkonfiguration gespeichert.", "Postenkonfiguration konnte nicht gespeichert werden.");
   }
   function saveAreaConfig(areas: MarshalAreaConfigAreaInput[], shifts: MarshalAreaConfigShiftInput[]) { return runAction(() => adminMarshalsService.updateAreaConfig({ eventId, areas, shifts }), "Bereiche und Schichten gespeichert.", "Bereiche und Schichten konnten nicht gespeichert werden."); }
   function resetAssignments() { return runAction(() => adminMarshalsService.resetEventAssignments(eventId), "Alle Event-Einteilungen wurden zurückgesetzt.", "Einteilungen konnten nicht zurückgesetzt werden."); }
+  async function previewStructure(sourceEventId: string): Promise<MarshalStructurePreview | null> {
+    setBusy(true); setError(""); setNotice("");
+    try { return (await adminMarshalsService.previewStructure(eventId, sourceEventId)).preview; }
+    catch (cause) { setError(getApiErrorMessage(cause, "Vorjahresstruktur konnte nicht geladen werden.")); return null; }
+    finally { setBusy(false); }
+  }
+  function initializeEvent(sourceEventId: string) { return runAction(() => adminMarshalsService.initializeEvent(eventId, sourceEventId), "Helferstruktur übernommen. Alle Posten starten unbesetzt.", "Helferstruktur konnte nicht übernommen werden."); }
   async function previewImport(file: File) {
     setBusy(true); setError(""); setNotice("");
     try { return await adminMarshalsService.previewImport(eventId, file); }
@@ -270,10 +296,15 @@ export function AdminMarshalsPage() {
 
   return <div className="mx-auto min-w-0 max-w-[1800px] pb-8">
     {(error || notice) && <div className="fixed right-4 top-4 z-[80] w-[min(24rem,calc(100vw-2rem))]" aria-live="polite" aria-atomic="true"><div className={cn("flex items-start gap-3 rounded-lg border p-3 text-sm shadow-lg", error ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-200 bg-emerald-50 text-emerald-900")} role={error ? "alert" : "status"}><span className="min-w-0 flex-1 break-words">{error || notice}</span><button type="button" className="rounded p-1 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Meldung schließen" onClick={() => { setError(""); setNotice(""); }}><X className="h-4 w-4" /></button></div></div>}
-    <div className="flex min-w-0 flex-col bg-white xl:min-h-[680px] xl:flex-row">
+    <div className="flex min-w-0 flex-col overflow-hidden bg-white lg:rounded-xl lg:border lg:shadow-sm xl:min-h-[680px] xl:flex-row">
       <MarshalSidebar workspace={workspace} activeView={view} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} events={events} selectedEvent={eventId || null} onEventChange={(id) => { loadSequence.current += 1; setSelectedPersonId(null); setLoadedWorkspace(null); setLoading(true); setEventId(id); }} />
-      <main className="min-w-0 flex-1 xl:px-6">
+      <main className="min-w-0 flex-1 p-4 sm:p-5 xl:p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 text-xs text-slate-500">
+          <span className="min-w-0 truncate"><strong className="text-slate-700">{selectedEvent?.name ?? "Helferverwaltung"}</strong>{selectedEvent && <> · {formatEventDate(selectedEvent.startsAt)}–{formatEventDate(selectedEvent.endsAt)}</>}</span>
+          <span className="flex items-center gap-2">{lastUpdatedAt && <span>Aktualisiert {lastUpdatedAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</span>}<Button type="button" size="sm" variant="ghost" className="h-9 px-2" disabled={!eventId || loading || busy} onClick={() => void loadWorkspace(eventId)}><RefreshCw className={cn("mr-1.5 h-4 w-4", loading && "animate-spin")} />Aktualisieren</Button></span>
+        </div>
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
+          {view !== "config" && workspace.posts.length === 0 && workspace.sections.length === 0 && workspace.areas.length === 0 && <div className="mb-4 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between"><div><strong>Helferstruktur noch nicht vorbereitet</strong><p className="mt-1 text-blue-800">Übernimm Posten, Sollwerte, Bereiche und Schichten aus einem früheren Event. Alle Posten beginnen unbesetzt.</p></div>{canWrite && <Button type="button" className="shrink-0" onClick={() => setView("config")}><Copy className="mr-2 h-4 w-4" />Jetzt vorbereiten</Button>}</div>}
           {view === "readiness" && <MarshalReadinessView workspace={workspace} days={workspace.days} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} />}
           {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onListSave={saveListDay} onSave={saveDay} onReplace={replacePostHelper} />}
           {areaForView?.areaType === "setup" && <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} />}
@@ -284,10 +315,19 @@ export function AdminMarshalsPage() {
           {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
           {view === "druck" && <MarshalDruckView workspace={workspace} canExport={canExport} onPrint={print} />}
           {view === "import" && <MarshalImportView canWrite={canWrite} busy={busy} onPreview={previewImport} onCommit={commitImport} />}
-          {view === "config" && <MarshalConfigView workspace={workspace} canWrite={canWrite} busy={busy} onSavePosts={savePostConfig} onSaveAreas={saveAreaConfig} onReset={resetAssignments} />}
+          {view === "config" && selectedEvent && <MarshalConfigView workspace={workspace} canWrite={canWrite} busy={busy} events={events} currentEvent={selectedEvent} onSavePosts={savePostConfig} onSaveAreas={saveAreaConfig} onReset={resetAssignments} onPreviewStructure={previewStructure} onInitializeEvent={initializeEvent} />}
         </>}
       </main>
     </div>
     {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} day={view === "track_saturday" || view === "track_sunday" ? activeDay ?? null : null} onClose={() => setSelectedPersonId(null)} onSave={savePerson} onSaveEventNote={saveEventNote} onSaveDayNote={saveDayNote} />}
   </div>;
+}
+
+function isSidebarView(value: string): value is SidebarView {
+  return value.startsWith("area:") || ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "stammdaten", "schulung", "druck", "import", "config"].includes(value);
+}
+
+function formatEventDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
 }

@@ -10,6 +10,7 @@ import type {
   MarshalPersonPatch,
   MarshalPrintParams,
   MarshalPostConfigInput,
+  MarshalStructurePreview,
   MarshalWorkspace,
 } from "@/types/admin-marshals";
 
@@ -52,6 +53,14 @@ export const adminMarshalsService = {
 
   async resetEventAssignments(eventId: string) {
     return requestJson<OkResponse>(`/admin/marshals/events/${eventId}/reset`, { method: "POST", body: { scope: "assignments" } });
+  },
+
+  async previewStructure(targetEventId: string, sourceEventId: string) {
+    return requestJson<OkResponse & { preview: MarshalStructurePreview }>(`/admin/marshals/events/${targetEventId}/structure-preview`, { query: { sourceEventId } });
+  },
+
+  async initializeEvent(targetEventId: string, sourceEventId: string) {
+    return requestJson<OkResponse>(`/admin/marshals/events/${targetEventId}/initialize`, { method: "POST", body: { sourceEventId } });
   },
 
   async updateAreaConfig(body: MarshalAreaConfigInput) {

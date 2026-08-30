@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { List, Map, MapPinned, X } from "lucide-react";
+import { ArrowDown, ArrowUp, List, Map, MapPinned, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
@@ -25,6 +25,8 @@ type Props = {
 };
 
 type SortMode = "post" | "name" | "helperNumber" | "status";
+type SortDirection = "asc" | "desc";
+type ViewMode = "list" | "overview" | "map";
 
 type DisplayedPostAssignment = {
   assignmentValue: string;
@@ -49,11 +51,13 @@ export function countActivePostStaffing(
 }
 
 export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, busy, targetMode, onTargetModeChange, onDayChange, onPersonOpen, onListSave, onSave, onReplace }: Props) {
-  const [mode, setMode] = useState<"list" | "overview" | "map">("list");
+  const storageKey = `msc_marshal_track_mode:${day.eventId}`;
+  const [mode, setMode] = useState<ViewMode>(() => readStoredMode(storageKey));
   const [search, setSearch] = useState("");
   const [sectionFilter, setSectionFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("post");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [optimisticAssignments, setOptimisticAssignments] = useState<Record<string, { assignmentValue: string; status: MarshalCommitmentStatus }>>({});
   const [savingRows, setSavingRows] = useState<Set<string>>(() => new Set());
   const savingRowsRef = useRef(new Set<string>());
@@ -91,6 +95,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
       return changed ? next : current;
     });
   }, [day.id, workspace.people]);
+  useEffect(() => { localStorage.setItem(storageKey, mode); }, [mode, storageKey]);
 
   async function saveOptimistically(person: MarshalPerson, requestedStatus: MarshalCommitmentStatus, assignmentValue: string) {
     const key = rowKey(person.id);
@@ -146,14 +151,14 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
       const aa = a.assignments.find((item) => item.dayId === day.id);
       const ba = b.assignments.find((item) => item.dayId === day.id);
       if (sortMode === "name")
-        return (
+        return sortDirectionMultiplier(sortDirection) * (
           a.lastName.localeCompare(b.lastName, "de", { sensitivity: "base" }) ||
           a.firstName.localeCompare(b.firstName, "de", {
             sensitivity: "base",
           }) ||
           a.helperNumber - b.helperNumber
         );
-      if (sortMode === "helperNumber") return a.helperNumber - b.helperNumber;
+      if (sortMode === "helperNumber") return sortDirectionMultiplier(sortDirection) * (a.helperNumber - b.helperNumber);
       if (sortMode === "status") {
         const statusOrder: Record<MarshalCommitmentStatus, number> = {
           accepted: 0,
@@ -164,11 +169,11 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
         };
         const ar = aa ? statusOrder[aa.commitmentStatus] : 5;
         const br = ba ? statusOrder[ba.commitmentStatus] : 5;
-        return ar - br || a.lastName.localeCompare(b.lastName, "de", { sensitivity: "base" }) || a.firstName.localeCompare(b.firstName, "de", { sensitivity: "base" });
+        return sortDirectionMultiplier(sortDirection) * (ar - br || a.lastName.localeCompare(b.lastName, "de", { sensitivity: "base" }) || a.firstName.localeCompare(b.firstName, "de", { sensitivity: "base" }));
       }
       const ap = workspace.posts.find((post) => post.id === aa?.postId)?.sortOrder ?? 9999;
       const bp = workspace.posts.find((post) => post.id === ba?.postId)?.sortOrder ?? 9999;
-      return ap - bp || a.helperNumber - b.helperNumber;
+      return sortDirectionMultiplier(sortDirection) * (ap - bp || a.helperNumber - b.helperNumber);
     });
   const staffing = workspace.days.map((summaryDay) => {
     const activePosts = workspace.posts.filter((post) => post.isActive);
@@ -202,7 +207,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
 
   return (
     <section className="min-w-0 bg-white" aria-labelledby="streckenposten-title">
-      <header className="border-b border-slate-200 px-3 py-4 sm:px-4 xl:px-0 xl:pt-0">
+      <header className="border-b border-slate-200 pb-4">
         <h1 id="streckenposten-title" className="text-xl font-semibold tracking-tight text-slate-900">
           Streckenposten
         </h1>
@@ -220,11 +225,11 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
             <div className="grid grid-cols-3 rounded-md bg-slate-100 p-0.5" role="group" aria-label="Darstellung">
               <Button type="button" size="sm" variant={mode === "list" ? "default" : "ghost"} className="min-h-10 px-1" aria-pressed={mode === "list"} onClick={() => setMode("list")}>
                 <List className="mr-1 h-4 w-4 shrink-0" />
-                Liste
+                Helferliste
               </Button>
               <Button type="button" size="sm" variant={mode === "overview" ? "default" : "ghost"} className="min-h-10 px-1" aria-pressed={mode === "overview"} onClick={() => setMode("overview")}>
                 <MapPinned className="mr-1 h-4 w-4 shrink-0" />
-                <span className="truncate">Übersicht</span>
+                <span className="truncate">Posten besetzen</span>
               </Button>
               <Button type="button" size="sm" variant={mode === "map" ? "default" : "ghost"} className="min-h-10 px-1" aria-pressed={mode === "map"} onClick={() => setMode("map")}>
                 <Map className="mr-1 h-4 w-4 shrink-0" />
@@ -244,7 +249,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
           </ControlGroup>
         </div>
       </header>
-      <div className="space-y-4 px-3 py-4 sm:px-4 xl:px-0">
+      <div className="space-y-4 pt-4">
         {mode === "list" ? (
           <>
             <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-lg border bg-slate-50 px-3 py-2 text-xs" aria-label="Besetzungsübersicht">
@@ -259,7 +264,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                 </span>
               ))}
             </div>
-            <div className="grid gap-3 border-y border-slate-200 py-3 sm:grid-cols-3">
+            <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
               <label className="grid gap-1 text-xs font-medium text-slate-600">
                 Suche
                 <span className="relative">
@@ -285,23 +290,25 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
               />
               <Filter label="Status" value={statusFilter} onChange={setStatusFilter} options={[{ value: "all", label: "Alle Status" }, ...Object.entries(marshalStatusLabels).map(([value, label]) => ({ value, label }))]} />
             </div>
-            <div className="flex justify-end">
-              <label className="grid gap-1 text-xs font-medium text-slate-600">
-                Sortierung
-                <select className="h-11 min-w-52 rounded-md border bg-white px-3 text-base font-normal text-slate-950 sm:text-sm" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+            {(search || sectionFilter !== "all" || statusFilter !== "all") && <div className="flex flex-wrap items-center gap-2 text-xs"><span className="font-medium text-slate-600">Aktive Filter:</span>{search && <FilterChip label={`Suche: ${search}`} onRemove={() => setSearch("")} />}{sectionFilter !== "all" && <FilterChip label={workspace.sections.find((section) => section.id === sectionFilter)?.name ?? "Abschnitt"} onRemove={() => setSectionFilter("all")} />}{statusFilter !== "all" && <FilterChip label={marshalStatusLabels[statusFilter as MarshalCommitmentStatus] ?? "Status"} onRemove={() => setStatusFilter("all")} />}<Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setSearch(""); setSectionFilter("all"); setStatusFilter("all"); }}><RotateCcw className="mr-1 h-3.5 w-3.5" />Alle zurücksetzen</Button></div>}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end lg:hidden">
+              <label className="grid flex-1 gap-1 text-xs font-medium text-slate-600 sm:max-w-64">
+                <span className="flex items-center gap-1"><SlidersHorizontal className="h-3.5 w-3.5" />Sortieren</span>
+                <select className="h-11 rounded-md border bg-white px-3 text-base font-normal text-slate-950 sm:text-sm" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
                   <option value="post">Nach Posten</option>
                   <option value="name">Nach Name (A→Z)</option>
                   <option value="helperNumber">Nach Helfernummer</option>
                   <option value="status">Nach Status</option>
                 </select>
               </label>
+              <Button type="button" variant="outline" className="h-11 justify-start sm:w-40" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>{sortDirection === "asc" ? <ArrowUp className="mr-2 h-4 w-4" /> : <ArrowDown className="mr-2 h-4 w-4" />}{sortDirection === "asc" ? "Aufsteigend" : "Absteigend"}</Button>
             </div>
             <div className="min-w-0 border-y border-slate-200 bg-white text-sm">
-              <div className="hidden grid-cols-[5rem_minmax(12rem,1fr)_minmax(12rem,1fr)_10rem] gap-3 border-b bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
-                <span>Nr.</span>
-                <span>Name</span>
-                <span>Posten</span>
-                <span>Status</span>
+              <div className="hidden grid-cols-[5rem_minmax(12rem,1fr)_minmax(12rem,1fr)_10rem] gap-3 border-b bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+                <SortHeader label="Nr." sortKey="helperNumber" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
+                <SortHeader label="Name" sortKey="name" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
+                <SortHeader label="Posten" sortKey="post" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
+                <SortHeader label="Status" sortKey="status" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
               </div>
               {people.map((person) => {
                 const assignment = person.assignments.find((item) => item.dayId === day.id);
@@ -315,14 +322,14 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                 const key = rowKey(person.id);
                 const disabled = !canWrite || busy || savingRows.has(key) || !person.isActive || person.noDeployment;
                 return (
-                  <div key={person.id} className={cn("grid gap-3 border-b p-3 last:border-b-0 md:grid-cols-[5rem_minmax(12rem,1fr)_minmax(12rem,1fr)_10rem] md:items-center md:gap-3 md:py-2", (person.noDeployment || !person.isActive) && "bg-red-50 text-red-900")}>
-                    <span className="hidden text-slate-500 md:block">{person.helperNumber}</span>
+                  <div key={person.id} className={cn("grid gap-3 border-b p-3 last:border-b-0 lg:grid-cols-[5rem_minmax(12rem,1fr)_minmax(12rem,1fr)_10rem] lg:items-center lg:gap-3 lg:py-2", (person.noDeployment || !person.isActive) && "bg-red-50 text-red-900")}>
+                    <span className="hidden text-slate-500 lg:block">{person.helperNumber}</span>
                     <div className="min-w-0">
                       <button type="button" className="break-words text-left font-medium text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => onPersonOpen(person)}>
                         {person.lastName}, {person.firstName}
                       </button>
                       <EventAssignmentBadges person={person} workspace={workspace} />
-                      <span className="ml-1 text-xs text-slate-500 md:hidden">#{person.helperNumber}</span>
+                      <span className="ml-1 text-xs text-slate-500 lg:hidden">#{person.helperNumber}</span>
                       {person.noDeployment ? <span className="ml-2 text-xs font-semibold">⚠ kein Einsatz</span> : !person.isActive && <span className="ml-2 text-xs font-semibold">Inaktiv</span>}
                       {assignment?.note && (
                         <span className="block truncate text-xs text-slate-500" title={assignment.note}>
@@ -330,16 +337,16 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                         </span>
                       )}
                     </div>
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-2 md:contents">
-                      <label className="grid min-w-0 gap-1 text-xs font-medium text-slate-600 md:contents">
-                        <span className="md:sr-only">Posten</span>
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:contents">
+                      <label className="grid min-w-0 gap-1 text-xs font-medium text-slate-600 lg:contents">
+                        <span className="lg:sr-only">Posten</span>
                         <span className="flex min-w-0 items-center">
                           <AssignmentSelect value={displayed.assignmentValue} workspace={workspace} day={day} targetMode={targetMode} currentPersonId={person.id} disabled={disabled} displayedAssignment={displayedAssignment} onChange={(value) => void saveOptimistically(person, displayed.status, value)} />
                           <DoubleBookingWarning labels={conflicts} day={day} />
                         </span>
                       </label>
-                      <label className="grid min-w-0 gap-1 text-xs font-medium text-slate-600 md:contents">
-                        <span className="md:sr-only">Status</span>
+                      <label className="grid min-w-0 gap-1 text-xs font-medium text-slate-600 lg:contents">
+                        <span className="lg:sr-only">Status</span>
                         <StatusSelect value={displayed.status} disabled={disabled} onChange={(status) => void saveOptimistically(person, status, displayed.assignmentValue)} />
                       </label>
                     </div>
@@ -412,6 +419,29 @@ function AssignmentSelect({ value, workspace, day, targetMode, currentPersonId, 
         })}
     </select>
   );
+}
+
+function SortHeader({ label, sortKey, activeKey, direction, onSort }: { label: string; sortKey: SortMode; activeKey: SortMode; direction: SortDirection; onSort: (key: SortMode) => void }) {
+  const active = sortKey === activeKey;
+  return <button type="button" className={cn("flex min-h-9 items-center gap-1 rounded px-1 text-left hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", active && "text-blue-700")} onClick={() => onSort(sortKey)}>{label}{active && (direction === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />)}</button>;
+}
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return <span className="inline-flex min-h-8 items-center gap-1 rounded-full border border-blue-200 bg-blue-50 pl-2.5 pr-1 text-blue-800"><span className="max-w-52 truncate">{label}</span><button type="button" className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" aria-label={`${label} entfernen`} onClick={onRemove}><X className="h-3.5 w-3.5" /></button></span>;
+}
+
+function selectSort(key: SortMode, currentKey: SortMode, currentDirection: SortDirection, setKey: (key: SortMode) => void, setDirection: (direction: SortDirection) => void) {
+  if (key === currentKey) setDirection(currentDirection === "asc" ? "desc" : "asc");
+  else { setKey(key); setDirection("asc"); }
+}
+
+function sortDirectionMultiplier(direction: SortDirection) {
+  return direction === "asc" ? 1 : -1;
+}
+
+function readStoredMode(key: string): ViewMode {
+  const stored = localStorage.getItem(key);
+  return stored === "list" || stored === "overview" || stored === "map" ? stored : "overview";
 }
 
 function normalizeArea(value: string) {

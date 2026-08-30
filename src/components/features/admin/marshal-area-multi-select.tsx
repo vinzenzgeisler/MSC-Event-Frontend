@@ -33,7 +33,7 @@ export function MarshalAreaMultiSelect({ areas, value, disabled, onChange }: { a
   const legacy = canonical.filter((item) => !configured.includes(item));
   const options = [...configured, ...legacy];
   return <fieldset className="grid gap-2 sm:grid-cols-2" disabled={disabled}>
-    <legend className="mb-1 text-xs font-medium text-slate-600">Bereiche</legend>
+    <legend className="mb-1 text-xs font-medium text-slate-600">Standardbereiche</legend>
     {options.map((option) => {
       const checked = canonical.includes(option);
       return <label key={option} className="flex min-h-10 items-center gap-2 rounded-md border bg-white px-3 text-sm">

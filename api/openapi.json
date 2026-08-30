@@ -22,6 +22,48 @@
     }
   ],
   "paths": {
+    "/admin/marshals/events/{targetEventId}/structure-preview": {
+      "get": {
+        "operationId": "get_admin_marshals_event_structure_preview",
+        "tags": ["admin"],
+        "parameters": [
+          { "name": "targetEventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "sourceEventId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Preview of structure-only copy. Every target post reports assignedStaff=0." },
+          "409": { "description": "Target marshal structure is already initialized." }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/admin/marshals/events/{targetEventId}/initialize": {
+      "post": {
+        "operationId": "post_admin_marshals_event_initialize",
+        "tags": ["admin"],
+        "parameters": [{ "name": "targetEventId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["sourceEventId"], "properties": { "sourceEventId": { "type": "string", "format": "uuid" } } } } } },
+        "responses": {
+          "200": { "description": "Sections, posts, normal/emergency targets, map positions, areas and shifted shift templates copied. Assignments, leaders and commitments remain empty." },
+          "409": { "description": "Target marshal structure is already initialized." }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/admin/marshals/print": {
+      "get": {
+        "operationId": "get_admin_marshals_print",
+        "tags": ["admin"],
+        "parameters": [
+          { "name": "eventId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["attendance", "section", "training", "area"] } },
+          { "name": "orientation", "in": "query", "required": false, "schema": { "type": "string", "enum": ["portrait"], "default": "portrait" } },
+          { "name": "sort", "in": "query", "required": false, "schema": { "type": "string", "enum": ["name", "post_name"] } }
+        ],
+        "responses": { "200": { "description": "Portrait PDF. post_name groups by configured post order and sorts people by last and first name inside each post." } },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "get_health",
