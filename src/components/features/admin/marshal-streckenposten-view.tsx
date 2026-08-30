@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, List, Map, MapPinned, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, List, Map, MapPinned, MessageSquareText, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
@@ -20,7 +20,7 @@ type Props = {
   onDayChange: (day: "saturday" | "sunday") => void;
   onPersonOpen: (person: MarshalPerson) => void;
   onListSave: (person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string) => Promise<boolean>;
-  onDayNoteSave: (person: MarshalPerson, day: MarshalDay, note: string | null) => Promise<boolean>;
+  onPersonNoteSave: (person: MarshalPerson, note: string | null) => Promise<boolean>;
   onSave: (person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string, allowOccupied?: boolean) => Promise<boolean>;
   onReplace: (currentPerson: MarshalPerson, replacementPerson: MarshalPerson, postId: string) => Promise<boolean>;
 };
@@ -50,7 +50,7 @@ export function countActivePostStaffing(
   };
 }
 
-export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, busy, targetMode, onTargetModeChange, onDayChange, onPersonOpen, onListSave, onDayNoteSave, onSave, onReplace }: Props) {
+export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, busy, targetMode, onTargetModeChange, onDayChange, onPersonOpen, onListSave, onPersonNoteSave, onSave, onReplace }: Props) {
   const storageKey = `msc_marshal_track_mode:${day.eventId}`;
   const [mode, setMode] = useState<ViewMode>(() => readStoredMode(storageKey));
   const [search, setSearch] = useState("");
@@ -313,10 +313,9 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                 <SortHeader label="Name" sortKey="name" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
                 <SortHeader label="Einteilung" sortKey="post" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
                 <SortHeader label="Status" sortKey="status" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
-                <span className="flex min-h-9 items-center px-1">Bemerkung</span>
+                <span className="flex min-h-9 items-center px-1">Stammbemerkung</span>
               </div>
               {people.map((person) => {
-                const assignment = person.assignments.find((item) => item.dayId === day.id);
                 const displayed = displayedAssignment(person);
                 const conflicts =
                   displayed.assignmentValue !== "none"
@@ -326,6 +325,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                     : [];
                 const key = rowKey(person.id);
                 const disabled = !canWrite || busy || savingRows.has(key) || !person.isActive || person.noDeployment;
+                const noteDisabled = !canWrite || busy || savingRows.has(key);
                 return (
                   <div key={person.id} className={cn("grid gap-3 border-b p-3 last:border-b-0 lg:grid-cols-[5rem_minmax(11rem,1fr)_minmax(11rem,1fr)_10rem_minmax(12rem,1fr)] lg:items-center lg:gap-3 lg:py-2", (person.noDeployment || !person.isActive) && "bg-red-50 text-red-900")}>
                     <span className="hidden text-slate-500 lg:block">{person.helperNumber}</span>
@@ -349,20 +349,27 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                         <span className="lg:sr-only">Status</span>
                         <StatusSelect value={displayed.status} disabled={disabled} onChange={(status) => void saveOptimistically(person, status, displayed.assignmentValue)} />
                       </label>
-                      <label className="grid min-w-0 gap-1 text-xs font-medium text-slate-600 lg:contents">
-                        <span className="lg:sr-only">Bemerkung</span>
-                        <input
-                          key={`${assignment?.id ?? "new"}:${assignment?.note ?? ""}`}
-                          aria-label={`Bemerkung für ${person.firstName} ${person.lastName}`}
-                          className="h-11 min-w-0 rounded-md border bg-white px-3 text-base font-normal text-slate-950 disabled:bg-slate-50 sm:text-sm md:h-9"
-                          defaultValue={assignment?.note ?? ""}
-                          disabled={disabled}
-                          placeholder="Bemerkung"
-                          onBlur={(event) => {
-                            if (event.target.value !== (assignment?.note ?? "")) void onDayNoteSave(person, day, event.target.value.trim() || null);
-                          }}
-                        />
-                      </label>
+                      <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+                        <span className="mb-1 block text-xs font-medium text-slate-600 lg:sr-only">Stammbemerkung</span>
+                        <span className="relative block min-w-0">
+                          <MessageSquareText className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-700" />
+                          <input
+                            key={person.note ?? ""}
+                            aria-label={`Stammbemerkung für ${person.firstName} ${person.lastName}`}
+                            title={person.note ?? ""}
+                            className="h-11 w-full min-w-0 rounded-md border border-amber-200 bg-amber-50 pl-8 pr-2.5 text-sm text-amber-950 placeholder:text-amber-700/60 hover:border-amber-300 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/40 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 md:h-9"
+                            defaultValue={person.note ?? ""}
+                            disabled={noteDisabled}
+                            placeholder="Stammplatz, Partnerwunsch …"
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") event.currentTarget.blur();
+                            }}
+                            onBlur={(event) => {
+                              if (event.target.value !== (person.note ?? "")) void onPersonNoteSave(person, event.target.value.trim() || null);
+                            }}
+                          />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );

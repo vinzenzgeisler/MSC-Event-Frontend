@@ -238,10 +238,6 @@ export function AdminMarshalsPage() {
   function saveEventNote(person: MarshalPerson, note: string | null) {
     return runAction(() => adminMarshalsService.saveAssignment(person.id, { eventId, note, days: [] }), "Event-Notiz gespeichert.", "Event-Notiz konnte nicht gespeichert werden.");
   }
-  function saveDayNote(person: MarshalPerson, day: MarshalDay, note: string | null) {
-    const assignment = person.assignments.find((item) => item.dayId === day.id);
-    return runAction(() => adminMarshalsService.saveAssignment(person.id, { eventId, days: [{ dayId: day.id, commitmentStatus: assignment?.commitmentStatus ?? "not_asked", role: assignment?.role ?? null, sectionId: assignment?.sectionId ?? null, postId: assignment?.postId ?? null, functionCode: assignment?.functionCode ?? null, note }] }), "Tagesnotiz gespeichert.", "Tagesnotiz konnte nicht gespeichert werden.");
-  }
   function createPerson(input: MarshalPersonInput) { return runAction(() => adminMarshalsService.createPerson(input), "Person angelegt.", "Person konnte nicht angelegt werden."); }
   function deletePerson(person: MarshalPerson) { return runAction(() => adminMarshalsService.deletePerson(person.id), "Person und verknüpfte Daten wurden endgültig gelöscht.", "Person konnte nicht gelöscht werden."); }
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
@@ -289,7 +285,7 @@ export function AdminMarshalsPage() {
         {loading && !workspace ? <LoadingState label="Helferarbeitsbereich wird geladen …" /> : !eventId ? <EmptyState message="Keine Veranstaltung verfügbar." /> : !workspace ? <EmptyState message="Für diese Veranstaltung konnten keine Helferdaten geladen werden." /> : <>
           {view !== "config" && workspace.posts.length === 0 && workspace.sections.length === 0 && workspace.areas.length === 0 && <div className="mb-4 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between"><div><strong>Helferstruktur noch nicht vorbereitet</strong><p className="mt-1 text-blue-800">Übernimm Posten, Sollwerte, Bereiche und Schichten aus einem früheren Event. Alle Posten beginnen unbesetzt.</p></div>{canWrite && <Button type="button" className="shrink-0" onClick={() => setView("config")}><Copy className="mr-2 h-4 w-4" />Jetzt vorbereiten</Button>}</div>}
           {view === "readiness" && <MarshalReadinessView workspace={workspace} days={workspace.days} onViewChange={(nextView) => { setSelectedPersonId(null); setView(nextView); }} />}
-          {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onListSave={saveListDay} onDayNoteSave={saveDayNote} onSave={saveDay} onReplace={replacePostHelper} />}
+          {(view === "track_saturday" || view === "track_sunday") && activeDay && <MarshalStreckenpostenView workspace={workspace} day={activeDay} dayKey={activeDayKey} canWrite={canWrite} busy={busy} targetMode={planningTargetMode} onTargetModeChange={setPlanningTargetMode} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "track_saturday" : "track_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onListSave={saveListDay} onPersonNoteSave={(person, note) => savePerson(person.id, { note })} onSave={saveDay} onReplace={replacePostHelper} />}
           {areaForView?.areaType === "setup" && <MarshalAufbauView workspace={workspace} area={areaForView} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onAddPerson={(person) => saveArea(person, areaForView.id, "not_asked", null)} onRemovePerson={(person) => removeArea(person, areaForView.id)} onSaveShift={saveShift} />}
           {areaForView?.areaType === "general" && <MarshalGeneralView workspace={workspace} area={areaForView} dayKey={activeDayKey} canWrite={canWrite} busy={busy} onDayChange={(day) => { setSelectedPersonId(null); setView(day === "saturday" ? "general_saturday" : "general_sunday"); }} onPersonOpen={(person) => setSelectedPersonId(person.id)} onSave={(person, status, note) => saveArea(person, areaForView.id, status, note)} onRemove={(person) => removeArea(person, areaForView.id)} />}
           {(view === "setup_fl1" || view === "setup_fl2") && !areaForView && <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />}
@@ -302,7 +298,7 @@ export function AdminMarshalsPage() {
         </>}
       </main>
     </div>
-    {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} day={view === "track_saturday" || view === "track_sunday" ? activeDay ?? null : null} onClose={() => setSelectedPersonId(null)} onSave={savePerson} onSaveEventNote={saveEventNote} onSaveDayNote={saveDayNote} />}
+    {workspace && <MarshalPersonDrawer person={selectedPerson} workspace={workspace} eventName={selectedEvent?.name ?? "Gewählte Veranstaltung"} canWrite={canWrite} busy={busy} onClose={() => setSelectedPersonId(null)} onSave={savePerson} onSaveEventNote={saveEventNote} />}
   </div>;
 }
 

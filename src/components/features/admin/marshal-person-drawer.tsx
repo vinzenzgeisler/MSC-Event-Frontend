@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/features/admin/marshal-status";
 import { canonicalizeMarshalAreas, MarshalAreaMultiSelect } from "@/components/features/admin/marshal-area-multi-select";
-import type { MarshalCommitmentStatus, MarshalDay, MarshalPerson, MarshalPersonPatch, MarshalWorkspace } from "@/types/admin-marshals";
+import type { MarshalCommitmentStatus, MarshalPerson, MarshalPersonPatch, MarshalWorkspace } from "@/types/admin-marshals";
 
 type Props = {
   person: MarshalPerson | null;
@@ -12,14 +12,12 @@ type Props = {
   eventName: string;
   canWrite: boolean;
   busy: boolean;
-  day: MarshalDay | null;
   onClose: () => void;
   onSave: (personId: string, patch: MarshalPersonPatch) => Promise<boolean>;
   onSaveEventNote: (person: MarshalPerson, note: string | null) => Promise<boolean>;
-  onSaveDayNote: (person: MarshalPerson, day: MarshalDay, note: string | null) => Promise<boolean>;
 };
 
-export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, busy, day, onClose, onSave, onSaveEventNote, onSaveDayNote }: Props) {
+export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, busy, onClose, onSave, onSaveEventNote }: Props) {
   const [draft, setDraft] = useState<MarshalPerson | null>(person);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
@@ -97,7 +95,6 @@ export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, bu
     return { id: assignment.id, title: area?.name ?? "Aufbau", detail: shift ? `${shift.label} · ${formatDate(shift.shiftDate)}` : "Schicht", status: assignment.commitmentStatus };
   });
   const history = [...dayHistory, ...areaHistory, ...shiftHistory];
-  const dayAssignment = day ? draft.assignments.find((assignment) => assignment.dayId === day.id) : undefined;
   const fields: Array<{ key: "firstName" | "lastName" | "street" | "zip" | "city" | "birthdate" | "phone" | "email" | "shirtSize" | "licenseNumber" | "vehicleRegistration"; label: string; type?: string }> = [
     { key: "firstName", label: "Vorname" }, { key: "lastName", label: "Nachname" },
     { key: "street", label: "Straße" }, { key: "zip", label: "PLZ" }, { key: "city", label: "Ort" },
@@ -155,11 +152,6 @@ export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, bu
             <textarea aria-label="Event-Notiz" className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 disabled:bg-slate-50" value={draft.participation.note ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, participation: { ...draft.participation, note: event.target.value } })} />
             {canWrite && <Button type="button" variant="outline" className="mt-3 w-full sm:w-auto" disabled={busy} onClick={() => void onSaveEventNote(draft, draft.participation.note?.trim() || null)}><Save className="mr-2 h-4 w-4" />Event-Notiz speichern</Button>}
           </section>
-          {day && <section aria-labelledby="marshal-person-day-note" className="border-t pt-6"><h3 id="marshal-person-day-note" className="mb-1 font-semibold">Tagesnotiz (aktueller Tag)</h3><p className="mb-3 text-xs text-slate-500">{day.label}</p>
-            <textarea aria-label="Tagesnotiz (aktueller Tag)" className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 disabled:bg-slate-50" value={dayAssignment?.note ?? ""} disabled={!canWrite || !dayAssignment} onChange={(event) => setDraft({ ...draft, assignments: draft.assignments.map((assignment) => assignment.dayId === day.id ? { ...assignment, note: event.target.value } : assignment) })} />
-            {!dayAssignment && <p className="mt-2 text-xs text-slate-500">Für diesen Tag besteht noch keine Tageszuordnung.</p>}
-            {canWrite && dayAssignment && <Button type="button" variant="outline" className="mt-3 w-full sm:w-auto" disabled={busy} onClick={() => void onSaveDayNote(draft, day, dayAssignment.note?.trim() || null)}><Save className="mr-2 h-4 w-4" />Tagesnotiz speichern</Button>}
-          </section>}
           <section aria-labelledby="marshal-person-history"><h3 id="marshal-person-history" className="font-semibold">Einsatzhistorie</h3><p className="mt-1 text-xs text-slate-500">Geladene Veranstaltung: {eventName}</p>
             {history.length ? <ul className="mt-3 space-y-2">{history.map((item) => <li key={item.id} className="flex items-start justify-between gap-3 rounded-lg border p-3"><div><strong className="text-sm">{item.title}</strong><p className="text-xs text-slate-500">{item.detail}</p></div><StatusBadge status={item.status} /></li>)}</ul> : <p className="mt-3 rounded-lg border border-dashed p-4 text-sm text-slate-500">Für diese Veranstaltung liegen noch keine Einsätze vor.</p>}
           </section>
