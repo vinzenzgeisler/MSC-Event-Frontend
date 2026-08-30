@@ -9,7 +9,6 @@ import type { MarshalCommitmentStatus, MarshalPerson, MarshalPersonPatch, Marsha
 type Props = {
   person: MarshalPerson | null;
   workspace: MarshalWorkspace;
-  eventName: string;
   canWrite: boolean;
   busy: boolean;
   onClose: () => void;
@@ -17,7 +16,7 @@ type Props = {
   onSaveEventNote: (person: MarshalPerson, note: string | null) => Promise<boolean>;
 };
 
-export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, busy, onClose, onSave, onSaveEventNote }: Props) {
+export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose, onSave, onSaveEventNote }: Props) {
   const [draft, setDraft] = useState<MarshalPerson | null>(person);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
@@ -152,7 +151,7 @@ export function MarshalPersonDrawer({ person, workspace, eventName, canWrite, bu
             <textarea aria-label="Event-Notiz" className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 disabled:bg-slate-50" value={draft.participation.note ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, participation: { ...draft.participation, note: event.target.value } })} />
             {canWrite && <Button type="button" variant="outline" className="mt-3 w-full sm:w-auto" disabled={busy} onClick={() => void onSaveEventNote(draft, draft.participation.note?.trim() || null)}><Save className="mr-2 h-4 w-4" />Event-Notiz speichern</Button>}
           </section>
-          <section aria-labelledby="marshal-person-history"><h3 id="marshal-person-history" className="font-semibold">Einsatzhistorie</h3><p className="mt-1 text-xs text-slate-500">Geladene Veranstaltung: {eventName}</p>
+          <section aria-labelledby="marshal-person-history"><h3 id="marshal-person-history" className="font-semibold">Einsatzhistorie</h3>
             {history.length ? <ul className="mt-3 space-y-2">{history.map((item) => <li key={item.id} className="flex items-start justify-between gap-3 rounded-lg border p-3"><div><strong className="text-sm">{item.title}</strong><p className="text-xs text-slate-500">{item.detail}</p></div><StatusBadge status={item.status} /></li>)}</ul> : <p className="mt-3 rounded-lg border border-dashed p-4 text-sm text-slate-500">Für diese Veranstaltung liegen noch keine Einsätze vor.</p>}
           </section>
         </div>

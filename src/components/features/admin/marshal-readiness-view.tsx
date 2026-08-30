@@ -38,10 +38,7 @@ export function MarshalReadinessView({ workspace, days, onViewChange }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-950">Bereitschaft</h1>
-        <p className="mt-1 text-sm text-slate-600">Besetzungsstand aller Helferbereiche auf einen Blick.</p>
-      </div>
+      <h1 className="text-2xl font-semibold text-slate-950">Bereitschaft</h1>
       <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
         <ReadinessCard title="Streckenposten" rows={trackRows} onClick={() => onViewChange(trackViewForDays(days))} />
         {areas.map((area) => (

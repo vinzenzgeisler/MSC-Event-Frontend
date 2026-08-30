@@ -473,7 +473,6 @@ function MasterNoteEditor({ person, canEdit, onSave }: { person: MarshalPerson; 
           className="min-h-20 w-full resize-y rounded-md border border-amber-200 bg-white px-2.5 py-2 text-sm leading-5 text-slate-950 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30"
           value={draft}
           disabled={saving}
-          placeholder="Stammplatz, Partnerwunsch …"
           onChange={(event) => setDraft(event.target.value)}
           onBlur={() => void save()}
           onKeyDown={(event) => {
@@ -484,7 +483,6 @@ function MasterNoteEditor({ person, canEdit, onSave }: { person: MarshalPerson; 
             if ((event.ctrlKey || event.metaKey) && event.key === "Enter") event.currentTarget.blur();
           }}
         />
-        <p className="mt-1 text-right text-[11px] text-amber-800">{saving ? "Speichert …" : "Speichert automatisch"}</p>
       </div>
     );
   }
@@ -492,9 +490,9 @@ function MasterNoteEditor({ person, canEdit, onSave }: { person: MarshalPerson; 
   if (!person.note) {
     return canEdit ? (
       <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md border border-dashed border-slate-300 px-2.5 text-left text-xs text-slate-500 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400" onClick={() => setEditing(true)}>
-        <Pencil className="h-3.5 w-3.5 shrink-0" />Bemerkung ergänzen
+        <Pencil className="h-3.5 w-3.5 shrink-0" />Bemerkung
       </button>
-    ) : <span className="hidden min-h-9 items-center text-xs text-slate-400 lg:flex">Keine Stammbemerkung</span>;
+    ) : <span className="hidden min-h-9 items-center text-xs text-slate-400 lg:flex" aria-label="Keine Stammbemerkung">—</span>;
   }
 
   return (

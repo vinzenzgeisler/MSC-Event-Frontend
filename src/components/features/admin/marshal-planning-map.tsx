@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarshalTrackSvg, type TrackLeader, type TrackPost } from "@/components/features/admin/marshal-track-svg";
 import { MarshalSectionLeaderEditor, MarshalSectionLeaderGrid } from "@/components/features/admin/marshal-section-leader-editor";
-import { MarshalInfoPopover } from "@/components/features/admin/marshal-info-popover";
 import type {
   MarshalCommitmentStatus,
   MarshalDay,
@@ -214,8 +213,7 @@ export function MarshalPlanningMap(props: PlanningProps) {
     <div className="space-y-4">
       <MarshalSectionLeaderGrid workspace={workspace} day={day} canWrite={props.canWrite} busy={props.busy} onSave={props.onAssign} />
       <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-white px-3 py-2 text-xs text-slate-600">
-          <MarshalInfoPopover label="Information zur Streckenkarte">Gespeicherte Postenkoordinaten werden bevorzugt.</MarshalInfoPopover>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b bg-white px-3 py-2 text-xs text-slate-600">
           <StaffingLegend />
         </div>
         <MarshalTrackSvg
@@ -271,7 +269,7 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
   }, [post]);
 
   if (!post) {
-    return <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">Posten wählen, um die festen Helferplätze zu bearbeiten.</div>;
+    return <div className="flex min-h-20 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500">Kein Posten ausgewählt</div>;
   }
 
   const target = getPostTarget(post, targetMode);
