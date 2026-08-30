@@ -19,6 +19,7 @@ export type PlanningTargetMode = "normal" | "emergency";
 export type StaffingLevel = "unfilled" | "met" | "overfilled";
 
 export type PostStaffingState = {
+  assigned: number;
   accepted: number;
   pending: number;
   target: number;
@@ -117,10 +118,11 @@ export function getPostStaffingState(
     if (assignment?.commitmentStatus === "pending" || assignment?.commitmentStatus === "tentative") pending += 1;
   }
   return {
+    assigned,
     accepted,
     pending,
     target,
-    level: assigned > target ? "overfilled" : accepted < target ? "unfilled" : "met",
+    level: assigned > target ? "overfilled" : assigned < target ? "unfilled" : "met",
   };
 }
 
@@ -200,11 +202,11 @@ export function MarshalPlanningMap(props: PlanningProps) {
   }, [day.id]);
   const trackPosts = posts.map((post): TrackPost => {
     const state = getPostStaffingState(post.id, day.id, workspace.people, getPostTarget(post, targetMode));
-    return { ...post, target: state.target, staffCount: state.accepted, overfilled: state.level === "overfilled" };
+    return { ...post, target: state.target, staffCount: state.assigned, overfilled: state.level === "overfilled" };
   });
   const trackLeaders = sections.map((section): TrackLeader => ({
     section,
-    target: 1,
+    target: 2,
     staffCount: workspace.people.filter((person) => !person.noDeployment && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id && assignment.commitmentStatus === "accepted")).length,
   }));
 
@@ -257,7 +259,7 @@ function PostButton({ post, state, selected, onClick }: { post: MarshalPost; sta
         <strong className="block break-words">{post.code}</strong>
         <span className="block break-words text-xs text-slate-500">{post.description || "Streckenposten"}</span>
       </span>
-      <span className="shrink-0 text-xs font-semibold">{state.accepted}/{state.target}{state.pending ? ` +${state.pending}` : ""}</span>
+      <span className="shrink-0 text-right text-xs"><strong>{state.assigned}/{state.target}</strong><span className="block font-normal text-slate-500">{state.accepted} zugesagt</span></span>
     </button>
   );
 }
@@ -315,6 +317,11 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
           <EmptySlot key={`empty-${index}`} label={`Platz ${index + 1}`} post={post} day={day} eligiblePeople={eligiblePeople} canWrite={canWrite} busy={busy} onAssign={onAssign} />
         ))}
       </div>
+      {canWrite && assignments.length >= target && eligiblePeople.length > 0 && (
+        <div className="mt-4 max-w-xl">
+          <EmptySlot label="Zusätzlicher Platz (über Soll)" post={post} day={day} eligiblePeople={eligiblePeople} canWrite={canWrite} busy={busy} onAssign={onAssign} allowOverfill />
+        </div>
+      )}
       {overflow.length > 0 && (
         <section className="mt-5 rounded-xl border border-red-300 bg-red-50 p-3" aria-label="Überbesetzung">
           <h4 className="font-semibold text-red-900">Über Soll ({overflow.length})</h4>
@@ -380,7 +387,7 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
   );
 }
 
-function EmptySlot({ label, post, day, eligiblePeople, canWrite, busy, onAssign }: { label: string; post: MarshalPost; day: MarshalDay; eligiblePeople: MarshalPerson[]; canWrite: boolean; busy: boolean; onAssign: AssignmentAction }) {
+function EmptySlot({ label, post, day, eligiblePeople, canWrite, busy, onAssign, allowOverfill = false }: { label: string; post: MarshalPost; day: MarshalDay; eligiblePeople: MarshalPerson[]; canWrite: boolean; busy: boolean; onAssign: AssignmentAction; allowOverfill?: boolean }) {
   const [helperId, setHelperId] = useState("");
   const helper = eligiblePeople.find((person) => person.id === helperId);
   const assignment = helper?.assignments.find((item) => item.dayId === day.id);
@@ -400,7 +407,7 @@ function EmptySlot({ label, post, day, eligiblePeople, canWrite, busy, onAssign 
           {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.lastName}, {person.firstName} · Nr. {person.helperNumber} · {commitmentLabels[person.assignments.find((item) => item.dayId === day.id)?.commitmentStatus ?? "not_asked"]}</option>)}
         </select>
       </label>
-      <Button type="button" size="sm" className="mt-2 w-full" disabled={!helper || !assignment || busy} onClick={() => helper && assignment && void onAssign(helper, assignment.commitmentStatus, `post:${post.id}`).then((saved) => saved && setHelperId(""))}>Platz besetzen</Button></>}
+      <Button type="button" size="sm" className="mt-2 w-full" disabled={!helper || !assignment || busy} onClick={() => helper && assignment && void onAssign(helper, assignment.commitmentStatus, `post:${post.id}`, allowOverfill).then((saved) => saved && setHelperId(""))}>{allowOverfill ? "Zusätzlich einteilen" : "Platz besetzen"}</Button></>}
     </div>
   );
 }
@@ -410,7 +417,7 @@ function CommitmentSelect({ value, disabled, onChange }: { value: MarshalCommitm
 }
 
 function StaffingLegend() {
-  return <div className="flex flex-wrap gap-2" aria-label="Legende"><LegendDot className="bg-amber-500" label="Unter Soll" /><LegendDot className="bg-emerald-600" label="Soll erreicht" /><LegendDot className="bg-red-600" label="Über Soll" /><span>+ = Offen/Vielleicht</span></div>;
+  return <div className="flex flex-wrap gap-2" aria-label="Legende"><LegendDot className="bg-amber-500" label="Unter Soll" /><LegendDot className="bg-emerald-600" label="Soll erreicht" /><LegendDot className="bg-red-600" label="Über Soll" /></div>;
 }
 
 function LegendDot({ className, label }: { className: string; label: string }) {
