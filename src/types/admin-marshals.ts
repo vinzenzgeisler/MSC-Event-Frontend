@@ -111,7 +111,6 @@ export type MarshalAreaAssignment = {
 };
 
 export type MarshalPersonInput = {
-  helperNumber: number;
   firstName: string;
   lastName: string;
   street?: string | null;
@@ -130,7 +129,7 @@ export type MarshalPersonInput = {
   noDeployment?: boolean;
 };
 
-export type MarshalPersonPatch = Omit<Partial<MarshalPersonInput>, "helperNumber"> & {
+export type MarshalPersonPatch = Partial<MarshalPersonInput> & {
   isActive?: boolean;
   noDeployment?: boolean;
 };
