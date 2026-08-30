@@ -12,7 +12,7 @@ export type MarshalEvent = {
 };
 
 export type MarshalDay = { id: string; eventId: string; dayKey: "saturday" | "sunday"; label: string; eventDate: string };
-export type MarshalSection = { id: string; eventId: string; code: string; name: string; leaderCode: string; sortOrder: number };
+export type MarshalSection = { id: string; eventId: string; code: string; name: string; leaderCode: string; leaderTargetStaff?: number; sortOrder: number };
 export type MarshalPost = {
   id: string;
   eventId: string;
@@ -188,6 +188,14 @@ export type MarshalPostConfigInput = {
   mapX: number | null;
   mapY: number | null;
   isActive: boolean;
+  sortOrder: number;
+};
+
+export type MarshalSectionConfigInput = {
+  code: string;
+  name: string;
+  leaderCode: string;
+  leaderTargetStaff: number;
   sortOrder: number;
 };
 

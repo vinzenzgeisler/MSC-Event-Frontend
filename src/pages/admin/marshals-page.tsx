@@ -33,6 +33,7 @@ import type {
   MarshalPersonInput,
   MarshalPersonPatch,
   MarshalPostConfigInput,
+  MarshalSectionConfigInput,
   MarshalTrainingParticipant,
   MarshalStructurePreview,
   MarshalWorkspace,
@@ -244,9 +245,10 @@ export function AdminMarshalsPage() {
   function saveAttendance(trainingId: string, person: MarshalPerson, status: MarshalTrainingParticipant["attendanceStatus"]) { return runAction(() => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, status), "Anwesenheit gespeichert.", "Anwesenheit konnte nicht gespeichert werden."); }
   async function print(params: { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params, orientation: "portrait", sort: params.type === "section" ? "post_name" : "name" }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
   async function printTraining(trainingId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "training", trainingId, orientation: "portrait", sort: "name" }), "Teilnehmerliste erstellt.", "Teilnehmerliste konnte nicht erstellt werden.", false); }
-  function savePostConfig(posts: MarshalPostConfigInput[]) {
+  function savePostConfig(posts: MarshalPostConfigInput[], sections?: MarshalSectionConfigInput[]) {
     if (!workspace) return Promise.resolve(false);
-    return runAction(() => adminMarshalsService.saveConfig({ eventId, sections: workspace.sections.map(({ code, name, leaderCode, sortOrder }) => ({ code, name, leaderCode, sortOrder })), posts }), "Postenkonfiguration gespeichert.", "Postenkonfiguration konnte nicht gespeichert werden.");
+    const sectionConfig = sections ?? workspace.sections.map(({ code, name, leaderCode, leaderTargetStaff, sortOrder }) => ({ code, name, leaderCode, leaderTargetStaff: leaderTargetStaff ?? 2, sortOrder }));
+    return runAction(() => adminMarshalsService.saveConfig({ eventId, sections: sectionConfig, posts }), "Postenkonfiguration gespeichert.", "Postenkonfiguration konnte nicht gespeichert werden.");
   }
   function saveAreaConfig(areas: MarshalAreaConfigAreaInput[], shifts: MarshalAreaConfigShiftInput[]) { return runAction(() => adminMarshalsService.updateAreaConfig({ eventId, areas, shifts }), "Bereiche und Schichten gespeichert.", "Bereiche und Schichten konnten nicht gespeichert werden."); }
   function resetAssignments() { return runAction(() => adminMarshalsService.resetEventAssignments(eventId), "Alle Event-Einteilungen wurden zurückgesetzt.", "Einteilungen konnten nicht zurückgesetzt werden."); }

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarshalTrackSvg, type TrackLeader, type TrackPost } from "@/components/features/admin/marshal-track-svg";
-import { MarshalSectionLeaderEditor, MarshalSectionLeaderGrid } from "@/components/features/admin/marshal-section-leader-editor";
+import { MarshalSectionLeaderEditor } from "@/components/features/admin/marshal-section-leader-editor";
 import type {
   MarshalCommitmentStatus,
   MarshalDay,
@@ -194,6 +194,7 @@ export function MarshalPlanningMap(props: PlanningProps) {
   const { posts, sections } = useMemo(() => sortedPlanningData(workspace), [workspace]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
+  const selectedLeader = sections.find((section) => section.id === selectedLeaderId) ?? null;
 
   useEffect(() => {
     setSelectedPostId(null);
@@ -205,13 +206,12 @@ export function MarshalPlanningMap(props: PlanningProps) {
   });
   const trackLeaders = sections.map((section): TrackLeader => ({
     section,
-    target: 2,
-    staffCount: workspace.people.filter((person) => !person.noDeployment && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id && assignment.commitmentStatus === "accepted")).length,
+    target: section.leaderTargetStaff ?? 2,
+    staffCount: workspace.people.filter((person) => !person.noDeployment && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id)).length,
   }));
 
   return (
     <div className="space-y-4">
-      <MarshalSectionLeaderGrid workspace={workspace} day={day} canWrite={props.canWrite} busy={props.busy} onSave={props.onAssign} />
       <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b bg-white px-3 py-2 text-xs text-slate-600">
           <StaffingLegend />
@@ -232,11 +232,22 @@ export function MarshalPlanningMap(props: PlanningProps) {
           }}
         />
       </div>
-      <PostPlanningPanel
+      {selectedLeader && (
+        <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="marshal-leader-panel-title">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 id="marshal-leader-panel-title" className="text-lg font-semibold">{selectedLeader.leaderCode} · {selectedLeader.name}</h3>
+            <Button type="button" size="sm" variant="ghost" aria-label="Abschnittsleitung schließen" onClick={() => setSelectedLeaderId(null)}><X className="h-4 w-4" /></Button>
+          </div>
+          <div className="max-w-xl">
+            <MarshalSectionLeaderEditor workspace={workspace} day={day} section={selectedLeader} canWrite={props.canWrite} busy={props.busy} onSave={props.onAssign} />
+          </div>
+        </aside>
+      )}
+      {!selectedLeader && <PostPlanningPanel
         {...props}
         post={posts.find((post) => post.id === selectedPostId) ?? null}
         onClose={() => setSelectedPostId(null)}
-      />
+      />}
     </div>
   );
 }

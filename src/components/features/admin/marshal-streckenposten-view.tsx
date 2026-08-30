@@ -410,7 +410,7 @@ function AssignmentSelect({ value, workspace, targetMode, disabled, displayedAss
       <optgroup label="Abschnittsleitung">
         {[...workspace.sections].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "de")).map((section) => {
           const assignedPeople = workspace.people.filter((person) => displayedAssignment(person).assignmentValue === `leader:${section.id}`);
-          return <option key={`leader:${section.id}`} value={`leader:${section.id}`}>{section.leaderCode} · {section.name} ({assignedPeople.length}/2)</option>;
+          return <option key={`leader:${section.id}`} value={`leader:${section.id}`}>{section.leaderCode} · {section.name} ({assignedPeople.length}/{section.leaderTargetStaff ?? 2})</option>;
         })}
       </optgroup>
       <optgroup label="Streckenposten">

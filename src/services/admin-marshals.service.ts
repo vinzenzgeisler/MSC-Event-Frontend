@@ -10,6 +10,7 @@ import type {
   MarshalPersonPatch,
   MarshalPrintParams,
   MarshalPostConfigInput,
+  MarshalSectionConfigInput,
   MarshalStructurePreview,
   MarshalWorkspace,
 } from "@/types/admin-marshals";
@@ -77,7 +78,7 @@ export const adminMarshalsService = {
 
   async saveConfig(payload: {
     eventId: string;
-    sections: Array<{ code: string; name: string; leaderCode: string; sortOrder: number }>;
+    sections: MarshalSectionConfigInput[];
     posts: MarshalPostConfigInput[];
   }) {
     return requestJson<OkResponse>("/admin/marshals/config", { method: "PUT", body: payload });
