@@ -128,7 +128,11 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
         const scanner = new QrScanner(
           videoRef.current,
           (result) => {
-            if (!active || scanPendingRef.current) return;
+            // Do NOT guard with `active` here: `active` comes from the init-effect closure
+            // and is set to false when the effect re-runs (e.g. on close). After the first
+            // open the scanner stays alive, so the callback must keep working across
+            // open/close cycles. `scanPendingRef` alone is the correct guard.
+            if (scanPendingRef.current) return;
             const entryId = inspectionEntryIdFromQrPayload(result.data);
             if (!entryId) {
               setInvalidCode(true);
