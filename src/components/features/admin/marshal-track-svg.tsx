@@ -31,7 +31,7 @@ export const DEFAULT_POST_COORDS: Record<string, Point> = {
   "3/3": { x: 210, y: 315 }, "3/4": { x: 224, y: 274 }, "3/5": { x: 276, y: 242 },
   "3/6": { x: 338, y: 212 }, "4/1": { x: 390, y: 202 }, "4/2": { x: 430, y: 190 },
   "4/3": { x: 474, y: 199 }, "4/4": { x: 510, y: 180 }, "4/5": { x: 560, y: 181 },
-  "5/1": { x: 610, y: 160 }, "5/2": { x: 650, y: 130 }, "5/3": { x: 680, y: 104 },
+  "5/1": { x: 610, y: 160 }, "5/2": { x: 650, y: 130 }, "5/3": { x: 664, y: 98 },
 };
 
 const SECTION_PATHS: Record<string, string> = {
@@ -42,10 +42,10 @@ const SECTION_PATHS: Record<string, string> = {
 };
 
 const LEADER_CARDS: Record<string, { x: number; y: number; anchor: Point; cardAnchor: Point }> = {
-  "1": { x: 840, y: 32, anchor: { x: 838, y: 304 }, cardAnchor: { x: 908, y: 86 } },
-  "2": { x: 650, y: 625, anchor: { x: 650, y: 533 }, cardAnchor: { x: 720, y: 625 } },
-  "3": { x: 24, y: 318, anchor: { x: 250, y: 350 }, cardAnchor: { x: 164, y: 344 } },
-  "4": { x: 284, y: 66, anchor: { x: 474, y: 199 }, cardAnchor: { x: 424, y: 120 } },
+  "1": { x: 816, y: 18, anchor: { x: 838, y: 304 }, cardAnchor: { x: 896, y: 78 } },
+  "2": { x: 620, y: 622, anchor: { x: 650, y: 533 }, cardAnchor: { x: 700, y: 622 } },
+  "3": { x: 20, y: 316, anchor: { x: 250, y: 350 }, cardAnchor: { x: 180, y: 346 } },
+  "4": { x: 270, y: 58, anchor: { x: 474, y: 199 }, cardAnchor: { x: 430, y: 118 } },
 };
 
 const SECTION_COLORS: Record<string, string> = { "1": "#3b82f6", "2": "#22c55e", "3": "#f59e0b", "4": "#a855f7" };
@@ -78,10 +78,23 @@ export function MarshalTrackSvg({ posts, sections, leaders = [], selectedMarker,
   const arrowId = `${instanceId}-marshal-track-arrow`;
   const controlClass = `${instanceId}-marshal-control`;
   const activeSections = new Set(sections.map((section) => section.code));
-  const position = (post: TrackPost) => {
+  const rawPosition = (post: TrackPost) => {
     if (post.mapX == null || post.mapY == null) return DEFAULT_POST_COORDS[post.code] ?? { x: 500, y: 350 };
     return { x: post.mapX, y: post.mapY > 700 ? post.mapY * 0.7 : post.mapY };
   };
+  const postPositions = new Map(posts.map((post) => [post.id, rawPosition(post)]));
+  const post53 = posts.find((post) => post.code === "5/3");
+  const post11 = posts.find((post) => post.code === "1/1");
+  if (post53 && post11) {
+    const a = postPositions.get(post53.id)!;
+    const b = postPositions.get(post11.id)!;
+    if (Math.hypot(a.x - b.x, a.y - b.y) < 60) {
+      const centerX = (a.x + b.x) / 2;
+      const centerY = (a.y + b.y) / 2;
+      postPositions.set(post53.id, { x: Math.max(34, centerX - 32), y: centerY });
+      postPositions.set(post11.id, { x: Math.min(966, centerX + 32), y: centerY });
+    }
+  }
 
   return (
     <svg viewBox="0 0 1000 700" className={className ?? "h-auto w-full"} role="group" aria-label="Schematischer Streckenplan mit auswählbaren Posten und Abschnittsleitungen">
@@ -104,7 +117,8 @@ export function MarshalTrackSvg({ posts, sections, leaders = [], selectedMarker,
       <path d={TRACK_PATH} fill="none" stroke="white" strokeWidth="3" strokeDasharray="13 11" opacity=".9" />
       <g aria-label="Start, Ziel und Fahrtrichtung">
         <path d="M680 107 L715 76" stroke="white" strokeWidth="9" /><path d="M681 108 L716 77" stroke="#1e293b" strokeWidth="4" strokeDasharray="7 6" />
-        <text x="720" y="70" fontSize="16" fill="#334155" fontWeight="700">START / ZIEL</text>
+        <rect x="646" y="16" width="132" height="30" rx="8" fill="white" stroke="#cbd5e1" />
+        <text x="712" y="36" textAnchor="middle" fontSize="14" fill="#334155" fontWeight="800">START / ZIEL</text>
         <path d="M730 125 C748 148 759 171 771 196" fill="none" stroke="#475569" strokeWidth="3" markerEnd={`url(#${arrowId})`} />
       </g>
 
@@ -119,19 +133,20 @@ export function MarshalTrackSvg({ posts, sections, leaders = [], selectedMarker,
         return (
           <g key={leader.section.id} transform={`translate(${card.x} ${card.y})`} role={action ? "button" : undefined} tabIndex={action ? 0 : undefined} aria-label={`${code}, Abschnitt ${leader.section.code}, ${leader.staffCount} von ${leader.target} besetzt, ${statusLabel}`} aria-pressed={action ? selected : undefined} onClick={action} onKeyDown={(event) => activate(event, action)} className={action ? `${controlClass} cursor-pointer outline-none` : undefined}>
             <title>{`${code}: ${leader.staffCount} von ${leader.target} besetzt (${statusLabel})`}</title>
-            <rect className="marshal-focus-ring" width="140" height="54" rx="10" fill="white" stroke={selected ? "#0f172a" : SECTION_COLORS[leader.section.code] ?? "#64748b"} strokeWidth={selected ? 4 : 2} />
-            <rect width="46" height="54" rx="10" fill={SECTION_COLORS[leader.section.code] ?? "#64748b"} />
-            <path d="M38 0v54" stroke="white" opacity=".35" />
-            <text x="23" y="32" textAnchor="middle" fontSize="13" fill="white" fontWeight="800">{code}</text>
-            <text x="55" y="21" fontSize="10" fill="#475569" fontWeight="700">ABSCHNITTSLEITUNG</text>
-            <circle cx="63" cy="38" r="7" fill={statusColor} />
-            <text x="76" y="42" fontSize="12" fill="#1e293b" fontWeight="800">{leader.staffCount}/{leader.target}</text>
+            <rect className="marshal-focus-ring" width="160" height="60" rx="10" fill="white" stroke={selected ? "#0f172a" : SECTION_COLORS[leader.section.code] ?? "#64748b"} strokeWidth={selected ? 4 : 2} />
+            <path d="M10 0h34v60H10A10 10 0 0 1 0 50V10A10 10 0 0 1 10 0Z" fill={SECTION_COLORS[leader.section.code] ?? "#64748b"} />
+            <path d="M36 0v60" stroke="white" opacity=".35" />
+            <text x="22" y="35" textAnchor="middle" fontSize="12" fill="white" fontWeight="800">{code}</text>
+            <text x="54" y="18" fontSize="9" fill="#475569" fontWeight="800">ABSCHNITTS-</text>
+            <text x="54" y="29" fontSize="9" fill="#475569" fontWeight="800">LEITUNG</text>
+            <circle cx="61" cy="45" r="7" fill={statusColor} />
+            <text x="75" y="49" fontSize="12" fill="#1e293b" fontWeight="800">{leader.staffCount}/{leader.target}</text>
           </g>
         );
       })}
 
       {posts.map((post) => {
-        const pos = position(post);
+        const pos = postPositions.get(post.id) ?? rawPosition(post);
         const selected = selectedMarker === `post:${post.id}`;
         const sectionCode = post.code.startsWith("5/") ? "4" : post.code.split("/")[0];
         const action = onPostClick ? () => onPostClick(post) : undefined;
