@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  X,
   XCircle
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -142,9 +143,27 @@ export function AdminTechnicalInspectionPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [noteRequired, setNoteRequired] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showInstallBanner, setShowInstallBanner] = useState(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches) return false;
+    return sessionStorage.getItem("install-banner-dismissed") !== "1";
+  });
   const searchRequestRef = useRef(0);
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSavedNotesRef = useRef<Record<InspectionTarget, string>>({ primary: "", backup: "" });
   const noteSaveTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -289,7 +308,8 @@ export function AdminTechnicalInspectionPage() {
     if (!detail || saving) return;
     const note = notes[activeTarget];
     if (techStatus === "failed" && !note.trim()) {
-      setError("Bei einer Ablehnung ist eine Notiz erforderlich.");
+      setNoteRequired(true);
+      noteTextareaRef.current?.focus();
       return;
     }
     setSaving(`${activeTarget}:${techStatus}`);
@@ -297,6 +317,8 @@ export function AdminTechnicalInspectionPage() {
     setSuccess("");
     try {
       await technicalInspectionService.update(detail.id, techStatus, note, activeTarget);
+      if (techStatus === "passed") navigator.vibrate?.(200);
+      if (techStatus === "failed") navigator.vibrate?.([100, 50, 100]);
       const [updated, updatedHistory] = await Promise.all([
         technicalInspectionService.getEntry(detail.id),
         technicalInspectionService.getHistory(detail.id)
@@ -324,6 +346,11 @@ export function AdminTechnicalInspectionPage() {
     [navigate]
   );
 
+  const dismissInstallBanner = () => {
+    sessionStorage.setItem("install-banner-dismissed", "1");
+    setShowInstallBanner(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="border-b bg-white">
@@ -343,17 +370,53 @@ export function AdminTechnicalInspectionPage() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-4 p-3 sm:p-4 lg:p-6">
+        {showInstallBanner && (
+          <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <span>
+              <strong>Als App installieren:</strong> iOS: Teilen → „Zum Home-Bildschirm" · Android: Menü → „App installieren"
+            </span>
+            <button
+              type="button"
+              className="ml-4 font-medium text-blue-600 hover:text-blue-800"
+              onClick={dismissInstallBanner}
+              aria-label="Installationshinweis schließen"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        {isOffline && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Keine Internetverbindung – bitte Verbindung prüfen.
+          </div>
+        )}
         <Card>
           <CardContent className="pt-5">
             <form className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2" onSubmit={searchEntries}>
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Startnummer, Name oder Orga-Code"
-                autoComplete="off"
-                aria-label="Nennung suchen"
-                className="h-11 rounded-xl border-slate-300 bg-slate-50 px-3 text-sm shadow-inner placeholder:text-xs focus-visible:bg-white sm:placeholder:text-sm"
-              />
+              <div className="relative">
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Startnummer, Name oder Orga-Code"
+                  autoComplete="off"
+                  aria-label="Nennung suchen"
+                  className="h-11 rounded-xl border-slate-300 bg-slate-50 px-3 pr-10 text-sm shadow-inner placeholder:text-xs focus-visible:bg-white sm:placeholder:text-sm"
+                />
+                {query.length > 0 && !entryId && (
+                  <button
+                    type="button"
+                    className="absolute right-0 top-0 flex h-11 w-10 items-center justify-center rounded-r-xl text-slate-500 hover:text-slate-900"
+                    onClick={() => {
+                      setQuery("");
+                      setResults([]);
+                      setSearched(false);
+                    }}
+                    aria-label="Suche leeren"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               <Button
                 type="submit"
                 className="h-11 rounded-xl px-4"
@@ -458,6 +521,20 @@ export function AdminTechnicalInspectionPage() {
                       <dd className="font-semibold text-slate-900">{detail.orgaCode || "–"}</dd>
                     </div>
                   </dl>
+                  {(detail.driverEmail || detail.driverPhone) && (
+                    <div className="mt-3 flex flex-wrap gap-4">
+                      {detail.driverEmail && (
+                        <a href={`mailto:${detail.driverEmail}`} className="text-sm text-blue-700 underline">
+                          📧 {detail.driverEmail}
+                        </a>
+                      )}
+                      {detail.driverPhone && (
+                        <a href={`tel:${detail.driverPhone}`} className="text-sm text-blue-700 underline">
+                          📞 {detail.driverPhone}
+                        </a>
+                      )}
+                    </div>
+                  )}
                   {detail.codriver && (
                     <div className="mt-4 border-t border-slate-200 pt-4">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Beifahrer</div>
@@ -510,9 +587,13 @@ export function AdminTechnicalInspectionPage() {
                     Prüfernotiz für {activeTarget === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}
                   </label>
                   <textarea
+                    ref={noteTextareaRef}
                     id="inspection-note"
                     value={notes[activeTarget]}
-                    onChange={(event) => setNotes((current) => ({ ...current, [activeTarget]: event.target.value }))}
+                    onChange={(event) => {
+                      setNotes((current) => ({ ...current, [activeTarget]: event.target.value }));
+                      setNoteRequired(false);
+                    }}
                     onBlur={() => {
                       if (noteSaveTimeoutRef.current !== null) {
                         window.clearTimeout(noteSaveTimeoutRef.current);
@@ -527,6 +608,9 @@ export function AdminTechnicalInspectionPage() {
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200"
                     placeholder="Notiz"
                   />
+                  {noteRequired && (
+                    <p className="mt-1 text-xs text-red-600">Bei einer Ablehnung ist eine Notiz erforderlich.</p>
+                  )}
                   {noteSaveState !== "idle" && (
                     <div className="mt-1 text-right text-xs text-slate-500">
                       {noteSaveState === "saving" ? "Speichert…" : "Gespeichert"}
@@ -538,7 +622,7 @@ export function AdminTechnicalInspectionPage() {
                   <Button type="button" className="h-20 bg-emerald-600 text-lg hover:bg-emerald-700" disabled={Boolean(saving)} onClick={() => void updateStatus("passed")}>
                     {saving === `${activeTarget}:passed` ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <CheckCircle2 className="mr-2 h-6 w-6" />}Abnahme bestätigen
                   </Button>
-                  <Button type="button" variant="destructive" className="h-20 text-lg" disabled={Boolean(saving) || !notes[activeTarget].trim()} onClick={() => void updateStatus("failed")}>
+                  <Button type="button" variant="destructive" className="h-20 text-lg" disabled={Boolean(saving)} onClick={() => void updateStatus("failed")}>
                     {saving === `${activeTarget}:failed` ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <XCircle className="mr-2 h-6 w-6" />}Abnahme ablehnen
                   </Button>
                 </div>
