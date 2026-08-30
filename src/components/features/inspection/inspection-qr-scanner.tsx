@@ -47,10 +47,17 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
   const videoRef = useRef<HTMLVideoElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const scannerRef = useRef<QrScannerType | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const openRef = useRef(open);
+  const onEntryDetectedRef = useRef(onEntryDetected);
+  const scanTimeoutRef = useRef<number | null>(null);
+  const scanPendingRef = useRef(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [invalidCode, setInvalidCode] = useState(false);
+  const [scanSuccessful, setScanSuccessful] = useState(false);
+
+  openRef.current = open;
+  onEntryDetectedRef.current = onEntryDetected;
 
   useEffect(() => {
     if (!open) return;
@@ -71,14 +78,11 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
   }, [onClose, open]);
 
   useEffect(() => {
-    if (!open || !videoRef.current) return;
+    if (!videoRef.current) return;
 
     let active = true;
     setStarting(true);
     setError("");
-    setInvalidCode(false);
-
-    let scanner: QrScannerType | null = null;
 
     void import("qr-scanner")
       .then(async ({ default: QrScanner }) => {
@@ -86,18 +90,22 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
         const hasCamera = await QrScanner.hasCamera();
         if (!hasCamera) throw new DOMException("No camera", "NotFoundError");
 
-        scanner = new QrScanner(
+        const scanner = new QrScanner(
           videoRef.current,
           (result) => {
-            if (!active) return;
+            if (!active || scanPendingRef.current) return;
             const entryId = inspectionEntryIdFromQrPayload(result.data);
             if (!entryId) {
               setInvalidCode(true);
               return;
             }
-            active = false;
-            scanner?.stop();
-            onEntryDetected(entryId);
+            scanPendingRef.current = true;
+            setScanSuccessful(true);
+            scanner.stop();
+            scanTimeoutRef.current = window.setTimeout(() => {
+              scanTimeoutRef.current = null;
+              onEntryDetectedRef.current(entryId);
+            }, 400);
           },
           {
             preferredCamera: "environment",
@@ -108,7 +116,7 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
           }
         );
         scannerRef.current = scanner;
-        await scanner.start();
+        if (openRef.current) await scanner.start();
       })
       .catch((startError) => {
         if (active) setError(cameraErrorMessage(startError));
@@ -119,16 +127,42 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
 
     return () => {
       active = false;
-      scanner?.destroy();
-      if (scannerRef.current === scanner) scannerRef.current = null;
+      if (scanTimeoutRef.current !== null) window.clearTimeout(scanTimeoutRef.current);
+      scannerRef.current?.destroy();
+      scannerRef.current = null;
     };
-  }, [attempt, onEntryDetected, open]);
+  }, []);
 
-  if (!open) return null;
+  useEffect(() => {
+    setInvalidCode(false);
+    setScanSuccessful(false);
+    scanPendingRef.current = false;
+    if (open) {
+      void scannerRef.current?.start().catch((startError) => setError(cameraErrorMessage(startError)));
+    } else {
+      scannerRef.current?.stop();
+    }
+  }, [open]);
+
+  const retryScanner = async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+    setStarting(true);
+    setError("");
+    scanner.stop();
+    try {
+      await scanner.start();
+    } catch (startError) {
+      setError(cameraErrorMessage(startError));
+    } finally {
+      setStarting(false);
+    }
+  };
 
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end bg-slate-950/75 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-4"
+      style={{ display: open ? undefined : "none" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="inspection-scanner-title"
@@ -147,7 +181,14 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
         </div>
 
         <div className="relative aspect-[4/5] max-h-[70vh] overflow-hidden bg-slate-950 sm:aspect-square">
-          <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+          <video
+            ref={videoRef}
+            className="h-full w-full object-cover"
+            style={{ display: open ? "block" : "none" }}
+            muted
+            playsInline
+          />
+          {scanSuccessful && <div className="absolute inset-0 bg-emerald-400/70 transition-opacity" aria-hidden="true" />}
           {starting && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950 text-sm text-white">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -158,7 +199,7 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-950 px-8 text-center text-white">
               <Camera className="h-10 w-10 text-slate-400" />
               <p className="text-sm">{error}</p>
-              <Button type="button" variant="secondary" onClick={() => setAttempt((value) => value + 1)}>
+              <Button type="button" variant="secondary" onClick={() => void retryScanner()}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Erneut versuchen
               </Button>

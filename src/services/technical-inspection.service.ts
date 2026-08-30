@@ -44,6 +44,8 @@ export type InspectionEntry = {
   acceptanceStatus: string;
   driverFirstName: string;
   driverLastName: string;
+  driverEmail: string | null;
+  driverPhone: string | null;
   codriverPersonId: string | null;
   codriver: {
     firstName: string;
