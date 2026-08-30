@@ -56,6 +56,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
   const [search, setSearch] = useState("");
   const [sectionFilter, setSectionFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("post");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [optimisticAssignments, setOptimisticAssignments] = useState<Record<string, { assignmentValue: string; status: MarshalCommitmentStatus }>>({});
@@ -65,7 +66,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
   const serverAssignment = (person: MarshalPerson) => {
     const assignment = person.assignments.find((item) => item.dayId === day.id);
     return {
-      assignmentValue: assignment?.postId ? `post:${assignment.postId}` : "none",
+      assignmentValue: assignment?.postId ? `post:${assignment.postId}` : assignment?.role === "section_leader" && assignment.sectionId ? `leader:${assignment.sectionId}` : "none",
       status: assignment?.commitmentStatus ?? ("not_asked" as MarshalCommitmentStatus),
     };
   };
@@ -73,7 +74,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
   const serverAssignmentForDay = (person: MarshalPerson, dayId: string) => {
     const assignment = person.assignments.find((item) => item.dayId === dayId);
     return {
-      assignmentValue: assignment?.postId ? `post:${assignment.postId}` : "none",
+      assignmentValue: assignment?.postId ? `post:${assignment.postId}` : assignment?.role === "section_leader" && assignment.sectionId ? `leader:${assignment.sectionId}` : "none",
       status: assignment?.commitmentStatus ?? ("not_asked" as MarshalCommitmentStatus),
     };
   };
@@ -141,11 +142,13 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
     .filter((person) => {
       const assignment = person.assignments.find((item) => item.dayId === day.id);
       const isTrackHelper = person.activityAreas.some((area) => trackAreaAliases.has(normalizeArea(area)));
-      if (!isTrackHelper || assignment?.role === "section_leader") return false;
+      if (!isTrackHelper) return false;
       const matchesTerm = !term || `${person.helperNumber} ${person.lastName} ${person.firstName} ${assignment?.functionCode ?? ""}`.toLocaleLowerCase("de").includes(term);
       const matchesStatus = statusFilter === "all" || (assignment?.commitmentStatus ?? "not_asked") === statusFilter;
       const matchesSection = sectionFilter === "all" || assignment?.sectionId === sectionFilter;
-      return matchesTerm && matchesStatus && matchesSection;
+      const assignmentValue = displayedAssignment(person).assignmentValue;
+      const matchesAssignment = assignmentFilter === "all" || (assignmentFilter === "unassigned" ? assignmentValue === "none" : assignmentFilter === "assigned" ? assignmentValue.startsWith("post:") : assignmentValue.startsWith("leader:"));
+      return matchesTerm && matchesStatus && matchesSection && matchesAssignment;
     })
     .sort((a, b) => {
       const aa = a.assignments.find((item) => item.dayId === day.id);
@@ -264,7 +267,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                 </span>
               ))}
             </div>
-            <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
+            <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="grid gap-1 text-xs font-medium text-slate-600">
                 Suche
                 <span className="relative">
@@ -288,9 +291,10 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                   })),
                 ]}
               />
+              <Filter label="Posten-Zuordnung" value={assignmentFilter} onChange={setAssignmentFilter} options={[{ value: "all", label: "Alle Zuordnungen" }, { value: "unassigned", label: "Nicht eingeteilt" }, { value: "assigned", label: "Auf Posten eingeteilt" }, { value: "leader", label: "Abschnittsleitung" }]} />
               <Filter label="Status" value={statusFilter} onChange={setStatusFilter} options={[{ value: "all", label: "Alle Status" }, ...Object.entries(marshalStatusLabels).map(([value, label]) => ({ value, label }))]} />
             </div>
-            {(search || sectionFilter !== "all" || statusFilter !== "all") && <div className="flex flex-wrap items-center gap-2 text-xs"><span className="font-medium text-slate-600">Aktive Filter:</span>{search && <FilterChip label={`Suche: ${search}`} onRemove={() => setSearch("")} />}{sectionFilter !== "all" && <FilterChip label={workspace.sections.find((section) => section.id === sectionFilter)?.name ?? "Abschnitt"} onRemove={() => setSectionFilter("all")} />}{statusFilter !== "all" && <FilterChip label={marshalStatusLabels[statusFilter as MarshalCommitmentStatus] ?? "Status"} onRemove={() => setStatusFilter("all")} />}<Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setSearch(""); setSectionFilter("all"); setStatusFilter("all"); }}><RotateCcw className="mr-1 h-3.5 w-3.5" />Alle zurücksetzen</Button></div>}
+            {(search || sectionFilter !== "all" || assignmentFilter !== "all" || statusFilter !== "all") && <div className="flex flex-wrap items-center gap-2 text-xs"><span className="font-medium text-slate-600">Aktive Filter:</span>{search && <FilterChip label={`Suche: ${search}`} onRemove={() => setSearch("")} />}{sectionFilter !== "all" && <FilterChip label={workspace.sections.find((section) => section.id === sectionFilter)?.name ?? "Abschnitt"} onRemove={() => setSectionFilter("all")} />}{assignmentFilter !== "all" && <FilterChip label={assignmentFilter === "unassigned" ? "Nicht eingeteilt" : assignmentFilter === "assigned" ? "Auf Posten eingeteilt" : "Abschnittsleitung"} onRemove={() => setAssignmentFilter("all")} />}{statusFilter !== "all" && <FilterChip label={marshalStatusLabels[statusFilter as MarshalCommitmentStatus] ?? "Status"} onRemove={() => setStatusFilter("all")} />}<Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => { setSearch(""); setSectionFilter("all"); setAssignmentFilter("all"); setStatusFilter("all"); }}><RotateCcw className="mr-1 h-3.5 w-3.5" />Alle zurücksetzen</Button></div>}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end lg:hidden">
               <label className="grid flex-1 gap-1 text-xs font-medium text-slate-600 sm:max-w-64">
                 <span className="flex items-center gap-1"><SlidersHorizontal className="h-3.5 w-3.5" />Sortieren</span>
@@ -307,7 +311,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
               <div className="hidden grid-cols-[5rem_minmax(12rem,1fr)_minmax(12rem,1fr)_10rem] gap-3 border-b bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
                 <SortHeader label="Nr." sortKey="helperNumber" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
                 <SortHeader label="Name" sortKey="name" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
-                <SortHeader label="Posten" sortKey="post" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
+                <SortHeader label="Einteilung" sortKey="post" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
                 <SortHeader label="Status" sortKey="status" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
               </div>
               {people.map((person) => {
@@ -339,7 +343,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                     </div>
                     <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:contents">
                       <label className="grid min-w-0 gap-1 text-xs font-medium text-slate-600 lg:contents">
-                        <span className="lg:sr-only">Posten</span>
+                        <span className="lg:sr-only">Einteilung</span>
                         <span className="flex min-w-0 items-center">
                           <AssignmentSelect value={displayed.assignmentValue} workspace={workspace} day={day} targetMode={targetMode} currentPersonId={person.id} disabled={disabled} displayedAssignment={displayedAssignment} onChange={(value) => void saveOptimistically(person, displayed.status, value)} />
                           <DoubleBookingWarning labels={conflicts} day={day} />
@@ -401,8 +405,17 @@ function StatusSelect({ value, disabled, onChange }: { value: MarshalCommitmentS
 }
 function AssignmentSelect({ value, workspace, day, targetMode, currentPersonId, disabled, displayedAssignment, onChange }: { value: string; workspace: MarshalWorkspace; day: MarshalDay; targetMode: PlanningTargetMode; currentPersonId: string; disabled: boolean; displayedAssignment: (person: MarshalPerson) => { assignmentValue: string }; onChange: (value: string) => void }) {
   return (
-    <select aria-label="Streckenposten" className="h-11 w-full min-w-0 rounded-md border bg-white px-2 text-base sm:text-sm md:h-9" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+    <select aria-label="Einteilung" className="h-11 w-full min-w-0 rounded-md border bg-white px-2 text-base sm:text-sm md:h-9" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
       <option value="none">Nicht eingeteilt</option>
+      <optgroup label="Abschnittsleitung">
+        {[...workspace.sections].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "de")).map((section) => {
+          const assignedPeople = workspace.people.filter((person) => displayedAssignment(person).assignmentValue === `leader:${section.id}`);
+          const currentIsAssigned = assignedPeople.some((person) => person.id === currentPersonId);
+          const occupied = assignedPeople.length > 0 && !currentIsAssigned;
+          return <option key={`leader:${section.id}`} value={`leader:${section.id}`} disabled={occupied}>{section.leaderCode} · {section.name}{occupied ? " (bereits besetzt)" : ""}</option>;
+        })}
+      </optgroup>
+      <optgroup label="Streckenposten">
       {workspace.posts
         .filter((post) => post.isActive)
         .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -417,6 +430,7 @@ function AssignmentSelect({ value, workspace, day, targetMode, currentPersonId, 
             </option>
           );
         })}
+      </optgroup>
     </select>
   );
 }

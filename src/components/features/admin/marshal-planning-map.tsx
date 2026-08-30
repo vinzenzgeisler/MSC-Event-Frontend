@@ -276,7 +276,7 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
   const allAssignments = workspace.people
     .map((person) => ({ person, assignment: person.assignments.find((item) => item.dayId === day.id && item.postId === post.id) }))
     .filter((item): item is typeof item & { assignment: NonNullable<typeof item.assignment> } => Boolean(item.assignment))
-    .sort((a, b) => a.person.helperNumber - b.person.helperNumber);
+    .sort((a, b) => compareMarshalNames(a.person, b.person));
   const assignments = allAssignments.filter((item) => !item.person.noDeployment);
   const excludedAssignments = allAssignments.filter((item) => item.person.noDeployment);
   const slots = Array.from({ length: target }, (_, index) => assignments[index] ?? null);
@@ -287,7 +287,7 @@ function PostPlanningPanel({ post, workspace, day, targetMode, canWrite, busy, o
       const assignment = person.assignments.find((item) => item.dayId === day.id);
       return Boolean(assignment && ["accepted", "pending", "tentative"].includes(assignment.commitmentStatus) && assignment.postId !== post.id);
     })
-    .sort((a, b) => a.helperNumber - b.helperNumber);
+    .sort(compareMarshalNames);
 
   return (
     <aside ref={panelRef} tabIndex={-1} aria-labelledby="marshal-post-panel-title" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -368,7 +368,7 @@ function FilledSlot({ label, item, post, eligiblePeople, canWrite, busy, onAssig
           {!item.person.noDeployment && <><label className="grid gap-1 text-xs font-medium text-slate-600">Helfer ersetzen
             <select className="h-10 w-full rounded-md border bg-white px-2 text-sm" value={replacementId} disabled={busy || eligiblePeople.length === 0} onChange={(event) => setReplacementId(event.target.value)}>
               <option value="">Ersatz wählen</option>
-              {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.helperNumber} · {person.firstName} {person.lastName}</option>)}
+              {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.lastName}, {person.firstName} · Nr. {person.helperNumber}</option>)}
             </select>
           </label>
           <Button type="button" size="sm" className="w-full" disabled={!replacement || busy} onClick={() => replacement && void onReplace(item.person, replacement, post.id).then((saved) => saved && setReplacementId(""))}>
@@ -397,7 +397,7 @@ function EmptySlot({ label, post, day, eligiblePeople, canWrite, busy, onAssign 
       {canWrite && <><label className="mt-3 grid gap-1 text-xs font-medium text-slate-600">Helfer auswählen
         <select className="h-10 w-full rounded-md border bg-white px-2 text-sm" value={helperId} disabled={busy || eligiblePeople.length === 0} onChange={(event) => setHelperId(event.target.value)}>
           <option value="">Helfer wählen</option>
-          {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.helperNumber} · {person.firstName} {person.lastName} · {commitmentLabels[person.assignments.find((item) => item.dayId === day.id)?.commitmentStatus ?? "not_asked"]}</option>)}
+          {eligiblePeople.map((person) => <option key={person.id} value={person.id}>{person.lastName}, {person.firstName} · Nr. {person.helperNumber} · {commitmentLabels[person.assignments.find((item) => item.dayId === day.id)?.commitmentStatus ?? "not_asked"]}</option>)}
         </select>
       </label>
       <Button type="button" size="sm" className="mt-2 w-full" disabled={!helper || !assignment || busy} onClick={() => helper && assignment && void onAssign(helper, assignment.commitmentStatus, `post:${post.id}`).then((saved) => saved && setHelperId(""))}>Platz besetzen</Button></>}
@@ -419,4 +419,8 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 
 function staffingColor(level: StaffingLevel) {
   return level === "unfilled" ? "bg-amber-500" : level === "overfilled" ? "bg-red-600" : "bg-emerald-600";
+}
+
+function compareMarshalNames(a: MarshalPerson, b: MarshalPerson) {
+  return a.lastName.localeCompare(b.lastName, "de", { sensitivity: "base" }) || a.firstName.localeCompare(b.firstName, "de", { sensitivity: "base" }) || a.helperNumber - b.helperNumber;
 }

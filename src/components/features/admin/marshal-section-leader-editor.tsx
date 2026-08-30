@@ -6,7 +6,7 @@ type SaveAction = (person: MarshalPerson, status: MarshalCommitmentStatus, assig
 export function MarshalSectionLeaderEditor({ workspace, day, section, canWrite, busy, onSave, onPersonOpen }: { workspace: MarshalWorkspace; day: MarshalDay; section: MarshalSection; canWrite: boolean; busy: boolean; onSave: SaveAction; onPersonOpen?: (person: MarshalPerson) => void }) {
   const [changing, setChanging] = useState(false);
   const leader = workspace.people.find((person) => person.isActive && !person.noDeployment && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.role === "section_leader" && assignment.sectionId === section.id));
-  const eligible = workspace.people.filter((person) => person.isActive && !person.noDeployment).sort((a, b) => a.helperNumber - b.helperNumber);
+  const eligible = workspace.people.filter((person) => person.isActive && !person.noDeployment).sort(compareMarshalNames);
 
   if (!canWrite) return leader ? <button type="button" className="min-h-10 break-words text-left font-medium text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => onPersonOpen?.(leader)}>{leader.lastName}, {leader.firstName}</button> : <span>Nicht besetzt</span>;
 
@@ -23,8 +23,12 @@ export function MarshalSectionLeaderEditor({ workspace, day, section, canWrite, 
 
   return <select aria-label={`Abschnittsleitung ${section.name}`} className="h-10 w-full min-w-0 rounded-md border bg-white px-2 text-sm" value={leader?.id ?? ""} disabled={busy || changing} onChange={(event) => void change(event.target.value)}>
     <option value="">Nicht besetzt</option>
-    {eligible.map((person) => <option key={person.id} value={person.id}>{person.helperNumber} · {person.lastName}, {person.firstName}</option>)}
+    {eligible.map((person) => <option key={person.id} value={person.id}>{person.lastName}, {person.firstName} · Nr. {person.helperNumber}</option>)}
   </select>;
+}
+
+function compareMarshalNames(a: MarshalPerson, b: MarshalPerson) {
+  return a.lastName.localeCompare(b.lastName, "de", { sensitivity: "base" }) || a.firstName.localeCompare(b.firstName, "de", { sensitivity: "base" }) || a.helperNumber - b.helperNumber;
 }
 
 export function MarshalSectionLeaderGrid({ workspace, day, canWrite, busy, onSave }: { workspace: MarshalWorkspace; day: MarshalDay; canWrite: boolean; busy: boolean; onSave: SaveAction }) {
