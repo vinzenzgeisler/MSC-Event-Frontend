@@ -46,8 +46,10 @@ function cameraErrorMessage(error: unknown) {
 export function InspectionQrScanner({ open, onClose, onEntryDetected }: InspectionQrScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  // Scanner instance lives across open/close cycles; destroyed only on unmount.
   const scannerRef = useRef<QrScannerType | null>(null);
-  const openRef = useRef(open);
+  // Whether the scanner has been created at least once (lazy init on first open).
+  const initializedRef = useRef(false);
   const onEntryDetectedRef = useRef(onEntryDetected);
   const scanTimeoutRef = useRef<number | null>(null);
   const scanPendingRef = useRef(false);
@@ -56,30 +58,62 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
   const [invalidCode, setInvalidCode] = useState(false);
   const [scanSuccessful, setScanSuccessful] = useState(false);
 
-  openRef.current = open;
+  // Keep callback ref current without re-triggering effects.
   onEntryDetectedRef.current = onEntryDetected;
 
+  // Unmount-only cleanup: destroy scanner instance.
+  useEffect(() => {
+    return () => {
+      if (scanTimeoutRef.current !== null) window.clearTimeout(scanTimeoutRef.current);
+      scannerRef.current?.destroy();
+      scannerRef.current = null;
+    };
+  }, []);
+
+  // Keyboard + body-scroll handling while open.
   useEffect(() => {
     if (!open) return;
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeButtonRef.current?.focus();
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
-
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose, open]);
 
+  // Core scanner lifecycle: lazy-init on first open, start/stop on subsequent opens/closes.
+  // Initialising only when open=true guarantees the <video> element is visible (not display:none)
+  // so QrScanner can measure its dimensions — which prevents the blank-camera bug on iOS.
   useEffect(() => {
+    // Reset per-session state on every open/close transition.
+    setInvalidCode(false);
+    setScanSuccessful(false);
+    scanPendingRef.current = false;
+
+    if (!open) {
+      // Closing: stop stream without destroying the instance so iOS keeps the permission grant.
+      scannerRef.current?.stop();
+      return;
+    }
+
+    // Opening: if already initialised, just start.
+    if (initializedRef.current && scannerRef.current) {
+      setError("");
+      void scannerRef.current
+        .start()
+        .catch((startError: unknown) => setError(cameraErrorMessage(startError)));
+      return;
+    }
+
+    // First open: create scanner now that the video element is visible.
     if (!videoRef.current) return;
 
+    initializedRef.current = true;
     let active = true;
     setStarting(true);
     setError("");
@@ -87,6 +121,7 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
     void import("qr-scanner")
       .then(async ({ default: QrScanner }) => {
         if (!active || !videoRef.current) return;
+
         const hasCamera = await QrScanner.hasCamera();
         if (!hasCamera) throw new DOMException("No camera", "NotFoundError");
 
@@ -102,6 +137,7 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
             scanPendingRef.current = true;
             setScanSuccessful(true);
             scanner.stop();
+            // Brief green flash before navigating away.
             scanTimeoutRef.current = window.setTimeout(() => {
               scanTimeoutRef.current = null;
               onEntryDetectedRef.current(entryId);
@@ -115,11 +151,16 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
             returnDetailedScanResult: true
           }
         );
+
         scannerRef.current = scanner;
-        if (openRef.current) await scanner.start();
+        if (active) await scanner.start();
       })
-      .catch((startError) => {
-        if (active) setError(cameraErrorMessage(startError));
+      .catch((startError: unknown) => {
+        if (active) {
+          setError(cameraErrorMessage(startError));
+          // Allow re-init on next open if initialisation failed.
+          initializedRef.current = false;
+        }
       })
       .finally(() => {
         if (active) setStarting(false);
@@ -127,26 +168,17 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
 
     return () => {
       active = false;
-      if (scanTimeoutRef.current !== null) window.clearTimeout(scanTimeoutRef.current);
-      scannerRef.current?.destroy();
-      scannerRef.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    setInvalidCode(false);
-    setScanSuccessful(false);
-    scanPendingRef.current = false;
-    if (open) {
-      void scannerRef.current?.start().catch((startError) => setError(cameraErrorMessage(startError)));
-    } else {
-      scannerRef.current?.stop();
-    }
   }, [open]);
 
   const retryScanner = async () => {
     const scanner = scannerRef.current;
-    if (!scanner) return;
+    if (!scanner) {
+      // Not yet initialised; reset so next open triggers fresh init.
+      initializedRef.current = false;
+      setError("");
+      return;
+    }
     setStarting(true);
     setError("");
     scanner.stop();
@@ -181,14 +213,21 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
         </div>
 
         <div className="relative aspect-[4/5] max-h-[70vh] overflow-hidden bg-slate-950 sm:aspect-square">
+          {/*
+            The <video> element must always be in the DOM (never conditionally rendered).
+            We use CSS visibility instead of display:none here to ensure the element has
+            proper layout dimensions when QrScanner initialises on first open.
+            The outer wrapper already hides the entire dialog via display:none when !open.
+          */}
           <video
             ref={videoRef}
             className="h-full w-full object-cover"
-            style={{ display: open ? "block" : "none" }}
             muted
             playsInline
           />
-          {scanSuccessful && <div className="absolute inset-0 bg-emerald-400/70 transition-opacity" aria-hidden="true" />}
+          {scanSuccessful && (
+            <div className="absolute inset-0 bg-emerald-400/70" aria-hidden="true" />
+          )}
           {starting && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950 text-sm text-white">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -208,7 +247,9 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
         </div>
 
         <div className="min-h-14 px-4 py-3 text-center text-sm text-slate-600" aria-live="polite">
-          {invalidCode ? "Dieser QR-Code gehört nicht zu einer technischen Abnahme." : "Die Nennung öffnet sich nach dem Scan automatisch."}
+          {invalidCode
+            ? "Dieser QR-Code gehört nicht zu einer technischen Abnahme."
+            : "Die Nennung öffnet sich nach dem Scan automatisch."}
         </div>
       </div>
     </div>
