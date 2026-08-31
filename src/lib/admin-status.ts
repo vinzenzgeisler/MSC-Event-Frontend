@@ -13,7 +13,8 @@ export function acceptanceStatusLabel(status: AcceptanceStatus): string {
 export function paymentStatusLabel(status: PaymentStatus): string {
   return {
     due: "Offen",
-    paid: "Bezahlt"
+    paid: "Bezahlt",
+    not_required: "Keine Zahlung erforderlich"
   }[status];
 }
 
@@ -66,7 +67,8 @@ export function acceptanceStatusRowAccentClasses(status: AcceptanceStatus): stri
 export function paymentStatusClasses(status: PaymentStatus): string {
   return {
     due: "border-amber-300 bg-amber-50 text-amber-900",
-    paid: "border-primary/35 bg-primary/10 text-primary"
+    paid: "border-primary/35 bg-primary/10 text-primary",
+    not_required: "border-slate-300 bg-slate-100 text-slate-700"
   }[status];
 }
 

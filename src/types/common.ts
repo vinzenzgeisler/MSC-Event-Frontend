@@ -6,7 +6,7 @@ export type RegistrationStatus = "submitted_unverified" | "submitted_verified";
 
 export type AcceptanceStatus = "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
 
-export type PaymentStatus = "due" | "paid";
+export type PaymentStatus = "due" | "paid" | "not_required";
 
 export type TechStatus = "pending" | "passed" | "failed";
 

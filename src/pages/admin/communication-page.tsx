@@ -1262,6 +1262,7 @@ export function AdminCommunicationPage() {
                     <SelectItem value="all">Alle</SelectItem>
                     <SelectItem value="due">{paymentStatusLabel("due")}</SelectItem>
                     <SelectItem value="paid">{paymentStatusLabel("paid")}</SelectItem>
+                    <SelectItem value="not_required">{paymentStatusLabel("not_required")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

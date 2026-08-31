@@ -107,7 +107,7 @@ function normalizePaymentStatus(value: unknown): PaymentStatus | null {
   if (value === null || value === undefined) {
     return null;
   }
-  return value === "paid" ? "paid" : "due";
+  return value === "paid" || value === "not_required" ? value : "due";
 }
 
 function normalizeWaiverSignedStatus(value?: { signed?: boolean; signedAt?: string | null; documentId?: string | null } | null) {

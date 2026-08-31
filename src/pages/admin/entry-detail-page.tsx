@@ -195,7 +195,6 @@ export function AdminEntryDetailPage() {
   const [mailHistoryError, setMailHistoryError] = useState("");
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected" | "withdrawn">("accepted");
-  const [paid, setPaid] = useState(false);
   const [checkinDone, setCheckinDone] = useState(false);
   const [confirmationMailSent, setConfirmationMailSent] = useState(false);
   const [confirmationMailVerified, setConfirmationMailVerified] = useState(false);
@@ -336,7 +335,6 @@ export function AdminEntryDetailPage() {
         setHasLoadedOnce(true);
         if (result) {
           setStatus(result.status);
-          setPaid(result.payment.status === "paid");
           setCheckinDone(result.checkinVerified);
           setConfirmationMailSent(result.confirmationMailSent);
           setConfirmationMailVerified(result.confirmationMailVerified);
@@ -544,7 +542,7 @@ export function AdminEntryDetailPage() {
   }
 
   const paymentApplicable = status !== "rejected" && status !== "withdrawn" && detail.payment.status !== null;
-  const paymentState = paymentApplicable ? (paid ? "paid" : "due") : null;
+  const paymentState = paymentApplicable ? detail.payment.status : null;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const changedAt = detail.history.reduce((latest, item) => {
@@ -1090,26 +1088,34 @@ export function AdminEntryDetailPage() {
                     "flex flex-wrap items-center gap-3 rounded-xl border p-4",
                     paymentState === "paid"
                       ? "border-emerald-200 bg-emerald-50/70"
-                      : "border-amber-200 bg-amber-50/70"
+                      : paymentState === "not_required"
+                        ? "border-slate-200 bg-slate-50"
+                        : "border-amber-200 bg-amber-50/70"
                   )}
                 >
                   <div
                     className={cn(
                       "flex h-12 w-12 items-center justify-center rounded-full",
-                      paymentState === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                      paymentState === "paid"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : paymentState === "not_required"
+                          ? "bg-slate-200 text-slate-700"
+                          : "bg-amber-100 text-amber-700"
                     )}
                   >
-                    {paymentState === "paid" ? <CheckCircle2 className="h-6 w-6" /> : <Clock3 className="h-6 w-6" />}
+                    {paymentState === "due" ? <Clock3 className="h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs uppercase tracking-wide text-slate-500">Zahlungsstatus</div>
                     <div className="mt-0.5 text-lg font-semibold text-slate-900">
-                      {paymentState === "paid" ? "Bezahlt" : "Offen"}
+                      {paymentStatusLabel(paymentState)}
                     </div>
                     <div className="text-sm text-slate-600">
                       {paymentState === "paid"
                         ? "Zahlungseingang wurde bestätigt."
-                        : "Zahlungseingang wurde noch nicht bestätigt."}
+                        : paymentState === "not_required"
+                          ? "Für diese Nennung fällt kein Nenngeld an."
+                          : "Zahlungseingang wurde noch nicht bestätigt."}
                     </div>
                   </div>
                   <Badge className={`${paymentStatusClasses(paymentState)} h-7 shrink-0 px-2.5 text-xs`} variant="outline">
@@ -1464,8 +1470,8 @@ export function AdminEntryDetailPage() {
                     disabledReason={
                       status !== "accepted"
                         ? "Zahlungserinnerung erst bei zugelassener Nennung."
-                        : paymentState === "paid"
-                          ? "Bei bezahlter Nennung keine Zahlungserinnerung nötig."
+                        : paymentState !== "due"
+                          ? "Für diese Nennung ist keine Zahlungserinnerung nötig."
                           : sendingPaymentReminder
                             ? "Zahlungserinnerung wird gerade eingeplant."
                             : undefined
@@ -1474,8 +1480,8 @@ export function AdminEntryDetailPage() {
                       if (sendingPaymentReminder) {
                         return;
                       }
-                      if (paymentState === "paid") {
-                        flashMessage("Für bezahlte Nennungen wird keine Zahlungserinnerung versendet.");
+                      if (paymentState !== "due") {
+                        flashMessage("Für diese Nennung wird keine Zahlungserinnerung versendet.");
                         return;
                       }
                       setSendingPaymentReminder(true);
@@ -1527,9 +1533,17 @@ export function AdminEntryDetailPage() {
                       <Wallet className="mr-2 h-4 w-4" />
                     )
                   }
-                  variant={paid ? "default" : "outline"}
-                  className={paid ? actionActiveClass : actionOutlineClass}
-                  disabledReason={anyActionInFlight ? "Aktion wird verarbeitet…" : status !== "accepted" ? "Zahlung kann erst nach Zulassung bestätigt werden." : undefined}
+                  variant={paymentState === "paid" ? "default" : "outline"}
+                  className={paymentState === "paid" ? actionActiveClass : actionOutlineClass}
+                  disabledReason={
+                    anyActionInFlight
+                      ? "Aktion wird verarbeitet…"
+                      : status !== "accepted"
+                        ? "Zahlung kann erst nach Zulassung bestätigt werden."
+                        : paymentState === "not_required"
+                          ? "Für diese Nennung ist keine Zahlung erforderlich."
+                          : undefined
+                  }
                   onClick={async () => {
                     setPendingPaymentConfirm(true);
                   }}

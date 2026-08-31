@@ -111,6 +111,7 @@ export function EntriesFilterBar({
             <SelectItem value="all">Alle</SelectItem>
             <SelectItem value="due">Offen</SelectItem>
             <SelectItem value="paid">Bezahlt</SelectItem>
+            <SelectItem value="not_required">Keine Zahlung erforderlich</SelectItem>
           </SelectContent>
         </Select>
       </div>

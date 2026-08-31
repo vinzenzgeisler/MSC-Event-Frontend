@@ -48,7 +48,7 @@ const EMPTY_META: ListMeta = {
 
 const ACCEPTANCE_VALUES: AdminEntriesFilter["acceptanceStatus"][] = ["all", "pending", "shortlist", "accepted", "rejected", "withdrawn"];
 const REGISTRATION_VALUES: AdminEntriesFilter["registrationStatus"][] = ["all", "submitted_unverified", "submitted_verified"];
-const PAYMENT_VALUES: AdminEntriesFilter["paymentStatus"][] = ["all", "due", "paid"];
+const PAYMENT_VALUES: AdminEntriesFilter["paymentStatus"][] = ["all", "due", "paid", "not_required"];
 const SORT_BY_VALUES: AdminEntriesFilter["sortBy"][] = ["createdAt", "updatedAt", "driverLastName", "driverFirstName", "className", "startNumberNorm"];
 const SORT_DIR_VALUES: AdminEntriesFilter["sortDir"][] = ["asc", "desc"];
 

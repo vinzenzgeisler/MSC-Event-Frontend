@@ -228,7 +228,7 @@ export const communicationService = {
     query?: string;
     classId?: string;
     acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
-    paymentStatus?: "due" | "paid";
+    paymentStatus?: "due" | "paid" | "not_required";
     limit?: number;
   }) {
     const eventId = await getAdminEventId();
@@ -302,7 +302,7 @@ export const communicationService = {
     classId?: string;
     acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
     registrationStatus?: "submitted_unverified" | "submitted_verified";
-    paymentStatus?: "due" | "paid";
+    paymentStatus?: "due" | "paid" | "not_required";
     additionalEmails?: string[];
     driverPersonIds?: string[];
     entryIds?: string[];
@@ -340,7 +340,7 @@ export const communicationService = {
       classId?: string;
       acceptanceStatus?: "pending" | "shortlist" | "accepted" | "rejected" | "withdrawn";
       registrationStatus?: "submitted_unverified" | "submitted_verified";
-      paymentStatus?: "due" | "paid";
+      paymentStatus?: "due" | "paid" | "not_required";
       allEntries?: boolean;
     };
     attachmentUploadIds?: string[];
