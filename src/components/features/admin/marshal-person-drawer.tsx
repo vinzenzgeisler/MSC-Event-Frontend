@@ -104,13 +104,13 @@ export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose
 
   async function save() {
     const current = draft;
-    if (!current) return;
-    const saved = await onSave(current.id, {
-      firstName: current.firstName, lastName: current.lastName, street: current.street, zip: current.zip, city: current.city,
-      birthdate: current.birthdate, phone: current.phone, email: current.email, shirtSize: current.shirtSize,
-      licenseNumber: current.licenseNumber, vehicleRegistration: current.vehicleRegistration,
-      activityAreas: current.activityAreas, note: current.note, isActive: current.isActive, noDeployment: current.noDeployment,
-    });
+    if (!current || !person) return;
+    const patch = buildPersonPatch(person, current);
+    if (Object.keys(patch).length === 0) {
+      onClose();
+      return;
+    }
+    const saved = await onSave(current.id, patch);
     if (saved) onClose();
   }
 
@@ -162,4 +162,26 @@ export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${value}T00:00:00`));
+}
+
+const nullableTextFields = ["street", "zip", "city", "birthdate", "phone", "email", "shirtSize", "licenseNumber", "vehicleRegistration", "note"] as const;
+
+function buildPersonPatch(original: MarshalPerson, current: MarshalPerson): MarshalPersonPatch {
+  const patch: MarshalPersonPatch = {};
+  const firstName = current.firstName.trim();
+  const lastName = current.lastName.trim();
+
+  if (firstName !== original.firstName) patch.firstName = firstName;
+  if (lastName !== original.lastName) patch.lastName = lastName;
+
+  for (const field of nullableTextFields) {
+    const value = current[field]?.trim() || null;
+    if (value !== original[field]) patch[field] = value;
+  }
+
+  if (JSON.stringify(current.activityAreas) !== JSON.stringify(original.activityAreas)) patch.activityAreas = current.activityAreas;
+  if (current.isActive !== original.isActive) patch.isActive = current.isActive;
+  if (current.noDeployment !== original.noDeployment) patch.noDeployment = current.noDeployment;
+
+  return patch;
 }
