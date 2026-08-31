@@ -541,7 +541,7 @@ export function AdminEntryDetailPage() {
     return <div className="rounded-xl border border-dashed p-6 text-sm text-slate-500">Nennung nicht gefunden.</div>;
   }
 
-  const paymentApplicable = status !== "rejected" && status !== "withdrawn" && detail.payment.status !== null;
+  const paymentApplicable = detail.payment.status !== null;
   const paymentState = paymentApplicable ? detail.payment.status : null;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
@@ -1078,7 +1078,7 @@ export function AdminEntryDetailPage() {
                   <div className="rounded-xl border border-slate-200 bg-slate-100 p-4 text-slate-600">
                     <div className="font-semibold text-slate-800">Nicht relevant</div>
                     <div className="mt-1 text-sm">
-                      Für {status === "withdrawn" ? "abgesagte" : "abgelehnte"} Nennungen werden keine Gebühren fällig. Vorhandene Zahlungshistorie bleibt in der Finanzverwaltung erhalten.
+                      Für diese {status === "withdrawn" ? "abgesagte" : "abgelehnte"} Nennung ist kein Zahlungseingang dokumentiert.
                     </div>
                   </div>
                 ) : (
@@ -1112,7 +1112,9 @@ export function AdminEntryDetailPage() {
                     </div>
                     <div className="text-sm text-slate-600">
                       {paymentState === "paid"
-                        ? "Zahlungseingang wurde bestätigt."
+                        ? status === "withdrawn"
+                          ? "Die Nennung wurde abgesagt; der Zahlungseingang bleibt vollständig dokumentiert."
+                          : "Zahlungseingang wurde bestätigt."
                         : paymentState === "not_required"
                           ? "Für diese Nennung fällt kein Nenngeld an."
                           : "Zahlungseingang wurde noch nicht bestätigt."}
@@ -1125,7 +1127,11 @@ export function AdminEntryDetailPage() {
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-md border bg-slate-50 p-3">
                     <div className="text-xs uppercase text-slate-500">
-                      {status === "accepted" ? "Nennungsbetrag" : "Vorgesehener Betrag"}
+                      {status === "accepted"
+                        ? "Nennungsbetrag"
+                        : paymentState === "paid"
+                          ? "Abgerechneter Betrag"
+                          : "Vorgesehener Betrag"}
                     </div>
                     <div className="mt-1 font-semibold text-slate-900">{euroDisplayFromCents(detail.payment.totalCents ?? 0)}</div>
                   </div>
