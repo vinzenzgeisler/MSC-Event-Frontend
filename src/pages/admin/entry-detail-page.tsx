@@ -2039,6 +2039,12 @@ export function AdminEntryDetailPage() {
             <p className="mt-2 text-sm text-slate-600">
               Diese Aktion bestätigt den Zahlungseingang für diese Nennung.
             </p>
+            <div className="mt-4 rounded-md border bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-wide text-slate-500">Geforderter Betrag</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {euroDisplayFromCents(detail.payment.totalCents ?? 0)}
+              </div>
+            </div>
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
