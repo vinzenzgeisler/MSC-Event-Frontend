@@ -39,6 +39,16 @@ body {
   touch-action: manipulation;
 }
 
+/*
+ * Radix Select locks body scrolling while its portalled menu is open and
+ * normally compensates for the removed scrollbar with a right margin. The
+ * root element already reserves that scrollbar (`overflow-y: scroll`), so
+ * applying the compensation as well would move the entire page horizontally.
+ */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
   select,
