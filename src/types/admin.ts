@@ -182,6 +182,7 @@ export type AdminEntryDetailDto = {
       motorsportHistory?: string | null;
     };
     codriver?: {
+      id: Id;
       firstName: string | null;
       lastName: string | null;
       email: string | null;
@@ -195,6 +196,15 @@ export type AdminEntryDetailDto = {
       emergencyContactPhone?: string | null;
       motorsportHistory?: string | null;
     } | null;
+    charityCodrivers?: Array<{
+      registrationId: Id;
+      personId: Id;
+      firstName: string | null;
+      lastName: string | null;
+      email: string | null;
+      birthdate: string | null;
+      createdAt: string;
+    }>;
   };
   vehicle: {
     vehicleType: VehicleType;
@@ -313,6 +323,7 @@ export type AdminEntryDetailViewModel = {
     motorsportHistory: string;
   };
   codriver: {
+    id: Id | null;
     assigned: boolean;
     label: string;
     firstName: string;
@@ -326,6 +337,14 @@ export type AdminEntryDetailViewModel = {
     city: string;
     addressLine: string;
   };
+  charityCodrivers: Array<{
+    registrationId: Id;
+    personId: Id;
+    name: string;
+    email: string;
+    birthdate: string;
+    createdAt: string;
+  }>;
   vehicle: {
     label: string;
     thumbUrl: string | null;

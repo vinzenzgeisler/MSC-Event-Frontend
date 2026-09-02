@@ -103,18 +103,18 @@ export const adminSigningService = {
       pairingCode: string;
       expiresAt: string;
       deviceSession: SigningDevice;
-    }>("/admin/signing/devices/pairing-code", {
+    }>("/admin/terminal/devices/pairing-code", {
       method: "POST"
     });
   },
 
   async listDevices() {
-    const response = await requestJson<{ ok: true; devices: SigningDevice[] }>("/admin/signing/devices");
+    const response = await requestJson<{ ok: true; devices: SigningDevice[] }>("/admin/terminal/devices");
     return response.devices;
   },
 
   async revokeDevice(deviceSessionId: string) {
-    return requestJson<{ ok: true; device: SigningDevice }>(`/admin/signing/devices/${deviceSessionId}`, {
+    return requestJson<{ ok: true; device: SigningDevice }>(`/admin/terminal/devices/${deviceSessionId}`, {
       method: "DELETE"
     });
   },
@@ -144,20 +144,20 @@ export const adminSigningService = {
       guardianRelationship: string | null;
     };
   }) {
-    return requestJson<{ ok: true; session: SigningSessionStatus }>("/admin/signing/sessions", {
+    return requestJson<{ ok: true; session: SigningSessionStatus }>("/admin/terminal/sessions", {
       method: "POST",
       includeAdminEmailHeader: true,
-      body: input
+      body: { ...input, workflowType: "waiver_signature" }
     });
   },
 
   async getSession(sessionId: string) {
-    const response = await requestJson<{ ok: true; session: SigningSessionStatus }>(`/admin/signing/sessions/${sessionId}`);
+    const response = await requestJson<{ ok: true; session: SigningSessionStatus }>(`/admin/terminal/sessions/${sessionId}`);
     return response.session;
   },
 
   async cancelSession(sessionId: string) {
-    const response = await requestJson<{ ok: true; session: SigningSessionStatus }>(`/admin/signing/sessions/${sessionId}/cancel`, {
+    const response = await requestJson<{ ok: true; session: SigningSessionStatus }>(`/admin/terminal/sessions/${sessionId}/cancel`, {
       method: "POST"
     });
     return response.session;

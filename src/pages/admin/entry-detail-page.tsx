@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Bike, Car, CheckCircle2, Clock3, Download, Loader2, Mail, TabletSmartphone, Trash2, Wallet } from "lucide-react";
+import { Bike, Car, CheckCircle2, Clock3, Copy, Download, Link2, Loader2, Mail, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -25,6 +25,8 @@ import {
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { adminSigningService, type SigningDevice, type SigningPrecheckTimestamps, type SigningRequirements, type SigningSessionStatus } from "@/services/admin-signing.service";
+import { adminTerminalService, type ParticipantTerminalSession, type ParticipantWorkflowType } from "@/services/admin-terminal.service";
+import { adminCodriverInvitationsService, type CodriverInvitation } from "@/services/admin-codriver-invitations.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
@@ -186,6 +188,8 @@ export function AdminEntryDetailPage() {
   const canReadMail = hasPermission(roles, "communication.read");
   const canSendMail = hasPermission(roles, "communication.write");
   const canChangeClass = hasPermission(roles, "entries.status.write");
+  const canManageParticipants = hasPermission(roles, "entries.participants.write");
+  const canPrintStampCards = hasPermission(roles, "stamp_cards.print");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -236,6 +240,21 @@ export function AdminEntryDetailPage() {
   const [guardianRelationship, setGuardianRelationship] = useState("");
   const [signingBusy, setSigningBusy] = useState(false);
   const [signingLoading, setSigningLoading] = useState(false);
+  const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
+  const [participantWorkflow, setParticipantWorkflow] = useState<ParticipantWorkflowType>("regular_codriver_registration");
+  const [participantEntryIds, setParticipantEntryIds] = useState<string[]>([]);
+  const [participantSession, setParticipantSession] = useState<ParticipantTerminalSession | null>(null);
+  const [participantBusy, setParticipantBusy] = useState(false);
+  const [participantChecks, setParticipantChecks] = useState({ identity: false, present: false, medical: false, guardianPresent: false, guardianAuthority: false });
+  const [codriverLinkDialogOpen, setCodriverLinkDialogOpen] = useState(false);
+  const [codriverLinkEntryIds, setCodriverLinkEntryIds] = useState<string[]>([]);
+  const [codriverLinkRecipientName, setCodriverLinkRecipientName] = useState("");
+  const [codriverLinkRecipientEmail, setCodriverLinkRecipientEmail] = useState("");
+  const [codriverLinkExpiresAt, setCodriverLinkExpiresAt] = useState("");
+  const [codriverLinkUrl, setCodriverLinkUrl] = useState("");
+  const [codriverInvitations, setCodriverInvitations] = useState<CodriverInvitation[]>([]);
+  const [codriverLinkBusy, setCodriverLinkBusy] = useState(false);
+  const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
   const signingInProgress = activeSigningSession?.status === "pending" || activeSigningSession?.status === "displayed";
 
   const flashMessage = (message: string, timeout = 2200) => {
@@ -523,6 +542,22 @@ export function AdminEntryDetailPage() {
     return () => window.clearInterval(interval);
   }, [activeSigningSession, signingDialogOpen, signingInProgress]);
 
+  useEffect(() => {
+    if (!participantDialogOpen || !participantSession || ["completed", "cancelled", "failed"].includes(participantSession.workflowStage)) return;
+    const poll = async () => {
+      try {
+        const session = await adminTerminalService.getSession(participantSession.id);
+        setParticipantSession(session);
+        if (session.workflowStage === "completed") loadDetail();
+      } catch {
+        // A temporary network interruption must not discard the active tablet flow.
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => void poll(), 2000);
+    return () => window.clearInterval(interval);
+  }, [participantDialogOpen, participantSession?.id, participantSession?.workflowStage]);
+
   const hasDriverNote = driverNote.trim().length > 0;
 
   useEffect(() => {
@@ -730,6 +765,152 @@ export function AdminEntryDetailPage() {
       ...current,
       [key]: current[key] ? null : new Date().toISOString()
     }));
+  };
+
+  const savePdfDownload = (download: { dataBase64: string; mimeType: string; filename: string }) => {
+    const bytes = Uint8Array.from(atob(download.dataBase64), (character) => character.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: download.mimeType }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = download.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadStampCard = async (subject: { cardType: "driver" | "regular_codriver"; personId: string } | { cardType: "charity_codriver"; registrationId: string }) => {
+    if (!detail || participantBusy) return;
+    setParticipantBusy(true);
+    try {
+      const download = await adminEntriesService.getStampCards({
+        eventId: detail.eventId,
+        startSlot: stampCardStartSlot,
+        selection: { type: "subjects", subjects: [subject] }
+      });
+      savePdfDownload(download);
+      flashMessage("Stempelkarte wurde erstellt.");
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Stempelkarte konnte nicht erstellt werden."), 3200);
+    } finally {
+      setParticipantBusy(false);
+    }
+  };
+
+  const openCodriverLinkDialog = async () => {
+    if (!detail) return;
+    const defaultExpiry = new Date(Date.now() + 14 * 24 * 60 * 60_000);
+    const localExpiry = new Date(defaultExpiry.getTime() - defaultExpiry.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    setCodriverLinkEntryIds(Array.from(new Set([detail.id, ...detail.relatedEntryIds])));
+    setCodriverLinkRecipientName("");
+    setCodriverLinkRecipientEmail("");
+    setCodriverLinkExpiresAt(localExpiry);
+    setCodriverLinkUrl("");
+    setCodriverLinkDialogOpen(true);
+    setCodriverLinkBusy(true);
+    try {
+      setCodriverInvitations(await adminCodriverInvitationsService.list(detail.id));
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Bestehende Beifahrer-Links konnten nicht geladen werden."), 3200);
+    } finally {
+      setCodriverLinkBusy(false);
+    }
+  };
+
+  const createCodriverLink = async () => {
+    if (!detail || codriverLinkBusy || codriverLinkEntryIds.length === 0 || !codriverLinkExpiresAt) return;
+    setCodriverLinkBusy(true);
+    try {
+      const result = await adminCodriverInvitationsService.create(detail.id, {
+        entryIds: codriverLinkEntryIds,
+        recipientName: codriverLinkRecipientName.trim() || undefined,
+        recipientEmail: codriverLinkRecipientEmail.trim() || undefined,
+        expiresAt: new Date(codriverLinkExpiresAt).toISOString()
+      });
+      setCodriverLinkUrl(result.url);
+      setCodriverInvitations(await adminCodriverInvitationsService.list(detail.id));
+      flashMessage("Persönlicher Beifahrer-Link wurde erstellt.");
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Beifahrer-Link konnte nicht erstellt werden."), 3400);
+    } finally {
+      setCodriverLinkBusy(false);
+    }
+  };
+
+  const revokeCodriverLink = async (invitationId: string) => {
+    if (!detail || codriverLinkBusy) return;
+    setCodriverLinkBusy(true);
+    try {
+      await adminCodriverInvitationsService.revoke(invitationId);
+      setCodriverInvitations(await adminCodriverInvitationsService.list(detail.id));
+      flashMessage("Beifahrer-Link wurde widerrufen.");
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Beifahrer-Link konnte nicht widerrufen werden."), 3200);
+    } finally {
+      setCodriverLinkBusy(false);
+    }
+  };
+
+  const openParticipantFlow = (workflow: ParticipantWorkflowType) => {
+    if (!detail) return;
+    setParticipantWorkflow(workflow);
+    setParticipantEntryIds(workflow === "charity_codriver_registration" ? [detail.id] : Array.from(new Set([detail.id, ...detail.relatedEntryIds])));
+    setParticipantSession(null);
+    setParticipantChecks({ identity: false, present: false, medical: false, guardianPresent: false, guardianAuthority: false });
+    setParticipantDialogOpen(true);
+    void loadSigningDevices();
+  };
+
+  const startParticipantFlow = async () => {
+    if (!selectedSigningDeviceId || !selectedSigningDeviceOnline || participantEntryIds.length === 0) return;
+    setParticipantBusy(true);
+    try {
+      const session = await adminTerminalService.createParticipantSession({
+        workflowType: participantWorkflow,
+        deviceSessionId: selectedSigningDeviceId,
+        entryIds: participantWorkflow === "charity_codriver_registration" ? [detail!.id] : participantEntryIds
+      });
+      setParticipantSession(session);
+      window.localStorage.setItem(PREFERRED_SIGNING_DEVICE_KEY, selectedSigningDeviceId);
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Beifahrer-Vorgang konnte nicht gestartet werden."), 3400);
+    } finally {
+      setParticipantBusy(false);
+    }
+  };
+
+  const participantDraft = participantSession?.draftPayload as { birthdate?: string; guardianFullName?: string } | null | undefined;
+  const participantAge = participantDraft?.birthdate
+    ? Math.floor((Date.now() - new Date(participantDraft.birthdate).getTime()) / 31_556_952_000)
+    : null;
+  const participantIsMinor = participantAge !== null && participantAge < 18;
+  const participantNeedsMedical = participantWorkflow === "regular_codriver_registration" && participantAge !== null && participantAge >= 70;
+  const participantApprovalComplete = participantChecks.identity && participantChecks.present
+    && (!participantNeedsMedical || participantChecks.medical)
+    && (!participantIsMinor || (participantChecks.guardianPresent && participantChecks.guardianAuthority));
+
+  const approveParticipantFlow = async () => {
+    if (!participantSession || !participantApprovalComplete) return;
+    setParticipantBusy(true);
+    const now = new Date().toISOString();
+    try {
+      setParticipantSession(await adminTerminalService.approve(participantSession.id, {
+        identityCheckedAt: now,
+        signerPresentAt: now,
+        medicalCertificateCheckedAt: participantNeedsMedical ? now : null,
+        guardianPresentAt: participantIsMinor ? now : null,
+        guardianAuthorityCheckedAt: participantIsMinor ? now : null
+      }));
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Freigabe konnte nicht erteilt werden."), 3400);
+    } finally {
+      setParticipantBusy(false);
+    }
+  };
+
+  const closeParticipantFlow = async () => {
+    if (participantSession && !["completed", "cancelled", "failed"].includes(participantSession.workflowStage)) {
+      try { await adminTerminalService.cancel(participantSession.id); } catch { /* Session expires automatically. */ }
+    }
+    setParticipantDialogOpen(false);
   };
 
   return (
@@ -945,6 +1126,34 @@ export function AdminEntryDetailPage() {
                 ) : (
                   <div>Nicht angegeben</div>
                 )}
+                {detail.charityCodrivers.length > 0 ? (
+                  <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-xs font-semibold uppercase text-slate-500">Charity-Beifahrer</div>
+                    <div className="mt-2 space-y-2">
+                      {detail.charityCodrivers.map((item) => (
+                        <div key={item.registrationId} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-white px-3 py-2">
+                          <div><span className="font-medium text-slate-900">{item.name}</span><span className="ml-2 text-xs text-slate-500">{item.email}</span></div>
+                          {canPrintStampCards ? <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "charity_codriver", registrationId: item.registrationId })}>Karte drucken</Button> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {(canManageParticipants || canPrintStampCards) ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3">
+                    {canPrintStampCards ? <label className="flex items-center gap-2 text-xs text-slate-600">
+                      Druckfeld
+                      <select className="h-9 rounded-md border px-2 text-sm" value={stampCardStartSlot} onChange={(event) => setStampCardStartSlot(Number(event.target.value))}>
+                        {Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
+                      </select>
+                    </label> : null}
+                    {canPrintStampCards ? <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "driver", personId: detail.driverPersonId })}>Fahrerkarte</Button> : null}
+                    {canPrintStampCards && detail.codriver.id ? <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "regular_codriver", personId: detail.codriver.id! })}>Beifahrerkarte</Button> : null}
+                    {canManageParticipants && !detail.codriver.assigned ? <Button type="button" size="sm" onClick={() => openParticipantFlow("regular_codriver_registration")}>Beifahrer nachmelden</Button> : null}
+                    {canManageParticipants && detail.status === "accepted" && !detail.codriver.assigned ? <Button type="button" size="sm" variant="outline" onClick={() => void openCodriverLinkDialog()}><Link2 className="mr-2 h-4 w-4" />Beifahrer-Link</Button> : null}
+                    {canManageParticipants ? <Button type="button" size="sm" variant="outline" onClick={() => openParticipantFlow("charity_codriver_registration")}>Charity-Fahrt erfassen</Button> : null}
+                  </div>
+                ) : null}
               </div>
               <div className="sm:col-span-2">
                 <div className="text-xs uppercase text-slate-500">Bisherige motorsportliche Laufbahn</div>
@@ -2221,6 +2430,159 @@ export function AdminEntryDetailPage() {
                 )}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {canManageParticipants && codriverLinkDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-white p-4 shadow-xl sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Persönlichen Beifahrer-Link erstellen</h2>
+                <p className="mt-1 text-sm text-slate-500">Nur für reguläre Beifahrer. Die Person erfasst ihre Daten online und unterschreibt den Haftverzicht später vor Ort. Charity-Beifahrer können keinen Link erhalten.</p>
+              </div>
+              <Button type="button" variant="outline" disabled={codriverLinkBusy} onClick={() => setCodriverLinkDialogOpen(false)}>Schließen</Button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-md border bg-slate-50 p-3">
+                <div className="text-sm font-semibold text-slate-900">Starts für diesen Beifahrer</div>
+                <div className="mt-2 space-y-2">
+                  {Array.from(new Set([detail.id, ...detail.relatedEntryIds])).map((id) => (
+                    <label key={id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={codriverLinkEntryIds.includes(id)} onChange={(event) => setCodriverLinkEntryIds((current) => event.target.checked ? Array.from(new Set([...current, id])) : current.filter((item) => item !== id))} />
+                      {id === detail.id ? `${detail.classLabel} · Startnummer ${detail.startNumber}` : `Weiterer Start · ${id.slice(0, 8)}`}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div><label className="mb-1.5 block text-sm font-medium">Empfängername (optional)</label><Input value={codriverLinkRecipientName} onChange={(event) => setCodriverLinkRecipientName(event.target.value)} placeholder="Max Mustermann" /></div>
+                <div><label className="mb-1.5 block text-sm font-medium">Empfänger-E-Mail (optional)</label><Input type="email" value={codriverLinkRecipientEmail} onChange={(event) => setCodriverLinkRecipientEmail(event.target.value)} placeholder="max@example.de" /><p className="mt-1 text-xs text-slate-500">Wenn gesetzt, kann nur diese E-Mail verwendet werden.</p></div>
+                <div className="sm:col-span-2"><label className="mb-1.5 block text-sm font-medium">Gültig bis</label><Input type="datetime-local" value={codriverLinkExpiresAt} onChange={(event) => setCodriverLinkExpiresAt(event.target.value)} /></div>
+              </div>
+              <Button type="button" className="w-full" disabled={codriverLinkBusy || codriverLinkEntryIds.length === 0 || !codriverLinkExpiresAt} onClick={() => void createCodriverLink()}>
+                {codriverLinkBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}Link erstellen
+              </Button>
+
+              {codriverLinkUrl ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-sm font-semibold text-emerald-950">Link erstellt – jetzt kopieren</div>
+                <p className="mt-1 text-xs text-emerald-800">Der vollständige persönliche Link wird aus Sicherheitsgründen nur jetzt angezeigt.</p>
+                <div className="mt-3 flex gap-2"><Input readOnly value={codriverLinkUrl} /><Button type="button" variant="outline" onClick={async () => { await navigator.clipboard.writeText(codriverLinkUrl); flashMessage("Link wurde kopiert."); }}><Copy className="mr-2 h-4 w-4" />Kopieren</Button></div>
+              </div> : null}
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Bisherige Links</h3>
+                <div className="mt-2 space-y-2">
+                  {codriverInvitations.length === 0 ? <p className="rounded-md border border-dashed p-3 text-sm text-slate-500">Noch kein Link erstellt.</p> : codriverInvitations.map((invitation) => (
+                    <div key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                      <div><div className="font-medium">{invitation.recipientName || invitation.recipientEmail || "Nicht personalisiert"}</div><div className="text-xs text-slate-500">{invitation.entryIds.length} Start{invitation.entryIds.length === 1 ? "" : "s"} · gültig bis {formatTimestamp(invitation.expiresAt)} · Status: {invitation.status === "active" ? "aktiv" : invitation.status === "used" ? "verwendet" : invitation.status === "revoked" ? "widerrufen" : "abgelaufen"}</div></div>
+                      {invitation.status === "active" ? <Button type="button" size="sm" variant="outline" disabled={codriverLinkBusy} onClick={() => void revokeCodriverLink(invitation.id)}>Widerrufen</Button> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canManageParticipants && participantDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-white p-4 shadow-xl sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {participantWorkflow === "charity_codriver_registration" ? "Charity-Beifahrer erfassen" : "Beifahrer nachmelden"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">Die Person trägt ihre Daten selbst am gekoppelten Tablet ein und unterschreibt anschließend.</p>
+              </div>
+              <Button type="button" variant="outline" disabled={participantBusy} onClick={() => void closeParticipantFlow()}>Schließen</Button>
+            </div>
+
+            {!participantSession ? (
+              <div className="mt-5 space-y-4">
+                {participantWorkflow === "regular_codriver_registration" && detail.relatedEntryIds.length > 0 ? (
+                  <div className="rounded-md border bg-slate-50 p-3">
+                    <div className="text-sm font-semibold text-slate-900">Gültige Starts auswählen</div>
+                    <div className="mt-2 space-y-2">
+                      {Array.from(new Set([detail.id, ...detail.relatedEntryIds])).map((id) => (
+                        <label key={id} className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={participantEntryIds.includes(id)} onChange={(event) => setParticipantEntryIds((current) => event.target.checked ? [...current, id] : current.filter((item) => item !== id))} />
+                          {id === detail.id ? `${detail.classLabel} · Startnummer ${detail.startNumber}` : `Weiterer Start · ${id.slice(0, 8)}`}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <div>
+                  <div className="mb-2 text-sm font-semibold text-slate-900">Tablet</div>
+                  <Select value={signingDeviceId || selectedSigningDeviceId || "__none__"} onValueChange={(value) => setSigningDeviceId(value === "__none__" ? "" : value)}>
+                    <SelectTrigger className="h-12"><SelectValue placeholder="Tablet auswählen" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Tablet auswählen</SelectItem>
+                      {connectedSigningDevices.map((device) => <SelectItem key={device.id} value={device.id}>{device.deviceName ?? "Terminal"}{isSigningDeviceOnline(device) ? "" : " (nicht aktiv)"}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="button" className="h-14 w-full" disabled={participantBusy || !selectedSigningDeviceId || !selectedSigningDeviceOnline || participantEntryIds.length === 0} onClick={() => void startParticipantFlow()}>
+                  {participantBusy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}
+                  Eingabe am Tablet starten
+                </Button>
+                {!selectedSigningDeviceOnline ? <p className="text-sm text-amber-700">Das Tablet muss geöffnet und als aktiv verbunden sein.</p> : null}
+              </div>
+            ) : participantSession.workflowStage === "collecting_data" ? (
+              <div className="mt-6 rounded-md border border-sky-200 bg-sky-50 p-5 text-center text-sky-900">
+                <Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin" />
+                Dateneingabe läuft am Tablet. Danach erscheint hier automatisch die Vorprüfung.
+              </div>
+            ) : participantSession.workflowStage === "awaiting_operator_approval" ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-md border bg-slate-50 p-4 text-sm">
+                  <div className="font-semibold text-slate-900">Eingaben kontrollieren</div>
+                  <div className="mt-2 grid gap-1 text-slate-700 sm:grid-cols-2">
+                    <div>Name: {String((participantSession.draftPayload as Record<string, unknown> | null)?.firstName ?? "")} {String((participantSession.draftPayload as Record<string, unknown> | null)?.lastName ?? "")}</div>
+                    <div>Geburtsdatum: {String((participantSession.draftPayload as Record<string, unknown> | null)?.birthdate ?? "-")}</div>
+                    <div className="sm:col-span-2">E-Mail: {String((participantSession.draftPayload as Record<string, unknown> | null)?.email ?? "-")}</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    ["identity", "Identität geprüft"],
+                    ["present", "Beifahrer ist persönlich anwesend"],
+                    ...(participantNeedsMedical ? [["medical", "Ärztliches Attest geprüft"]] : []),
+                    ...(participantIsMinor ? [["guardianPresent", "Sorgeberechtigte Person ist anwesend"], ["guardianAuthority", "Vertretungsberechtigung geprüft"]] : [])
+                  ].map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-3 rounded-md border px-3 py-3 text-sm">
+                      <input type="checkbox" checked={participantChecks[key as keyof typeof participantChecks]} onChange={(event) => setParticipantChecks((current) => ({ ...current, [key]: event.target.checked }))} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" disabled={participantBusy} onClick={async () => setParticipantSession(await adminTerminalService.returnToForm(participantSession.id))}>Zur Korrektur zurückgeben</Button>
+                  <Button type="button" disabled={participantBusy || !participantApprovalComplete} onClick={() => void approveParticipantFlow()}>Prüfung freigeben</Button>
+                </div>
+              </div>
+            ) : participantSession.workflowStage === "ready_to_sign" ? (
+              <div className="mt-6 rounded-md border border-sky-200 bg-sky-50 p-5 text-center text-sky-900">
+                <Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin" />
+                Freigegeben. Haftverzicht und Unterschrift werden jetzt am Tablet abgeschlossen.
+              </div>
+            ) : participantSession.workflowStage === "completed" ? (
+              <div className="mt-6 space-y-4 rounded-md border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
+                <div className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="h-6 w-6" /> Beifahrer vollständig gespeichert</div>
+                <p className="text-sm">Der unterschriebene Haftverzicht wurde automatisch per E-Mail versendet.</p>
+                {canPrintStampCards ? <Button type="button" disabled={participantBusy} onClick={() => {
+                  const result = participantSession.resultPayload as { participantId?: string; charityRegistrationId?: string } | null;
+                  if (participantWorkflow === "charity_codriver_registration" && result?.charityRegistrationId) void downloadStampCard({ cardType: "charity_codriver", registrationId: result.charityRegistrationId });
+                  else if (result?.participantId) void downloadStampCard({ cardType: "regular_codriver", personId: result.participantId });
+                }}><Download className="mr-2 h-4 w-4" />Stempelkarte drucken</Button> : null}
+              </div>
+            ) : (
+              <div className="mt-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-900">Der Vorgang wurde abgebrochen oder ist fehlgeschlagen.</div>
+            )}
           </div>
         </div>
       )}

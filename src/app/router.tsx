@@ -17,6 +17,11 @@ const AnmeldungVerifyPage = lazy(() =>
     default: module.AnmeldungVerifyPage,
   })),
 );
+const CodriverInvitationPage = lazy(() =>
+  import("@/pages/public/codriver-invitation-page").then((module) => ({
+    default: module.CodriverInvitationPage,
+  })),
+);
 const LegalPlaceholderPage = lazy(() =>
   import("@/pages/public/legal-placeholder-page").then((module) => ({
     default: module.LegalPlaceholderPage,
@@ -138,6 +143,10 @@ export const router = createBrowserRouter([
         element: <AnmeldungVerifyPage />,
       },
       {
+        path: "/beifahrer-anmeldung/:token",
+        element: <CodriverInvitationPage />,
+      },
+      {
         path: "/anmeldung/rechtliches/:docId",
         element: <LegalPlaceholderPage />,
       },
@@ -215,6 +224,14 @@ export const router = createBrowserRouter([
       },
       {
         path: "/inspection/:entryId",
+        element: (
+          <ProtectedRoute allowedRoles={["admin", "technical_inspector"]}>
+            <AdminTechnicalInspectionPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/inspection/participant/:eventId/:personId",
         element: (
           <ProtectedRoute allowedRoles={["admin", "technical_inspector"]}>
             <AdminTechnicalInspectionPage />

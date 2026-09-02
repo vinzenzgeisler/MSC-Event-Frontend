@@ -5,6 +5,8 @@ export type AppPermission =
   | "entries.read"
   | "entries.status.write"
   | "entries.checkin.write"
+  | "entries.participants.write"
+  | "stamp_cards.print"
   | "entries.payment.write"
   | "entries.notes.write"
   | "entries.delete"
@@ -30,6 +32,8 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "entries.read",
     "entries.status.write",
     "entries.checkin.write",
+    "entries.participants.write",
+    "stamp_cards.print",
     "entries.payment.write",
     "entries.notes.write",
     "entries.delete",
@@ -52,6 +56,8 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "entries.read",
     "entries.status.write",
     "entries.checkin.write",
+    "entries.participants.write",
+    "stamp_cards.print",
     "entries.payment.write",
     "entries.notes.write",
     "exports.read"

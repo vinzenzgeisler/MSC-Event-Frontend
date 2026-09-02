@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 
 const ENTRY_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function inspectionEntryIdFromQrPayload(payload: string): string | null {
+export type InspectionQrTarget = { type: "entry"; entryId: string } | { type: "participant"; eventId: string; personId: string };
+
+export function inspectionTargetFromQrPayload(payload: string): InspectionQrTarget | null {
   const value = payload.trim();
   if (ENTRY_ID_PATTERN.test(value)) {
-    return value;
+    return { type: "entry", entryId: value };
   }
 
   try {
@@ -16,9 +18,15 @@ export function inspectionEntryIdFromQrPayload(payload: string): string | null {
     if (url.origin !== window.location.origin || url.search || url.hash) {
       return null;
     }
+    const participantMatch = url.pathname.match(/^\/inspection\/participant\/([^/]+)\/([^/]+)\/?$/);
+    if (participantMatch) {
+      const eventId = decodeURIComponent(participantMatch[1]);
+      const personId = decodeURIComponent(participantMatch[2]);
+      return ENTRY_ID_PATTERN.test(eventId) && ENTRY_ID_PATTERN.test(personId) ? { type: "participant", eventId, personId } : null;
+    }
     const match = url.pathname.match(/^\/inspection\/([^/]+)\/?$/);
     const entryId = match ? decodeURIComponent(match[1]) : "";
-    return ENTRY_ID_PATTERN.test(entryId) ? entryId : null;
+    return ENTRY_ID_PATTERN.test(entryId) ? { type: "entry", entryId } : null;
   } catch {
     return null;
   }
@@ -27,7 +35,7 @@ export function inspectionEntryIdFromQrPayload(payload: string): string | null {
 type InspectionQrScannerProps = {
   open: boolean;
   onClose: () => void;
-  onEntryDetected: (entryId: string) => void;
+  onTargetDetected: (target: InspectionQrTarget) => void;
 };
 
 function cameraErrorMessage(error: unknown) {
@@ -43,14 +51,14 @@ function cameraErrorMessage(error: unknown) {
   return "Die Kamera konnte nicht gestartet werden. Bitte prüfe die Browser-Berechtigung.";
 }
 
-export function InspectionQrScanner({ open, onClose, onEntryDetected }: InspectionQrScannerProps) {
+export function InspectionQrScanner({ open, onClose, onTargetDetected }: InspectionQrScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   // Scanner instance lives across open/close cycles; destroyed only on unmount.
   const scannerRef = useRef<QrScannerType | null>(null);
   // Whether the scanner has been created at least once (lazy init on first open).
   const initializedRef = useRef(false);
-  const onEntryDetectedRef = useRef(onEntryDetected);
+  const onTargetDetectedRef = useRef(onTargetDetected);
   const scanTimeoutRef = useRef<number | null>(null);
   const scanPendingRef = useRef(false);
   const [starting, setStarting] = useState(false);
@@ -59,7 +67,7 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
   const [scanSuccessful, setScanSuccessful] = useState(false);
 
   // Keep callback ref current without re-triggering effects.
-  onEntryDetectedRef.current = onEntryDetected;
+  onTargetDetectedRef.current = onTargetDetected;
 
   // Unmount-only cleanup: destroy scanner instance.
   useEffect(() => {
@@ -133,8 +141,8 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
             // open the scanner stays alive, so the callback must keep working across
             // open/close cycles. `scanPendingRef` alone is the correct guard.
             if (scanPendingRef.current) return;
-            const entryId = inspectionEntryIdFromQrPayload(result.data);
-            if (!entryId) {
+            const target = inspectionTargetFromQrPayload(result.data);
+            if (!target) {
               setInvalidCode(true);
               return;
             }
@@ -144,7 +152,7 @@ export function InspectionQrScanner({ open, onClose, onEntryDetected }: Inspecti
             // Brief green flash before navigating away.
             scanTimeoutRef.current = window.setTimeout(() => {
               scanTimeoutRef.current = null;
-              onEntryDetectedRef.current(entryId);
+              onTargetDetectedRef.current(target);
             }, 400);
           },
           {

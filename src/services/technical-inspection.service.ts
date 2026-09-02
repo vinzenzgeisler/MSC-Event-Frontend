@@ -104,6 +104,13 @@ export const technicalInspectionService = {
     return response.entry;
   },
 
+  async getParticipant(eventId: string, personId: string) {
+    const response = await requestJson<{ ok: true; participant: { event: InspectionContext["event"]; driver: { personId: string; firstName: string; lastName: string }; entries: InspectionEntry[] } }>(
+      `/inspection/participants/${eventId}/${personId}`
+    );
+    return response.participant;
+  },
+
   async getHistory(entryId: string) {
     const response = await requestJson<{ ok: true; history: InspectionHistoryItem[] }>(
       `/inspection/entries/${entryId}/history`

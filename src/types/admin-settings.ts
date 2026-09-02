@@ -50,6 +50,7 @@ export type AdminSettingsEvent = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  stampCardAccentColor: string;
   entryConfirmationConfig: AdminSettingsEntryConfirmationConfig;
 };
 
@@ -60,6 +61,7 @@ export type AdminSettingsEventForm = {
   registrationOpenAt: string;
   registrationCloseAt: string;
   paymentDueAt: string;
+  stampCardAccentColor?: string;
   entryConfirmationConfig: AdminSettingsEntryConfirmationConfig;
 };
 

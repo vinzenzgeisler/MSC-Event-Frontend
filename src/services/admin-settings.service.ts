@@ -217,6 +217,7 @@ function mapEvent(event: Record<string, unknown>): AdminSettingsEvent {
     archivedAt: asNullableString(event.archivedAt),
     createdAt: asRequiredString(event.createdAt),
     updatedAt: asRequiredString(event.updatedAt),
+    stampCardAccentColor: asRequiredString(event.stampCardAccentColor, "#0F6B65"),
     entryConfirmationConfig: normalizeEntryConfirmationConfig(event.entryConfirmationConfig)
   };
 }
@@ -330,6 +331,7 @@ export const adminSettingsService = {
       name: payload.name,
       startsAt: payload.startsAt,
       endsAt: payload.endsAt,
+      stampCardAccentColor: payload.stampCardAccentColor || undefined,
       entryConfirmationConfig: toEntryConfirmationPayload(payload.entryConfirmationConfig, "compact")
     };
 
@@ -361,6 +363,7 @@ export const adminSettingsService = {
         name: payload.name,
         startsAt: payload.startsAt,
         endsAt: payload.endsAt,
+        stampCardAccentColor: payload.stampCardAccentColor || "#0F6B65",
         registrationOpenAt: payload.registrationOpenAt ? new Date(payload.registrationOpenAt).toISOString() : null,
         registrationCloseAt: payload.registrationCloseAt ? new Date(payload.registrationCloseAt).toISOString() : null,
         paymentDueAt: payload.paymentDueAt ? new Date(payload.paymentDueAt).toISOString() : null,

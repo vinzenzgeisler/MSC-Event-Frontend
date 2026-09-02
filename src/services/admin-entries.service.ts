@@ -349,6 +349,7 @@ function fromAdminEntryDetailDto(
       motorsportHistory: dto.person.driver.motorsportHistory ?? "Keine Angabe"
     },
     codriver: {
+      id: codriver?.id ?? null,
       assigned: Boolean(codriver),
       label: codriver ? parseName(codriver.firstName, codriver.lastName) : "Nicht angegeben",
       firstName: codriver?.firstName ?? "-",
@@ -362,6 +363,14 @@ function fromAdminEntryDetailDto(
       city: codriver?.city ?? "-",
       addressLine: [codriver?.street, codriver?.zip, codriver?.city, codriverCountry !== "-" ? codriverCountry : null].filter(Boolean).join(", ") || "-"
     },
+    charityCodrivers: (dto.person.charityCodrivers ?? []).map((item) => ({
+      registrationId: item.registrationId,
+      personId: item.personId,
+      name: parseName(item.firstName, item.lastName),
+      email: item.email ?? "-",
+      birthdate: asDate(item.birthdate),
+      createdAt: item.createdAt
+    })),
     vehicle: {
       label: dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug"),
       thumbUrl: resolveImageUrl(dto.vehicleThumbUrl),
@@ -904,6 +913,19 @@ export const adminEntriesService = {
         method: "POST",
         body: { entryIds }
       }
+    );
+  },
+
+  async getStampCards(payload: {
+    eventId: string;
+    startSlot: number;
+    selection:
+      | { type: "accepted_regular" }
+      | { type: "subjects"; subjects: Array<{ cardType: "driver" | "regular_codriver"; personId: string } | { cardType: "charity_codriver"; registrationId: string }> };
+  }) {
+    return requestJson<{ ok: true; filename: string; mimeType: string; dataBase64: string; cardCount: number; pageCount: number }>(
+      "/admin/stamp-cards/export",
+      { method: "POST", body: payload }
     );
   },
 

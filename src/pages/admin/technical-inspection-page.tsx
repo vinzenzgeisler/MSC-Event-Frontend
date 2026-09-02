@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
-import { InspectionQrScanner } from "@/components/features/inspection/inspection-qr-scanner";
+import { InspectionQrScanner, type InspectionQrTarget } from "@/components/features/inspection/inspection-qr-scanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,7 +125,7 @@ function VehicleChoice({
 }
 
 export function AdminTechnicalInspectionPage() {
-  const { entryId } = useParams();
+  const { entryId, eventId: participantEventId, personId } = useParams();
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [context, setContext] = useState<InspectionContext | null>(null);
@@ -143,6 +143,7 @@ export function AdminTechnicalInspectionPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [participantHeading, setParticipantHeading] = useState("");
   const [noteRequired, setNoteRequired] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [showInstallBanner, setShowInstallBanner] = useState(() => {
@@ -182,6 +183,35 @@ export function AdminTechnicalInspectionPage() {
       active = false;
     };
   }, [entryId]);
+
+  useEffect(() => {
+    if (!participantEventId || !personId) return;
+    let active = true;
+    setLoading(true);
+    setError("");
+    void technicalInspectionService.getParticipant(participantEventId, personId)
+      .then((participant) => {
+        if (!active) return;
+        setParticipantHeading(`${participant.driver.firstName} ${participant.driver.lastName} · ${participant.entries.length} Starts`);
+        setResults(participant.entries.map((item) => ({
+          id: item.id,
+          startNumber: item.startNumber,
+          driverFirstName: item.driverFirstName,
+          driverLastName: item.driverLastName,
+          className: item.className,
+          vehicleMake: item.vehicleMake,
+          vehicleModel: item.vehicleModel,
+          techStatus: item.techStatus,
+          backupVehicleId: item.backupVehicleId,
+          backupTechStatus: item.backupTechStatus,
+          techCheckedAt: item.techCheckedAt
+        })));
+        setSearched(true);
+      })
+      .catch((loadError) => active && setError(messageFromError(loadError)))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [participantEventId, personId]);
 
   useEffect(() => {
     if (!entryId) {
@@ -247,12 +277,12 @@ export function AdminTechnicalInspectionPage() {
   }, [navigate]);
 
   useEffect(() => {
-    if (entryId) return;
+    if (entryId || personId) return;
     const timeout = window.setTimeout(() => {
       void executeSearch(query);
     }, 300);
     return () => window.clearTimeout(timeout);
-  }, [entryId, executeSearch, query]);
+  }, [entryId, executeSearch, personId, query]);
 
   const searchEntries = (event: FormEvent) => {
     event.preventDefault();
@@ -338,10 +368,10 @@ export function AdminTechnicalInspectionPage() {
     setScannerOpen(false);
   }, []);
 
-  const openScannedEntry = useCallback(
-    (scannedEntryId: string) => {
+  const openScannedTarget = useCallback(
+    (target: InspectionQrTarget) => {
       setScannerOpen(false);
-      navigate(`/inspection/${scannedEntryId}`);
+      navigate(target.type === "entry" ? `/inspection/${target.entryId}` : `/inspection/participant/${target.eventId}/${target.personId}`);
     },
     [navigate]
   );
@@ -439,7 +469,7 @@ export function AdminTechnicalInspectionPage() {
           </CardContent>
         </Card>
 
-        {entryId && (
+        {(entryId || personId) && (
           <Button type="button" variant="ghost" onClick={() => navigate("/inspection")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Andere Nennung
@@ -451,7 +481,9 @@ export function AdminTechnicalInspectionPage() {
         )}
 
         {!entryId && results.length > 0 && (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div>
+            {participantHeading ? <div className="mb-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 font-semibold text-teal-950">{participantHeading} · alle angenommenen Starts</div> : null}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {results.map((item) => (
               <button
                 key={item.id}
@@ -473,6 +505,7 @@ export function AdminTechnicalInspectionPage() {
                 )}
               </button>
             ))}
+            </div>
           </div>
         )}
 
@@ -661,7 +694,7 @@ export function AdminTechnicalInspectionPage() {
         {success && <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white shadow-lg">{success}</div>}
         {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</div>}
       </main>
-      <InspectionQrScanner open={scannerOpen} onClose={closeScanner} onEntryDetected={openScannedEntry} />
+      <InspectionQrScanner open={scannerOpen} onClose={closeScanner} onTargetDetected={openScannedTarget} />
     </div>
   );
 }

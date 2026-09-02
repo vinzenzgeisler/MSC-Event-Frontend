@@ -66,6 +66,7 @@ function eventToForm(event: AdminSettingsEvent): AdminSettingsEventForm {
     registrationOpenAt: toDatetimeLocal(event.registrationOpenAt),
     registrationCloseAt: toDatetimeLocal(event.registrationCloseAt),
     paymentDueAt: toDatetimeLocal(event.paymentDueAt),
+    stampCardAccentColor: event.stampCardAccentColor,
     entryConfirmationConfig: entryConfirmationConfigToForm(event.entryConfirmationConfig)
   };
 }
@@ -1410,6 +1411,7 @@ export function AdminSettingsPage() {
         registrationOpenAt: eventForm.registrationOpenAt,
         registrationCloseAt: eventForm.registrationCloseAt,
         paymentDueAt: eventForm.paymentDueAt,
+        stampCardAccentColor: eventForm.stampCardAccentColor,
         entryConfirmationConfig: eventForm.entryConfirmationConfig
       });
       const nextEventForm = eventToForm(created);
@@ -2177,6 +2179,13 @@ export function AdminSettingsPage() {
                           onChange={(event) => setEventForm((prev) => ({ ...prev, paymentDueAt: event.target.value }))}
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label>Akzentfarbe Stempelkarten</Label>
+                        <div className="flex gap-2">
+                          <Input type="color" className="h-10 w-14 p-1" value={eventForm.stampCardAccentColor || "#0F6B65"} disabled={!canManage} onChange={(event) => setEventForm((prev) => ({ ...prev, stampCardAccentColor: event.target.value.toUpperCase() }))} />
+                          <Input value={eventForm.stampCardAccentColor || "#0F6B65"} disabled={!canManage} onChange={(event) => setEventForm((prev) => ({ ...prev, stampCardAccentColor: event.target.value.toUpperCase() }))} />
+                        </div>
+                      </div>
                     </div>
 
                     {eventError && <div className="text-sm text-destructive">{eventError}</div>}
@@ -2379,6 +2388,13 @@ export function AdminSettingsPage() {
                         disabled={!canManage || !eventState || !selectedEventIsEditable}
                         onChange={(event) => setEventForm((prev) => ({ ...prev, paymentDueAt: event.target.value }))}
                       />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Akzentfarbe Stempelkarten</Label>
+                      <div className="flex gap-2">
+                        <Input type="color" className="h-10 w-14 p-1" value={eventForm.stampCardAccentColor || "#0F6B65"} disabled={!canManage || !eventState || !selectedEventIsEditable} onChange={(event) => setEventForm((prev) => ({ ...prev, stampCardAccentColor: event.target.value.toUpperCase() }))} />
+                        <Input value={eventForm.stampCardAccentColor || "#0F6B65"} disabled={!canManage || !eventState || !selectedEventIsEditable} onChange={(event) => setEventForm((prev) => ({ ...prev, stampCardAccentColor: event.target.value.toUpperCase() }))} />
+                      </div>
                     </div>
                   </div>
 
