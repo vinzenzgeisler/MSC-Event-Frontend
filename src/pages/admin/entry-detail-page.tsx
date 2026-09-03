@@ -255,6 +255,8 @@ export function AdminEntryDetailPage() {
   const [codriverInvitations, setCodriverInvitations] = useState<CodriverInvitation[]>([]);
   const [codriverLinkBusy, setCodriverLinkBusy] = useState(false);
   const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
+  const [pendingCharityRevoke, setPendingCharityRevoke] = useState<{ registrationId: string; name: string } | null>(null);
+  const [charityRevocationReason, setCharityRevocationReason] = useState("");
   const signingInProgress = activeSigningSession?.status === "pending" || activeSigningSession?.status === "displayed";
 
   const flashMessage = (message: string, timeout = 2200) => {
@@ -578,6 +580,7 @@ export function AdminEntryDetailPage() {
 
   const paymentApplicable = detail.payment.status !== null;
   const paymentState = paymentApplicable ? detail.payment.status : null;
+  const currentClassAllowsCodriver = classOptions.find((option) => option.id === detail.classId)?.allowsCodriver ?? false;
   const hiddenHistoryCount = Math.max(detail.history.length - HISTORY_PREVIEW_LIMIT, 0);
   const historyItems = historyExpanded ? detail.history : detail.history.slice(0, HISTORY_PREVIEW_LIMIT);
   const changedAt = detail.history.reduce((latest, item) => {
@@ -795,6 +798,21 @@ export function AdminEntryDetailPage() {
     }
   };
 
+  const resendWaiverMail = async (documentId: string, participantName: string) => {
+    const actionKey = `waiver-mail-${documentId}`;
+    if (actionInFlight) return;
+    setActionInFlight(actionKey);
+    try {
+      const result = await adminSigningService.resendSignedWaiverMail(documentId);
+      flashMessage(`Haftverzicht mit PDF wurde erneut an ${result.recipient} gesendet.`, 4200);
+      loadMailHistory();
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, `Haftverzicht-Mail für ${participantName} konnte nicht versendet werden.`), 4200);
+    } finally {
+      setActionInFlight((current) => current === actionKey ? null : current);
+    }
+  };
+
   const openCodriverLinkDialog = async () => {
     if (!detail) return;
     const defaultExpiry = new Date(Date.now() + 14 * 24 * 60 * 60_000);
@@ -851,6 +869,11 @@ export function AdminEntryDetailPage() {
 
   const openParticipantFlow = (workflow: ParticipantWorkflowType) => {
     if (!detail) return;
+    const classAllowsCodriver = classOptions.find((option) => option.id === detail.classId)?.allowsCodriver ?? false;
+    if (!classAllowsCodriver) {
+      flashMessage("Diese Fahrzeugklasse erlaubt keine Beifahrer.", 3400);
+      return;
+    }
     setParticipantWorkflow(workflow);
     setParticipantEntryIds(workflow === "charity_codriver_registration" ? [detail.id] : Array.from(new Set([detail.id, ...detail.relatedEntryIds])));
     setParticipantSession(null);
@@ -965,9 +988,12 @@ export function AdminEntryDetailPage() {
                   Prüfung: Noch nicht relevant
                 </Badge>
               )}
-              <Badge className={`${waiverSignedClasses(detail.waiverSigned.signed)} h-6 px-2.5 text-xs`} variant="outline">
-                Haftverzicht: {waiverSignedLabel(detail.waiverSigned.signed)}
+              <Badge className={`${waiverSignedClasses(detail.waiverSigners.driver.signed)} h-6 px-2.5 text-xs`} variant="outline">
+                Fahrer-Haftverzicht: {waiverSignedLabel(detail.waiverSigners.driver.signed)}
               </Badge>
+              {detail.waiverSigners.codriver ? <Badge className={`${waiverSignedClasses(detail.waiverSigners.codriver.signed)} h-6 px-2.5 text-xs`} variant="outline">
+                Beifahrer-Haftverzicht: {waiverSignedLabel(detail.waiverSigners.codriver.signed)}
+              </Badge> : null}
               {statusActionInFlight && (
                 <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -1027,9 +1053,12 @@ export function AdminEntryDetailPage() {
                 Prüfung: Noch nicht relevant
               </Badge>
             )}
-            <Badge className={`${waiverSignedClasses(detail.waiverSigned.signed)} h-6 px-2.5 text-xs`} variant="outline">
-              Haftverzicht: {waiverSignedLabel(detail.waiverSigned.signed)}
+            <Badge className={`${waiverSignedClasses(detail.waiverSigners.driver.signed)} h-6 px-2.5 text-xs`} variant="outline">
+              Fahrer-Haftverzicht: {waiverSignedLabel(detail.waiverSigners.driver.signed)}
             </Badge>
+            {detail.waiverSigners.codriver ? <Badge className={`${waiverSignedClasses(detail.waiverSigners.codriver.signed)} h-6 px-2.5 text-xs`} variant="outline">
+              Beifahrer-Haftverzicht: {waiverSignedLabel(detail.waiverSigners.codriver.signed)}
+            </Badge> : null}
             {statusActionInFlight && (
               <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
                 <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -1131,27 +1160,18 @@ export function AdminEntryDetailPage() {
                     <div className="text-xs font-semibold uppercase text-slate-500">Charity-Beifahrer</div>
                     <div className="mt-2 space-y-2">
                       {detail.charityCodrivers.map((item) => (
-                        <div key={item.registrationId} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-white px-3 py-2">
-                          <div><span className="font-medium text-slate-900">{item.name}</span><span className="ml-2 text-xs text-slate-500">{item.email}</span></div>
-                          {canPrintStampCards ? <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "charity_codriver", registrationId: item.registrationId })}>Karte drucken</Button> : null}
+                        <div key={item.registrationId} className={cn("rounded border px-3 py-2", item.status === "active" ? "bg-white" : "border-slate-200 bg-slate-100 text-slate-500")}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-slate-900">{item.name}</span>
+                            <Badge variant="outline" className={item.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-slate-100 text-slate-600"}>
+                              {item.status === "active" ? "Aktiv" : "Storniert"}
+                            </Badge>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">{item.email} · erfasst {formatTimestamp(item.createdAt)}</div>
+                          {item.status === "revoked" ? <div className="mt-1 text-xs">Grund: {item.revocationReason || "-"}</div> : null}
                         </div>
                       ))}
                     </div>
-                  </div>
-                ) : null}
-                {(canManageParticipants || canPrintStampCards) ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white p-3">
-                    {canPrintStampCards ? <label className="flex items-center gap-2 text-xs text-slate-600">
-                      Druckfeld
-                      <select className="h-9 rounded-md border px-2 text-sm" value={stampCardStartSlot} onChange={(event) => setStampCardStartSlot(Number(event.target.value))}>
-                        {Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
-                      </select>
-                    </label> : null}
-                    {canPrintStampCards ? <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "driver", personId: detail.driverPersonId })}>Fahrerkarte</Button> : null}
-                    {canPrintStampCards && detail.codriver.id ? <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "regular_codriver", personId: detail.codriver.id! })}>Beifahrerkarte</Button> : null}
-                    {canManageParticipants && !detail.codriver.assigned ? <Button type="button" size="sm" onClick={() => openParticipantFlow("regular_codriver_registration")}>Beifahrer nachmelden</Button> : null}
-                    {canManageParticipants && detail.status === "accepted" && !detail.codriver.assigned ? <Button type="button" size="sm" variant="outline" onClick={() => void openCodriverLinkDialog()}><Link2 className="mr-2 h-4 w-4" />Beifahrer-Link</Button> : null}
-                    {canManageParticipants ? <Button type="button" size="sm" variant="outline" onClick={() => openParticipantFlow("charity_codriver_registration")}>Charity-Fahrt erfassen</Button> : null}
                   </div>
                 ) : null}
               </div>
@@ -1622,6 +1642,130 @@ export function AdminEntryDetailPage() {
                     disabledReason={signingBusy || signingLoading ? "Signing-Aktion läuft…" : undefined}
                     onClick={() => void openSigningDialog()}
                   />
+                </div>
+              )}
+
+              {(canManageParticipants || canPrintStampCards || canSendMail || canCheckin) && (
+                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fahrer &amp; Beifahrer</div>
+                  {canManageParticipants && (
+                    <>
+                      <HintButton
+                        label="Beifahrer am Terminal nachmelden"
+                        icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
+                        variant="default"
+                        className={actionActiveClass}
+                        disabledReason={
+                          participantBusy
+                            ? "Beifahrer-Aktion läuft…"
+                            : status !== "accepted"
+                              ? "Beifahrer können erst nach Zulassung ergänzt werden."
+                              : !currentClassAllowsCodriver
+                                ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
+                                : detail.codriver.assigned
+                                  ? "Für diese Nennung ist bereits ein regulärer Beifahrer hinterlegt."
+                                  : undefined
+                        }
+                        onClick={() => openParticipantFlow("regular_codriver_registration")}
+                      />
+                      <HintButton
+                        label="Persönlichen Beifahrer-Link erstellen"
+                        icon={<Link2 className="mr-2 h-4 w-4" />}
+                        disabledReason={
+                          codriverLinkBusy
+                            ? "Beifahrer-Link wird verarbeitet…"
+                            : status !== "accepted"
+                              ? "Beifahrer-Links können erst nach Zulassung erstellt werden."
+                              : !currentClassAllowsCodriver
+                                ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
+                                : detail.codriver.assigned
+                                  ? "Für diese Nennung ist bereits ein regulärer Beifahrer hinterlegt."
+                                  : undefined
+                        }
+                        onClick={() => void openCodriverLinkDialog()}
+                      />
+                      <HintButton
+                        label="Charity-Fahrt am Terminal erfassen"
+                        icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
+                        disabledReason={
+                          participantBusy
+                            ? "Beifahrer-Aktion läuft…"
+                            : status !== "accepted"
+                              ? "Charity-Fahrten können erst nach Zulassung erfasst werden."
+                              : !currentClassAllowsCodriver
+                                ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
+                                : undefined
+                        }
+                        onClick={() => openParticipantFlow("charity_codriver_registration")}
+                      />
+                    </>
+                  )}
+                  {canPrintStampCards && (
+                    <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                      <label className="flex items-center justify-between gap-2 text-xs text-slate-600">
+                        Druckfeld
+                        <select className="h-9 rounded-md border bg-white px-2 text-sm" value={stampCardStartSlot} onChange={(event) => setStampCardStartSlot(Number(event.target.value))}>
+                          {Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
+                        </select>
+                      </label>
+                      <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "driver", personId: detail.driverPersonId })}>
+                        <Download className="mr-2 h-4 w-4" />Fahrerkarte drucken
+                      </Button>
+                      {detail.codriver.id ? (
+                        <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "regular_codriver", personId: detail.codriver.id! })}>
+                          <Download className="mr-2 h-4 w-4" />Beifahrerkarte drucken
+                        </Button>
+                      ) : null}
+                      {detail.charityCodrivers.filter((item) => item.status === "active").map((item) => (
+                        <Button key={item.registrationId} type="button" size="sm" variant="outline" className="h-auto whitespace-normal py-2" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "charity_codriver", registrationId: item.registrationId })}>
+                          <Download className="mr-2 h-4 w-4" />Charity-Karte: {item.name}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Haftverzicht-Dokumente</div>
+                    {[
+                      { key: "driver", name: detail.driver.name, role: "Fahrer", waiver: detail.waiverSigners.driver },
+                      ...(detail.waiverSigners.codriver ? [{ key: "codriver", name: detail.codriver.label, role: "Beifahrer", waiver: detail.waiverSigners.codriver }] : [])
+                    ].map((item) => (
+                      <div key={item.key} className="rounded-md border bg-white p-2">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="min-w-0 truncate font-medium">{item.role}: {item.name}</span>
+                          <Badge className={waiverSignedClasses(item.waiver.signed)} variant="outline">{waiverSignedLabel(item.waiver.signed)}</Badge>
+                        </div>
+                        {item.waiver.documentId ? (
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            <Button type="button" size="sm" variant="outline" onClick={() => void handleDocumentDownloadById(item.waiver.documentId!, `${item.role}-Haftverzicht`, `waiver-pdf-${item.key}`)}>
+                              <Download className="mr-1.5 h-4 w-4" />PDF
+                            </Button>
+                            {canSendMail ? <Button type="button" size="sm" variant="outline" disabled={Boolean(actionInFlight)} onClick={() => void resendWaiverMail(item.waiver.documentId!, item.name)}>
+                              <Mail className="mr-1.5 h-4 w-4" />Mail
+                            </Button> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                    {detail.charityCodrivers.map((item) => (
+                      <div key={item.registrationId} className={cn("rounded-md border p-2", item.status === "active" ? "bg-white" : "bg-slate-100 opacity-70")}>
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="min-w-0 truncate font-medium">Charity: {item.name}</span>
+                          <Badge className={waiverSignedClasses(item.waiverSigned.signed)} variant="outline">{waiverSignedLabel(item.waiverSigned.signed)}</Badge>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {item.waiverSigned.documentId ? <Button type="button" size="sm" variant="outline" onClick={() => void handleDocumentDownloadById(item.waiverSigned.documentId!, "Charity-Haftverzicht", `waiver-pdf-${item.registrationId}`)}>
+                            <Download className="mr-1.5 h-4 w-4" />PDF
+                          </Button> : null}
+                          {canSendMail && item.waiverSigned.documentId ? <Button type="button" size="sm" variant="outline" disabled={Boolean(actionInFlight)} onClick={() => void resendWaiverMail(item.waiverSigned.documentId!, item.name)}>
+                            <Mail className="mr-1.5 h-4 w-4" />Mail
+                          </Button> : null}
+                          {canManageParticipants && item.status === "active" ? <Button type="button" size="sm" variant="outline" className="col-span-2 border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => { setCharityRevocationReason(""); setPendingCharityRevoke({ registrationId: item.registrationId, name: item.name }); }}>
+                            <Trash2 className="mr-1.5 h-4 w-4" />Charity-Berechtigung stornieren
+                          </Button> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -2428,6 +2572,52 @@ export function AdminEntryDetailPage() {
                 ) : (
                   "Ja, löschen"
                 )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canManageParticipants && pendingCharityRevoke && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div className="w-full max-w-lg rounded-lg border bg-white p-5 shadow-xl">
+            <h2 className="text-xl font-semibold text-slate-900">Charity-Berechtigung stornieren</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Die Stempelkarte von {pendingCharityRevoke.name} wird ungültig. Die unterschriebene Erklärung bleibt revisionssicher gespeichert.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-slate-800" htmlFor="charity-revocation-reason">Begründung</label>
+            <textarea
+              id="charity-revocation-reason"
+              className="mt-1 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              maxLength={500}
+              value={charityRevocationReason}
+              onChange={(event) => setCharityRevocationReason(event.target.value)}
+              placeholder="Zum Beispiel doppelt oder irrtümlich erfasst"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="outline" disabled={Boolean(actionInFlight)} onClick={() => setPendingCharityRevoke(null)}>Abbrechen</Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={Boolean(actionInFlight) || !charityRevocationReason.trim()}
+                onClick={async () => {
+                  if (!pendingCharityRevoke || !charityRevocationReason.trim() || actionInFlight) return;
+                  setActionInFlight("charity-revoke");
+                  try {
+                    await adminEntriesService.revokeCharityCodriver(detail.id, pendingCharityRevoke.registrationId, charityRevocationReason.trim());
+                    setPendingCharityRevoke(null);
+                    setCharityRevocationReason("");
+                    flashMessage("Charity-Berechtigung wurde storniert.", 3200);
+                    loadDetail();
+                  } catch (error) {
+                    flashMessage(getApiErrorMessage(error, "Charity-Berechtigung konnte nicht storniert werden."), 4200);
+                  } finally {
+                    setActionInFlight((current) => current === "charity-revoke" ? null : current);
+                  }
+                }}
+              >
+                {actionInFlight === "charity-revoke" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Stornieren
               </Button>
             </div>
           </div>

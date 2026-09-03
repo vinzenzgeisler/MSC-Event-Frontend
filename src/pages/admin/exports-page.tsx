@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Download, Loader2 } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { acceptanceStatusLabel, exportStatusClasses, exportStatusLabel } from "@/lib/admin-status";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
+import { adminEntriesService } from "@/services/admin-entries.service";
+import { getAdminEventId } from "@/services/api/event-context";
 import { exportsService } from "@/services/exports.service";
 import type { ExportCreateForm, ExportJob } from "@/types/admin";
 
@@ -22,10 +25,13 @@ const initialForm: ExportCreateForm = {
 export function AdminExportsPage() {
   const { roles } = useAuth();
   const canCreateExports = hasPermission(roles, "exports.write");
+  const canPrintStampCards = hasPermission(roles, "stamp_cards.print");
   const [form, setForm] = useState<ExportCreateForm>(initialForm);
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
+  const [stampCardExporting, setStampCardExporting] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const showToast = (message: string) => {
@@ -38,6 +44,31 @@ export function AdminExportsPage() {
       setJobs(await exportsService.listExports());
     } catch (error) {
       showToast(getApiErrorMessage(error, "Exportliste konnte nicht geladen werden."));
+    }
+  };
+
+  const downloadStampCards = async () => {
+    if (stampCardExporting) return;
+    setStampCardExporting(true);
+    try {
+      const eventId = await getAdminEventId();
+      const download = await adminEntriesService.getStampCards({
+        eventId,
+        startSlot: stampCardStartSlot,
+        selection: { type: "accepted_regular" }
+      });
+      const bytes = Uint8Array.from(atob(download.dataBase64), (character) => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: download.mimeType }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = download.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast(`${download.cardCount} Stempelkarten auf ${download.pageCount} Seite(n) heruntergeladen.`);
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "Stempelkarten-Sammeldruck fehlgeschlagen."));
+    } finally {
+      setStampCardExporting(false);
     }
   };
 
@@ -66,11 +97,11 @@ export function AdminExportsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="entries_csv">entries_csv</SelectItem>
-                <SelectItem value="startlist_csv">startlist_csv</SelectItem>
-                <SelectItem value="participants_csv">participants_csv</SelectItem>
-                <SelectItem value="payments_open_csv">payments_open_csv</SelectItem>
-                <SelectItem value="checkin_status_csv">checkin_status_csv</SelectItem>
+                <SelectItem value="entries_csv">Nennungen (CSV)</SelectItem>
+                <SelectItem value="startlist_csv">Startliste (CSV)</SelectItem>
+                <SelectItem value="participants_csv">Teilnehmer inkl. Beifahrer (CSV)</SelectItem>
+                <SelectItem value="payments_open_csv">Offene Zahlungen (CSV)</SelectItem>
+                <SelectItem value="checkin_status_csv">Check-in-Status (CSV)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -209,6 +240,40 @@ export function AdminExportsPage() {
           )}
         </CardContent>
       </Card>
+
+      {canPrintStampCards && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Stempelkarten-Sammeldruck</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Erstellt die persönlichen Stempelkarten aller zugelassenen Fahrer und regulären Beifahrer als druckfertige PDF-Datei.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="stamp-card-start-slot">Erstes Druckfeld</Label>
+                <Select value={String(stampCardStartSlot)} onValueChange={(value) => setStampCardStartSlot(Number(value))}>
+                  <SelectTrigger id="stamp-card-start-slot" className="w-40 text-base md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, index) => (
+                      <SelectItem key={index + 1} value={String(index + 1)}>
+                        Feld {index + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="button" disabled={stampCardExporting} onClick={() => void downloadStampCards()}>
+                {stampCardExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Sammeldruck herunterladen
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

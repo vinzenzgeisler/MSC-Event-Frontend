@@ -163,6 +163,13 @@ export const adminSigningService = {
     return response.session;
   },
 
+  async resendSignedWaiverMail(documentId: string) {
+    return requestJson<{ ok: true; outboxId: string; recipient: string }>(
+      `/admin/documents/${documentId}/resend-waiver-mail`,
+      { method: "POST" }
+    );
+  },
+
   // Alias used in settings page
   async generatePairingCode() {
     return adminSigningService.createPairingCode();

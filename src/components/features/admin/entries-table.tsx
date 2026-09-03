@@ -378,9 +378,14 @@ function EntriesTableInner({
                   Noch nicht relevant
                 </Badge>
               )}
-              <Badge className={`${waiverSignedClasses(row.waiverSigned.signed)} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
-                Haftverzicht: {waiverSignedLabel(row.waiverSigned.signed)}
+              <Badge className={`${waiverSignedClasses(row.waiverSigners.driver.signed)} h-auto max-w-full whitespace-normal break-words px-2.5 py-1 text-center text-xs leading-tight`} variant="outline">
+                Fahrer: {waiverSignedLabel(row.waiverSigners.driver.signed)}
               </Badge>
+              {row.waiverSigners.codriver ? (
+                <Badge className={`${waiverSignedClasses(row.waiverSigners.codriver.signed)} h-auto max-w-full whitespace-normal break-words px-2.5 py-1 text-center text-xs leading-tight`} variant="outline">
+                  Beifahrer: {waiverSignedLabel(row.waiverSigners.codriver.signed)}
+                </Badge>
+              ) : null}
             </div>
             <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div>
           </div>
@@ -391,15 +396,15 @@ function EntriesTableInner({
         <div ref={handleDesktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[28%]" />
+              <col className="w-[25%]" />
               <col className="w-[9%]" />
               <col className="w-[7%]" />
               <col className="w-[10%]" />
               <col className="w-[9%]" />
               <col className="w-[9%]" />
-              <col className="w-[10%]" />
+              <col className="w-[11%]" />
               <col className="w-[8%]" />
-              <col className="w-[16%]" />
+              <col className="w-[12%]" />
             </colgroup>
             <thead className="bg-slate-100 text-left text-slate-700">
               <tr>
@@ -478,10 +483,17 @@ function EntriesTableInner({
                       <span className="text-xs text-slate-500">Noch nicht relevant</span>
                     )}
                   </td>
-                  <td className="px-3 py-3">
-                    <Badge className={`${waiverSignedClasses(row.waiverSigned.signed)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
-                      {waiverSignedLabel(row.waiverSigned.signed)}
-                    </Badge>
+                  <td className="min-w-0 px-2 py-3">
+                    <div className="grid min-w-0 gap-1">
+                      <Badge className={`${waiverSignedClasses(row.waiverSigners.driver.signed)} h-auto w-full min-w-0 justify-center whitespace-normal break-words px-1 py-1 text-center text-[10px] leading-tight`} variant="outline">
+                        F: {waiverSignedLabel(row.waiverSigners.driver.signed)}
+                      </Badge>
+                      {row.waiverSigners.codriver ? (
+                        <Badge className={`${waiverSignedClasses(row.waiverSigners.codriver.signed)} h-auto w-full min-w-0 justify-center whitespace-normal break-words px-1 py-1 text-center text-[10px] leading-tight`} variant="outline">
+                          BF: {waiverSignedLabel(row.waiverSigners.codriver.signed)}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-3.5 text-slate-700">
                     <span className="block leading-tight">{row.createdAt}</span>

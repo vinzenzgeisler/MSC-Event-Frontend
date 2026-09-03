@@ -13,6 +13,7 @@ export type WaiverSignedStatus = {
   signed: boolean;
   signedAt: string | null;
   documentId: Id | null;
+  signingSessionId?: Id | null;
 };
 
 export type AdminEntryListItemDto = {
@@ -46,6 +47,10 @@ export type AdminEntryListItemDto = {
   confirmationMailVerified?: boolean;
   confirmationMailSent: boolean;
   waiverSigned?: WaiverSignedStatus;
+  waiverSigners?: {
+    driver: WaiverSignedStatus;
+    codriver: WaiverSignedStatus | null;
+  };
   internalNote?: string | null;
   driverNote?: string | null;
   inspectionNote?: string | null;
@@ -91,6 +96,10 @@ export type AdminEntryListItem = {
   checkin: "offen" | "bestätigt";
   techStatus: TechStatus;
   waiverSigned: WaiverSignedStatus;
+  waiverSigners: {
+    driver: WaiverSignedStatus;
+    codriver: WaiverSignedStatus | null;
+  };
   confirmationMailSent: boolean;
   confirmationMailVerified: boolean;
   driverNote: string;
@@ -166,6 +175,10 @@ export type AdminEntryDetailDto = {
   confirmationMailSent?: boolean;
   confirmationMailVerified?: boolean;
   waiverSigned?: WaiverSignedStatus;
+  waiverSigners?: {
+    driver: WaiverSignedStatus;
+    codriver: WaiverSignedStatus | null;
+  };
   person: {
     driver: {
       firstName: string | null;
@@ -204,6 +217,12 @@ export type AdminEntryDetailDto = {
       email: string | null;
       birthdate: string | null;
       createdAt: string;
+      status: "active" | "revoked";
+      terminalSessionId: Id | null;
+      revokedAt: string | null;
+      revokedBy: string | null;
+      revocationReason: string | null;
+      waiverSigned: WaiverSignedStatus;
     }>;
   };
   vehicle: {
@@ -308,6 +327,10 @@ export type AdminEntryDetailViewModel = {
   techCheckedAt: string | null;
   techCheckedBy: string | null;
   waiverSigned: WaiverSignedStatus;
+  waiverSigners: {
+    driver: WaiverSignedStatus;
+    codriver: WaiverSignedStatus | null;
+  };
   driver: {
     name: string;
     email: string;
@@ -344,6 +367,12 @@ export type AdminEntryDetailViewModel = {
     email: string;
     birthdate: string;
     createdAt: string;
+    status: "active" | "revoked";
+    terminalSessionId: Id | null;
+    revokedAt: string | null;
+    revokedBy: string | null;
+    revocationReason: string;
+    waiverSigned: WaiverSignedStatus;
   }>;
   vehicle: {
     label: string;

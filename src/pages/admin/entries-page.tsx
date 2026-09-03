@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -15,7 +15,6 @@ import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.s
 import { adminIamService } from "@/services/admin-iam.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
-import { getAdminEventId } from "@/services/api/event-context";
 import type { AdminDeletedEntryListItem, AdminEntriesFilter, AdminEntryListItem, ListMeta } from "@/types/admin";
 
 const PAGE_SIZE = 12;
@@ -419,7 +418,6 @@ export function AdminEntriesPage() {
   const canManageStatus = hasPermission(roles, "entries.status.write");
   const canDeleteEntries = hasPermission(roles, "entries.delete");
   const canReadIam = hasPermission(roles, "iam.read");
-  const canPrintStampCards = hasPermission(roles, "stamp_cards.print");
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -453,8 +451,6 @@ export function AdminEntriesPage() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [qrExporting, setQrExporting] = useState(false);
-  const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pendingAcceptEntryId, setPendingAcceptEntryId] = useState<string | null>(null);
   const [pendingRejectEntryId, setPendingRejectEntryId] = useState<string | null>(null);
@@ -483,27 +479,6 @@ export function AdminEntriesPage() {
   const classNameById = useMemo(() => {
     return new Map(classOptions.map((item) => [item.id, item.name]));
   }, [classOptions]);
-
-  const downloadStampCards = async () => {
-    if (qrExporting || rows.length === 0) return;
-    setQrExporting(true);
-    try {
-      const eventId = await getAdminEventId();
-      const download = await adminEntriesService.getStampCards({ eventId, startSlot: stampCardStartSlot, selection: { type: "accepted_regular" } });
-      const bytes = Uint8Array.from(atob(download.dataBase64), (character) => character.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: download.mimeType }));
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = download.filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      showToast(`${download.cardCount} Stempelkarten auf ${download.pageCount} Seite(n) heruntergeladen.`);
-    } catch (error) {
-      showToast(getApiErrorMessage(error, "Stempelkarten-Download fehlgeschlagen."));
-    } finally {
-      setQrExporting(false);
-    }
-  };
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -1195,22 +1170,6 @@ export function AdminEntriesPage() {
               <Button type="button" size="sm" variant="outline" onClick={() => setFilterDraft(initialFilter)}>
                 Filter zurücksetzen
               </Button>
-              {canPrintStampCards ? <label className="flex items-center gap-2 text-xs text-slate-600">
-                Startfeld
-                <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm" value={stampCardStartSlot} onChange={(event) => setStampCardStartSlot(Number(event.target.value))} aria-label="Erstes Druckfeld">
-                  {Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
-                </select>
-              </label> : null}
-              {canPrintStampCards ? <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={qrExporting || rows.length === 0}
-                onClick={() => void downloadStampCards()}
-              >
-                {qrExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                Stempelkarten
-              </Button> : null}
             </div>
           </div>
           {activeFilterChips.length > 0 && (

@@ -110,11 +110,12 @@ function normalizePaymentStatus(value: unknown): PaymentStatus | null {
   return value === "paid" || value === "not_required" ? value : "due";
 }
 
-function normalizeWaiverSignedStatus(value?: { signed?: boolean; signedAt?: string | null; documentId?: string | null } | null) {
+function normalizeWaiverSignedStatus(value?: { signed?: boolean; signedAt?: string | null; documentId?: string | null; signingSessionId?: string | null } | null) {
   return {
     signed: Boolean(value?.signed),
     signedAt: value?.signedAt ?? null,
-    documentId: value?.documentId ?? null
+    documentId: value?.documentId ?? null,
+    signingSessionId: value?.signingSessionId ?? null
   };
 }
 
@@ -258,6 +259,10 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
     checkin: dto.checkinIdVerified ? "bestätigt" : "offen",
     techStatus: dto.techStatus ?? "pending",
     waiverSigned: normalizeWaiverSignedStatus(dto.waiverSigned),
+    waiverSigners: {
+      driver: normalizeWaiverSignedStatus(dto.waiverSigners?.driver ?? dto.waiverSigned),
+      codriver: dto.waiverSigners?.codriver ? normalizeWaiverSignedStatus(dto.waiverSigners.codriver) : null
+    },
     confirmationMailSent: Boolean(dto.confirmationMailSent),
     confirmationMailVerified: Boolean(dto.confirmationMailVerified),
     driverNote: (dto.driverNote ?? "").trim(),
@@ -334,6 +339,10 @@ function fromAdminEntryDetailDto(
     techCheckedAt: dto.checkin.techCheckedAt,
     techCheckedBy: dto.checkin.techCheckedBy,
     waiverSigned: normalizeWaiverSignedStatus(dto.waiverSigned),
+    waiverSigners: {
+      driver: normalizeWaiverSignedStatus(dto.waiverSigners?.driver ?? dto.waiverSigned),
+      codriver: dto.waiverSigners?.codriver ? normalizeWaiverSignedStatus(dto.waiverSigners.codriver) : null
+    },
     driver: {
       name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
       email: dto.person.driver.email ?? "-",
@@ -369,7 +378,13 @@ function fromAdminEntryDetailDto(
       name: parseName(item.firstName, item.lastName),
       email: item.email ?? "-",
       birthdate: asDate(item.birthdate),
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      status: item.status ?? "active",
+      terminalSessionId: item.terminalSessionId ?? null,
+      revokedAt: item.revokedAt ?? null,
+      revokedBy: item.revokedBy ?? null,
+      revocationReason: item.revocationReason ?? "",
+      waiverSigned: normalizeWaiverSignedStatus(item.waiverSigned)
     })),
     vehicle: {
       label: dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug"),
@@ -927,6 +942,13 @@ export const adminEntriesService = {
       "/admin/stamp-cards/export",
       { method: "POST", body: payload }
     );
+  },
+
+  async revokeCharityCodriver(entryId: string, registrationId: string, reason: string) {
+    return requestJson<{ ok: true }>(`/admin/entries/${entryId}/charity-codrivers/${registrationId}/revoke`, {
+      method: "POST",
+      body: { reason }
+    });
   },
 
   async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string; inspectionNote: string; status?: AcceptanceStatus }) {
