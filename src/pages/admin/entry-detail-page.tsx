@@ -770,14 +770,14 @@ export function AdminEntryDetailPage() {
     }));
   };
 
-  const savePdfDownload = (download: { dataBase64: string; mimeType: string; filename: string }) => {
-    const bytes = Uint8Array.from(atob(download.dataBase64), (character) => character.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bytes], { type: download.mimeType }));
+  const saveStampCardDownload = (download: { downloadUrl: string; filename: string }) => {
     const anchor = document.createElement("a");
-    anchor.href = url;
+    anchor.href = download.downloadUrl;
     anchor.download = download.filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
   };
 
   const downloadStampCard = async (subject: { cardType: "driver" | "regular_codriver"; personId: string } | { cardType: "charity_codriver"; registrationId: string }) => {
@@ -789,7 +789,7 @@ export function AdminEntryDetailPage() {
         startSlot: stampCardStartSlot,
         selection: { type: "subjects", subjects: [subject] }
       });
-      savePdfDownload(download);
+      saveStampCardDownload(download);
       flashMessage("Stempelkarte wurde erstellt.");
     } catch (error) {
       flashMessage(getApiErrorMessage(error, "Stempelkarte konnte nicht erstellt werden."), 3200);

@@ -938,7 +938,7 @@ export const adminEntriesService = {
       | { type: "accepted_regular" }
       | { type: "subjects"; subjects: Array<{ cardType: "driver" | "regular_codriver"; personId: string } | { cardType: "charity_codriver"; registrationId: string }> };
   }) {
-    return requestJson<{ ok: true; filename: string; mimeType: string; dataBase64: string; cardCount: number; pageCount: number }>(
+    return requestJson<{ ok: true; filename: string; mimeType: string; downloadUrl: string; cardCount: number; pageCount: number }>(
       "/admin/stamp-cards/export",
       { method: "POST", body: payload }
     );
