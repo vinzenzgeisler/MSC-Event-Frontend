@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/features/admin/marshal-status";
 import { canonicalizeMarshalAreas, MarshalAreaMultiSelect } from "@/components/features/admin/marshal-area-multi-select";
+import { MarshalShirtSizeInput } from "@/components/features/admin/marshal-shirt-size-input";
 import type { MarshalCommitmentStatus, MarshalPerson, MarshalPersonPatch, MarshalWorkspace } from "@/types/admin-marshals";
 
 type Props = {
@@ -137,7 +138,7 @@ export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose
           </section>
           <section aria-labelledby="marshal-person-masterdata" className="border-t pt-4"><h3 id="marshal-person-masterdata" className="mb-3 font-semibold">Stammdaten</h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              {fields.map(({ key, label, type = "text" }) => <label key={key} className="grid gap-1 text-xs font-medium text-slate-600">{label}<Input type={type} value={draft[key] ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} /></label>)}
+              {fields.map(({ key, label, type = "text" }) => <label key={key} className="grid gap-1 text-xs font-medium text-slate-600">{label}{key === "shirtSize" ? <MarshalShirtSizeInput value={draft[key] ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} /> : <Input type={type} value={draft[key] ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />}</label>)}
               <div className="sm:col-span-2"><MarshalAreaMultiSelect areas={workspace.areas} value={draft.activityAreas} disabled={!canWrite} onChange={(activityAreas) => setDraft({ ...draft, activityAreas })} /></div>
               <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">Bemerkungen (Stammdaten)<textarea className="min-h-24 rounded-md border bg-white px-3 py-2 text-sm font-normal text-slate-950 disabled:bg-slate-50" value={draft.note ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, note: event.target.value })} /></label>
             </div>
