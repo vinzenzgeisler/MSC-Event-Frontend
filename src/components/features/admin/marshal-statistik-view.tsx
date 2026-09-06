@@ -34,6 +34,7 @@ export function MarshalStatistikView({ workspace, canExport, onPrint }: Props) {
                 {item.sizes.map(({ size, count }) => <li key={size} className="rounded-md border bg-white px-3 py-2 text-sm"><strong>{count}×</strong> {size}</li>)}
                 {item.sizes.length === 0 && <li className="text-sm text-slate-500">0 T-Shirts</li>}
               </ul>
+              {item.issues.length > 0 && <details className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm"><summary className="cursor-pointer font-medium text-amber-900">{item.issues.length} Größenangabe{item.issues.length === 1 ? "" : "n"} prüfen</summary><ul className="mt-2 space-y-1 text-xs text-amber-950">{item.issues.map((issue) => <li key={issue.personId}>#{issue.helperNumber} {issue.name}: {issue.reason === "missing" ? "kein Eintrag" : `ungültig „${issue.rawValue}“`}</li>)}</ul></details>}
               <Button type="button" variant="outline" size="sm" className="mt-4 w-full" disabled={!canExport} onClick={() => void onPrint(item.areaId)}><Download className="mr-2 h-4 w-4" />Bereich als PDF</Button>
             </section>
           ))}

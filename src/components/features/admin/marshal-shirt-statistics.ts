@@ -6,12 +6,13 @@ export type MarshalShirtStatistic = {
   areaName: string;
   peopleCount: number;
   sizes: Array<{ size: string; count: number }>;
+  issues: Array<{ personId: string; helperNumber: number; name: string; reason: "missing" | "invalid"; rawValue: string | null }>;
 };
 
 const shirtSizeOrder = ["KINDER", "XS", "S", "M", "L", "XL", "XXL", "2XL", "XXXL", "3XL", "4XL", "5XL", "6XL"];
 
 export function getMarshalShirtSize(person: MarshalPerson): string | null {
-  return cleanShirtSize(person.shirtSize);
+  return classifyShirtSize(person.shirtSize).size;
 }
 
 export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): MarshalShirtStatistic[] {
@@ -46,9 +47,18 @@ export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): Marsha
 
   return groups.map((group) => {
     const counts = new Map<string, number>();
+    const issues: MarshalShirtStatistic["issues"] = [];
     group.people.forEach((person) => {
-      const size = getMarshalShirtSize(person) ?? "Ohne Größenangabe";
-      counts.set(size, (counts.get(size) ?? 0) + 1);
+      const classification = classifyShirtSize(person.shirtSize);
+      const label = classification.size ?? (classification.reason === "invalid" ? "Ungültige Größenangabe" : "Ohne Größenangabe");
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+      if (classification.reason) issues.push({
+        personId: person.id,
+        helperNumber: person.helperNumber,
+        name: `${person.firstName} ${person.lastName}`,
+        reason: classification.reason,
+        rawValue: classification.reason === "invalid" ? person.shirtSize?.trim() ?? null : null,
+      });
     });
     return {
       areaId: group.areaId,
@@ -57,15 +67,16 @@ export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): Marsha
       sizes: [...counts.entries()]
         .map(([size, count]) => ({ size, count }))
         .sort((a, b) => shirtSizeRank(a.size) - shirtSizeRank(b.size) || a.size.localeCompare(b.size, "de", { numeric: true })),
+      issues: issues.sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" })),
     };
   });
 }
 
-function cleanShirtSize(value: string | null | undefined): string | null {
+function classifyShirtSize(value: string | null | undefined): { size: string | null; reason: "missing" | "invalid" | null } {
   const trimmed = value?.trim();
-  if (!trimmed) return null;
+  if (!trimmed) return { size: null, reason: "missing" };
   const validSize = /^(?:(?:H|D|K|HERREN|DAMEN|KINDER)\s*[-/ ]\s*)?(?:XXS|XS|S|M|L|XL|XXL|XXXL|XXXXL|[2-6]XL|\d{2,3}(?:\s*\/\s*\d{2,3})?)$/i;
-  return validSize.test(trimmed) ? trimmed : null;
+  return validSize.test(trimmed) ? { size: trimmed, reason: null } : { size: null, reason: "invalid" };
 }
 
 function shirtSizeRank(size: string) {
