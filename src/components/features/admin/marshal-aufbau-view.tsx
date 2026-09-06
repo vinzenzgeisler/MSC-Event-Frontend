@@ -91,26 +91,26 @@ export function MarshalAufbauView({ workspace, area, canWrite, busy, onPersonOpe
             </label>
           </div>
           {shifts.length === 0 && <p className="rounded-xl border border-dashed p-4 text-sm text-slate-500">Keine Schichten konfiguriert.</p>}
-          <div className="overflow-x-auto">
-            <table className="min-w-max w-full text-sm">
+          <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-lg border">
+            <table className="w-max min-w-full text-sm">
               <thead>
                 <tr className="border-b bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="sticky left-0 z-10 bg-slate-50 p-3">Name</th>
+                  <th className="sticky left-0 z-20 w-48 min-w-48 max-w-48 border-r bg-slate-50 p-3 shadow-[6px_0_10px_-10px_rgba(15,23,42,0.55)]">Name</th>
                   {shifts.map((shift) => (
-                    <th key={shift.id} className="min-w-28 p-3 text-center">
-                      <span className="block">{shift.label}</span>
-                      <span className="normal-case font-normal">{formatShortDate(shift.shiftDate)}</span>
+                    <th key={shift.id} className="w-44 min-w-44 p-3 text-center">
+                      <span className="block whitespace-nowrap">{shift.label}</span>
+                      <span className="block whitespace-nowrap font-normal normal-case">{formatShortDate(shift.shiftDate)}</span>
                     </th>
                   ))}
-                  <th className="p-3">Shirt</th>
-                  {canWrite && <th className="p-3">Aktionen</th>}
+                  <th className="w-24 min-w-24 p-3">Shirt</th>
+                  {canWrite && <th className="w-20 min-w-20 p-3">Aktionen</th>}
                 </tr>
               </thead>
               <tbody>
                 {people.map((person) => (
                   <tr key={person.id} className={cn("border-b", person.noDeployment && "bg-red-50 text-red-900")}>
-                    <td className="sticky left-0 z-10 bg-inherit p-3">
-                      <button type="button" className="font-medium text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => onPersonOpen(person)}>
+                    <td className={cn("sticky left-0 z-10 w-48 min-w-48 max-w-48 border-r p-3 shadow-[6px_0_10px_-10px_rgba(15,23,42,0.55)]", person.noDeployment ? "bg-red-50" : "bg-white")}>
+                      <button type="button" className="max-w-full break-words text-left font-medium text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => onPersonOpen(person)}>
                         {person.lastName}, {person.firstName}
                       </button>
                       <EventAssignmentBadges person={person} workspace={workspace} />
@@ -126,9 +126,9 @@ export function MarshalAufbauView({ workspace, area, canWrite, busy, onPersonOpe
                         : [];
                       const conflictDay = workspace.days.find((item) => item.eventDate === shift.shiftDate);
                       return (
-                        <td key={shift.id} className="p-2 text-center">
-                          <span className="inline-flex items-center">
-                            <select aria-label={`${shift.label} für ${person.firstName} ${person.lastName}`} title={marshalStatusLabels[status]} className={cn("h-9 w-24 rounded-md border px-2 text-center text-sm font-semibold", statusClass(status))} value={status} disabled={!canWrite || busy || person.noDeployment} onChange={(event) => void onSaveShift(person, shift.id, event.target.value as MarshalCommitmentStatus)}>
+                        <td key={shift.id} className="w-44 min-w-44 p-2 text-center">
+                          <span className="inline-flex w-full items-center justify-center">
+                            <select aria-label={`${shift.label} für ${person.firstName} ${person.lastName}`} title={marshalStatusLabels[status]} className={cn("h-10 w-36 rounded-md border px-2 text-left text-sm font-semibold", statusClass(status))} value={status} disabled={!canWrite || busy || person.noDeployment} onChange={(event) => void onSaveShift(person, shift.id, event.target.value as MarshalCommitmentStatus)}>
                               {Object.entries(marshalStatusLabels).map(([value, label]) => (
                                 <option key={value} value={value}>
                                   {label}
