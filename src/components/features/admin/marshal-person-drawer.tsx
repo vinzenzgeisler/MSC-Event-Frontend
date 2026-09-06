@@ -142,7 +142,8 @@ export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose
               <div className="sm:col-span-2"><MarshalAreaMultiSelect areas={workspace.areas} value={draft.activityAreas} disabled={!canWrite} onChange={(activityAreas) => setDraft({ ...draft, activityAreas })} /></div>
               <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">Bemerkungen (Stammdaten)<textarea className="min-h-24 rounded-md border bg-white px-3 py-2 text-sm font-normal text-slate-950 disabled:bg-slate-50" value={draft.note ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, note: event.target.value })} /></label>
             </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <label className="flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm"><input type="checkbox" checked={draft.clubMember} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, clubMember: event.target.checked })} />Vereinsmitglied</label>
               <label className="flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm"><input type="checkbox" checked={draft.isActive} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} />Aktiver Stammdatensatz</label>
               <label className={`flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm ${draft.noDeployment ? "border-red-300 bg-red-50 text-red-900" : ""}`}><input type="checkbox" checked={draft.noDeployment} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, noDeployment: event.target.checked })} /><AlertTriangle className="h-4 w-4" />Kein Einsatz mehr</label>
             </div>
@@ -181,6 +182,7 @@ function buildPersonPatch(original: MarshalPerson, current: MarshalPerson): Mars
   }
 
   if (JSON.stringify(current.activityAreas) !== JSON.stringify(original.activityAreas)) patch.activityAreas = current.activityAreas;
+  if (current.clubMember !== original.clubMember) patch.clubMember = current.clubMember;
   if (current.isActive !== original.isActive) patch.isActive = current.isActive;
   if (current.noDeployment !== original.noDeployment) patch.noDeployment = current.noDeployment;
 
