@@ -136,7 +136,7 @@ export type MarshalPersonPatch = Partial<MarshalPersonInput> & {
 
 export type MarshalInitialEventAssignment =
   | { kind: "none" }
-  | { kind: "area"; areaId: string; commitmentStatus: MarshalCommitmentStatus }
+  | { kind: "area"; areaId: string; shiftId?: string; commitmentStatus: MarshalCommitmentStatus }
   | { kind: "track"; dayId: string; commitmentStatus: MarshalCommitmentStatus };
 
 export type MarshalDayAssignmentInput = {

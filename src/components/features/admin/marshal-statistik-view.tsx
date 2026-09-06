@@ -19,7 +19,7 @@ export function MarshalStatistikView({ workspace, canExport, onPrint }: Props) {
       <div>
         <div>
           <h1 className="text-2xl font-semibold text-slate-950">T-Shirt-Statistik</h1>
-          <p className="mt-1 text-sm text-slate-600">Zugesagte Helfer werden veranstaltungsweit genau einmal gezählt. Streckenposten haben Vorrang vor Aufbau- und weiteren Bereichen.</p>
+          <p className="mt-1 text-sm text-slate-600">Helfer werden veranstaltungsweit genau einmal gezählt. Im Aufbau zählt bereits die Bereichszuordnung als Shirtbedarf; Streckenposten haben bei Überschneidungen Vorrang.</p>
         </div>
       </div>
       <Card>

@@ -250,6 +250,9 @@ export function AdminMarshalsPage() {
       try {
         if (initialAssignment.kind === "area") {
           await adminMarshalsService.upsertAreaAssignment(person.id, { eventId: operationEventId, areaId: initialAssignment.areaId, commitmentStatus: initialAssignment.commitmentStatus });
+          if (initialAssignment.shiftId) {
+            await adminMarshalsService.upsertShiftAssignment(person.id, { eventId: operationEventId, shiftId: initialAssignment.shiftId, commitmentStatus: initialAssignment.commitmentStatus });
+          }
         } else if (initialAssignment.kind === "track") {
           await adminMarshalsService.saveAssignment(person.id, {
             eventId: operationEventId,

@@ -1,5 +1,5 @@
 import type { MarshalPerson, MarshalWorkspace } from "@/types/admin-marshals";
-import { hasAcceptedMarshalTrackAssignment } from "@/components/features/admin/marshal-assignment-helpers";
+import { hasAcceptedMarshalTrackAssignment, isMarshalShirtRelevantAreaAssignment } from "@/components/features/admin/marshal-assignment-helpers";
 
 export type MarshalShirtStatistic = {
   areaId: string;
@@ -33,10 +33,10 @@ export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): Marsha
     const shiftIds = new Set(workspace.areaShifts.filter((shift) => shift.areaId === area.id).map((shift) => shift.id));
     const participationIds = new Set([
       ...workspace.areaAssignments
-        .filter((assignment) => assignment.areaId === area.id && assignment.commitmentStatus === "accepted")
+        .filter((assignment) => assignment.areaId === area.id && isMarshalShirtRelevantAreaAssignment(area.areaType, assignment.commitmentStatus))
         .map((assignment) => assignment.participationId),
       ...workspace.shiftAssignments
-        .filter((assignment) => shiftIds.has(assignment.shiftId) && assignment.commitmentStatus === "accepted")
+        .filter((assignment) => shiftIds.has(assignment.shiftId) && isMarshalShirtRelevantAreaAssignment(area.areaType, assignment.commitmentStatus))
         .map((assignment) => assignment.participationId),
     ]);
     const people = workspace.people.filter((person) => person.isActive && !person.noDeployment && participationIds.has(person.participation.id) && !counted.has(person.participation.id));

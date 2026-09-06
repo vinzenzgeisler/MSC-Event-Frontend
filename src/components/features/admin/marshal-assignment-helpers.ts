@@ -1,6 +1,7 @@
 import type { MarshalAreaAssignment, MarshalCommitmentStatus, MarshalPerson, MarshalShiftAssignment } from "@/types/admin-marshals";
 
 const TRACK_AREA_ALIASES = new Set(["strecke", "streckenposten", "team strecke", "team streckenposten", "track", "marshal"]);
+const ACTIVE_ASSIGNMENT_STATUSES = new Set<MarshalCommitmentStatus>(["accepted", "pending", "tentative"]);
 
 export function normalizeMarshalActivityArea(value: string): string {
   return value.trim().replace(/[\s_-]+/g, " ").toLocaleLowerCase("de");
@@ -39,6 +40,20 @@ export function getSetupAreaMemberParticipationIds(
     if (shiftIds.has(assignment.shiftId)) participationIds.add(assignment.participationId);
   });
   return participationIds;
+}
+
+export function isMarshalEventAreaAssignment(
+  areaType: string,
+  commitmentStatus: MarshalCommitmentStatus,
+): boolean {
+  return areaType === "setup" || ACTIVE_ASSIGNMENT_STATUSES.has(commitmentStatus);
+}
+
+export function isMarshalShirtRelevantAreaAssignment(
+  areaType: string,
+  commitmentStatus: MarshalCommitmentStatus,
+): boolean {
+  return areaType === "setup" || commitmentStatus === "accepted";
 }
 
 export function statusForTargetSelection(status: MarshalCommitmentStatus, assignmentValue: string): MarshalCommitmentStatus {
