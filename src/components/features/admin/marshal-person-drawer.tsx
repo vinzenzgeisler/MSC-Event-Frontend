@@ -123,9 +123,9 @@ export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose
         </div>
         <div className="space-y-6 p-4 sm:p-6">
           <section aria-labelledby="marshal-person-event-card" className="rounded-lg border bg-slate-50 p-3">
-            <h3 id="marshal-person-event-card" className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Event-Einsätze</h3>
+            <h3 id="marshal-person-event-card" className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Einsätze dieser Veranstaltung</h3>
             {einsatzEntries.length === 0
-              ? <p className="text-xs text-slate-400">Noch keine Einsätze in diesem Event</p>
+              ? <p className="text-xs text-slate-400">Noch keine Einsätze in dieser Veranstaltung</p>
               : <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 md:grid-cols-3">
                   {einsatzEntries.map((entry) => (
                     <li key={entry.id} className="flex min-w-0 items-center gap-1.5 rounded-md border bg-white px-2 py-1 text-xs">
@@ -147,9 +147,9 @@ export function MarshalPersonDrawer({ person, workspace, canWrite, busy, onClose
             </div>
             {canWrite && <Button type="button" className="mt-4 w-full sm:w-auto" disabled={busy || !draft.firstName || !draft.lastName} onClick={() => void save()}><Save className="mr-2 h-4 w-4" />Änderungen speichern</Button>}
           </section>
-          <section aria-labelledby="marshal-person-event-note" className="border-t pt-6"><h3 id="marshal-person-event-note" className="mb-3 font-semibold">Event-Notiz</h3>
-            <textarea aria-label="Event-Notiz" className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 disabled:bg-slate-50" value={draft.participation.note ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, participation: { ...draft.participation, note: event.target.value } })} />
-            {canWrite && <Button type="button" variant="outline" className="mt-3 w-full sm:w-auto" disabled={busy} onClick={() => void onSaveEventNote(draft, draft.participation.note?.trim() || null)}><Save className="mr-2 h-4 w-4" />Event-Notiz speichern</Button>}
+          <section aria-labelledby="marshal-person-event-note" className="border-t pt-6"><h3 id="marshal-person-event-note" className="mb-3 font-semibold">Veranstaltungsnotiz</h3>
+            <textarea aria-label="Veranstaltungsnotiz" className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-950 disabled:bg-slate-50" value={draft.participation.note ?? ""} disabled={!canWrite} onChange={(event) => setDraft({ ...draft, participation: { ...draft.participation, note: event.target.value } })} />
+            {canWrite && <Button type="button" variant="outline" className="mt-3 w-full sm:w-auto" disabled={busy} onClick={() => void onSaveEventNote(draft, draft.participation.note?.trim() || null)}><Save className="mr-2 h-4 w-4" />Veranstaltungsnotiz speichern</Button>}
           </section>
           <section aria-labelledby="marshal-person-history"><h3 id="marshal-person-history" className="font-semibold">Einsatzhistorie</h3>
             {history.length ? <ul className="mt-3 space-y-2">{history.map((item) => <li key={item.id} className="flex items-start justify-between gap-3 rounded-lg border p-3"><div><strong className="text-sm">{item.title}</strong><p className="text-xs text-slate-500">{item.detail}</p></div><StatusBadge status={item.status} /></li>)}</ul> : <p className="mt-3 rounded-lg border border-dashed p-4 text-sm text-slate-500">Für diese Veranstaltung liegen noch keine Einsätze vor.</p>}

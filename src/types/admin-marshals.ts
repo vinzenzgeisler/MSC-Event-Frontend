@@ -134,6 +134,11 @@ export type MarshalPersonPatch = Partial<MarshalPersonInput> & {
   noDeployment?: boolean;
 };
 
+export type MarshalInitialEventAssignment =
+  | { kind: "none" }
+  | { kind: "area"; areaId: string; commitmentStatus: MarshalCommitmentStatus }
+  | { kind: "track"; dayId: string; commitmentStatus: MarshalCommitmentStatus };
+
 export type MarshalDayAssignmentInput = {
   dayId: string;
   commitmentStatus: MarshalCommitmentStatus;
@@ -169,7 +174,7 @@ export type MarshalAreaConfigInput = {
 
 export type MarshalPrintParams = {
   eventId: string;
-  type: "attendance" | "section" | "training" | "area";
+  type: "attendance" | "section" | "training" | "area" | "shirt_statistics";
   dayId?: string;
   sectionId?: string;
   trainingId?: string;

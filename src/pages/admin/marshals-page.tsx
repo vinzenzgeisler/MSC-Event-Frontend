@@ -14,6 +14,7 @@ import { getPostTarget, type PlanningTargetMode } from "@/components/features/ad
 import { MarshalSchulungView } from "@/components/features/admin/marshal-schulung-view";
 import { MarshalSidebar, type SidebarView } from "@/components/features/admin/marshal-sidebar";
 import { MarshalStammdatenView } from "@/components/features/admin/marshal-stammdaten-view";
+import { MarshalStatistikView } from "@/components/features/admin/marshal-statistik-view";
 import { MarshalStreckenpostenView } from "@/components/features/admin/marshal-streckenposten-view";
 import { EmptyState } from "@/components/state/empty-state";
 import { LoadingState } from "@/components/state/loading-state";
@@ -29,6 +30,7 @@ import type {
   MarshalDay,
   MarshalEvent,
   MarshalImportPreview,
+  MarshalInitialEventAssignment,
   MarshalPerson,
   MarshalPersonInput,
   MarshalPersonPatch,
@@ -95,7 +97,7 @@ export function AdminMarshalsPage() {
   }, [eventId, loadWorkspace]);
   useEffect(() => { if (eventId) localStorage.setItem(`msc_marshal_view:${eventId}`, view); }, [eventId, view]);
   useEffect(() => {
-    const canRefresh = ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "druck"].includes(view) || view.startsWith("area:");
+    const canRefresh = ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "statistik", "druck"].includes(view) || view.startsWith("area:");
     if (!eventId || !canRefresh || busy || selectedPersonId) return;
     const refresh = () => { if (document.visibilityState === "visible") void loadWorkspace(eventId); };
     const interval = window.setInterval(refresh, 30_000);
@@ -237,21 +239,69 @@ export function AdminMarshalsPage() {
   }
   function savePerson(personId: string, patch: MarshalPersonPatch) { return runAction(() => adminMarshalsService.updatePerson(personId, patch), "Stammdaten gespeichert.", "Stammdaten konnten nicht gespeichert werden."); }
   function saveEventNote(person: MarshalPerson, note: string | null) {
-    return runAction(() => adminMarshalsService.saveAssignment(person.id, { eventId, note, days: [] }), "Event-Notiz gespeichert.", "Event-Notiz konnte nicht gespeichert werden.");
+    return runAction(() => adminMarshalsService.saveAssignment(person.id, { eventId, note, days: [] }), "Veranstaltungsnotiz gespeichert.", "Veranstaltungsnotiz konnte nicht gespeichert werden.");
   }
-  function createPerson(input: MarshalPersonInput) { return runAction(() => adminMarshalsService.createPerson(input), "Person angelegt.", "Person konnte nicht angelegt werden."); }
+  async function createPerson(input: MarshalPersonInput, initialAssignment: MarshalInitialEventAssignment) {
+    const operationEventId = eventId;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const { person } = await adminMarshalsService.createPerson(input);
+      let assignmentError = "";
+      try {
+        if (initialAssignment.kind === "area") {
+          await adminMarshalsService.upsertAreaAssignment(person.id, { eventId: operationEventId, areaId: initialAssignment.areaId, commitmentStatus: initialAssignment.commitmentStatus });
+        } else if (initialAssignment.kind === "track") {
+          await adminMarshalsService.saveAssignment(person.id, {
+            eventId: operationEventId,
+            days: [{ dayId: initialAssignment.dayId, commitmentStatus: initialAssignment.commitmentStatus, role: "special", functionCode: "Streckenposten" }],
+          });
+        }
+      } catch (cause) {
+        assignmentError = getApiErrorMessage(cause, "Person wurde angelegt, die Veranstaltungszuordnung konnte jedoch nicht gespeichert werden.");
+      }
+      await loadWorkspace(operationEventId);
+      if (activeEventId.current === operationEventId) {
+        if (assignmentError) setError(assignmentError);
+        else setNotice(initialAssignment.kind === "none" ? "Person angelegt." : "Person mit Veranstaltungszuordnung angelegt.");
+      }
+      return true;
+    } catch (cause) {
+      if (activeEventId.current === operationEventId) setError(getApiErrorMessage(cause, "Person konnte nicht angelegt werden."));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
   function deletePerson(person: MarshalPerson) { return runAction(() => adminMarshalsService.deletePerson(person.id), "Person und verknüpfte Daten wurden endgültig gelöscht.", "Person konnte nicht gelöscht werden."); }
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
   function saveAttendance(trainingId: string, person: MarshalPerson, status: MarshalTrainingParticipant["attendanceStatus"]) { return runAction(() => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, status), "Anwesenheit gespeichert.", "Anwesenheit konnte nicht gespeichert werden."); }
+  async function registerAcceptedForTraining(trainingId: string, people: MarshalPerson[]) {
+    const operationEventId = eventId;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await Promise.all(people.map((person) => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, "registered")));
+      await loadWorkspace(operationEventId);
+      if (activeEventId.current === operationEventId) setNotice(`${people.length} zugesagte Streckenposten wurden angemeldet.`);
+      return true;
+    } catch (cause) {
+      const message = getApiErrorMessage(cause, "Zugesagte Streckenposten konnten nicht vollständig angemeldet werden.");
+      await loadWorkspace(operationEventId);
+      if (activeEventId.current === operationEventId) setError(message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
   async function print(params: { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params, orientation: "portrait", sort: params.type === "section" ? "post_name" : "name" }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
   async function printTraining(trainingId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "training", trainingId, orientation: "portrait", sort: "name" }), "Teilnehmerliste erstellt.", "Teilnehmerliste konnte nicht erstellt werden.", false); }
+  async function printShirtStatistics() { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "shirt_statistics", orientation: "portrait", sort: "name" }), "T-Shirt-Statistik erstellt.", "T-Shirt-Statistik konnte nicht erstellt werden.", false); }
   function savePostConfig(posts: MarshalPostConfigInput[], sections?: MarshalSectionConfigInput[]) {
     if (!workspace) return Promise.resolve(false);
     const sectionConfig = sections ?? workspace.sections.map(({ code, name, leaderCode, leaderTargetStaff, sortOrder }) => ({ code, name, leaderCode, leaderTargetStaff: leaderTargetStaff ?? 2, sortOrder }));
     return runAction(() => adminMarshalsService.saveConfig({ eventId, sections: sectionConfig, posts }), "Postenkonfiguration gespeichert.", "Postenkonfiguration konnte nicht gespeichert werden.");
   }
   function saveAreaConfig(areas: MarshalAreaConfigAreaInput[], shifts: MarshalAreaConfigShiftInput[]) { return runAction(() => adminMarshalsService.updateAreaConfig({ eventId, areas, shifts }), "Bereiche und Schichten gespeichert.", "Bereiche und Schichten konnten nicht gespeichert werden."); }
-  function resetAssignments() { return runAction(() => adminMarshalsService.resetEventAssignments(eventId), "Alle Event-Einteilungen wurden zurückgesetzt.", "Einteilungen konnten nicht zurückgesetzt werden."); }
+  function resetAssignments() { return runAction(() => adminMarshalsService.resetEventAssignments(eventId), "Alle Veranstaltungseinteilungen wurden zurückgesetzt.", "Einteilungen konnten nicht zurückgesetzt werden."); }
   async function previewStructure(sourceEventId: string): Promise<MarshalStructurePreview | null> {
     setBusy(true); setError(""); setNotice("");
     try { return (await adminMarshalsService.previewStructure(eventId, sourceEventId)).preview; }
@@ -293,7 +343,8 @@ export function AdminMarshalsPage() {
           {(view === "setup_fl1" || view === "setup_fl2") && !areaForView && <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />}
           {(view === "general_saturday" || view === "general_sunday") && !areaForView && <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />}
           {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onCreate={createPerson} onDelete={deletePerson} />}
-          {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
+          {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onRegisterAccepted={registerAcceptedForTraining} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
+          {view === "statistik" && <MarshalStatistikView workspace={workspace} canExport={canExport} onPrint={printShirtStatistics} />}
           {view === "druck" && <MarshalDruckView workspace={workspace} canExport={canExport} onPrint={print} />}
           {view === "import" && <MarshalImportView canWrite={canWrite} busy={busy} onPreview={previewImport} onCommit={commitImport} />}
           {view === "config" && selectedEvent && <MarshalConfigView workspace={workspace} canWrite={canWrite} busy={busy} events={events} currentEvent={selectedEvent} onSavePosts={savePostConfig} onSaveAreas={saveAreaConfig} onReset={resetAssignments} onPreviewStructure={previewStructure} onInitializeEvent={initializeEvent} />}
@@ -305,7 +356,7 @@ export function AdminMarshalsPage() {
 }
 
 function isSidebarView(value: string): value is SidebarView {
-  return value.startsWith("area:") || ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "stammdaten", "schulung", "druck", "import", "config"].includes(value);
+  return value.startsWith("area:") || ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "stammdaten", "schulung", "statistik", "druck", "import", "config"].includes(value);
 }
 
 function formatEventDate(value: string) {

@@ -69,7 +69,7 @@ export const adminMarshalsService = {
   },
 
   async createPerson(payload: MarshalPersonInput) {
-    return requestJson<OkResponse>("/admin/marshals/persons", { method: "POST", body: payload });
+    return requestJson<OkResponse & { person: { id: string } }>("/admin/marshals/persons", { method: "POST", body: payload });
   },
 
   async updatePerson(personId: string, payload: MarshalPersonPatch) {

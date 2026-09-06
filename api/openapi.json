@@ -92,7 +92,7 @@
         "tags": ["admin"],
         "parameters": [
           { "name": "eventId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["attendance", "section", "training", "area"] } },
+          { "name": "type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["attendance", "section", "training", "area", "shirt_statistics"] } },
           { "name": "orientation", "in": "query", "required": false, "schema": { "type": "string", "enum": ["portrait"], "default": "portrait" } },
           { "name": "sort", "in": "query", "required": false, "schema": { "type": "string", "enum": ["name", "post_name"] } }
         ],

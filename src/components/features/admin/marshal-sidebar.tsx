@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AlertCircle, GraduationCap, Import, Printer, Settings2, Users } from "lucide-react";
+import { AlertCircle, BarChart3, GraduationCap, Import, Printer, Settings2, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { MarshalEvent, MarshalWorkspace } from "@/types/admin-marshals";
@@ -9,7 +9,7 @@ export type SidebarView =
   | "track_saturday" | "track_sunday"
   | "setup_fl1" | "setup_fl2"
   | "general_saturday" | "general_sunday"
-  | "stammdaten" | "schulung" | "druck" | "import" | "config"
+  | "stammdaten" | "schulung" | "statistik" | "druck" | "import" | "config"
   | `area:${string}`;
 
 type Props = {
@@ -56,7 +56,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
           onChange={onEventChange}
           disabled={events.length === 0}
         >
-          {!selectedEvent && <option value="">Event wählen</option>}
+          {!selectedEvent && <option value="">Veranstaltung wählen</option>}
           {sortedEvents.map((event) => <option key={event.id} value={event.id}>{event.isCurrent ? "Aktuell · " : ""}{event.name}</option>)}
         </CompactSelect>
         <CompactSelect label="Arbeitsbereich" value={activeView} onChange={(value) => onViewChange(value as SidebarView)}>
@@ -83,6 +83,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
           <optgroup label="Verwaltung">
             <option value="stammdaten">Stammdaten</option>
             <option value="schulung">Schulungen</option>
+            <option value="statistik">T-Shirt-Statistik</option>
             <option value="druck">Drucken</option>
             <option value="import">Import</option>
             <option value="config">Konfiguration</option>
@@ -93,7 +94,7 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
       <div className="hidden border-b border-slate-200 p-3 xl:block">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Helferverwaltung</p>
         <Select value={selectedEvent ?? ""} onValueChange={onEventChange}>
-          <SelectTrigger className="h-10 w-full text-sm"><SelectValue placeholder="Event wählen" /></SelectTrigger>
+          <SelectTrigger className="h-10 w-full text-sm"><SelectValue placeholder="Veranstaltung wählen" /></SelectTrigger>
           <SelectContent>{sortedEvents.map((event) => <SelectItem key={event.id} value={event.id}>{event.isCurrent ? "Aktuell · " : ""}{event.name}</SelectItem>)}</SelectContent>
         </Select>
       </div>
@@ -121,13 +122,14 @@ export function MarshalSidebar({ workspace, activeView, onViewChange, events, se
           <SectionTitle>Verwaltung</SectionTitle>
           <NavItem active={activeView === "stammdaten"} onClick={() => onViewChange("stammdaten")} label={`Stammdaten (${workspace?.people.length ?? 0})`} icon={<Users className="h-4 w-4" />} />
           <NavItem active={activeView === "schulung"} onClick={() => onViewChange("schulung")} label="Schulungen" icon={<GraduationCap className="h-4 w-4" />} />
+          <NavItem active={activeView === "statistik"} onClick={() => onViewChange("statistik")} label="T-Shirt-Statistik" icon={<BarChart3 className="h-4 w-4" />} />
         </div>
       </nav>
 
       <div className="hidden border-t border-slate-200 p-2 xl:block xl:space-y-0.5">
         <NavItem active={activeView === "druck"} onClick={() => onViewChange("druck")} label="Drucken" icon={<Printer className="h-4 w-4" />} />
         <NavItem active={activeView === "import"} onClick={() => onViewChange("import")} label="Import" icon={<Import className="h-4 w-4" />} />
-        <NavItem active={activeView === "config"} onClick={() => onViewChange("config")} label={needsSetup ? "Event vorbereiten" : "Konfiguration"} icon={needsSetup ? <AlertCircle className="h-4 w-4 text-amber-600" /> : <Settings2 className="h-4 w-4" />} />
+        <NavItem active={activeView === "config"} onClick={() => onViewChange("config")} label={needsSetup ? "Veranstaltung vorbereiten" : "Konfiguration"} icon={needsSetup ? <AlertCircle className="h-4 w-4 text-amber-600" /> : <Settings2 className="h-4 w-4" />} />
       </div>
     </aside>
   );

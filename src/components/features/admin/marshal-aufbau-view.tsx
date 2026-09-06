@@ -6,6 +6,7 @@ import { getSetupAreaMemberParticipationIds } from "@/components/features/admin/
 import { DoubleBookingWarning, EventAssignmentBadges, sameDayConflicts } from "@/components/features/admin/marshal-event-assignment-indicators";
 import { MarshalConfirmDialog } from "@/components/features/admin/marshal-confirm-dialog";
 import { marshalStatusLabels } from "@/components/features/admin/marshal-status";
+import { getMarshalShirtSize } from "@/components/features/admin/marshal-shirt-statistics";
 import { cn } from "@/lib/utils";
 import type { MarshalCommitmentStatus, MarshalHelperArea, MarshalPerson, MarshalWorkspace } from "@/types/admin-marshals";
 
@@ -139,7 +140,7 @@ export function MarshalAufbauView({ workspace, area, canWrite, busy, onPersonOpe
                         </td>
                       );
                     })}
-                    <td className="p-3">{person.participation.shirtSizeSnapshot ?? person.shirtSize ?? "—"}</td>
+                    <td className="p-3">{getMarshalShirtSize(person) ?? "—"}</td>
                     {canWrite && (
                       <td className="p-2">
                         <Button type="button" size="sm" variant="ghost" className="text-red-700" disabled={busy} aria-label={`${person.firstName} ${person.lastName} aus ${area.name} entfernen`} onClick={() => setRemovePerson(person)}>
