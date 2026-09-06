@@ -1,4 +1,5 @@
 import type { MarshalPerson, MarshalWorkspace } from "@/types/admin-marshals";
+import { hasAcceptedMarshalTrackAssignment } from "@/components/features/admin/marshal-assignment-helpers";
 
 export type MarshalShirtStatistic = {
   areaId: string;
@@ -16,7 +17,7 @@ export function getMarshalShirtSize(person: MarshalPerson): string | null {
 export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): MarshalShirtStatistic[] {
   const trackPeople = new Set(
     workspace.people
-      .filter((person) => !person.noDeployment && person.assignments.some((assignment) => assignment.commitmentStatus === "accepted"))
+      .filter((person) => person.isActive && !person.noDeployment && hasAcceptedMarshalTrackAssignment(person))
       .map((person) => person.participation.id),
   );
   const counted = new Set<string>();
@@ -24,7 +25,7 @@ export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): Marsha
 
   const trackHelpers = workspace.people.filter((person) => trackPeople.has(person.participation.id));
   trackHelpers.forEach((person) => counted.add(person.participation.id));
-  if (trackHelpers.length) groups.push({ areaId: "track", areaName: "Streckenposten", people: trackHelpers });
+  groups.push({ areaId: "track", areaName: "Streckenposten", people: trackHelpers });
 
   const sortedAreas = [...workspace.areas].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "de"));
   for (const area of sortedAreas) {
@@ -37,9 +38,10 @@ export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): Marsha
         .filter((assignment) => shiftIds.has(assignment.shiftId) && assignment.commitmentStatus === "accepted")
         .map((assignment) => assignment.participationId),
     ]);
-    const people = workspace.people.filter((person) => !person.noDeployment && participationIds.has(person.participation.id) && !counted.has(person.participation.id));
+    const people = workspace.people.filter((person) => person.isActive && !person.noDeployment && participationIds.has(person.participation.id) && !counted.has(person.participation.id));
     people.forEach((person) => counted.add(person.participation.id));
-    if (people.length) groups.push({ areaId: area.id, areaName: area.name, people });
+    const dayLabel = area.dayScope === "saturday" ? "Samstag" : area.dayScope === "sunday" ? "Sonntag" : null;
+    groups.push({ areaId: area.id, areaName: dayLabel ? `${area.name} · ${dayLabel}` : area.name, people });
   }
 
   return groups.map((group) => {
@@ -61,7 +63,9 @@ export function buildMarshalShirtStatistics(workspace: MarshalWorkspace): Marsha
 
 function cleanShirtSize(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed || null;
+  if (!trimmed) return null;
+  const validSize = /^(?:(?:H|D|K|HERREN|DAMEN|KINDER)\s*[-/ ]\s*)?(?:XXS|XS|S|M|L|XL|XXL|XXXL|XXXXL|[2-6]XL|\d{2,3}(?:\s*\/\s*\d{2,3})?)$/i;
+  return validSize.test(trimmed) ? trimmed : null;
 }
 
 function shirtSizeRank(size: string) {

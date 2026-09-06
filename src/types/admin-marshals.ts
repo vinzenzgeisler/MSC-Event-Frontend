@@ -180,6 +180,7 @@ export type MarshalPrintParams = {
   trainingId?: string;
   areaId?: string;
   shiftId?: string;
+  statisticsAreaId?: string;
   orientation?: "portrait";
   sort?: "name" | "post_name";
 };

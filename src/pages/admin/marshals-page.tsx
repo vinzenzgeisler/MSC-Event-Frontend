@@ -294,7 +294,7 @@ export function AdminMarshalsPage() {
   }
   async function print(params: { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string }) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, ...params, orientation: "portrait", sort: params.type === "section" ? "post_name" : "name" }), "Druckliste erstellt.", "Druckliste konnte nicht erstellt werden.", false); }
   async function printTraining(trainingId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "training", trainingId, orientation: "portrait", sort: "name" }), "Teilnehmerliste erstellt.", "Teilnehmerliste konnte nicht erstellt werden.", false); }
-  async function printShirtStatistics() { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "shirt_statistics", orientation: "portrait", sort: "name" }), "T-Shirt-Statistik erstellt.", "T-Shirt-Statistik konnte nicht erstellt werden.", false); }
+  async function printShirtStatistics(statisticsAreaId: string) { await runAction(() => adminMarshalsService.downloadPrint({ eventId, type: "shirt_statistics", statisticsAreaId, orientation: "portrait", sort: "name" }), "T-Shirt-Statistik erstellt.", "T-Shirt-Statistik konnte nicht erstellt werden.", false); }
   function savePostConfig(posts: MarshalPostConfigInput[], sections?: MarshalSectionConfigInput[]) {
     if (!workspace) return Promise.resolve(false);
     const sectionConfig = sections ?? workspace.sections.map(({ code, name, leaderCode, leaderTargetStaff, sortOrder }) => ({ code, name, leaderCode, leaderTargetStaff: leaderTargetStaff ?? 2, sortOrder }));

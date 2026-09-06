@@ -94,6 +94,7 @@
           { "name": "eventId", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
           { "name": "type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["attendance", "section", "training", "area", "shirt_statistics"] } },
           { "name": "orientation", "in": "query", "required": false, "schema": { "type": "string", "enum": ["portrait"], "default": "portrait" } },
+          { "name": "statisticsAreaId", "in": "query", "required": false, "schema": { "type": "string", "description": "track oder ID des Helferbereichs für einen einzelnen Statistikdruck" } },
           { "name": "sort", "in": "query", "required": false, "schema": { "type": "string", "enum": ["name", "post_name"] } }
         ],
         "responses": { "200": { "description": "Portrait PDF. post_name groups by configured post order and sorts people by last and first name inside each post." } },

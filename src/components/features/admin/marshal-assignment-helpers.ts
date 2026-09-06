@@ -1,4 +1,30 @@
-import type { MarshalAreaAssignment, MarshalCommitmentStatus, MarshalShiftAssignment } from "@/types/admin-marshals";
+import type { MarshalAreaAssignment, MarshalCommitmentStatus, MarshalPerson, MarshalShiftAssignment } from "@/types/admin-marshals";
+
+const TRACK_AREA_ALIASES = new Set(["strecke", "streckenposten", "team strecke", "team streckenposten", "track", "marshal"]);
+
+export function normalizeMarshalActivityArea(value: string): string {
+  return value.trim().replace(/[\s_-]+/g, " ").toLocaleLowerCase("de");
+}
+
+export function isMarshalTrackActivityArea(value: string): boolean {
+  return TRACK_AREA_ALIASES.has(normalizeMarshalActivityArea(value));
+}
+
+export function isMarshalTrackHelper(person: Pick<MarshalPerson, "activityAreas">): boolean {
+  return person.activityAreas.some(isMarshalTrackActivityArea);
+}
+
+export function hasAcceptedMarshalTrackAssignment(
+  person: Pick<MarshalPerson, "activityAreas" | "assignments">,
+  dayId?: string,
+): boolean {
+  const hasTrackMasterArea = person.activityAreas.some(isMarshalTrackActivityArea);
+  if (!hasTrackMasterArea) return false;
+  return person.assignments.some((assignment) => (
+    (!dayId || assignment.dayId === dayId)
+      && assignment.commitmentStatus === "accepted"
+  ));
+}
 
 export function getSetupAreaMemberParticipationIds(
   areaId: string,

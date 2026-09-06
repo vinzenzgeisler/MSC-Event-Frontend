@@ -1,6 +1,7 @@
 import { CalendarDays, Download, FileText, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { hasAcceptedMarshalTrackAssignment } from "@/components/features/admin/marshal-assignment-helpers";
 import type { MarshalWorkspace } from "@/types/admin-marshals";
 
 type PrintParams = { type: "attendance" | "section" | "area"; dayId?: string; sectionId?: string; areaId?: string; shiftId?: string };
@@ -16,14 +17,14 @@ export function MarshalDruckView({ workspace, canExport, onPrint }: Props) {
         <CardHeader className="p-4 sm:p-6"><CardTitle className="flex items-center gap-2 text-lg"><CalendarDays className="h-5 w-5 text-blue-600" />Veranstaltungstage</CardTitle></CardHeader>
         <CardContent className="grid gap-3 p-4 pt-0 sm:p-6 sm:pt-0 lg:grid-cols-2">
           {workspace.days.map((day) => {
-            const attendanceCount = workspace.people.filter((person) => person.assignments.some((assignment) => assignment.dayId === day.id && activeStatuses.has(assignment.commitmentStatus))).length;
+            const attendanceCount = workspace.people.filter((person) => person.isActive && !person.noDeployment && hasAcceptedMarshalTrackAssignment(person, day.id)).length;
             return (
               <section key={day.id} className="rounded-xl border bg-slate-50/70 p-4">
                 <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-900">{day.label}</h2><p className="text-xs text-slate-500">{formatDate(day.eventDate)}</p></div><Count count={attendanceCount} /></div>
                 <div className="mt-4 grid gap-2">
                   <PrintItem title="Anwesenheitsliste" count={attendanceCount} disabled={!canExport} onClick={() => void onPrint({ type: "attendance", dayId: day.id })} />
                   {workspace.sections.map((section) => {
-                    const count = workspace.people.filter((person) => person.assignments.some((assignment) => assignment.dayId === day.id && assignment.sectionId === section.id && activeStatuses.has(assignment.commitmentStatus))).length;
+                    const count = workspace.people.filter((person) => person.isActive && !person.noDeployment && hasAcceptedMarshalTrackAssignment(person, day.id) && person.assignments.some((assignment) => assignment.dayId === day.id && assignment.sectionId === section.id)).length;
                     return <PrintItem key={section.id} title={section.name} count={count} disabled={!canExport} onClick={() => void onPrint({ type: "section", dayId: day.id, sectionId: section.id })} />;
                   })}
                 </div>

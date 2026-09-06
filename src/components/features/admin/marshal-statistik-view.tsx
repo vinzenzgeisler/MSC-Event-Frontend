@@ -7,7 +7,7 @@ import type { MarshalWorkspace } from "@/types/admin-marshals";
 type Props = {
   workspace: MarshalWorkspace;
   canExport: boolean;
-  onPrint: () => Promise<void>;
+  onPrint: (areaId: string) => Promise<void>;
 };
 
 export function MarshalStatistikView({ workspace, canExport, onPrint }: Props) {
@@ -16,14 +16,11 @@ export function MarshalStatistikView({ workspace, canExport, onPrint }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
         <div>
           <h1 className="text-2xl font-semibold text-slate-950">T-Shirt-Statistik</h1>
           <p className="mt-1 text-sm text-slate-600">Zugesagte Helfer werden veranstaltungsweit genau einmal gezählt. Streckenposten haben Vorrang vor Aufbau- und weiteren Bereichen.</p>
         </div>
-        <Button type="button" variant="outline" disabled={!canExport || statistics.length === 0} onClick={() => void onPrint()}>
-          <Download className="mr-2 h-4 w-4" />PDF erstellen
-        </Button>
       </div>
       <Card>
         <CardHeader className="p-4 sm:p-6">
@@ -32,13 +29,14 @@ export function MarshalStatistikView({ workspace, canExport, onPrint }: Props) {
         <CardContent className="grid gap-3 p-4 pt-0 sm:grid-cols-2 sm:p-6 sm:pt-0 xl:grid-cols-3">
           {statistics.map((item) => (
             <section key={item.areaId} className="rounded-xl border bg-slate-50/70 p-4">
-              <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-900">{item.areaName}</h2><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">{item.peopleCount}</span></div>
+              <div className="flex items-start justify-between gap-3"><h2 className="font-semibold text-slate-900">{item.areaName}</h2><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">{item.peopleCount}</span></div>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {item.sizes.map(({ size, count }) => <li key={size} className="rounded-md border bg-white px-3 py-2 text-sm"><strong>{count}×</strong> {size}</li>)}
+                {item.sizes.length === 0 && <li className="text-sm text-slate-500">0 T-Shirts</li>}
               </ul>
+              <Button type="button" variant="outline" size="sm" className="mt-4 w-full" disabled={!canExport} onClick={() => void onPrint(item.areaId)}><Download className="mr-2 h-4 w-4" />Bereich als PDF</Button>
             </section>
           ))}
-          {statistics.length === 0 && <p className="rounded-xl border border-dashed p-6 text-sm text-slate-500 sm:col-span-2 xl:col-span-3">Für diese Veranstaltung gibt es noch keine zugesagten Helfer mit einer konkreten Zuordnung.</p>}
         </CardContent>
       </Card>
     </div>

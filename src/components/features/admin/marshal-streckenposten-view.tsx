@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, List, Map, MapPinned, MessageSquareText, Pencil, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
+import { isMarshalTrackHelper, statusForTargetSelection } from "@/components/features/admin/marshal-assignment-helpers";
 import { DoubleBookingWarning, EventAssignmentBadges, sameDayConflicts } from "@/components/features/admin/marshal-event-assignment-indicators";
 import { getPostTarget, MarshalPlanningMap, MarshalPlanningOverview, type PlanningTargetMode } from "@/components/features/admin/marshal-planning-map";
 import { marshalStatusLabels } from "@/components/features/admin/marshal-status";
@@ -132,14 +132,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
     }
   }
   const term = search.trim().toLocaleLowerCase("de");
-  const trackAreaAliases = new Set(["strecke", "streckenposten", "track", "marshal"]);
-  workspace.areas.forEach((area) => {
-    if (trackAreaAliases.has(normalizeArea(area.code)) || trackAreaAliases.has(normalizeArea(area.name))) {
-      trackAreaAliases.add(normalizeArea(area.code));
-      trackAreaAliases.add(normalizeArea(area.name));
-    }
-  });
-  const isTrackHelper = (person: MarshalPerson) => person.activityAreas.some((area) => trackAreaAliases.has(normalizeArea(area)));
+  const isTrackHelper = (person: MarshalPerson) => isMarshalTrackHelper(person);
   const people = workspace.people
     .filter((person) => {
       const assignment = person.assignments.find((item) => item.dayId === day.id);
@@ -308,8 +301,8 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
               </label>
               <Button type="button" variant="outline" className="h-11 justify-start sm:w-40" onClick={() => setSortDirection((current) => current === "asc" ? "desc" : "asc")}>{sortDirection === "asc" ? <ArrowUp className="mr-2 h-4 w-4" /> : <ArrowDown className="mr-2 h-4 w-4" />}{sortDirection === "asc" ? "Aufsteigend" : "Absteigend"}</Button>
             </div>
-            <div className="min-w-0 border-y border-slate-200 bg-white text-sm">
-              <div className="hidden grid-cols-[5rem_minmax(11rem,1fr)_minmax(11rem,1fr)_10rem_5rem_minmax(12rem,1fr)] gap-3 border-b bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className="min-w-0 overflow-x-auto border-y border-slate-200 bg-white text-sm">
+              <div className="hidden grid-cols-[4rem_minmax(8rem,0.85fr)_minmax(9rem,1fr)_7rem_4rem_minmax(9rem,1fr)] gap-2 border-b bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
                 <SortHeader label="Nr." sortKey="helperNumber" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
                 <SortHeader label="Name" sortKey="name" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
                 <SortHeader label="Einteilung" sortKey="post" activeKey={sortMode} direction={sortDirection} onSort={(key) => selectSort(key, sortMode, sortDirection, setSortMode, setSortDirection)} />
@@ -329,7 +322,7 @@ export function MarshalStreckenpostenView({ workspace, day, dayKey, canWrite, bu
                 const disabled = !canWrite || busy || savingRows.has(key) || !person.isActive || person.noDeployment;
                 const noteDisabled = !canWrite || busy || savingRows.has(key);
                 return (
-                  <div key={person.id} className={cn("grid gap-3 border-b p-3 last:border-b-0 lg:grid-cols-[5rem_minmax(11rem,1fr)_minmax(11rem,1fr)_10rem_5rem_minmax(12rem,1fr)] lg:items-center lg:gap-3 lg:py-2", (person.noDeployment || !person.isActive) && "bg-red-50 text-red-900")}>
+                  <div key={person.id} className={cn("grid gap-3 border-b p-3 last:border-b-0 lg:grid-cols-[4rem_minmax(8rem,0.85fr)_minmax(9rem,1fr)_7rem_4rem_minmax(9rem,1fr)] lg:items-center lg:gap-2 lg:py-2", (person.noDeployment || !person.isActive) && "bg-red-50 text-red-900")}>
                     <span className="hidden text-slate-500 lg:block">{person.helperNumber}</span>
                     <div className="min-w-0">
                       <button type="button" className="break-words text-left font-medium text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => onPersonOpen(person)}>
@@ -499,7 +492,7 @@ function MasterNoteEditor({ person, canEdit, onSave }: { person: MarshalPerson; 
   }
 
   return (
-    <button type="button" title={person.note} className="group flex min-h-9 w-full min-w-0 items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-left text-xs leading-4 text-amber-950 transition hover:border-amber-300 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:cursor-default" disabled={!canEdit} onClick={() => setEditing(true)}>
+    <button type="button" title={person.note} className="group flex min-h-9 w-full min-w-0 max-w-full items-start gap-2 overflow-hidden rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-left text-xs leading-4 text-amber-950 transition hover:border-amber-300 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:cursor-default" disabled={!canEdit} onClick={() => setEditing(true)}>
       <MessageSquareText className="mt-px h-3.5 w-3.5 shrink-0 text-amber-700" />
       <span className="line-clamp-2 min-w-0 flex-1 whitespace-pre-line">{person.note}</span>
       {canEdit && <Pencil className="mt-px h-3.5 w-3.5 shrink-0 text-amber-700 opacity-60 group-hover:opacity-100" />}
@@ -519,8 +512,4 @@ function sortDirectionMultiplier(direction: SortDirection) {
 function readStoredMode(key: string): ViewMode {
   const stored = localStorage.getItem(key);
   return stored === "list" || stored === "overview" || stored === "map" ? stored : "overview";
-}
-
-function normalizeArea(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
 }
