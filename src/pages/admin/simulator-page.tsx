@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Trophy, Trash2, Moon, Sun, Plus } from "lucide-react";
+import { Trophy, Trash2, Plus, ExternalLink, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { adminSimulatorService } from "@/services/admin-simulator.service";
 import { adminMetaService } from "@/services/admin-meta.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { TimeDrumPicker } from "@/components/features/admin/time-drum-picker";
 import type { SimDay, SimEntry } from "@/types/admin-simulator";
 
-/* ─── time helpers ─────────────────────────────────────────────────────────── */
+/* ─── helpers ───────────────────────────────────────────────────────────────── */
 
 function formatTimeMs(ms: number): string {
   const t = Math.round(ms);
@@ -18,10 +21,9 @@ function formatTimeMs(ms: number): string {
   return `${m}:${String(s).padStart(2, "0")}.${String(i).padStart(3, "0")}`;
 }
 
-/* ─── constants ─────────────────────────────────────────────────────────────── */
-
 const DAY_LABEL: Record<SimDay, string> = { saturday: "Samstag", sunday: "Sonntag" };
-const DEFAULT_TIME_MS = 90_000; // 1:30.000
+const LEADERBOARD_URL = "https://sim.event.msc-oberlausitz.de";
+const DEFAULT_TIME_MS = 90_000;
 
 /* ─── component ─────────────────────────────────────────────────────────────── */
 
@@ -29,15 +31,12 @@ export function AdminSimulatorPage() {
   const { roles } = useAuth();
   const canWrite = hasPermission(roles, "sim.write");
 
-  /* ── state ── */
-  const [dark, setDark] = useState(true);
   const [eventId, setEventId] = useState<string | null>(null);
   const [day, setDay] = useState<SimDay>("saturday");
   const [entries, setEntries] = useState<SimEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  /* form */
   const [nameInput, setNameInput] = useState("");
   const [timeMs, setTimeMs] = useState(DEFAULT_TIME_MS);
   const [submitting, setSubmitting] = useState(false);
@@ -45,7 +44,10 @@ export function AdminSimulatorPage() {
   const [showAC, setShowAC] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
-  /* ── load event & entries ── */
+  /* leaderboard theme – controls what URL is shown to the operator */
+  const [lbTheme, setLbTheme] = useState<"dark" | "light">("dark");
+
+  /* ── load ── */
   const loadEntries = useCallback(async (eid: string) => {
     setLoading(true);
     setError("");
@@ -61,12 +63,7 @@ export function AdminSimulatorPage() {
 
   useEffect(() => {
     adminMetaService.getCurrentEvent()
-      .then(ev => {
-        if (ev) {
-          setEventId(ev.id);
-          loadEntries(ev.id);
-        }
-      })
+      .then(ev => { if (ev) { setEventId(ev.id); loadEntries(ev.id); } })
       .catch(() => setError("Event konnte nicht geladen werden."));
   }, [loadEntries]);
 
@@ -91,7 +88,6 @@ export function AdminSimulatorPage() {
   const handleSubmit = async () => {
     if (!eventId || !canWrite) return;
     if (!nameInput.trim()) { setSubmitError("Name fehlt."); return; }
-    if (timeMs <= 0) { setSubmitError("Zeit ungültig."); return; }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -117,289 +113,221 @@ export function AdminSimulatorPage() {
     }
   };
 
-  /* ── theme tokens ── */
-  const bg      = dark ? "#0d1829" : "#f4f6fb";
-  const surface = dark ? "#162240" : "#ffffff";
-  const border  = dark ? "#2455a4" : "#c8d8f0";
-  const text    = dark ? "#f0f4ff" : "#1a2455";
-  const muted   = dark ? "#8899bb" : "#6b82aa";
-  const accent  = dark ? "#3a6dc7" : "#2455a4";
-  const gold    = "#f5c000";
-  const inputBg = dark ? "#0d1829" : "#e8f0fe";
-  const inputBorder = dark ? "#2455a4" : "#a0b8d8";
+  const leaderboardUrl = lbTheme === "light"
+    ? `${LEADERBOARD_URL}?theme=light`
+    : LEADERBOARD_URL;
 
+  /* ─────────────────────────────────────────────────────────────────── */
   return (
-    <div style={{
-      minHeight: "100vh", background: bg, color: text,
-      fontFamily: "'Segoe UI', system-ui, sans-serif",
-      padding: "0 0 40px",
-    }}>
+    <div className="space-y-6">
 
-      {/* ── TOP BAR ─────────────────────────────────────────────────── */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "16px 20px",
-        background: surface,
-        borderBottom: `2px solid ${border}`,
-        marginBottom: 20,
-        gap: 12,
-        flexWrap: "wrap",
-      }}>
+      {/* ── Header ───────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>Simulator-Bestenliste</div>
-          <div style={{ fontSize: 12, color: muted, marginTop: 2 }}>
-            <a
-              href="https://sim.event.msc-oberlausitz.de"
-              target="_blank" rel="noreferrer"
-              style={{ color: accent, textDecoration: "underline" }}
-            >
-              sim.event.msc-oberlausitz.de
-            </a>
-          </div>
+          <h1 className="text-xl font-semibold text-slate-900">Simulator-Bestenliste</h1>
+          <p className="text-sm text-slate-500 mt-1">Zeiten eintragen und verwalten</p>
         </div>
 
-        {/* Day + Dark toggle */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {(["saturday", "sunday"] as SimDay[]).map(d => (
-            <button key={d} onClick={() => setDay(d)} style={{
-              padding: "8px 18px",
-              borderRadius: 10,
-              border: `2px solid ${day === d ? accent : border}`,
-              background: day === d ? accent : "transparent",
-              color: day === d ? "#fff" : muted,
-              fontWeight: 700, fontSize: 14, cursor: "pointer",
-              transition: "all .15s",
-            }}>
-              {DAY_LABEL[d]}
+        {/* Leaderboard-Link + Theme-Toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500">Anzeigetafel:</span>
+          <div className="flex items-center rounded-md border bg-white overflow-hidden text-sm">
+            <button
+              type="button"
+              onClick={() => setLbTheme("dark")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
+                lbTheme === "dark"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              <Moon size={13} /> Dark
             </button>
-          ))}
-
-          <button onClick={() => setDark(d => !d)} style={{
-            width: 38, height: 38, borderRadius: 10,
-            border: `1px solid ${border}`,
-            background: "transparent",
-            color: muted, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+            <button
+              type="button"
+              onClick={() => setLbTheme("light")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
+                lbTheme === "light"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              <Sun size={13} /> Hell
+            </button>
+          </div>
+          <a
+            href={leaderboardUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            Öffnen <ExternalLink size={13} />
+          </a>
         </div>
       </div>
 
-      <div style={{ padding: "0 16px", maxWidth: 700, margin: "0 auto" }}>
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div style={{
-            background: "#ef444420", border: "1px solid #ef4444",
-            borderRadius: 10, padding: "10px 14px",
-            color: "#ef4444", fontSize: 14, marginBottom: 16,
-          }}>{error}</div>
-        )}
+      {/* ── Day tabs ─────────────────────────────────────────────────── */}
+      <div className="flex gap-2">
+        {(["saturday", "sunday"] as SimDay[]).map(d => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setDay(d)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              day === d
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            {DAY_LABEL[d]}
+          </button>
+        ))}
+      </div>
 
-        {/* ── ENTRY FORM ────────────────────────────────────────────── */}
-        {canWrite && (
-          <div style={{
-            background: surface, borderRadius: 16,
-            border: `1px solid ${border}`,
-            padding: 20, marginBottom: 20,
-          }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: muted, marginBottom: 14, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              Neuer Eintrag – {DAY_LABEL[day]}
-            </div>
+      {/* ── Entry form ───────────────────────────────────────────────── */}
+      {canWrite && (
+        <div className="rounded-lg border bg-white shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-medium text-slate-700">
+            Neuer Eintrag – {DAY_LABEL[day]}
+          </h2>
 
-            {/* NAME */}
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: muted, marginBottom: 5 }}>
-                Name des Fahrers / der Fahrerin
-              </label>
-              <input
-                value={nameInput}
-                onChange={e => { setNameInput(e.target.value); setShowAC(true); }}
-                onFocus={() => setShowAC(true)}
-                onBlur={() => setTimeout(() => setShowAC(false), 150)}
-                placeholder="Name eingeben…"
-                style={{
-                  width: "100%", padding: "14px 16px",
-                  fontSize: 18, fontWeight: 600,
-                  background: inputBg, color: text,
-                  border: `2px solid ${existing ? gold : inputBorder}`,
-                  borderRadius: 12, outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-
-              {existing && (
-                <div style={{
-                  marginTop: 6, padding: "6px 12px",
-                  background: `${gold}22`, border: `1px solid ${gold}66`,
-                  borderRadius: 8, fontSize: 13, color: gold,
-                  fontWeight: 600,
-                }}>
-                  ⚠ Bisherige Zeit: {formatTimeMs(existing.bestTimeMs)} – wird überschrieben
-                </div>
-              )}
-
-              {/* autocomplete */}
-              {showAC && acItems.length > 0 && (
-                <div style={{
-                  position: "absolute", zIndex: 20, top: "100%", left: 0, right: 0,
-                  background: surface, border: `1px solid ${border}`,
-                  borderRadius: 10, overflow: "hidden",
-                  boxShadow: "0 8px 24px rgba(0,0,0,.3)",
-                  marginTop: 4,
-                }}>
-                  {acItems.map(item => (
-                    <button key={item.id} type="button"
-                      onMouseDown={() => { setNameInput(item.name); setTimeMs(item.bestTimeMs); setShowAC(false); setShowPicker(true); }}
-                      style={{
-                        display: "flex", width: "100%", alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "13px 16px", background: "transparent",
-                        border: "none", borderBottom: `1px solid ${border}33`,
-                        color: text, cursor: "pointer", textAlign: "left",
-                        fontSize: 16,
-                      }}
-                    >
-                      <span style={{ fontWeight: 600 }}>{item.name}</span>
-                      <span style={{ fontFamily: "monospace", color: muted, fontSize: 14 }}>
-                        {formatTimeMs(item.bestTimeMs)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* TIME PICKER */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                marginBottom: 8,
-              }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: muted }}>
-                  Bestzeit
-                </label>
-                <div style={{
-                  fontSize: 22, fontFamily: "monospace", fontWeight: 800,
-                  color: accent, letterSpacing: "0.04em",
-                }}>
-                  {formatTimeMs(timeMs)}
-                </div>
-              </div>
-
-              {!showPicker ? (
-                <button
-                  onClick={() => setShowPicker(true)}
-                  style={{
-                    width: "100%", padding: "18px",
-                    background: inputBg, border: `2px dashed ${inputBorder}`,
-                    borderRadius: 14, color: muted, cursor: "pointer",
-                    fontSize: 15, fontWeight: 600, display: "flex",
-                    alignItems: "center", justifyContent: "center", gap: 8,
-                  }}
-                >
-                  <Plus size={18} /> Zeit einstellen
-                </button>
-              ) : (
-                <TimeDrumPicker valueMs={timeMs} onChange={setTimeMs} dark={dark} />
-              )}
-            </div>
-
-            {submitError && (
-              <div style={{ fontSize: 13, color: "#ef4444", marginBottom: 10 }}>{submitError}</div>
+          {/* Name */}
+          <div className="relative space-y-1">
+            <Label htmlFor="sim-name">Name</Label>
+            <Input
+              id="sim-name"
+              value={nameInput}
+              onChange={e => { setNameInput(e.target.value); setShowAC(true); }}
+              onFocus={() => setShowAC(true)}
+              onBlur={() => setTimeout(() => setShowAC(false), 150)}
+              placeholder="Fahrer- oder Gästename"
+              autoComplete="off"
+              className={existing ? "border-amber-400 focus-visible:ring-amber-400" : ""}
+            />
+            {existing && (
+              <p className="text-xs text-amber-600 font-medium">
+                ⚠ Bisherige Zeit: {formatTimeMs(existing.bestTimeMs)} – wird überschrieben
+              </p>
             )}
 
-            {/* SUBMIT */}
-            <button
-              onClick={handleSubmit}
-              disabled={submitting || !nameInput.trim() || !showPicker}
-              style={{
-                width: "100%", padding: "16px",
-                background: submitting || !nameInput.trim() || !showPicker ? `${accent}55` : accent,
-                color: "#fff", border: "none", borderRadius: 12,
-                fontSize: 18, fontWeight: 800, cursor: submitting ? "not-allowed" : "pointer",
-                transition: "background .15s",
-                letterSpacing: "0.02em",
-              }}
-            >
-              {submitting ? "Speichern…" : existing ? "Zeit überschreiben" : "Eintrag speichern"}
-            </button>
-          </div>
-        )}
-
-        {/* ── LEADERBOARD TABLE ────────────────────────────────────── */}
-        <div style={{
-          background: surface, borderRadius: 16,
-          border: `1px solid ${border}`,
-          overflow: "hidden",
-        }}>
-          <div style={{
-            padding: "14px 20px",
-            borderBottom: `1px solid ${border}`,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>
-              {DAY_LABEL[day]} · {sorted.length} Einträge
-            </span>
-            {loading && <span style={{ fontSize: 12, color: muted }}>Lade…</span>}
-          </div>
-
-          {sorted.length === 0 ? (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: muted, fontSize: 15 }}>
-              Noch keine Einträge für {DAY_LABEL[day]}.
-            </div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: dark ? "#0d1829" : "#e8f0fe" }}>
-                  {["#", "Name", "Bestzeit", ""].map((h, i) => (
-                    <th key={i} style={{
-                      padding: "10px 16px", textAlign: i === 2 ? "right" : "left",
-                      fontSize: 11, fontWeight: 700, letterSpacing: "0.1em",
-                      textTransform: "uppercase", color: muted,
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((entry, i) => (
-                  <tr key={entry.id} style={{
-                    borderTop: `1px solid ${border}22`,
-                    transition: "background .1s",
-                  }}>
-                    <td style={{ padding: "14px 16px", width: 44 }}>
-                      {i === 0
-                        ? <Trophy size={18} style={{ color: gold }} />
-                        : <span style={{ fontWeight: 700, color: muted, fontSize: 14 }}>{i + 1}</span>
-                      }
-                    </td>
-                    <td style={{ padding: "14px 16px", fontWeight: 600, fontSize: 16 }}>
-                      {entry.name}
-                    </td>
-                    <td style={{ padding: "14px 16px", textAlign: "right", fontFamily: "monospace", fontSize: 18, fontWeight: 700, color: accent }}>
-                      {formatTimeMs(entry.bestTimeMs)}
-                    </td>
-                    <td style={{ padding: "14px 12px", textAlign: "right", width: 44 }}>
-                      {canWrite && (
-                        <button
-                          onClick={() => handleDelete(entry.id)}
-                          style={{
-                            background: "transparent", border: "none",
-                            color: dark ? "#334155" : "#b0c0d8",
-                            cursor: "pointer", padding: 4,
-                            borderRadius: 6,
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+            {/* Autocomplete */}
+            {showAC && acItems.length > 0 && (
+              <ul className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg text-sm overflow-hidden">
+                {acItems.map(item => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2.5 hover:bg-slate-50 flex justify-between items-center gap-4"
+                      onMouseDown={() => {
+                        setNameInput(item.name);
+                        setTimeMs(item.bestTimeMs);
+                        setShowAC(false);
+                        setShowPicker(true);
+                      }}
+                    >
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-slate-400 font-mono text-xs">{formatTimeMs(item.bestTimeMs)}</span>
+                    </button>
+                  </li>
                 ))}
-              </tbody>
-            </table>
+              </ul>
+            )}
+          </div>
+
+          {/* Time picker */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Bestzeit</Label>
+              <span className="font-mono text-lg font-bold text-primary">
+                {formatTimeMs(timeMs)}
+              </span>
+            </div>
+
+            {!showPicker ? (
+              <button
+                type="button"
+                onClick={() => setShowPicker(true)}
+                className="w-full py-4 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+              >
+                <Plus size={16} /> Zeit einstellen
+              </button>
+            ) : (
+              <TimeDrumPicker valueMs={timeMs} onChange={setTimeMs} dark={false} />
+            )}
+          </div>
+
+          {submitError && (
+            <p className="text-sm text-red-600">{submitError}</p>
           )}
+
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !nameInput.trim() || !showPicker}
+            className="w-full"
+          >
+            {submitting ? "Speichern…" : existing ? "Zeit überschreiben" : "Eintrag speichern"}
+          </Button>
         </div>
+      )}
+
+      {/* ── Table ────────────────────────────────────────────────────── */}
+      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-700">
+            {DAY_LABEL[day]} · {sorted.length} Einträge
+          </h2>
+          {loading && <span className="text-xs text-slate-400">Lade…</span>}
+        </div>
+
+        {sorted.length === 0 ? (
+          <div className="py-10 text-center text-sm text-slate-400">
+            Noch keine Einträge für {DAY_LABEL[day]}.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+              <tr>
+                <th className="px-5 py-3 text-left w-12">#</th>
+                <th className="px-5 py-3 text-left">Name</th>
+                <th className="px-5 py-3 text-right">Bestzeit</th>
+                {canWrite && <th className="px-5 py-3 w-12" />}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {sorted.map((entry, i) => (
+                <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-5 py-3">
+                    {i === 0
+                      ? <Trophy size={16} className="text-yellow-500" />
+                      : <span className="text-slate-400 font-medium">{i + 1}</span>
+                    }
+                  </td>
+                  <td className="px-5 py-3 font-medium text-slate-900">{entry.name}</td>
+                  <td className="px-5 py-3 text-right font-mono font-semibold text-slate-700">
+                    {formatTimeMs(entry.bestTimeMs)}
+                  </td>
+                  {canWrite && (
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(entry.id)}
+                        className="text-slate-300 hover:text-red-500 transition-colors p-1 rounded"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

@@ -184,8 +184,8 @@ function fieldsToMs(min: number, sec: number, mil: number) {
 export function TimeDrumPicker({ valueMs, onChange, dark }: Props) {
   const { min, sec, mil } = msToFields(valueMs);
 
-  const bg     = dark ? "#111d31" : "#f0f4fb";
-  const sepClr = dark ? "#2455a4" : "#94b0d8";
+  const bg     = dark ? "#111d31" : "#f8fafc";
+  const sepClr = dark ? "#2455a4" : "#94a3b8";
 
   return (
     <div style={{
