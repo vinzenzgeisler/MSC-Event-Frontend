@@ -5,7 +5,7 @@ import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { adminSimulatorService } from "@/services/admin-simulator.service";
+import { adminSimulatorService, simConfigService, type SimTheme } from "@/services/admin-simulator.service";
 import { adminMetaService } from "@/services/admin-meta.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { TimeDrumPicker } from "@/components/features/admin/time-drum-picker";
@@ -44,8 +44,8 @@ export function AdminSimulatorPage() {
   const [showAC, setShowAC] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
-  /* leaderboard theme – controls what URL is shown to the operator */
-  const [lbTheme, setLbTheme] = useState<"dark" | "light">("dark");
+  const [lbTheme, setLbTheme] = useState<SimTheme>("dark");
+  const [themeLoading, setThemeLoading] = useState(false);
 
   /* ── load ── */
   const loadEntries = useCallback(async (eid: string) => {
@@ -65,6 +65,8 @@ export function AdminSimulatorPage() {
     adminMetaService.getCurrentEvent()
       .then(ev => { if (ev) { setEventId(ev.id); loadEntries(ev.id); } })
       .catch(() => setError("Event konnte nicht geladen werden."));
+    // Load current leaderboard theme from backend
+    simConfigService.getTheme().then(setLbTheme).catch(() => {});
   }, [loadEntries]);
 
   /* ── derived ── */
@@ -113,9 +115,7 @@ export function AdminSimulatorPage() {
     }
   };
 
-  const leaderboardUrl = lbTheme === "light"
-    ? `${LEADERBOARD_URL}?theme=light`
-    : LEADERBOARD_URL;
+  const leaderboardUrl = LEADERBOARD_URL;
 
   /* ─────────────────────────────────────────────────────────────────── */
   return (
@@ -132,28 +132,26 @@ export function AdminSimulatorPage() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-slate-500">Anzeigetafel:</span>
           <div className="flex items-center rounded-md border bg-white overflow-hidden text-sm">
-            <button
-              type="button"
-              onClick={() => setLbTheme("dark")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
-                lbTheme === "dark"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              <Moon size={13} /> Dark
-            </button>
-            <button
-              type="button"
-              onClick={() => setLbTheme("light")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
-                lbTheme === "light"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              <Sun size={13} /> Hell
-            </button>
+            {(["dark", "light"] as SimTheme[]).map(t => (
+              <button
+                key={t}
+                type="button"
+                disabled={themeLoading}
+                onClick={async () => {
+                  setThemeLoading(true);
+                  try {
+                    await simConfigService.setTheme(t);
+                    setLbTheme(t);
+                  } catch { /* ignore */ }
+                  finally { setThemeLoading(false); }
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
+                  lbTheme === t ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50"
+                } disabled:opacity-50`}
+              >
+                {t === "dark" ? <><Moon size={13} /> Dark</> : <><Sun size={13} /> Hell</>}
+              </button>
+            ))}
           </div>
           <a
             href={leaderboardUrl}
