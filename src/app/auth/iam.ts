@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector" | "marshal_manager";
+export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector" | "marshal_manager" | "simulator_manager";
 
 export type AppPermission =
   | "dashboard.read"
@@ -22,9 +22,11 @@ export type AppPermission =
   | "inspection.write"
   | "marshals.read"
   | "marshals.write"
-  | "marshals.export";
+  | "marshals.export"
+  | "sim.read"
+  | "sim.write";
 
-const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager"];
+const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager"];
 
 const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   admin: [
@@ -49,7 +51,9 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "inspection.write",
     "marshals.read",
     "marshals.write",
-    "marshals.export"
+    "marshals.export",
+    "sim.read",
+    "sim.write"
   ],
   editor: [
     "dashboard.read",
@@ -64,7 +68,8 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   ],
   viewer: ["dashboard.read", "entries.read", "exports.read"],
   technical_inspector: ["inspection.read", "inspection.write"],
-  marshal_manager: ["marshals.read", "marshals.write", "marshals.export"]
+  marshal_manager: ["marshals.read", "marshals.write", "marshals.export"],
+  simulator_manager: ["sim.read", "sim.write"]
 };
 
 function normalizeRole(role: string): AppRole | null {

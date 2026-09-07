@@ -87,6 +87,11 @@ const AdminMarshalsPage = lazy(() =>
     default: module.AdminMarshalsPage,
   })),
 );
+const AdminSimulatorPage = lazy(() =>
+  import("@/pages/admin/simulator-page").then((module) => ({
+    default: module.AdminSimulatorPage,
+  })),
+);
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -122,6 +127,7 @@ function AdminIndexRedirect() {
   if (hasPermission(roles, "entries.read")) return <Navigate to="entries" replace />;
   if (hasPermission(roles, "marshals.read")) return <Navigate to="marshals" replace />;
   if (hasPermission(roles, "inspection.read")) return <Navigate to="/inspection" replace />;
+  if (hasPermission(roles, "sim.read")) return <Navigate to="sim" replace />;
   return <Navigate to="/admin/forbidden" replace />;
 }
 
@@ -209,6 +215,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin", "marshal_manager"]}>
                 <AdminMarshalsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "sim",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "simulator_manager"]}>
+                <AdminSimulatorPage />
               </ProtectedRoute>
             ),
           },

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ListChecks, Mail, FileDown, Settings, ShieldCheck, PenLine, UsersRound } from "lucide-react";
+import { LayoutGrid, ListChecks, Mail, FileDown, Settings, ShieldCheck, PenLine, UsersRound, Gauge } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission, type AppPermission } from "@/app/auth/iam";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,12 @@ const links = [
     label: "Haftverzicht",
     icon: PenLine,
     permission: "entries.checkin.write" as AppPermission
+  },
+  {
+    to: "/admin/sim",
+    label: "Simulator",
+    icon: Gauge,
+    permission: "sim.read" as AppPermission
   },
   {
     to: "/inspection",
