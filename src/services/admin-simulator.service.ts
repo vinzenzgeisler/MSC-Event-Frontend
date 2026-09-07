@@ -21,3 +21,15 @@ export const adminSimulatorService = {
     return requestJson<OkResponse>(`/admin/sim/entries/${id}`, { method: "DELETE" });
   }
 };
+
+export type SimTheme = "dark" | "light";
+
+export const simConfigService = {
+  async getTheme(): Promise<SimTheme> {
+    const res = await requestJson<{ ok: boolean; theme: SimTheme }>("/public/sim/config");
+    return res.theme;
+  },
+  async setTheme(theme: SimTheme): Promise<void> {
+    await requestJson<{ ok: boolean }>("/admin/sim/config", { method: "PUT", body: { theme } });
+  }
+};
