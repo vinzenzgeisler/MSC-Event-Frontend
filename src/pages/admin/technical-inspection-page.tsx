@@ -497,10 +497,7 @@ export function AdminTechnicalInspectionPage() {
                   <div className="text-2xl font-bold">#{item.startNumber ?? "–"}</div>
                   <Badge className={statusClasses[item.techStatus]}>{statusLabels[item.techStatus]}</Badge>
                 </div>
-                <div className="mt-2 flex items-center gap-2 font-semibold">
-                  <span>{item.driverDisplayName}</span>
-                  {item.identityProtected ? <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">Veröffentlichungsname</Badge> : null}
-                </div>
+                <div className="mt-2 font-semibold">{item.driverDisplayName}</div>
                 <div className="text-sm text-slate-600">{item.vehicleMake} {item.vehicleModel} · {item.className}</div>
                 {item.backupVehicleId && (
                   <div className="mt-2 flex items-center justify-between border-t pt-2 text-xs text-slate-600">
@@ -545,10 +542,7 @@ export function AdminTechnicalInspectionPage() {
                     <div id="driver-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Fahrer
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xl font-bold text-slate-950">
-                      <span>{detail.driverDisplayName}</span>
-                      {detail.identityProtected ? <Badge variant="outline" className="border-violet-200 bg-violet-50 text-xs text-violet-800">Veröffentlichungsname</Badge> : null}
-                    </div>
+                    <div className="mt-1 text-xl font-bold text-slate-950">{detail.driverDisplayName}</div>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-4">
                     <div>
@@ -579,7 +573,6 @@ export function AdminTechnicalInspectionPage() {
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Beifahrer</div>
                       <div className="mt-1 font-semibold text-slate-900">
                         {detail.codriver.displayName}
-                        {detail.codriver.identityProtected ? <Badge variant="outline" className="ml-2 border-violet-200 bg-violet-50 text-violet-800">Veröffentlichungsname</Badge> : null}
                       </div>
                       <div className="mt-1 text-sm text-slate-600">
                         {detail.codriver.birthdate

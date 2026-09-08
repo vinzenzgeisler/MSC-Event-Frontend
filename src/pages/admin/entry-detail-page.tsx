@@ -1180,11 +1180,6 @@ export function AdminEntryDetailPage() {
                 <div className="text-xs uppercase text-slate-500">Name</div>
                 <div>{detail.driver.name}</div>
               </div>
-              {detail.driver.identityProtected ? (
-                <div className="rounded-md border border-violet-200 bg-violet-50 p-3 text-violet-900 sm:col-span-2">
-                  In allen Arbeitsansichten wird ausschließlich der Veröffentlichungsname angezeigt. Rechtliche Stammdaten erscheinen nur in den dafür vorgesehenen offiziellen Dokumenten.
-                </div>
-              ) : null}
               <div>
                 <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
                 <div>{detail.driver.birthdate}</div>
