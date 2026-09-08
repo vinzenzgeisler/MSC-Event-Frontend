@@ -416,6 +416,7 @@ function readReturnSnapshot(search: string): EntriesReturnSnapshot | null {
 export function AdminEntriesPage() {
   const { roles } = useAuth();
   const canManageStatus = hasPermission(roles, "entries.status.write");
+  const canSignWaiver = hasPermission(roles, "entries.checkin.write");
   const canDeleteEntries = hasPermission(roles, "entries.delete");
   const canReadIam = hasPermission(roles, "iam.read");
   const location = useLocation();
@@ -1259,6 +1260,7 @@ export function AdminEntriesPage() {
         <EntriesTable
           rows={rows}
           canManageStatus={canManageStatus}
+          canSignWaiver={canSignWaiver}
           statusActionBusy={statusActionBusy !== null}
           isLoadingInitial={loadingInitial}
           isLoadingMore={loadingMore}

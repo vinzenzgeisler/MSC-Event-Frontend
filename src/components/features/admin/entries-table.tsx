@@ -25,6 +25,7 @@ const DESKTOP_OVERSCAN = 8;
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
   canManageStatus: boolean;
+  canSignWaiver: boolean;
   statusActionBusy?: boolean;
   isLoadingInitial?: boolean;
   isLoadingMore: boolean;
@@ -86,16 +87,16 @@ function ActionButton(props: {
 }) {
   const disabled = Boolean(props.disabledReason);
   return (
-    <span className={cn("inline-flex h-8 w-full", props.wrapperClassName)} title={props.disabledReason}>
+    <span className={cn("inline-flex h-8 w-full min-w-0 max-w-full overflow-hidden", props.wrapperClassName)} title={props.disabledReason}>
       <Button
         type="button"
         size="sm"
         variant={props.variant ?? "outline"}
-        className={cn("h-full w-full max-w-full justify-center overflow-hidden text-ellipsis whitespace-nowrap px-3 text-xs", props.className)}
+        className={cn("h-full w-full min-w-0 max-w-full justify-center overflow-hidden px-2 text-xs", props.className)}
         disabled={disabled}
         onClick={props.onClick}
       >
-        {props.label}
+        <span className="block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap">{props.label}</span>
       </Button>
     </span>
   );
@@ -120,6 +121,7 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
 function EntriesTableInner({
   rows,
   canManageStatus,
+  canSignWaiver,
   statusActionBusy = false,
   isLoadingInitial = false,
   isLoadingMore,
@@ -285,9 +287,9 @@ function EntriesTableInner({
             className={`rounded-md border p-3 shadow-sm ${row.confirmationMailVerified ? `bg-white ${acceptanceStatusRowAccentClasses(row.status)}` : "border-l-4 border-l-slate-300 bg-slate-50"}`}
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <VehicleThumb src={row.vehicleThumbUrl} label={row.vehicleLabel} />
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-1.5 font-medium text-slate-900">
                     <span>{row.name}</span>
                     {row.identityProtected ? (
@@ -313,7 +315,7 @@ function EntriesTableInner({
                   )}
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex w-[7.25rem] shrink-0 flex-col gap-1">
                 <Button asChild size="sm" variant="outline">
                   <Link
                     to={`/admin/entries/${row.id}${location.search}`}
@@ -323,6 +325,19 @@ function EntriesTableInner({
                     Details
                   </Link>
                 </Button>
+                {canSignWaiver ? (
+                  <Button asChild size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs">
+                    <Link
+                      to={`/admin/entries/${row.id}${location.search}`}
+                      onClick={persistReturnSnapshot}
+                      state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length, openSigningDialog: true }}
+                      title="Haftverzicht unterschreiben"
+                      aria-label={`Haftverzicht für ${row.name} unterschreiben`}
+                    >
+                      HV sign.
+                    </Link>
+                  </Button>
+                ) : null}
                 {canManageStatus && (
                   <>
                     <ActionButton
@@ -401,7 +416,7 @@ function EntriesTableInner({
         <div ref={handleDesktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[25%]" />
+              <col className="w-[23%]" />
               <col className="w-[9%]" />
               <col className="w-[7%]" />
               <col className="w-[10%]" />
@@ -409,7 +424,7 @@ function EntriesTableInner({
               <col className="w-[9%]" />
               <col className="w-[11%]" />
               <col className="w-[8%]" />
-              <col className="w-[12%]" />
+              <col className="w-[14%]" />
             </colgroup>
             <thead className="bg-slate-100 text-left text-slate-700">
               <tr>
@@ -508,25 +523,40 @@ function EntriesTableInner({
                   <td className="px-3 py-3.5 text-slate-700">
                     <span className="block leading-tight">{row.createdAt}</span>
                   </td>
-                  <td className="px-3 py-3">
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <div className="col-span-2 h-8 w-full">
-                        <Button asChild size="sm" variant="outline" className="h-full w-full justify-center px-3.5 text-xs">
+                  <td className="min-w-0 px-2 py-3">
+                    <div className="grid min-w-0 grid-cols-2 gap-1.5 overflow-hidden">
+                      <div className={cn("h-8 min-w-0", canSignWaiver ? "" : "col-span-2")}>
+                        <Button asChild size="sm" variant="outline" className="h-full w-full min-w-0 justify-center overflow-hidden px-2 text-xs">
                           <Link
                             to={`/admin/entries/${row.id}${location.search}`}
                             onClick={persistReturnSnapshot}
                             state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length }}
                           >
-                            Details
+                            <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Details</span>
                           </Link>
                         </Button>
                       </div>
+                      {canSignWaiver ? (
+                        <div className="h-8 min-w-0">
+                          <Button asChild size="sm" variant="outline" className="h-full w-full min-w-0 justify-center overflow-hidden border-primary/30 bg-primary/5 px-1.5 text-xs text-primary hover:bg-primary/10">
+                            <Link
+                              to={`/admin/entries/${row.id}${location.search}`}
+                              onClick={persistReturnSnapshot}
+                              state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length, openSigningDialog: true }}
+                              title="Haftverzicht unterschreiben"
+                              aria-label={`Haftverzicht für ${row.name} unterschreiben`}
+                            >
+                              <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">HV sign.</span>
+                            </Link>
+                          </Button>
+                        </div>
+                      ) : null}
                       {canManageStatus && (
                         <>
                           <ActionButton
                             label="Vorauswahl"
                             wrapperClassName="h-8 w-full"
-                            className="px-3.5"
+                            className="px-1.5"
                             variant="outline"
                             disabledReason={statusDisabledReason(row, "shortlist")}
                             onClick={() => onSetShortlist(row.id)}
@@ -534,7 +564,7 @@ function EntriesTableInner({
                           <ActionButton
                             label="Ablehnen"
                             wrapperClassName="h-8 w-full"
-                            className="px-3.5"
+                            className="px-1.5"
                             variant="outline"
                             disabledReason={statusDisabledReason(row, "rejected")}
                             onClick={() => onSetRejected(row.id)}
@@ -542,7 +572,7 @@ function EntriesTableInner({
                           <ActionButton
                             label="Absagen"
                             wrapperClassName="h-8 w-full"
-                            className="px-3.5"
+                            className="px-1.5"
                             variant="outline"
                             disabledReason={statusDisabledReason(row, "withdrawn")}
                             onClick={() => onSetWithdrawn(row.id)}
@@ -550,7 +580,7 @@ function EntriesTableInner({
                           <ActionButton
                             label="Zulassen"
                             wrapperClassName="col-span-2 h-8 w-full"
-                            className="px-3.5"
+                            className="px-1.5"
                             variant="default"
                             disabledReason={statusDisabledReason(row, "accepted")}
                             onClick={() => onSetAccepted(row.id)}
@@ -595,6 +625,7 @@ export const EntriesTable = memo(EntriesTableInner, (prev, next) => {
   return (
     prev.rows === next.rows &&
     prev.canManageStatus === next.canManageStatus &&
+    prev.canSignWaiver === next.canSignWaiver &&
     prev.statusActionBusy === next.statusActionBusy &&
     prev.isLoadingInitial === next.isLoadingInitial &&
     prev.isLoadingMore === next.isLoadingMore &&

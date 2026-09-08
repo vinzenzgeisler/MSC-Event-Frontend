@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bike, Car, CheckCircle2, Clock3, Copy, Download, FileText, Link2, Loader2, Mail, Pencil, Printer, ShieldCheck, ShieldOff, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
@@ -211,6 +211,7 @@ export function AdminEntryDetailPage() {
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const signingDeepLinkHandledRef = useRef(false);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
   const [mailHistory, setMailHistory] = useState<Awaited<ReturnType<typeof adminEntriesService.listEntryMailHistory>>>([]);
   const [mailHistoryLoading, setMailHistoryLoading] = useState(false);
@@ -560,8 +561,26 @@ export function AdminEntryDetailPage() {
 
   useEffect(() => {
     setHasLoadedOnce(false);
+    signingDeepLinkHandledRef.current = false;
     loadDetail();
   }, [entryId]);
+
+  useEffect(() => {
+    const state = location.state as {
+      fromEntriesList?: boolean;
+      scrollY?: number;
+      loadedCount?: number;
+      openSigningDialog?: boolean;
+    } | null;
+    if (!detail || detail.id !== entryId || !canCheckin || !state?.openSigningDialog || signingDeepLinkHandledRef.current) {
+      return;
+    }
+
+    signingDeepLinkHandledRef.current = true;
+    const { openSigningDialog: _openSigningDialog, ...restState } = state;
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: restState });
+    void openSigningDialog();
+  }, [canCheckin, detail, entryId]);
 
   useEffect(() => {
     adminMetaService
