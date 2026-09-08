@@ -1,6 +1,7 @@
 import { requestJson } from "@/services/api/http-client";
 
 export type ParticipantWorkflowType = "regular_codriver_registration" | "charity_codriver_registration";
+export type ParticipantOperation = "create" | "edit";
 export type TerminalWorkflowStage = "collecting_data" | "awaiting_operator_approval" | "ready_to_sign" | "completed" | "cancelled" | "failed";
 
 export type ParticipantTerminalSession = {
@@ -10,6 +11,7 @@ export type ParticipantTerminalSession = {
   workflowStage: TerminalWorkflowStage;
   deviceSessionId: string;
   draftPayload?: Record<string, unknown> | null;
+  sessionPayload?: Record<string, unknown> | null;
   resultPayload?: Record<string, unknown> | null;
   expiresAt: string;
   updatedAt: string;
@@ -20,6 +22,8 @@ export const adminTerminalService = {
     workflowType: ParticipantWorkflowType;
     deviceSessionId: string;
     entryIds: string[];
+    operation?: ParticipantOperation;
+    participantPersonId?: string;
   }) {
     const response = await requestJson<{ ok: true; session: ParticipantTerminalSession }>("/admin/terminal/sessions", {
       method: "POST",

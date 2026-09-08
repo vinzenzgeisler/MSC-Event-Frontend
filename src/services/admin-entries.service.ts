@@ -985,6 +985,13 @@ export const adminEntriesService = {
     });
   },
 
+  async removeRegularCodriver(entryId: string, reason: string) {
+    return requestJson<{ ok: true }>(`/admin/entries/${entryId}/codriver`, {
+      method: "DELETE",
+      body: { reason }
+    });
+  },
+
   async saveEntryNotes(entryId: string, payload: { internalNote: string; driverNote: string; inspectionNote: string; status?: AcceptanceStatus }) {
     const body = {
       internalNote: payload.internalNote,

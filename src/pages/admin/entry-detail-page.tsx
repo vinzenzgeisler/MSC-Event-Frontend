@@ -25,7 +25,7 @@ import {
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { adminSigningService, type SigningDevice, type SigningPrecheckTimestamps, type SigningRequirements, type SigningSessionStatus } from "@/services/admin-signing.service";
-import { adminTerminalService, type ParticipantTerminalSession, type ParticipantWorkflowType } from "@/services/admin-terminal.service";
+import { adminTerminalService, type ParticipantOperation, type ParticipantTerminalSession, type ParticipantWorkflowType } from "@/services/admin-terminal.service";
 import { adminCodriverInvitationsService, type CodriverInvitation } from "@/services/admin-codriver-invitations.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
@@ -114,20 +114,20 @@ function HintButton(props: {
     <Button
       type="button"
       variant={props.variant ?? "outline"}
-      className={cn("h-auto w-full justify-start whitespace-normal break-words py-2 text-left leading-tight", props.className)}
+      className={cn("h-auto w-full min-w-0 max-w-full overflow-hidden justify-start whitespace-normal py-2 text-left leading-tight", props.className)}
       disabled={disabled}
       onClick={props.onClick}
     >
-      {props.icon}
-      {props.label}
+      {props.icon ? <span className="shrink-0">{props.icon}</span> : null}
+      <span className="min-w-0 flex-1 break-words">{props.label}</span>
     </Button>
   );
   if (!props.disabledReason) {
     return button;
   }
   return (
-    <span className="inline-flex w-full" title={props.disabledReason}>
-      <span className="w-full">{button}</span>
+    <span className="inline-flex w-full min-w-0 max-w-full" title={props.disabledReason}>
+      <span className="w-full min-w-0 max-w-full">{button}</span>
     </span>
   );
 }
@@ -251,6 +251,7 @@ export function AdminEntryDetailPage() {
   const [signingLoading, setSigningLoading] = useState(false);
   const [participantDialogOpen, setParticipantDialogOpen] = useState(false);
   const [participantWorkflow, setParticipantWorkflow] = useState<ParticipantWorkflowType>("regular_codriver_registration");
+  const [participantOperation, setParticipantOperation] = useState<ParticipantOperation>("create");
   const [participantEntryIds, setParticipantEntryIds] = useState<string[]>([]);
   const [participantSession, setParticipantSession] = useState<ParticipantTerminalSession | null>(null);
   const [participantBusy, setParticipantBusy] = useState(false);
@@ -266,6 +267,8 @@ export function AdminEntryDetailPage() {
   const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
   const [pendingCharityRevoke, setPendingCharityRevoke] = useState<{ registrationId: string; name: string } | null>(null);
   const [charityRevocationReason, setCharityRevocationReason] = useState("");
+  const [pendingCodriverRemoval, setPendingCodriverRemoval] = useState(false);
+  const [codriverRemovalReason, setCodriverRemovalReason] = useState("");
   const [publicationNameTarget, setPublicationNameTarget] = useState<PublicationNameTarget | null>(null);
   const [publicationNameDraft, setPublicationNameDraft] = useState("");
   const [publicationNameRemovalConfirmed, setPublicationNameRemovalConfirmed] = useState(false);
@@ -938,7 +941,7 @@ export function AdminEntryDetailPage() {
     }
   };
 
-  const openParticipantFlow = (workflow: ParticipantWorkflowType) => {
+  const openParticipantFlow = (workflow: ParticipantWorkflowType, operation: ParticipantOperation = "create") => {
     if (!detail) return;
     const classAllowsCodriver = classOptions.find((option) => option.id === detail.classId)?.allowsCodriver ?? false;
     if (!classAllowsCodriver) {
@@ -946,7 +949,8 @@ export function AdminEntryDetailPage() {
       return;
     }
     setParticipantWorkflow(workflow);
-    setParticipantEntryIds(workflow === "charity_codriver_registration" ? [detail.id] : Array.from(new Set([detail.id, ...detail.relatedEntryIds])));
+    setParticipantOperation(operation);
+    setParticipantEntryIds(workflow === "charity_codriver_registration" || operation === "edit" ? [detail.id] : Array.from(new Set([detail.id, ...detail.relatedEntryIds])));
     setParticipantSession(null);
     setParticipantChecks({ identity: false, present: false, medical: false, guardianPresent: false, guardianAuthority: false });
     setParticipantDialogOpen(true);
@@ -960,7 +964,9 @@ export function AdminEntryDetailPage() {
       const session = await adminTerminalService.createParticipantSession({
         workflowType: participantWorkflow,
         deviceSessionId: selectedSigningDeviceId,
-        entryIds: participantWorkflow === "charity_codriver_registration" ? [detail!.id] : participantEntryIds
+        entryIds: participantWorkflow === "charity_codriver_registration" ? [detail!.id] : participantEntryIds,
+        operation: participantOperation,
+        participantPersonId: participantOperation === "edit" ? detail!.codriver.id ?? undefined : undefined
       });
       setParticipantSession(session);
       window.localStorage.setItem(PREFERRED_SIGNING_DEVICE_KEY, selectedSigningDeviceId);
@@ -971,12 +977,9 @@ export function AdminEntryDetailPage() {
     }
   };
 
-  const participantDraft = participantSession?.draftPayload as { birthdate?: string; guardianFullName?: string } | null | undefined;
-  const participantAge = participantDraft?.birthdate
-    ? Math.floor((Date.now() - new Date(participantDraft.birthdate).getTime()) / 31_556_952_000)
-    : null;
-  const participantIsMinor = participantAge !== null && participantAge < 18;
-  const participantNeedsMedical = participantWorkflow === "regular_codriver_registration" && participantAge !== null && participantAge >= 70;
+  const participantContext = participantSession?.sessionPayload as { isMinor?: boolean; requiresMedicalCertificate?: boolean } | null | undefined;
+  const participantIsMinor = participantContext?.isMinor === true;
+  const participantNeedsMedical = participantContext?.requiresMedicalCertificate === true;
   const participantApprovalComplete = participantChecks.identity && participantChecks.present
     && (!participantNeedsMedical || participantChecks.medical)
     && (!participantIsMinor || (participantChecks.guardianPresent && participantChecks.guardianAuthority));
@@ -1680,15 +1683,15 @@ export function AdminEntryDetailPage() {
           </Card>
         </div>
 
-        <aside className="order-2 w-full min-w-0 lg:order-2 lg:min-h-0 lg:w-[340px] lg:justify-self-end">
-          <div className="space-y-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 scrollbar-none">
-          <Card className="min-w-0">
+        <aside className="order-2 w-full min-w-0 max-w-full overflow-hidden lg:order-2 lg:min-h-0 lg:w-[340px] lg:justify-self-end">
+          <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 scrollbar-none">
+          <Card className="min-w-0 max-w-full overflow-hidden">
             <CardHeader>
               <CardTitle>Aktionen</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0 space-y-4">
               {(canSetStatus || canCheckin) && (
-                <div className="grid gap-2">
+                <div className="grid min-w-0 max-w-full gap-2">
                   {canSetStatus && (
                     <>
                       <HintButton
@@ -1768,12 +1771,12 @@ export function AdminEntryDetailPage() {
               )}
 
               {(canManageParticipants || canPrintStampCards || canSendMail || canCheckin) && (
-                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <div className="grid min-w-0 max-w-full gap-2 border-t border-slate-200 pt-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fahrer &amp; Beifahrer</div>
                   {canManageParticipants && (
                     <>
                       <HintButton
-                        label="Beifahrer am Terminal nachmelden"
+                        label={detail.codriver.assigned ? "Beifahrer am Terminal bearbeiten" : "Beifahrer am Terminal nachmelden"}
                         icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
                         variant="default"
                         className={actionActiveClass}
@@ -1784,12 +1787,22 @@ export function AdminEntryDetailPage() {
                               ? "Beifahrer können erst nach Zulassung ergänzt werden."
                               : !currentClassAllowsCodriver
                                 ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
-                                : detail.codriver.assigned
-                                  ? "Für diese Nennung ist bereits ein regulärer Beifahrer hinterlegt."
-                                  : undefined
+                                : undefined
                         }
-                        onClick={() => openParticipantFlow("regular_codriver_registration")}
+                        onClick={() => openParticipantFlow("regular_codriver_registration", detail.codriver.assigned ? "edit" : "create")}
                       />
+                      {detail.codriver.assigned ? (
+                        <HintButton
+                          label="Beifahrer entfernen"
+                          icon={<Trash2 className="mr-2 h-4 w-4" />}
+                          variant="destructive"
+                          disabledReason={participantBusy || actionInFlight ? "Beifahrer-Aktion läuft…" : undefined}
+                          onClick={() => {
+                            setCodriverRemovalReason("");
+                            setPendingCodriverRemoval(true);
+                          }}
+                        />
+                      ) : null}
                       <HintButton
                         label="Persönlichen Beifahrer-Link erstellen"
                         icon={<Link2 className="mr-2 h-4 w-4" />}
@@ -1823,23 +1836,23 @@ export function AdminEntryDetailPage() {
                     </>
                   )}
                   {canPrintStampCards && (
-                    <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <div className="grid min-w-0 max-w-full gap-2 overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-3">
                       <label className="flex items-center justify-between gap-2 text-xs text-slate-600">
                         Druckfeld
                         <select className="h-9 rounded-md border bg-white px-2 text-sm" value={stampCardStartSlot} onChange={(event) => setStampCardStartSlot(Number(event.target.value))}>
                           {Array.from({ length: 10 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
                         </select>
                       </label>
-                      <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "driver", personId: detail.driverPersonId })}>
+                      <Button type="button" size="sm" variant="outline" className="w-full min-w-0 max-w-full whitespace-normal" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "driver", personId: detail.driverPersonId })}>
                         <Download className="mr-2 h-4 w-4" />Fahrerkarte drucken
                       </Button>
                       {detail.codriver.id ? (
-                        <Button type="button" size="sm" variant="outline" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "regular_codriver", personId: detail.codriver.id! })}>
+                        <Button type="button" size="sm" variant="outline" className="w-full min-w-0 max-w-full whitespace-normal" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "regular_codriver", personId: detail.codriver.id! })}>
                           <Download className="mr-2 h-4 w-4" />Beifahrerkarte drucken
                         </Button>
                       ) : null}
                       {detail.charityCodrivers.filter((item) => item.status === "active").map((item) => (
-                        <Button key={item.registrationId} type="button" size="sm" variant="outline" className="h-auto whitespace-normal py-2" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "charity_codriver", registrationId: item.registrationId })}>
+                        <Button key={item.registrationId} type="button" size="sm" variant="outline" className="h-auto w-full min-w-0 max-w-full whitespace-normal py-2" disabled={participantBusy} onClick={() => void downloadStampCard({ cardType: "charity_codriver", registrationId: item.registrationId })}>
                           <Download className="mr-2 h-4 w-4" />Charity-Karte: {item.name}
                         </Button>
                       ))}
@@ -2780,6 +2793,52 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
+      {canManageParticipants && pendingCodriverRemoval && detail.codriver.assigned && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div className="w-full max-w-lg rounded-lg border bg-white p-5 shadow-xl">
+            <h2 className="text-xl font-semibold text-slate-900">Beifahrer entfernen</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {detail.codriver.label} wird von dieser Nennung entfernt. Die Person und bereits unterschriebene Dokumente bleiben revisionssicher gespeichert.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-slate-800" htmlFor="codriver-removal-reason">Begründung</label>
+            <textarea
+              id="codriver-removal-reason"
+              className="mt-1 min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              maxLength={500}
+              value={codriverRemovalReason}
+              onChange={(event) => setCodriverRemovalReason(event.target.value)}
+              placeholder="Zum Beispiel irrtümlich zugeordnet oder Teilnahme abgesagt"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="outline" disabled={Boolean(actionInFlight)} onClick={() => setPendingCodriverRemoval(false)}>Abbrechen</Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={Boolean(actionInFlight) || !codriverRemovalReason.trim()}
+                onClick={async () => {
+                  if (!codriverRemovalReason.trim() || actionInFlight) return;
+                  setActionInFlight("codriver-remove");
+                  try {
+                    await adminEntriesService.removeRegularCodriver(detail.id, codriverRemovalReason.trim());
+                    setPendingCodriverRemoval(false);
+                    setCodriverRemovalReason("");
+                    flashMessage("Beifahrer wurde von dieser Nennung entfernt.", 3200);
+                    loadDetail();
+                  } catch (error) {
+                    flashMessage(getApiErrorMessage(error, "Beifahrer konnte nicht entfernt werden."), 4200);
+                  } finally {
+                    setActionInFlight((current) => current === "codriver-remove" ? null : current);
+                  }
+                }}
+              >
+                {actionInFlight === "codriver-remove" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Entfernen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {canManageParticipants && pendingCharityRevoke && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
           <div className="w-full max-w-lg rounded-lg border bg-white p-5 shadow-xl">
@@ -2886,16 +2945,21 @@ export function AdminEntryDetailPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">
-                  {participantWorkflow === "charity_codriver_registration" ? "Charity-Beifahrer erfassen" : "Beifahrer nachmelden"}
+                  {participantWorkflow === "charity_codriver_registration"
+                    ? "Charity-Beifahrer erfassen"
+                    : participantOperation === "edit" ? "Beifahrer bearbeiten" : "Beifahrer nachmelden"}
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">Die Person trägt ihre Daten selbst am gekoppelten Tablet ein und unterschreibt anschließend.</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Die Person trägt ihre Daten selbst am gekoppelten Tablet ein und unterschreibt anschließend.
+                  {participantOperation === "edit" ? " Die Stammdaten werden personenweit aktualisiert." : ""}
+                </p>
               </div>
               <Button type="button" variant="outline" disabled={participantBusy} onClick={() => void closeParticipantFlow()}>Schließen</Button>
             </div>
 
             {!participantSession ? (
               <div className="mt-5 space-y-4">
-                {participantWorkflow === "regular_codriver_registration" && detail.relatedEntryIds.length > 0 ? (
+                {participantWorkflow === "regular_codriver_registration" && participantOperation === "create" && detail.relatedEntryIds.length > 0 ? (
                   <div className="rounded-md border bg-slate-50 p-3">
                     <div className="text-sm font-semibold text-slate-900">Gültige Starts auswählen</div>
                     <div className="mt-2 space-y-2">
@@ -2970,7 +3034,7 @@ export function AdminEntryDetailPage() {
               </div>
             ) : participantSession.workflowStage === "completed" ? (
               <div className="mt-6 space-y-4 rounded-md border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
-                <div className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="h-6 w-6" /> Beifahrer vollständig gespeichert</div>
+                <div className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="h-6 w-6" /> {participantOperation === "edit" ? "Beifahrer aktualisiert" : "Beifahrer vollständig gespeichert"}</div>
                 <p className="text-sm">Der unterschriebene Haftverzicht wurde automatisch per E-Mail versendet.</p>
                 {canPrintStampCards ? <Button type="button" disabled={participantBusy} onClick={() => {
                   const result = participantSession.resultPayload as { participantId?: string; charityRegistrationId?: string } | null;
