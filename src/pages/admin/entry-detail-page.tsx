@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Bike, Car, CheckCircle2, Clock3, Copy, Download, Link2, Loader2, Mail, ShieldCheck, ShieldOff, TabletSmartphone, Trash2, Wallet } from "lucide-react";
+import { Bike, Car, CheckCircle2, Clock3, Copy, Download, FileText, Link2, Loader2, Mail, Pencil, Printer, ShieldCheck, ShieldOff, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -129,6 +129,15 @@ function HintButton(props: {
     <span className="inline-flex w-full min-w-0 max-w-full" title={props.disabledReason}>
       <span className="w-full min-w-0 max-w-full">{button}</span>
     </span>
+  );
+}
+
+function ActionSection(props: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <section className={cn("min-w-0 rounded-lg border border-slate-200 bg-slate-50/70 p-3", props.className)}>
+      <h4 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{props.title}</h4>
+      <div className="grid min-w-0 gap-2">{props.children}</div>
+    </section>
   );
 }
 
@@ -1218,7 +1227,22 @@ export function AdminEntryDetailPage() {
                 <div>{detail.driver.emergencyContactPhone}</div>
               </div>
               <div className="sm:col-span-2">
-                <div className="text-xs uppercase text-slate-500">Beifahrer</div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs uppercase text-slate-500">Beifahrer</div>
+                  {canManageParticipants && detail.codriver.id ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-300 bg-white text-slate-700 hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                      disabled={participantBusy || status !== "accepted" || !currentClassAllowsCodriver}
+                      title={status !== "accepted" ? "Beifahrer können erst nach Zulassung bearbeitet werden." : !currentClassAllowsCodriver ? "Diese Fahrzeugklasse erlaubt keine Beifahrer." : undefined}
+                      onClick={() => openParticipantFlow("regular_codriver_registration", "edit")}
+                    >
+                      <Pencil className="mr-1.5 h-4 w-4" />Bearbeiten
+                    </Button>
+                  ) : null}
+                </div>
                 {detail.codriver.assigned ? (
                   <details className="mt-1 rounded-md border bg-slate-50 p-3">
                     <summary className="cursor-pointer break-words font-medium text-slate-900">
@@ -1686,12 +1710,12 @@ export function AdminEntryDetailPage() {
         <aside className="order-2 w-full min-w-0 max-w-full overflow-hidden lg:order-2 lg:min-h-0 lg:w-[340px] lg:justify-self-end">
           <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1 scrollbar-none">
           <Card className="min-w-0 max-w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle>Aktionen</CardTitle>
+            <CardHeader className="p-5 pb-4">
+              <CardTitle className="text-lg">Aktionen</CardTitle>
             </CardHeader>
-            <CardContent className="min-w-0 space-y-4">
+            <CardContent className="min-w-0 space-y-3 px-3 pb-3">
               {(canSetStatus || canCheckin) && (
-                <div className="grid min-w-0 max-w-full gap-2">
+                <ActionSection title="Status & Check-in">
                   {canSetStatus && (
                     <>
                       <HintButton
@@ -1754,11 +1778,11 @@ export function AdminEntryDetailPage() {
                       onClick={() => setPendingCheckinConfirm(true)}
                     />
                   )}
-                </div>
+                </ActionSection>
               )}
 
               {canCheckin && (
-                <div className="border-t border-slate-200 pt-4">
+                <ActionSection title="Vor Ort">
                   <HintButton
                     label={hasSignedWaiverDocument ? "Haftverzicht erneut erfassen" : "Haftverzicht unterschreiben"}
                     icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
@@ -1767,12 +1791,11 @@ export function AdminEntryDetailPage() {
                     disabledReason={signingBusy || signingLoading ? "Signing-Aktion läuft…" : undefined}
                     onClick={() => void openSigningDialog()}
                   />
-                </div>
+                </ActionSection>
               )}
 
               {(canManageParticipants || canPrintStampCards || canSendMail || canCheckin) && (
-                <div className="grid min-w-0 max-w-full gap-2 border-t border-slate-200 pt-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fahrer &amp; Beifahrer</div>
+                <ActionSection title="Fahrer & Beifahrer">
                   {canManageParticipants && (
                     <>
                       <HintButton
@@ -1795,7 +1818,8 @@ export function AdminEntryDetailPage() {
                         <HintButton
                           label="Beifahrer entfernen"
                           icon={<Trash2 className="mr-2 h-4 w-4" />}
-                          variant="destructive"
+                          variant="outline"
+                          className="border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
                           disabledReason={participantBusy || actionInFlight ? "Beifahrer-Aktion läuft…" : undefined}
                           onClick={() => {
                             setCodriverRemovalReason("");
@@ -1803,22 +1827,22 @@ export function AdminEntryDetailPage() {
                           }}
                         />
                       ) : null}
-                      <HintButton
-                        label="Persönlichen Beifahrer-Link erstellen"
-                        icon={<Link2 className="mr-2 h-4 w-4" />}
-                        disabledReason={
-                          codriverLinkBusy
-                            ? "Beifahrer-Link wird verarbeitet…"
-                            : status !== "accepted"
-                              ? "Beifahrer-Links können erst nach Zulassung erstellt werden."
-                              : !currentClassAllowsCodriver
-                                ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
-                                : detail.codriver.assigned
-                                  ? "Für diese Nennung ist bereits ein regulärer Beifahrer hinterlegt."
+                      {!detail.codriver.assigned ? (
+                        <HintButton
+                          label="Persönlichen Beifahrer-Link erstellen"
+                          icon={<Link2 className="mr-2 h-4 w-4" />}
+                          disabledReason={
+                            codriverLinkBusy
+                              ? "Beifahrer-Link wird verarbeitet…"
+                              : status !== "accepted"
+                                ? "Beifahrer-Links können erst nach Zulassung erstellt werden."
+                                : !currentClassAllowsCodriver
+                                  ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
                                   : undefined
-                        }
-                        onClick={() => void openCodriverLinkDialog()}
-                      />
+                          }
+                          onClick={() => void openCodriverLinkDialog()}
+                        />
+                      ) : null}
                       <HintButton
                         label="Charity-Fahrt am Terminal erfassen"
                         icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
@@ -1836,7 +1860,13 @@ export function AdminEntryDetailPage() {
                     </>
                   )}
                   {canPrintStampCards && (
-                    <div className="grid min-w-0 max-w-full gap-2 overflow-hidden rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <details className="group min-w-0 max-w-full overflow-hidden rounded-md border border-slate-200 bg-white">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        <Printer className="h-4 w-4 text-slate-500" />
+                        <span className="flex-1">Stempelkarten drucken</span>
+                        <span className="text-xs text-slate-400 transition-transform group-open:rotate-180">⌄</span>
+                      </summary>
+                      <div className="grid min-w-0 gap-2 border-t border-slate-200 bg-slate-50/70 p-3">
                       <label className="flex items-center justify-between gap-2 text-xs text-slate-600">
                         Druckfeld
                         <select className="h-9 rounded-md border bg-white px-2 text-sm" value={stampCardStartSlot} onChange={(event) => setStampCardStartSlot(Number(event.target.value))}>
@@ -1856,10 +1886,16 @@ export function AdminEntryDetailPage() {
                           <Download className="mr-2 h-4 w-4" />Charity-Karte: {item.name}
                         </Button>
                       ))}
-                    </div>
+                      </div>
+                    </details>
                   )}
-                  <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Haftverzicht-Dokumente</div>
+                  <details className="group min-w-0 max-w-full overflow-hidden rounded-md border border-slate-200 bg-white">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                      <FileText className="h-4 w-4 text-slate-500" />
+                      <span className="flex-1">Haftverzicht-Dokumente</span>
+                      <span className="text-xs text-slate-400 transition-transform group-open:rotate-180">⌄</span>
+                    </summary>
+                    <div className="grid gap-2 border-t border-slate-200 bg-slate-50/70 p-3">
                     {[
                       { key: "driver", name: detail.driver.name, role: "Fahrer", waiver: detail.waiverSigners.driver },
                       ...(detail.waiverSigners.codriver ? [{ key: "codriver", name: detail.codriver.label, role: "Beifahrer", waiver: detail.waiverSigners.codriver }] : [])
@@ -1900,12 +1936,13 @@ export function AdminEntryDetailPage() {
                         </div>
                       </div>
                     ))}
-                  </div>
-                </div>
+                    </div>
+                  </details>
+                </ActionSection>
               )}
 
               {canSendMail && (
-                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <ActionSection title="Kommunikation">
                   <HintButton
                   label={
                     sendingVerificationMail
@@ -2013,11 +2050,11 @@ export function AdminEntryDetailPage() {
                       }
                     }}
                   />
-                </div>
+                </ActionSection>
               )}
 
                   {canPaymentWrite && (
-                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <ActionSection title="Zahlung">
                   <HintButton
                   label={actionInFlight === "payment-mark" ? "Zahlung wird bestätigt…" : "Zahlung als eingegangen markieren"}
                   icon={
@@ -2060,10 +2097,10 @@ export function AdminEntryDetailPage() {
                       setPaymentEditorOpen(true);
                     }}
                   />
-                </div>
+                </ActionSection>
               )}
 
-              <div className="grid gap-2 border-t border-slate-200 pt-4">
+              <ActionSection title="Dokumente">
                 <Button
                   type="button"
                   variant="outline"
@@ -2100,10 +2137,10 @@ export function AdminEntryDetailPage() {
                   )}
                   {actionInFlight === "download-tech-check" ? "Technische Abnahme wird geladen…" : "PDF Technische Abnahme"}
                 </Button>
-              </div>
+              </ActionSection>
 
               {canDeleteEntry && (
-                <div className="grid gap-2 border-t border-slate-200 pt-4">
+                <ActionSection title="Weitere Aktionen" className="bg-white">
                   <HintButton
                   label={actionInFlight === "entry-delete" ? "Nennung wird gelöscht…" : "Nennung löschen"}
                   icon={
@@ -2121,7 +2158,7 @@ export function AdminEntryDetailPage() {
                     setPendingDeleteConfirm(true);
                   }}
                 />
-                </div>
+                </ActionSection>
               )}
             </CardContent>
           </Card>
