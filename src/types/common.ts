@@ -12,6 +12,6 @@ export type TechStatus = "pending" | "passed" | "failed";
 
 export type OutboxStatus = "queued" | "sending" | "sent" | "failed";
 
-export type ExportJobStatus = "queued" | "processing" | "succeeded" | "failed";
+export type ExportJobStatus = "queued" | "processing" | "succeeded" | "failed" | "invalidated";
 
 export type StartNumberConflictType = "none" | "same_class_taken" | "invalid_format";

@@ -41,8 +41,10 @@ export type SigningRequirements = {
     orgaCode: string | null;
     startNumber: string | null;
     codriver: {
-      firstName: string;
-      lastName: string;
+      displayName: string;
+      identityProtected: boolean;
+      firstName: string | null;
+      lastName: string | null;
     } | null;
     vehicles: Array<{
       id: string;

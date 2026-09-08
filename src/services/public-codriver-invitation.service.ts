@@ -24,7 +24,7 @@ export type CodriverParticipantInput = {
 export type PublicCodriverInvitation = {
   invitation: { recipientName: string | null; recipientEmail: string | null; expiresAt: string };
   event: { name: string; startsAt: string; endsAt: string };
-  driver: { firstName: string; lastName: string };
+  driver: { displayName: string; identityProtected: boolean; firstName: string | null; lastName: string | null };
   entries: Array<{ id: string; className: string; startNumber: string | null }>;
 };
 

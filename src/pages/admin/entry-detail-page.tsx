@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Bike, Car, CheckCircle2, Clock3, Copy, Download, Link2, Loader2, Mail, TabletSmartphone, Trash2, Wallet } from "lucide-react";
+import { Bike, Car, CheckCircle2, Clock3, Copy, Download, Link2, Loader2, Mail, ShieldCheck, ShieldOff, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
@@ -177,6 +177,14 @@ function MailNoteSwitch(props: {
   );
 }
 
+type PublicationNameTarget = {
+  personId: string;
+  roleLabel: string;
+  displayName: string;
+  identityProtected: boolean;
+  publicationName: string | null;
+};
+
 export function AdminEntryDetailPage() {
   const HISTORY_PREVIEW_LIMIT = 5;
   const { roles } = useAuth();
@@ -189,6 +197,7 @@ export function AdminEntryDetailPage() {
   const canSendMail = hasPermission(roles, "communication.write");
   const canChangeClass = hasPermission(roles, "entries.status.write");
   const canManageParticipants = hasPermission(roles, "entries.participants.write");
+  const canManagePublicationName = hasPermission(roles, "entries.publication_name.write");
   const canPrintStampCards = hasPermission(roles, "stamp_cards.print");
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
@@ -257,11 +266,73 @@ export function AdminEntryDetailPage() {
   const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
   const [pendingCharityRevoke, setPendingCharityRevoke] = useState<{ registrationId: string; name: string } | null>(null);
   const [charityRevocationReason, setCharityRevocationReason] = useState("");
+  const [publicationNameTarget, setPublicationNameTarget] = useState<PublicationNameTarget | null>(null);
+  const [publicationNameDraft, setPublicationNameDraft] = useState("");
+  const [publicationNameRemovalConfirmed, setPublicationNameRemovalConfirmed] = useState(false);
+  const [publicationNameRemovalReason, setPublicationNameRemovalReason] = useState("");
   const signingInProgress = activeSigningSession?.status === "pending" || activeSigningSession?.status === "displayed";
 
   const flashMessage = (message: string, timeout = 2200) => {
     setActionMessage(message);
     setTimeout(() => setActionMessage(""), timeout);
+  };
+
+  const openPublicationNameDialog = (target: PublicationNameTarget) => {
+    setPublicationNameTarget(target);
+    setPublicationNameDraft(target.publicationName ?? "");
+    setPublicationNameRemovalConfirmed(false);
+    setPublicationNameRemovalReason("");
+  };
+
+  const closePublicationNameDialog = () => {
+    if (actionInFlight === "publication-name") return;
+    setPublicationNameTarget(null);
+    setPublicationNameDraft("");
+    setPublicationNameRemovalConfirmed(false);
+    setPublicationNameRemovalReason("");
+  };
+
+  const savePublicationName = async () => {
+    if (!publicationNameTarget || actionInFlight) return;
+    const nextName = publicationNameDraft.trim().replace(/\s+/g, " ");
+    const removesProtection = publicationNameTarget.identityProtected && !nextName;
+    if (!nextName && !removesProtection) {
+      flashMessage("Bitte einen Veröffentlichungsnamen eingeben.", 3200);
+      return;
+    }
+    if (removesProtection && (!publicationNameRemovalConfirmed || publicationNameRemovalReason.trim().length < 5)) {
+      flashMessage("Bestätigung und Begründung sind zum Entfernen erforderlich.", 3800);
+      return;
+    }
+    setActionInFlight("publication-name");
+    try {
+      const result = await adminEntriesService.updatePublicationName(
+        publicationNameTarget.personId,
+        removesProtection
+          ? {
+              publicationName: null,
+              confirmLegalNameExposure: true,
+              reason: publicationNameRemovalReason.trim()
+            }
+          : { publicationName: nextName }
+      );
+      const invalidated = result.invalidation.invalidatedExportCount;
+      const cleanupPending = result.invalidation.cleanupPendingCount;
+      setPublicationNameTarget(null);
+      flashMessage(
+        cleanupPending > 0
+          ? `Veröffentlichungsname gespeichert. ${cleanupPending} Dateibereinigung(en) stehen noch aus.`
+          : invalidated > 0
+            ? `Veröffentlichungsname gespeichert; ${invalidated} alte Exportdatei(en) wurden ungültig.`
+            : "Veröffentlichungsname gespeichert.",
+        5200
+      );
+      loadDetail();
+    } catch (error) {
+      flashMessage(getApiErrorMessage(error, "Veröffentlichungsname konnte nicht gespeichert werden."), 4800);
+    } finally {
+      setActionInFlight((current) => current === "publication-name" ? null : current);
+    }
   };
 
   const runAction = async (
@@ -1078,14 +1149,42 @@ export function AdminEntryDetailPage() {
       <div className="relative z-0 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] lg:overflow-hidden">
         <div className="order-1 min-w-0 space-y-4 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-2 scrollbar-none">
           <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Fahrerdaten</CardTitle>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <div className="min-w-0">
+                <CardTitle>Fahrerdaten</CardTitle>
+                {detail.driver.identityProtected ? (
+                  <Badge variant="outline" className="mt-2 border-violet-200 bg-violet-50 text-violet-800">
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5" />Identität geschützt
+                  </Badge>
+                ) : null}
+              </div>
+              {canManagePublicationName ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openPublicationNameDialog({
+                    personId: detail.driverPersonId,
+                    roleLabel: "Fahrer",
+                    displayName: detail.driver.name,
+                    identityProtected: detail.driver.identityProtected,
+                    publicationName: detail.driver.publicationName
+                  })}
+                >
+                  <ShieldCheck className="mr-1.5 h-4 w-4" />Veröffentlichungsname
+                </Button>
+              ) : null}
             </CardHeader>
             <CardContent className="grid min-w-0 gap-3 break-words text-sm text-slate-700 sm:grid-cols-2">
               <div>
                 <div className="text-xs uppercase text-slate-500">Name</div>
                 <div>{detail.driver.name}</div>
               </div>
+              {detail.driver.identityProtected ? (
+                <div className="rounded-md border border-violet-200 bg-violet-50 p-3 text-violet-900 sm:col-span-2">
+                  In allen Arbeitsansichten wird ausschließlich der Veröffentlichungsname angezeigt. Rechtliche Stammdaten erscheinen nur in den dafür vorgesehenen offiziellen Dokumenten.
+                </div>
+              ) : null}
               <div>
                 <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
                 <div>{detail.driver.birthdate}</div>
@@ -1124,11 +1223,14 @@ export function AdminEntryDetailPage() {
                 <div className="text-xs uppercase text-slate-500">Beifahrer</div>
                 {detail.codriver.assigned ? (
                   <details className="mt-1 rounded-md border bg-slate-50 p-3">
-                    <summary className="cursor-pointer break-words font-medium text-slate-900">{detail.codriver.label}</summary>
+                    <summary className="cursor-pointer break-words font-medium text-slate-900">
+                      <span>{detail.codriver.label}</span>
+                      {detail.codriver.identityProtected ? <Badge variant="outline" className="ml-2 border-violet-200 bg-violet-50 text-violet-800">Geschützt</Badge> : null}
+                    </summary>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div>
                         <div className="text-xs uppercase text-slate-500">Name</div>
-                        <div>{detail.codriver.firstName} {detail.codriver.lastName}</div>
+                        <div>{detail.codriver.label}</div>
                       </div>
                       <div>
                         <div className="text-xs uppercase text-slate-500">Geburtsdatum</div>
@@ -1150,6 +1252,19 @@ export function AdminEntryDetailPage() {
                         <div className="text-xs uppercase text-slate-500">Adresse</div>
                         <div>{detail.codriver.addressLine}</div>
                       </div>
+                      {canManagePublicationName && detail.codriver.id ? (
+                        <div className="sm:col-span-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => openPublicationNameDialog({
+                            personId: detail.codriver.id!,
+                            roleLabel: "Beifahrer",
+                            displayName: detail.codriver.label,
+                            identityProtected: detail.codriver.identityProtected,
+                            publicationName: detail.codriver.publicationName
+                          })}>
+                            <ShieldCheck className="mr-1.5 h-4 w-4" />Veröffentlichungsname verwalten
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </details>
                 ) : (
@@ -1163,11 +1278,23 @@ export function AdminEntryDetailPage() {
                         <div key={item.registrationId} className={cn("rounded border px-3 py-2", item.status === "active" ? "bg-white" : "border-slate-200 bg-slate-100 text-slate-500")}>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium text-slate-900">{item.name}</span>
+                            {item.identityProtected ? <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-800">Geschützt</Badge> : null}
                             <Badge variant="outline" className={item.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-slate-100 text-slate-600"}>
                               {item.status === "active" ? "Aktiv" : "Storniert"}
                             </Badge>
                           </div>
                           <div className="mt-1 text-xs text-slate-500">{item.email} · erfasst {formatTimestamp(item.createdAt)}</div>
+                          {canManagePublicationName ? (
+                            <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => openPublicationNameDialog({
+                              personId: item.personId,
+                              roleLabel: "Charity-Beifahrer",
+                              displayName: item.name,
+                              identityProtected: item.identityProtected,
+                              publicationName: item.publicationName
+                            })}>
+                              <ShieldCheck className="mr-1.5 h-4 w-4" />Veröffentlichungsname verwalten
+                            </Button>
+                          ) : null}
                           {item.status === "revoked" ? <div className="mt-1 text-xs">Grund: {item.revocationReason || "-"}</div> : null}
                         </div>
                       ))}
@@ -2578,6 +2705,86 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
+      {canManagePublicationName && publicationNameTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+          <div className="w-full max-w-xl rounded-lg border bg-white p-5 shadow-xl">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-violet-100 p-2 text-violet-800">
+                {publicationNameTarget.identityProtected ? <ShieldCheck className="h-5 w-5" /> : <ShieldOff className="h-5 w-5" />}
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Veröffentlichungsname verwalten</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {publicationNameTarget.roleLabel}: {publicationNameTarget.displayName}. Der Schutz gilt personenweit für alle Veranstaltungen und Rollen.
+                </p>
+              </div>
+            </div>
+
+            <label className="mt-5 block text-sm font-medium text-slate-800" htmlFor="publication-name">Veröffentlichungsname</label>
+            <Input
+              id="publication-name"
+              className="mt-1"
+              autoFocus
+              maxLength={100}
+              value={publicationNameDraft}
+              onChange={(event) => {
+                setPublicationNameDraft(event.target.value);
+                if (event.target.value.trim()) {
+                  setPublicationNameRemovalConfirmed(false);
+                  setPublicationNameRemovalReason("");
+                }
+              }}
+              placeholder="z. B. Der Blitz"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Dieser Name ersetzt den gesetzlichen Namen in Ansichten, APIs, E-Mails und Exporten. Offizielle Dokumente verwenden weiterhin die gesetzlichen Stammdaten.
+            </p>
+
+            {publicationNameTarget.identityProtected && !publicationNameDraft.trim() ? (
+              <div className="mt-5 rounded-md border border-rose-300 bg-rose-50 p-4 text-rose-950">
+                <div className="flex items-center gap-2 font-semibold"><ShieldOff className="h-4 w-4" />Identitätsschutz entfernen</div>
+                <p className="mt-2 text-sm">Danach kann der gesetzliche Name wieder in zukünftigen Arbeitsansichten, E-Mails und Veröffentlichungen erscheinen. Bestehende Exporte werden ungültig.</p>
+                <label className="mt-3 flex items-start gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={publicationNameRemovalConfirmed}
+                    onChange={(event) => setPublicationNameRemovalConfirmed(event.target.checked)}
+                  />
+                  Ich bestätige ausdrücklich, dass der gesetzliche Name wieder sichtbar werden darf.
+                </label>
+                <label className="mt-3 block text-sm font-medium" htmlFor="publication-name-removal-reason">Begründung</label>
+                <textarea
+                  id="publication-name-removal-reason"
+                  className="mt-1 min-h-24 w-full rounded-md border border-rose-300 bg-white px-3 py-2 text-sm"
+                  maxLength={500}
+                  value={publicationNameRemovalReason}
+                  onChange={(event) => setPublicationNameRemovalReason(event.target.value)}
+                  placeholder="Mindestens 5 Zeichen"
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="outline" disabled={actionInFlight === "publication-name"} onClick={closePublicationNameDialog}>Abbrechen</Button>
+              <Button
+                type="button"
+                variant={publicationNameTarget.identityProtected && !publicationNameDraft.trim() ? "destructive" : "default"}
+                disabled={
+                  actionInFlight === "publication-name"
+                  || (!publicationNameDraft.trim() && !publicationNameTarget.identityProtected)
+                  || (publicationNameTarget.identityProtected && !publicationNameDraft.trim() && (!publicationNameRemovalConfirmed || publicationNameRemovalReason.trim().length < 5))
+                }
+                onClick={() => void savePublicationName()}
+              >
+                {actionInFlight === "publication-name" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {publicationNameTarget.identityProtected && !publicationNameDraft.trim() ? "Schutz entfernen" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {canManageParticipants && pendingCharityRevoke && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
           <div className="w-full max-w-lg rounded-lg border bg-white p-5 shadow-xl">
@@ -2732,7 +2939,13 @@ export function AdminEntryDetailPage() {
                 <div className="rounded-md border bg-slate-50 p-4 text-sm">
                   <div className="font-semibold text-slate-900">Eingaben kontrollieren</div>
                   <div className="mt-2 grid gap-1 text-slate-700 sm:grid-cols-2">
-                    <div>Name: {String((participantSession.draftPayload as Record<string, unknown> | null)?.firstName ?? "")} {String((participantSession.draftPayload as Record<string, unknown> | null)?.lastName ?? "")}</div>
+                    <div>Name: {String((
+                      (participantSession.draftPayload as Record<string, unknown> | null)?.displayName
+                      ?? [
+                        (participantSession.draftPayload as Record<string, unknown> | null)?.firstName,
+                        (participantSession.draftPayload as Record<string, unknown> | null)?.lastName
+                      ].filter(Boolean).join(" ")
+                    ) || "-")}</div>
                     <div>Geburtsdatum: {String((participantSession.draftPayload as Record<string, unknown> | null)?.birthdate ?? "-")}</div>
                     <div className="sm:col-span-2">E-Mail: {String((participantSession.draftPayload as Record<string, unknown> | null)?.email ?? "-")}</div>
                   </div>
@@ -2970,7 +3183,7 @@ export function AdminEntryDetailPage() {
                         signingRequirementEntries.map((entry) => (
                           <div key={entry.id} className="rounded border bg-white p-2">
                             <div className="font-medium text-slate-900">{entry.className} · Startnummer {entry.startNumber ?? "-"}</div>
-                            <div className="text-xs text-slate-500">Beifahrer: {entry.codriver ? `${entry.codriver.firstName} ${entry.codriver.lastName}` : "-"}</div>
+                            <div className="text-xs text-slate-500">Beifahrer: {entry.codriver?.displayName ?? "-"}</div>
                             <div className="mt-1 text-xs text-slate-600">
                               {(entry.vehicles ?? []).map((vehicle) => `${vehicle.role === "backup" ? "Ersatz" : "Fahrzeug"}: ${vehicle.make} ${vehicle.model}`).join(" · ") || "Fahrzeugdaten werden am iPad aus dem Backend-Kontext geladen."}
                             </div>
@@ -2979,7 +3192,7 @@ export function AdminEntryDetailPage() {
                       ) : (
                         <div className="rounded border bg-white p-2">
                           <div className="font-medium text-slate-900">{detail.classLabel} · Startnummer {detail.startNumber || "-"}</div>
-                          <div className="text-xs text-slate-500">Beifahrer: {detail.codriver.assigned ? `${detail.codriver.firstName} ${detail.codriver.lastName}` : "-"}</div>
+                          <div className="text-xs text-slate-500">Beifahrer: {detail.codriver.assigned ? detail.codriver.label : "-"}</div>
                           <div className="mt-1 text-xs text-slate-600">
                             Fahrzeug: {detail.vehicle.make} {detail.vehicle.model}
                           </div>

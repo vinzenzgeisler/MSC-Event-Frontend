@@ -243,7 +243,9 @@ function fromAdminEntryListDto(dto: AdminEntryListItemDto): AdminEntryListItem {
   return {
     id: dto.id,
     classId: dto.classId,
-    name: dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
+    name: dto.displayName || dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
+    identityProtected: Boolean(dto.identityProtected),
+    publicationName: dto.publicationName ?? null,
     orgaCode: (dto.orgaCode ?? "").trim(),
     driverPersonIdRaw: (dto.driverPersonId ?? "").trim(),
     driverEmailRaw: (dto.driverEmail ?? "").trim().toLowerCase(),
@@ -283,7 +285,7 @@ function fromAdminDeletedEntryDto(dto: AdminEntryListItemDto): AdminDeletedEntry
   return {
     id: dto.id,
     classId: dto.classId,
-    name: dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
+    name: dto.displayName || dto.name || parseName(dto.driverFirstName, dto.driverLastName, dto.driverEmail ?? `Eintrag ${dto.id}`),
     classLabel: dto.className || dto.classId || "-",
     startNumber: dto.startNumber ?? dto.startNumberNorm ?? "-",
     vehicleLabel: dto.vehicleLabel || "-",
@@ -308,7 +310,7 @@ function fromAdminEntryDetailDto(
 ): AdminEntryDetailViewModel {
   const codriver = dto.person.codriver ?? null;
   const backupVehicle = dto.backupVehicle ?? null;
-  const driverName = parseName(dto.person.driver.firstName, dto.person.driver.lastName, `Fahrer ${dto.ids.entryId.slice(0, 8)}`);
+  const driverName = dto.person.driver.displayName || parseName(dto.person.driver.firstName, dto.person.driver.lastName, `Fahrer ${dto.ids.entryId.slice(0, 8)}`);
   const vehicleLabel = dto.vehicleLabel ?? ([dto.vehicle.make, dto.vehicle.model].filter(Boolean).join(" ") || "Fahrzeug");
   const backupVehicleLabel = backupVehicle ? ([backupVehicle.make, backupVehicle.model].filter(Boolean).join(" ") || "Ersatzfahrzeug") : "Ersatzfahrzeug";
   const rawDriverCountry = (dto.person.driver.country ?? "").trim();
@@ -344,7 +346,9 @@ function fromAdminEntryDetailDto(
       codriver: dto.waiverSigners?.codriver ? normalizeWaiverSignedStatus(dto.waiverSigners.codriver) : null
     },
     driver: {
-      name: parseName(dto.person.driver.firstName, dto.person.driver.lastName),
+      name: dto.person.driver.displayName || parseName(dto.person.driver.firstName, dto.person.driver.lastName),
+      identityProtected: Boolean(dto.person.driver.identityProtected),
+      publicationName: dto.person.driver.publicationName ?? null,
       email: dto.person.driver.email ?? "-",
       birthdate: asDate(dto.person.driver.birthdate),
       country: driverCountry,
@@ -360,7 +364,9 @@ function fromAdminEntryDetailDto(
     codriver: {
       id: codriver?.id ?? null,
       assigned: Boolean(codriver),
-      label: codriver ? parseName(codriver.firstName, codriver.lastName) : "Nicht angegeben",
+      label: codriver ? (codriver.displayName || parseName(codriver.firstName, codriver.lastName)) : "Nicht angegeben",
+      identityProtected: Boolean(codriver?.identityProtected),
+      publicationName: codriver?.publicationName ?? null,
       firstName: codriver?.firstName ?? "-",
       lastName: codriver?.lastName ?? "-",
       email: codriver?.email ?? "-",
@@ -375,7 +381,9 @@ function fromAdminEntryDetailDto(
     charityCodrivers: (dto.person.charityCodrivers ?? []).map((item) => ({
       registrationId: item.registrationId,
       personId: item.personId,
-      name: parseName(item.firstName, item.lastName),
+      name: item.displayName || parseName(item.firstName, item.lastName),
+      identityProtected: Boolean(item.identityProtected),
+      publicationName: item.publicationName ?? null,
       email: item.email ?? "-",
       birthdate: asDate(item.birthdate),
       createdAt: item.createdAt,
@@ -551,6 +559,21 @@ type AdminEntryPaymentAmountsResponse = {
   amountOpenCents: number;
 };
 
+export type PublicationNameUpdateResult = {
+  person: {
+    id: string;
+    displayName: string;
+    identityProtected: boolean;
+    publicationName: string | null;
+    publicationNameVersion: number;
+  };
+  invalidation: {
+    invalidatedExportCount: number;
+    deletedObjectCount: number;
+    cleanupPendingCount: number;
+  };
+};
+
 type AdminEntryClassChangeResponse = {
   ok: boolean;
   entryId: string;
@@ -701,6 +724,17 @@ export const adminEntriesService = {
     });
 
     return fromAdminEntryDetailDto(response.entry, response.history);
+  },
+
+  async updatePublicationName(
+    personId: string,
+    input: { publicationName: string | null; confirmLegalNameExposure?: true; reason?: string }
+  ): Promise<PublicationNameUpdateResult> {
+    const response = await requestJson<{ ok: true } & PublicationNameUpdateResult>(
+      `/admin/persons/${personId}/publication-name`,
+      { method: "PATCH", body: input }
+    );
+    return response;
   },
 
   async listEntryMailHistory(entryId: string): Promise<AdminEntryMailHistoryItem[]> {

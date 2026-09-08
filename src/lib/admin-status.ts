@@ -32,7 +32,8 @@ export function exportStatusLabel(status: ExportJobStatus): string {
     queued: "In Warteschlange",
     processing: "In Bearbeitung",
     succeeded: "Erfolgreich",
-    failed: "Fehlgeschlagen"
+    failed: "Fehlgeschlagen",
+    invalidated: "Ungültig – Name geändert"
   }[status];
 }
 
@@ -110,6 +111,7 @@ export function exportStatusClasses(status: ExportJobStatus): string {
     queued: "border-primary/35 bg-primary/10 text-primary",
     processing: "border-indigo-300 bg-indigo-50 text-indigo-900",
     succeeded: "border-primary/35 bg-primary/10 text-primary",
-    failed: "border-rose-300 bg-rose-50 text-rose-900"
+    failed: "border-rose-300 bg-rose-50 text-rose-900",
+    invalidated: "border-violet-300 bg-violet-50 text-violet-900"
   }[status];
 }

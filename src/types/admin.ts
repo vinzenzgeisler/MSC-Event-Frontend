@@ -28,6 +28,9 @@ export type AdminEntryListItemDto = {
   startNumber?: string | null;
   startNumberNorm?: string | null;
   driverPersonId?: Id;
+  displayName?: string;
+  identityProtected?: boolean;
+  publicationName?: string | null;
   driverFirstName?: string | null;
   driverLastName?: string | null;
   driverEmail?: string | null;
@@ -81,6 +84,8 @@ export type AdminEntryListItem = {
   id: Id;
   classId?: Id;
   name: string;
+  identityProtected: boolean;
+  publicationName: string | null;
   orgaCode: string;
   driverPersonIdRaw: string;
   driverEmailRaw: string;
@@ -181,6 +186,9 @@ export type AdminEntryDetailDto = {
   };
   person: {
     driver: {
+      displayName: string;
+      identityProtected: boolean;
+      publicationName: string | null;
       firstName: string | null;
       lastName: string | null;
       email: string | null;
@@ -196,6 +204,9 @@ export type AdminEntryDetailDto = {
     };
     codriver?: {
       id: Id;
+      displayName: string;
+      identityProtected: boolean;
+      publicationName: string | null;
       firstName: string | null;
       lastName: string | null;
       email: string | null;
@@ -212,6 +223,9 @@ export type AdminEntryDetailDto = {
     charityCodrivers?: Array<{
       registrationId: Id;
       personId: Id;
+      displayName: string;
+      identityProtected: boolean;
+      publicationName: string | null;
       firstName: string | null;
       lastName: string | null;
       email: string | null;
@@ -333,6 +347,8 @@ export type AdminEntryDetailViewModel = {
   };
   driver: {
     name: string;
+    identityProtected: boolean;
+    publicationName: string | null;
     email: string;
     birthdate: string;
     country: string;
@@ -349,6 +365,8 @@ export type AdminEntryDetailViewModel = {
     id: Id | null;
     assigned: boolean;
     label: string;
+    identityProtected: boolean;
+    publicationName: string | null;
     firstName: string;
     lastName: string;
     email: string;
@@ -364,6 +382,8 @@ export type AdminEntryDetailViewModel = {
     registrationId: Id;
     personId: Id;
     name: string;
+    identityProtected: boolean;
+    publicationName: string | null;
     email: string;
     birthdate: string;
     createdAt: string;

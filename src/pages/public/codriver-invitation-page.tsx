@@ -138,7 +138,7 @@ export function CodriverInvitationPage() {
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-950">{text.onsite}</div>
         <section className="mb-6 rounded-lg border bg-slate-50 p-4 text-sm">
           <h2 className="font-semibold text-slate-900">{text.event}</h2><p className="mt-1">{invitation.event.name} · {eventDate}</p>
-          <p className="mt-1"><span className="text-slate-500">{text.driver}:</span> {invitation.driver.firstName} {invitation.driver.lastName}</p>
+          <p className="mt-1"><span className="text-slate-500">{text.driver}:</span> {invitation.driver.displayName}</p>
           <ul className="mt-2 list-inside list-disc">{invitation.entries.map((entry) => <li key={entry.id}>{entry.className} · Startnummer {entry.startNumber ?? "–"}</li>)}</ul>
         </section>
         <form onSubmit={submit} className="space-y-6">

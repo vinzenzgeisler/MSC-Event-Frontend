@@ -290,6 +290,11 @@ function EntriesTableInner({
                 <div>
                   <div className="flex items-center gap-1.5 font-medium text-slate-900">
                     <span>{row.name}</span>
+                    {row.identityProtected ? (
+                      <Badge className="h-5 shrink-0 border-violet-200 bg-violet-50 px-1.5 text-[10px] text-violet-800" variant="outline">
+                        Veröffentlichungsname
+                      </Badge>
+                    ) : null}
                     {row.confirmationMailVerified && (
                       <span title="E-Mail verifiziert">
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -436,6 +441,11 @@ function EntriesTableInner({
                       <div className="min-w-0 pt-0.5">
                         <div className="flex items-center gap-1.5 font-semibold leading-tight text-slate-900">
                           <span className="truncate">{row.name}</span>
+                          {row.identityProtected ? (
+                            <Badge className="h-5 shrink-0 border-violet-200 bg-violet-50 px-1.5 text-[10px] text-violet-800" variant="outline">
+                              Veröffentlichungsname
+                            </Badge>
+                          ) : null}
                           {row.confirmationMailVerified && (
                             <span title="E-Mail verifiziert">
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />

@@ -13,8 +13,10 @@ export type InspectionContext = {
 export type InspectionListItem = {
   id: string;
   startNumber: string | null;
-  driverFirstName: string;
-  driverLastName: string;
+  driverDisplayName: string;
+  identityProtected: boolean;
+  driverFirstName: string | null;
+  driverLastName: string | null;
   className: string;
   vehicleMake: string | null;
   vehicleModel: string | null;
@@ -42,14 +44,18 @@ export type InspectionEntry = {
   startNumber: string | null;
   orgaCode: string | null;
   acceptanceStatus: string;
-  driverFirstName: string;
-  driverLastName: string;
+  driverDisplayName: string;
+  identityProtected: boolean;
+  driverFirstName: string | null;
+  driverLastName: string | null;
   driverEmail: string | null;
   driverPhone: string | null;
   codriverPersonId: string | null;
   codriver: {
-    firstName: string;
-    lastName: string;
+    displayName: string;
+    identityProtected: boolean;
+    firstName: string | null;
+    lastName: string | null;
     birthdate: string | null;
     country: string | null;
   } | null;
@@ -105,7 +111,7 @@ export const technicalInspectionService = {
   },
 
   async getParticipant(eventId: string, personId: string) {
-    const response = await requestJson<{ ok: true; participant: { event: InspectionContext["event"]; driver: { personId: string; firstName: string; lastName: string }; entries: InspectionEntry[] } }>(
+    const response = await requestJson<{ ok: true; participant: { event: InspectionContext["event"]; driver: { personId: string; displayName: string; identityProtected: boolean; firstName: string | null; lastName: string | null }; entries: InspectionEntry[] } }>(
       `/inspection/participants/${eventId}/${personId}`
     );
     return response.participant;
