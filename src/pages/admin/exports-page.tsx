@@ -101,7 +101,6 @@ export function AdminExportsPage() {
                 <SelectItem value="startlist_csv">Startliste (CSV)</SelectItem>
                 <SelectItem value="participants_csv">Teilnehmer inkl. Beifahrer (CSV)</SelectItem>
                 <SelectItem value="payments_open_csv">Offene Zahlungen (CSV)</SelectItem>
-                <SelectItem value="checkin_status_csv">Check-in-Status (CSV)</SelectItem>
               </SelectContent>
             </Select>
           </div>

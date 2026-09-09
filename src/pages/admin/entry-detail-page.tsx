@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Bike, Car, CheckCircle2, Clock3, Copy, Download, FileText, Link2, Loader2, Mail, Pencil, Printer, ShieldCheck, ShieldOff, TabletSmartphone, Trash2, Wallet } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
@@ -12,8 +12,6 @@ import { cn } from "@/lib/utils";
 import {
   acceptanceStatusClasses,
   acceptanceStatusLabel,
-  checkinClasses,
-  checkinLabel,
   outboxStatusClasses,
   outboxStatusLabel,
   paymentStatusClasses,
@@ -198,7 +196,7 @@ export function AdminEntryDetailPage() {
   const HISTORY_PREVIEW_LIMIT = 5;
   const { roles } = useAuth();
   const canSetStatus = hasPermission(roles, "entries.status.write");
-  const canCheckin = hasPermission(roles, "entries.checkin.write");
+  const canManageWaivers = hasPermission(roles, "entries.checkin.write");
   const canPaymentWrite = hasPermission(roles, "entries.payment.write");
   const canNotesWrite = hasPermission(roles, "entries.notes.write");
   const canDeleteEntry = hasPermission(roles, "entries.delete");
@@ -211,14 +209,12 @@ export function AdminEntryDetailPage() {
   const { entryId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const signingDeepLinkHandledRef = useRef(false);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof adminEntriesService.getEntryDetail>>>(null);
   const [mailHistory, setMailHistory] = useState<Awaited<ReturnType<typeof adminEntriesService.listEntryMailHistory>>>([]);
   const [mailHistoryLoading, setMailHistoryLoading] = useState(false);
   const [mailHistoryError, setMailHistoryError] = useState("");
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [status, setStatus] = useState<"pending" | "shortlist" | "accepted" | "rejected" | "withdrawn">("accepted");
-  const [checkinDone, setCheckinDone] = useState(false);
   const [confirmationMailSent, setConfirmationMailSent] = useState(false);
   const [confirmationMailVerified, setConfirmationMailVerified] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
@@ -232,7 +228,6 @@ export function AdminEntryDetailPage() {
   const [pendingRejectConfirm, setPendingRejectConfirm] = useState(false);
   const [pendingWithdrawConfirm, setPendingWithdrawConfirm] = useState(false);
   const [withdrawalReasonDraft, setWithdrawalReasonDraft] = useState("");
-  const [pendingCheckinConfirm, setPendingCheckinConfirm] = useState(false);
   const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState(false);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
   const [deleteReasonDraft, setDeleteReasonDraft] = useState("");
@@ -440,7 +435,6 @@ export function AdminEntryDetailPage() {
         setHasLoadedOnce(true);
         if (result) {
           setStatus(result.status);
-          setCheckinDone(result.checkinVerified);
           setConfirmationMailSent(result.confirmationMailSent);
           setConfirmationMailVerified(result.confirmationMailVerified);
           setInternalNote(result.internalNote);
@@ -545,7 +539,9 @@ export function AdminEntryDetailPage() {
     try {
       const [requirements] = await Promise.all([adminSigningService.getRequirements(entryId), loadSigningDevices()]);
       setSigningRequirements(requirements);
-      const preferredSigner = requirements.signers?.find((item) => item.role === "driver") ?? requirements.signers?.[0];
+      const preferredSigner = requirements.signers?.find((item) => !item.signed)
+        ?? requirements.signers?.find((item) => item.role === "driver")
+        ?? requirements.signers?.[0];
       setSigningSignerPersonId(preferredSigner?.personId ?? "");
       setActiveSigningSession(null);
       setSigningPrechecks(emptySigningPrechecks());
@@ -561,26 +557,8 @@ export function AdminEntryDetailPage() {
 
   useEffect(() => {
     setHasLoadedOnce(false);
-    signingDeepLinkHandledRef.current = false;
     loadDetail();
   }, [entryId]);
-
-  useEffect(() => {
-    const state = location.state as {
-      fromEntriesList?: boolean;
-      scrollY?: number;
-      loadedCount?: number;
-      openSigningDialog?: boolean;
-    } | null;
-    if (!detail || detail.id !== entryId || !canCheckin || !state?.openSigningDialog || signingDeepLinkHandledRef.current) {
-      return;
-    }
-
-    signingDeepLinkHandledRef.current = true;
-    const { openSigningDialog: _openSigningDialog, ...restState } = state;
-    navigate(`${location.pathname}${location.search}`, { replace: true, state: restState });
-    void openSigningDialog();
-  }, [canCheckin, detail, entryId]);
 
   useEffect(() => {
     adminMetaService
@@ -590,11 +568,11 @@ export function AdminEntryDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (!canCheckin) {
+    if (!canManageWaivers) {
       return;
     }
     void loadSigningDevices();
-  }, [canCheckin, loadSigningDevices]);
+  }, [canManageWaivers, loadSigningDevices]);
 
   useEffect(() => {
     if (!signingDialogOpen || !pairingCode || signingDevices.some((device) => device.status === "connected")) {
@@ -644,7 +622,7 @@ export function AdminEntryDetailPage() {
     void poll();
     const interval = window.setInterval(() => void poll(), 2500);
     return () => window.clearInterval(interval);
-  }, [activeSigningSession, signingDialogOpen, signingInProgress]);
+  }, [activeSigningSession?.id, entryId, signingDialogOpen, signingInProgress]);
 
   useEffect(() => {
     if (!participantDialogOpen || !participantSession || ["completed", "cancelled", "failed"].includes(participantSession.workflowStage)) return;
@@ -1733,8 +1711,8 @@ export function AdminEntryDetailPage() {
               <CardTitle className="text-lg">Aktionen</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0 space-y-3 px-3 pb-3">
-              {(canSetStatus || canCheckin) && (
-                <ActionSection title="Status & Check-in">
+              {canSetStatus && (
+                <ActionSection title="Status">
                   {canSetStatus && (
                     <>
                       <HintButton
@@ -1781,26 +1759,10 @@ export function AdminEntryDetailPage() {
                       />
                     </>
                   )}
-                  {canCheckin && (
-                    <HintButton
-                      label={actionInFlight === "checkin-confirm" ? "Check-in wird bestätigt…" : "Einchecken bestätigen"}
-                      icon={actionInFlight === "checkin-confirm" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : undefined}
-                      variant={checkinDone ? "default" : "outline"}
-                      className={checkinDone ? actionActiveClass : actionOutlineClass}
-                      disabledReason={
-                        anyActionInFlight
-                          ? "Aktion wird verarbeitet…"
-                          : status !== "accepted"
-                            ? "Check-in erst nach Zulassung möglich."
-                            : undefined
-                      }
-                      onClick={() => setPendingCheckinConfirm(true)}
-                    />
-                  )}
                 </ActionSection>
               )}
 
-              {canCheckin && (
+              {canManageWaivers && (
                 <ActionSection title="Vor Ort">
                   <HintButton
                     label={hasSignedWaiverDocument ? "Haftverzicht erneut erfassen" : "Haftverzicht unterschreiben"}
@@ -1813,7 +1775,7 @@ export function AdminEntryDetailPage() {
                 </ActionSection>
               )}
 
-              {(canManageParticipants || canPrintStampCards || canSendMail || canCheckin) && (
+              {(canManageParticipants || canPrintStampCards || canSendMail || canManageWaivers) && (
                 <ActionSection title="Fahrer & Beifahrer">
                   {canManageParticipants && (
                     <>
@@ -2411,57 +2373,6 @@ export function AdminEntryDetailPage() {
                   </>
                 ) : (
                   "Ja, zulassen"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {canCheckin && pendingCheckinConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-lg border bg-white p-4 shadow-lg">
-            <h2 className="text-lg font-semibold text-slate-900">Einchecken wirklich bestätigen?</h2>
-            <p className="mt-2 text-sm text-slate-600">Bitte nur bestätigen, wenn alle Punkte erfüllt sind:</p>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
-              <li>Haftverzicht unterschrieben</li>
-              <li>Führerschein geprüft</li>
-              <li>Bei Ü70 Ärztliches Attest geprüft</li>
-              <li>Technische Abnahme durchgeführt und dokumentiert</li>
-            </ul>
-            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={actionInFlight === "checkin-confirm"}
-                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
-                onClick={() => setPendingCheckinConfirm(false)}
-              >
-                Abbrechen
-              </Button>
-              <Button
-                type="button"
-                disabled={actionInFlight === "checkin-confirm"}
-                className="h-auto w-full whitespace-normal py-2 sm:w-auto"
-                onClick={async () => {
-                  const success = await runAction(
-                    "checkin-confirm",
-                    () => adminEntriesService.setEntryCheckinVerified(detail.id),
-                    "Einchecken wurde bestätigt.",
-                    "Check-in konnte nicht bestätigt werden."
-                  );
-                  if (success) {
-                    setPendingCheckinConfirm(false);
-                  }
-                }}
-              >
-                {actionInFlight === "checkin-confirm" ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Wird bestätigt…
-                  </>
-                ) : (
-                  "Ja, bestätigen"
                 )}
               </Button>
             </div>
@@ -3105,7 +3016,7 @@ export function AdminEntryDetailPage() {
         </div>
       )}
 
-      {canCheckin && signingDialogOpen && (
+      {canManageWaivers && signingDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
           <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-white p-4 shadow-xl sm:p-6">
             <div className="flex items-start justify-between gap-3">
@@ -3261,28 +3172,35 @@ export function AdminEntryDetailPage() {
                     <div className="mt-1">{signingRequirements.driverName}</div>
                     {signingSignerOptions.length > 1 ? (
                       <div className="mt-3">
-                        <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Unterzeichner</div>
-                        <Select
-                          value={selectedSigningSigner?.personId ?? ""}
-                          disabled={Boolean(activeSigningSession && signingInProgress)}
-                          onValueChange={(value) => {
-                            setSigningSignerPersonId(value);
-                            setSigningPrechecks(emptySigningPrechecks());
-                            setGuardianName("");
-                            setGuardianRelationship("");
-                          }}
-                        >
-                          <SelectTrigger className="h-12 bg-white">
-                            <SelectValue placeholder="Unterzeichner auswählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {signingSignerOptions.map((signer) => (
-                              <SelectItem key={signer.personId || signer.role} value={signer.personId}>
-                                {signer.label}: {signer.name}{signer.signed ? ` · unterschrieben ${signer.signedAt ? formatTimestamp(signer.signedAt) : ""}` : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Wer unterschreibt?</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {signingSignerOptions.map((signer) => {
+                            const active = selectedSigningSigner?.personId === signer.personId;
+                            return (
+                              <button
+                                key={signer.personId || signer.role}
+                                type="button"
+                                disabled={Boolean(activeSigningSession && signingInProgress)}
+                                aria-pressed={active}
+                                onClick={() => {
+                                  setSigningSignerPersonId(signer.personId);
+                                  setSigningPrechecks(emptySigningPrechecks());
+                                  setGuardianName("");
+                                  setGuardianRelationship("");
+                                }}
+                                className={cn(
+                                  "min-h-14 rounded-lg border-2 px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+                                  active ? "border-primary bg-primary/5" : "border-slate-200 bg-white hover:border-slate-300"
+                                )}
+                              >
+                                <span className="block text-sm font-semibold text-slate-900">{signer.label}</span>
+                                <span className={cn("block truncate text-xs", signer.signed ? "text-emerald-700" : "text-amber-700")}>
+                                  {signer.signed ? "Unterschrieben" : "Offen"} · {signer.name}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                         {selectedSigningSigner?.role === "codriver" ? (
                           <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
                             Beifahrer unterschreiben in einem eigenen Vorgang. Diese Unterschrift ersetzt nicht die Fahrer-Unterschrift.

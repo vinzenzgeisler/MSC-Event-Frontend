@@ -1,8 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bike, Car, CheckCircle2 } from "lucide-react";
+import { Bike, Car, CheckCircle2, MoreHorizontal } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   acceptanceStatusClasses,
@@ -19,11 +20,12 @@ import type { AdminEntryListItem } from "@/types/admin";
 
 const RETURN_SNAPSHOT_KEY = "admin.entries.return.v1";
 const DESKTOP_MEDIA_QUERY = "(min-width: 1280px)";
-const DESKTOP_ROW_ESTIMATE = 112;
+const DESKTOP_ROW_ESTIMATE = 172;
 const DESKTOP_OVERSCAN = 8;
 
 type EntriesTableProps = {
   rows: AdminEntryListItem[];
+  viewMode: "administration" | "race";
   canManageStatus: boolean;
   canSignWaiver: boolean;
   statusActionBusy?: boolean;
@@ -35,6 +37,7 @@ type EntriesTableProps = {
   desktopLoadMoreRef?: (node: HTMLDivElement | null) => void;
   desktopScrollContainerRef?: (node: HTMLDivElement | null) => void;
   resolveScrollOffset?: () => number;
+  onSignWaiver: (row: AdminEntryListItem) => void;
   onSetShortlist: (entryId: string) => void;
   onSetAccepted: (entryId: string) => void;
   onSetRejected: (entryId: string) => void;
@@ -120,6 +123,7 @@ function VehicleThumb({ src, label }: { src: string | null; label: string }) {
 
 function EntriesTableInner({
   rows,
+  viewMode,
   canManageStatus,
   canSignWaiver,
   statusActionBusy = false,
@@ -131,6 +135,7 @@ function EntriesTableInner({
   desktopLoadMoreRef,
   desktopScrollContainerRef,
   resolveScrollOffset,
+  onSignWaiver,
   onSetShortlist,
   onSetAccepted,
   onSetRejected,
@@ -271,6 +276,66 @@ function EntriesTableInner({
   const desktopTopSpacerHeight = isDesktopLayout ? desktopVisibleRange.startIndex * DESKTOP_ROW_ESTIMATE : 0;
   const desktopBottomSpacerHeight = isDesktopLayout ? Math.max(0, (rows.length - desktopVisibleRange.endIndex) * DESKTOP_ROW_ESTIMATE) : 0;
 
+  const waiverComplete = (row: AdminEntryListItem) =>
+    row.waiverSigners.driver.signed && (!row.waiverSigners.codriver || row.waiverSigners.codriver.signed);
+
+  const handleStatusMenuAction = (row: AdminEntryListItem, action: string) => {
+    if (action === "waiver") {
+      onSignWaiver(row);
+    } else if (action === "shortlist") {
+      onSetShortlist(row.id);
+    } else if (action === "accepted") {
+      onSetAccepted(row.id);
+    } else if (action === "rejected") {
+      onSetRejected(row.id);
+    } else if (action === "withdrawn") {
+      onSetWithdrawn(row.id);
+    }
+  };
+
+  const raceActions = (row: AdminEntryListItem) => {
+    const complete = waiverComplete(row);
+    const showMenu = canManageStatus || (canSignWaiver && complete);
+    return (
+      <div className="grid min-w-0 gap-2">
+        <Button asChild variant="outline" className="h-11 w-full min-w-0 overflow-hidden px-3">
+          <Link
+            to={`/admin/entries/${row.id}${location.search}`}
+            onClick={persistReturnSnapshot}
+            state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length }}
+          >
+            <span className="truncate">Details</span>
+          </Link>
+        </Button>
+        {complete ? (
+          <div className="flex h-11 min-w-0 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-800">
+            <CheckCircle2 className="mr-2 h-4 w-4 shrink-0" /><span className="truncate">Eingecheckt</span>
+          </div>
+        ) : canSignWaiver ? (
+          <Button type="button" className="h-11 w-full min-w-0 overflow-hidden px-3" onClick={() => onSignWaiver(row)}>
+            <span className="truncate">HV unterschreiben</span>
+          </Button>
+        ) : (
+          <div className="flex h-11 items-center justify-center rounded-md border bg-slate-50 px-3 text-sm text-slate-500">HV offen</div>
+        )}
+        {showMenu ? (
+          <Select value="" onValueChange={(value) => handleStatusMenuAction(row, value)}>
+            <SelectTrigger className="ml-auto h-9 w-11 justify-center px-2 [&>svg:last-child]:hidden" title="Weitere Aktionen" aria-label={`Weitere Aktionen für ${row.name}`}>
+              <MoreHorizontal className="h-5 w-5" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {canSignWaiver && complete ? <SelectItem value="waiver">HV erneut erfassen</SelectItem> : null}
+              {canManageStatus ? <SelectItem value="shortlist" disabled={Boolean(statusDisabledReason(row, "shortlist"))}>Auf Vorauswahl setzen</SelectItem> : null}
+              {canManageStatus ? <SelectItem value="accepted" disabled={Boolean(statusDisabledReason(row, "accepted"))}>Zulassen</SelectItem> : null}
+              {canManageStatus ? <SelectItem value="rejected" disabled={Boolean(statusDisabledReason(row, "rejected"))}>Ablehnen</SelectItem> : null}
+              {canManageStatus ? <SelectItem value="withdrawn" disabled={Boolean(statusDisabledReason(row, "withdrawn"))}>Absagen</SelectItem> : null}
+            </SelectContent>
+          </Select>
+        ) : null}
+      </div>
+    );
+  };
+
   if (!rows.length) {
     if (isLoadingInitial) {
       return <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">Nennungen werden geladen…</div>;
@@ -315,7 +380,9 @@ function EntriesTableInner({
                   )}
                 </div>
               </div>
-              <div className="flex w-[7.25rem] shrink-0 flex-col gap-1">
+              <div className={cn("shrink-0", viewMode === "race" ? "w-[9.5rem]" : "flex w-[7.25rem] flex-col gap-1")}>
+                {viewMode === "race" ? raceActions(row) : (
+                  <>
                 <Button asChild size="sm" variant="outline">
                   <Link
                     to={`/admin/entries/${row.id}${location.search}`}
@@ -326,16 +393,8 @@ function EntriesTableInner({
                   </Link>
                 </Button>
                 {canSignWaiver ? (
-                  <Button asChild size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs">
-                    <Link
-                      to={`/admin/entries/${row.id}${location.search}`}
-                      onClick={persistReturnSnapshot}
-                      state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length, openSigningDialog: true }}
-                      title="Haftverzicht unterschreiben"
-                      aria-label={`Haftverzicht für ${row.name} unterschreiben`}
-                    >
-                      HV sign.
-                    </Link>
+                  <Button type="button" size="sm" variant="outline" className="h-8 min-w-0 px-2 text-xs" title="Haftverzicht unterschreiben" aria-label={`Haftverzicht für ${row.name} unterschreiben`} onClick={() => onSignWaiver(row)}>
+                    HV sign.
                   </Button>
                 ) : null}
                 {canManageStatus && (
@@ -374,12 +433,16 @@ function EntriesTableInner({
                     />
                   </>
                 )}
+                  </>
+                )}
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge className={`${acceptanceStatusClasses(row.status)} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
-                {acceptanceStatusLabel(row.status)}
-              </Badge>
+              {viewMode === "administration" ? (
+                <Badge className={`${acceptanceStatusClasses(row.status)} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
+                  {acceptanceStatusLabel(row.status)}
+                </Badge>
+              ) : null}
               {row.status === "accepted" ? (
                 <Badge className={`${paymentStatusClasses(row.payment ?? "due")} h-7 whitespace-nowrap px-2.5 text-xs`} variant="outline">
                   {paymentStatusLabel(row.payment ?? "due")}
@@ -407,7 +470,7 @@ function EntriesTableInner({
                 </Badge>
               ) : null}
             </div>
-            <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div>
+            {viewMode === "administration" ? <div className="mt-2 text-xs text-slate-500">Erstellt: {row.createdAt}</div> : null}
           </div>
         ))}
       </div>}
@@ -416,39 +479,39 @@ function EntriesTableInner({
         <div ref={handleDesktopScrollContainerRef} className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-none">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[23%]" />
-              <col className="w-[9%]" />
-              <col className="w-[7%]" />
-              <col className="w-[10%]" />
-              <col className="w-[9%]" />
-              <col className="w-[9%]" />
-              <col className="w-[11%]" />
-              <col className="w-[8%]" />
-              <col className="w-[14%]" />
+              <col className={viewMode === "race" ? "w-[30%]" : "w-[23%]"} />
+              <col className={viewMode === "race" ? "w-[10%]" : "w-[9%]"} />
+              <col className={viewMode === "race" ? "w-[8%]" : "w-[7%]"} />
+              {viewMode === "administration" ? <col className="w-[10%]" /> : null}
+              <col className={viewMode === "race" ? "w-[10%]" : "w-[9%]"} />
+              <col className={viewMode === "race" ? "w-[10%]" : "w-[9%]"} />
+              <col className={viewMode === "race" ? "w-[14%]" : "w-[11%]"} />
+              {viewMode === "administration" ? <col className="w-[8%]" /> : null}
+              <col className={viewMode === "race" ? "w-[18%]" : "w-[14%]"} />
             </colgroup>
             <thead className="bg-slate-100 text-left text-slate-700">
               <tr>
                 <th className="sticky top-0 z-10 border-l-4 border-l-slate-100 bg-slate-100 px-4 py-3 font-semibold">Nennung</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Klasse</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">St.-Nr.</th>
-                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Status</th>
+                {viewMode === "administration" ? <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Status</th> : null}
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Zahlung</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Prüfstatus</th>
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Haftverzicht</th>
-                <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Erstellt am</th>
+                {viewMode === "administration" ? <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Erstellt am</th> : null}
                 <th className="sticky top-0 z-10 bg-slate-100 px-3 py-3 font-semibold">Aktion</th>
               </tr>
             </thead>
             <tbody>
               {desktopTopSpacerHeight > 0 && (
                 <tr aria-hidden="true">
-                  <td colSpan={9} style={{ height: desktopTopSpacerHeight, padding: 0, border: 0 }} />
+                  <td colSpan={viewMode === "race" ? 7 : 9} style={{ height: desktopTopSpacerHeight, padding: 0, border: 0 }} />
                 </tr>
               )}
               {desktopRows.map((row) => (
                 <tr
                   key={row.id}
-                  className={`border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowBackgroundClasses(row.status) : "bg-slate-50"}`}
+                  className={`h-[172px] border-t align-middle hover:bg-slate-50 ${row.confirmationMailVerified ? acceptanceStatusRowBackgroundClasses(row.status) : "bg-slate-50"}`}
                 >
                   <td className={`px-4 py-2.5 ${row.confirmationMailVerified ? acceptanceStatusRowBorderClasses(row.status) : "border-l-4 border-l-slate-300"}`}>
                     <div className="flex items-start gap-3">
@@ -483,11 +546,11 @@ function EntriesTableInner({
                   <td className="px-3 py-3.5 font-medium text-slate-900">
                     <span className="block truncate">{row.startNumber}</span>
                   </td>
-                  <td className="px-3 py-3">
+                  {viewMode === "administration" ? <td className="px-3 py-3">
                     <Badge className={`${acceptanceStatusClasses(row.status)} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
                       {acceptanceStatusLabel(row.status)}
                     </Badge>
-                  </td>
+                  </td> : null}
                   <td className="px-3 py-3">
                     {row.status === "accepted" ? (
                       <Badge className={`${paymentStatusClasses(row.payment ?? "due")} h-7 max-w-full overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1 text-xs leading-tight`} variant="outline">
@@ -520,12 +583,13 @@ function EntriesTableInner({
                       ) : null}
                     </div>
                   </td>
-                  <td className="px-3 py-3.5 text-slate-700">
+                  {viewMode === "administration" ? <td className="px-3 py-3.5 text-slate-700">
                     <span className="block leading-tight">{row.createdAt}</span>
-                  </td>
+                  </td> : null}
                   <td className="min-w-0 px-2 py-3">
+                    {viewMode === "race" ? raceActions(row) : (
                     <div className="grid min-w-0 grid-cols-2 gap-1.5 overflow-hidden">
-                      <div className={cn("h-8 min-w-0", canSignWaiver ? "" : "col-span-2")}>
+                      <div className="col-span-2 h-8 min-w-0">
                         <Button asChild size="sm" variant="outline" className="h-full w-full min-w-0 justify-center overflow-hidden px-2 text-xs">
                           <Link
                             to={`/admin/entries/${row.id}${location.search}`}
@@ -537,17 +601,9 @@ function EntriesTableInner({
                         </Button>
                       </div>
                       {canSignWaiver ? (
-                        <div className="h-8 min-w-0">
-                          <Button asChild size="sm" variant="outline" className="h-full w-full min-w-0 justify-center overflow-hidden border-primary/30 bg-primary/5 px-1.5 text-xs text-primary hover:bg-primary/10">
-                            <Link
-                              to={`/admin/entries/${row.id}${location.search}`}
-                              onClick={persistReturnSnapshot}
-                              state={{ fromEntriesList: true, scrollY: window.scrollY, loadedCount: rows.length, openSigningDialog: true }}
-                              title="Haftverzicht unterschreiben"
-                              aria-label={`Haftverzicht für ${row.name} unterschreiben`}
-                            >
-                              <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">HV sign.</span>
-                            </Link>
+                        <div className="col-span-2 h-8 min-w-0">
+                          <Button type="button" size="sm" variant="outline" className="h-full w-full min-w-0 justify-center overflow-hidden border-primary/30 bg-primary/5 px-1.5 text-xs text-primary hover:bg-primary/10" title="Haftverzicht unterschreiben" aria-label={`Haftverzicht für ${row.name} unterschreiben`} onClick={() => onSignWaiver(row)}>
+                            <span className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">HV sign.</span>
                           </Button>
                         </div>
                       ) : null}
@@ -560,6 +616,14 @@ function EntriesTableInner({
                             variant="outline"
                             disabledReason={statusDisabledReason(row, "shortlist")}
                             onClick={() => onSetShortlist(row.id)}
+                          />
+                          <ActionButton
+                            label="Zulassen"
+                            wrapperClassName="h-8 w-full"
+                            className="px-1.5"
+                            variant="default"
+                            disabledReason={statusDisabledReason(row, "accepted")}
+                            onClick={() => onSetAccepted(row.id)}
                           />
                           <ActionButton
                             label="Ablehnen"
@@ -577,23 +641,16 @@ function EntriesTableInner({
                             disabledReason={statusDisabledReason(row, "withdrawn")}
                             onClick={() => onSetWithdrawn(row.id)}
                           />
-                          <ActionButton
-                            label="Zulassen"
-                            wrapperClassName="col-span-2 h-8 w-full"
-                            className="px-1.5"
-                            variant="default"
-                            disabledReason={statusDisabledReason(row, "accepted")}
-                            onClick={() => onSetAccepted(row.id)}
-                          />
                         </>
                       )}
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}
               {desktopBottomSpacerHeight > 0 && (
                 <tr aria-hidden="true">
-                  <td colSpan={9} style={{ height: desktopBottomSpacerHeight, padding: 0, border: 0 }} />
+                  <td colSpan={viewMode === "race" ? 7 : 9} style={{ height: desktopBottomSpacerHeight, padding: 0, border: 0 }} />
                 </tr>
               )}
             </tbody>
@@ -624,6 +681,7 @@ function EntriesTableInner({
 export const EntriesTable = memo(EntriesTableInner, (prev, next) => {
   return (
     prev.rows === next.rows &&
+    prev.viewMode === next.viewMode &&
     prev.canManageStatus === next.canManageStatus &&
     prev.canSignWaiver === next.canSignWaiver &&
     prev.statusActionBusy === next.statusActionBusy &&

@@ -170,7 +170,7 @@ function auditLogText(action: string, payload: Record<string, unknown> | null | 
 
   switch (action) {
     case "checkin_id_verified_set":
-      return data.checkinIdVerified ? "Check-in bestätigt." : "Check-in zurückgesetzt.";
+      return data.checkinIdVerified ? "Anwesenheit bestätigt (Altbestand)." : "Anwesenheit zurückgesetzt (Altbestand).";
     case "entry_status_updated": {
       const reason = typeof data.withdrawalReason === "string" && data.withdrawalReason.trim()
         ? ` Grund: ${data.withdrawalReason.trim()}`

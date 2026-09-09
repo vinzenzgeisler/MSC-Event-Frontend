@@ -387,7 +387,7 @@ export function AdminDashboardPage() {
           <Card>
             <CardHeader><CardTitle className="text-base">Betrieb</CardTitle></CardHeader>
             <CardContent className="grid gap-2 text-sm">
-              <Metric label="Check-in offen" value={numberValue(operations, "checkinPendingTotal")} />
+              <Metric label="Haftverzicht offen" value={numberValue(operations, "signingOpenTotal")} />
               <Metric label="Technik offen" value={numberValue(operations, "techPendingTotal")} />
               <Metric label="Exporte aktiv" value={numberValue(operations, "exportsQueuedTotal") + numberValue(operations, "exportsProcessingTotal")} />
             </CardContent>
@@ -470,9 +470,9 @@ export function AdminDashboardPage() {
 
       {activeTab === "operations" && (
         <section className="grid gap-4 xl:grid-cols-3">
-          <Card><CardHeader><CardTitle className="text-base">Check-in</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Erledigt" value={numberValue(operations, "checkinCompletedTotal")} tone="good" /><Metric label="Offen" value={numberValue(operations, "checkinPendingTotal")} tone={numberValue(operations, "checkinPendingTotal") > 0 ? "warn" : "good"} /></CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-base">Haftverzicht</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Unterschrieben" value={numberValue(operations, "signingCompletedTotal")} tone="good" /><Metric label="Offen" value={numberValue(operations, "signingOpenTotal")} tone={numberValue(operations, "signingOpenTotal") > 0 ? "warn" : "good"} /></CardContent></Card>
           <Card><CardHeader><CardTitle className="text-base">Technische Abnahme</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Offen" value={numberValue(operations, "techPendingTotal")} /><Metric label="Bestanden" value={numberValue(operations, "techPassedTotal")} tone="good" /><Metric label="Fehler" value={numberValue(operations, "techFailedTotal")} tone={numberValue(operations, "techFailedTotal") > 0 ? "bad" : "good"} /></CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-base">Exports & Signing</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Export queued" value={numberValue(operations, "exportsQueuedTotal")} /><Metric label="Export failed" value={numberValue(operations, "exportsFailedTotal")} tone={numberValue(operations, "exportsFailedTotal") > 0 ? "bad" : "good"} /><Metric label="Signing offen" value={numberValue(operations, "signingOpenTotal")} /><Metric label="Signing fertig" value={numberValue(operations, "signingCompletedTotal")} /></CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-base">Exporte</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="In Warteschlange" value={numberValue(operations, "exportsQueuedTotal")} /><Metric label="Fehlgeschlagen" value={numberValue(operations, "exportsFailedTotal")} tone={numberValue(operations, "exportsFailedTotal") > 0 ? "bad" : "good"} /></CardContent></Card>
           <Card className="xl:col-span-3"><CardHeader><CardTitle className="text-base">Dokumenttypen</CardTitle></CardHeader><CardContent><BarList rows={rowsValue(documents, "byType")} labelKey="type" /></CardContent></Card>
         </section>
       )}

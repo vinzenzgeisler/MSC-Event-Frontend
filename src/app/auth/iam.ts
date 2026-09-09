@@ -124,7 +124,7 @@ export function toRoleMatrix() {
       marshal_manager: "none"
     },
     {
-      area: "Check-in",
+      area: "Haftverzicht",
       admin: "write",
       editor: "write",
       viewer: "none",

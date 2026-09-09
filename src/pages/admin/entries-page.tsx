@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { Flag, Filter, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { EntriesFilterBar } from "@/components/features/admin/entries-filter-bar";
 import { EntriesTable } from "@/components/features/admin/entries-table";
+import { WaiverSigningDialog } from "@/components/features/admin/waiver-signing-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,12 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_KEY = "admin.entries.page.cache.v5";
 const RETURN_SNAPSHOT_KEY = "admin.entries.return.v1";
 const RETURN_SNAPSHOT_TTL_MS = 5 * 60 * 1000;
+const ENTRIES_VIEW_MODE_KEY = "admin.entries.view-mode.v1";
+const ADMIN_FILTER_SNAPSHOT_KEY = "admin.entries.admin-filter-before-race.v1";
+const ADMIN_SCOPE_SNAPSHOT_KEY = "admin.entries.admin-scope-before-race.v1";
 
 type EntriesScope = "active" | "deleted";
+type EntriesViewMode = "administration" | "race";
 
 const initialFilter: AdminEntriesFilter = {
   query: "",
@@ -36,6 +41,39 @@ const initialFilter: AdminEntriesFilter = {
   sortBy: "createdAt",
   sortDir: "desc"
 };
+
+const raceFilter: AdminEntriesFilter = {
+  ...initialFilter,
+  acceptanceStatus: "accepted",
+  sortBy: "startNumberNorm",
+  sortDir: "asc"
+};
+
+function readEntriesViewMode(): EntriesViewMode {
+  try {
+    return window.localStorage.getItem(ENTRIES_VIEW_MODE_KEY) === "race" ? "race" : "administration";
+  } catch {
+    return "administration";
+  }
+}
+
+function readAdminFilterSnapshot(): AdminEntriesFilter | null {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(ADMIN_FILTER_SNAPSHOT_KEY) ?? "null") as Partial<AdminEntriesFilter> | null;
+    if (!value) return null;
+    return { ...initialFilter, ...value } as AdminEntriesFilter;
+  } catch {
+    return null;
+  }
+}
+
+function readAdminScopeSnapshot(): EntriesScope {
+  try {
+    return window.localStorage.getItem(ADMIN_SCOPE_SNAPSHOT_KEY) === "deleted" ? "deleted" : "active";
+  } catch {
+    return "active";
+  }
+}
 
 const EMPTY_META: ListMeta = {
   page: 1,
@@ -422,11 +460,12 @@ export function AdminEntriesPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<EntriesViewMode>(readEntriesViewMode);
   const [pendingScrollRestoreY, setPendingScrollRestoreY] = useState<number | null>(null);
 
-  const initialFilterRef = useRef<AdminEntriesFilter>(filterFromSearchParams(searchParams));
+  const initialFilterRef = useRef<AdminEntriesFilter>(viewMode === "race" ? raceFilter : filterFromSearchParams(searchParams));
   const [filterDraft, setFilterDraft] = useState<AdminEntriesFilter>(initialFilterRef.current);
-  const [viewScope, setViewScope] = useState<EntriesScope>(() => scopeFromSearchParams(searchParams, canDeleteEntries));
+  const [viewScope, setViewScope] = useState<EntriesScope>(() => viewMode === "race" ? "active" : scopeFromSearchParams(searchParams, canDeleteEntries));
 
   const debouncedQuery = useDebouncedValue(filterDraft.query, 450);
   const appliedFilter = useMemo<AdminEntriesFilter>(
@@ -466,6 +505,7 @@ export function AdminEntriesPage() {
   const [mobileLoadMoreNode, setMobileLoadMoreNode] = useState<HTMLDivElement | null>(null);
   const [desktopLoadMoreNode, setDesktopLoadMoreNode] = useState<HTMLDivElement | null>(null);
   const [activeTableScrollContainerNode, setActiveTableScrollContainerNode] = useState<HTMLDivElement | null>(null);
+  const [signingEntry, setSigningEntry] = useState<AdminEntryListItem | null>(null);
 
   const rowsRef = useRef<AdminEntryListItem[]>([]);
   const deletedRowsRef = useRef<AdminDeletedEntryListItem[]>([]);
@@ -476,6 +516,7 @@ export function AdminEntriesPage() {
   const hasRestoredFromStateRef = useRef(false);
   const activeTableScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const selfAuthoredSearchRef = useRef<string | null>(null);
+  const firstSearchSyncRef = useRef(true);
 
   const classNameById = useMemo(() => {
     return new Map(classOptions.map((item) => [item.id, item.name]));
@@ -484,6 +525,40 @@ export function AdminEntriesPage() {
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(""), 2600);
+  };
+
+  const changeViewMode = (nextMode: EntriesViewMode) => {
+    if (nextMode === viewMode) return;
+    let nextFilter: AdminEntriesFilter;
+    let nextScope: EntriesScope;
+    if (nextMode === "race") {
+      try {
+        window.localStorage.setItem(ADMIN_FILTER_SNAPSHOT_KEY, JSON.stringify(filterDraft));
+        window.localStorage.setItem(ADMIN_SCOPE_SNAPSHOT_KEY, viewScope);
+        window.localStorage.setItem(ENTRIES_VIEW_MODE_KEY, "race");
+      } catch {
+        // The mode still works for this session when storage is unavailable.
+      }
+      nextFilter = raceFilter;
+      nextScope = "active";
+    } else {
+      nextFilter = readAdminFilterSnapshot() ?? initialFilter;
+      nextScope = canDeleteEntries ? readAdminScopeSnapshot() : "active";
+      try {
+        window.localStorage.setItem(ENTRIES_VIEW_MODE_KEY, "administration");
+      } catch {
+        // no-op
+      }
+    }
+    setViewScope(nextScope);
+    setFilterDraft(nextFilter);
+    setViewMode(nextMode);
+    const nextParams = searchParamsFromState(nextFilter, nextScope, canDeleteEntries);
+    const nextSearch = nextParams.toString();
+    if (nextSearch !== searchParams.toString()) {
+      selfAuthoredSearchRef.current = nextSearch;
+      setSearchParams(nextParams, { replace: true });
+    }
   };
 
   const handleActiveTableScrollContainer = useCallback((node: HTMLDivElement | null) => {
@@ -769,6 +844,10 @@ export function AdminEntriesPage() {
     [appliedFilter, replaceActiveRows, replaceDeletedRows, viewScope]
   );
 
+  const handleWaiverCompleted = useCallback(async () => {
+    await refreshSnapshot(false);
+  }, [refreshSnapshot]);
+
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
@@ -855,12 +934,16 @@ export function AdminEntriesPage() {
       selfAuthoredSearchRef.current = null;
       return;
     }
+    if (firstSearchSyncRef.current) {
+      firstSearchSyncRef.current = false;
+      if (viewMode === "race") return;
+    }
     const nextFilter = filterFromSearchParams(searchParams);
     setFilterDraft((prev) => (sameFilter(prev, nextFilter) ? prev : nextFilter));
 
     const nextScope = scopeFromSearchParams(searchParams, canDeleteEntries);
     setViewScope((prev) => (prev === nextScope ? prev : nextScope));
-  }, [canDeleteEntries, searchParams]);
+  }, [canDeleteEntries, searchParams, viewMode]);
 
   useEffect(() => {
     const nextParams = searchParamsFromState(appliedFilter, viewScope, canDeleteEntries);
@@ -1094,6 +1177,16 @@ export function AdminEntriesPage() {
               <Button
                 type="button"
                 size="sm"
+                variant={viewMode === "race" ? "default" : "outline"}
+                className="h-9 px-2.5"
+                title={viewMode === "race" ? "Zur Verwaltungsansicht wechseln" : "Rennbetrieb aktivieren"}
+                onClick={() => changeViewMode(viewMode === "race" ? "administration" : "race")}
+              >
+                <Flag className="mr-1.5 h-4 w-4" />{viewMode === "race" ? "Rennbetrieb" : "Verwaltung"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
                 variant="outline"
                 className="h-9 w-9 bg-white p-0"
                 disabled={refreshing}
@@ -1149,7 +1242,14 @@ export function AdminEntriesPage() {
       </div>
 
       <div className={cn("space-y-4", useDesktopTableShell && "xl:flex-none xl:pb-4")}>
-        <h1 className="hidden text-2xl font-semibold text-slate-900 md:block">Nennungen</h1>
+        <div className="hidden items-center justify-between gap-3 md:flex">
+          <h1 className="text-2xl font-semibold text-slate-900">Nennungen</h1>
+          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1" aria-label="Ansicht auswählen">
+            <span className="px-2 text-xs font-medium text-slate-500">Ansicht:</span>
+            <Button type="button" size="sm" variant={viewMode === "administration" ? "default" : "ghost"} className="h-8" onClick={() => changeViewMode("administration")}>Verwaltung</Button>
+            <Button type="button" size="sm" variant={viewMode === "race" ? "default" : "ghost"} className="h-8" onClick={() => changeViewMode("race")}><Flag className="mr-1.5 h-4 w-4" />Rennbetrieb</Button>
+          </div>
+        </div>
         <div className="hidden rounded-xl border bg-white p-4 md:block">
           <div className="hidden md:block">
             <EntriesFilterBar
@@ -1259,6 +1359,7 @@ export function AdminEntriesPage() {
       ) : (
         <EntriesTable
           rows={rows}
+          viewMode={viewMode}
           canManageStatus={canManageStatus}
           canSignWaiver={canSignWaiver}
           statusActionBusy={statusActionBusy !== null}
@@ -1270,6 +1371,7 @@ export function AdminEntriesPage() {
           desktopLoadMoreRef={setDesktopLoadMoreNode}
           desktopScrollContainerRef={handleActiveTableScrollContainer}
           resolveScrollOffset={() => getVisibleActiveTableScrollContainer()?.scrollTop ?? window.scrollY}
+          onSignWaiver={(row) => setSigningEntry(row)}
           onSetShortlist={async (entryId) => {
             if (statusActionBusy) {
               return;
@@ -1344,6 +1446,14 @@ export function AdminEntriesPage() {
           }}
         />
       )}
+
+      <WaiverSigningDialog
+        entryId={signingEntry?.id ?? null}
+        entryName={signingEntry?.name}
+        open={Boolean(signingEntry)}
+        onClose={() => setSigningEntry(null)}
+        onCompleted={handleWaiverCompleted}
+      />
       </div>
 
       {toastMessage && (
