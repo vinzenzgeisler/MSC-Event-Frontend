@@ -11,10 +11,6 @@ export type CodriverParticipantInput = {
   city: string;
   email: string;
   phone: string;
-  emergencyContactFirstName: string;
-  emergencyContactLastName: string;
-  emergencyContactPhone: string;
-  motorsportHistory?: string | null;
   guardianFullName?: string | null;
   guardianEmail?: string | null;
   guardianPhone?: string | null;
