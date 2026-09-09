@@ -278,6 +278,7 @@ export function AdminMarshalsPage() {
   function deletePerson(person: MarshalPerson) { return runAction(() => adminMarshalsService.deletePerson(person.id), "Person und verknüpfte Daten wurden endgültig gelöscht.", "Person konnte nicht gelöscht werden."); }
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
   function saveAttendance(trainingId: string, person: MarshalPerson, status: MarshalTrainingParticipant["attendanceStatus"]) { return runAction(() => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, status), "Anwesenheit gespeichert.", "Anwesenheit konnte nicht gespeichert werden."); }
+  function deleteAttendance(trainingId: string, person: MarshalPerson) { return runAction(() => adminMarshalsService.deleteTrainingParticipant(trainingId, person.id), "Person von der Schulung abgemeldet.", "Person konnte nicht von der Schulung abgemeldet werden."); }
   async function registerAcceptedForTraining(trainingId: string, people: MarshalPerson[]) {
     const operationEventId = eventId;
     setBusy(true); setError(""); setNotice("");
@@ -346,7 +347,7 @@ export function AdminMarshalsPage() {
           {(view === "setup_fl1" || view === "setup_fl2") && !areaForView && <EmptyState message="Der Aufbau-Bereich ist in dieser Veranstaltung noch nicht verfügbar." />}
           {(view === "general_saturday" || view === "general_sunday") && !areaForView && <EmptyState message="Der allgemeine Helferbereich ist in dieser Veranstaltung noch nicht verfügbar." />}
           {view === "stammdaten" && <MarshalStammdatenView workspace={workspace} canWrite={canWrite} busy={busy} onPersonOpen={(person) => setSelectedPersonId(person.id)} onCreate={createPerson} onDelete={deletePerson} />}
-          {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onRegisterAccepted={registerAcceptedForTraining} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
+          {view === "schulung" && <MarshalSchulungView workspace={workspace} canWrite={canWrite} canExport={canExport} busy={busy} onCreate={createTraining} onAttendance={saveAttendance} onAttendanceDelete={deleteAttendance} onRegisterAccepted={registerAcceptedForTraining} onPrint={printTraining} onPersonOpen={(person) => setSelectedPersonId(person.id)} />}
           {view === "statistik" && <MarshalStatistikView workspace={workspace} canExport={canExport} onPrint={printShirtStatistics} />}
           {view === "druck" && <MarshalDruckView workspace={workspace} canExport={canExport} onPrint={print} />}
           {view === "import" && <MarshalImportView canWrite={canWrite} busy={busy} onPreview={previewImport} onCommit={commitImport} />}

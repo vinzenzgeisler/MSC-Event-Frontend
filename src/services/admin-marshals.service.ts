@@ -92,6 +92,10 @@ export const adminMarshalsService = {
     return requestJson<OkResponse>(`/admin/marshals/trainings/${sessionId}/participants/${personId}`, { method: "PUT", body: { attendanceStatus } });
   },
 
+  async deleteTrainingParticipant(sessionId: string, personId: string) {
+    return requestJson<OkResponse>(`/admin/marshals/trainings/${sessionId}/participants/${personId}`, { method: "DELETE" });
+  },
+
   async previewImport(eventId: string, file: File) {
     const dataBase64 = await fileToBase64(file);
     const response = await requestJson<OkResponse & MarshalImportPreview>("/admin/marshals/import/preview", { method: "POST", body: { eventId, filename: file.name, dataBase64 } });
