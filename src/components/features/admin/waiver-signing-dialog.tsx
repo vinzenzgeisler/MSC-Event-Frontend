@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Download, Loader2, TabletSmartphone, X } from "lucide-react";
+import { CheckCircle2, Download, Loader2, RefreshCw, TabletSmartphone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -54,6 +54,7 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
   const [session, setSession] = useState<SigningSessionStatus | null>(null);
   const [pairingCode, setPairingCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const completedSessionRef = useRef<string | null>(null);
@@ -107,6 +108,19 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
     setRequirements(nextRequirements);
     return nextRequirements;
   }, []);
+
+  const refreshStatus = useCallback(async () => {
+    if (!entryId || refreshing) return;
+    setRefreshing(true);
+    setError("");
+    try {
+      await Promise.all([loadRequirements(entryId), loadDevices()]);
+    } catch (refreshError) {
+      setError(getApiErrorMessage(refreshError, "Status konnte nicht aktualisiert werden."));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [entryId, loadDevices, loadRequirements, refreshing]);
 
   useEffect(() => {
     if (!open || !entryId) return;
@@ -219,7 +233,12 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
       window.localStorage.setItem(PREFERRED_SIGNING_DEVICE_KEY, selectedDeviceId);
       setSession(result.session);
     } catch (signingError) {
-      setError(getApiErrorMessage(signingError, "Signing-Session konnte nicht gestartet werden."));
+      const apiMessage = getApiErrorMessage(signingError, "Signing-Session konnte nicht gestartet werden.");
+      setError(apiMessage.includes("SIGNING_SESSION_ALREADY_ACTIVE")
+        ? "Für diese Nennung läuft bereits ein Unterschriftenvorgang bei einem anderen Operator oder Terminal."
+        : apiMessage.includes("SIGNING_DEVICE_BUSY")
+          ? "Dieses Terminal wird bereits für einen anderen Unterschriftenvorgang verwendet."
+          : apiMessage);
     } finally {
       setBusy(false);
     }
@@ -242,10 +261,10 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
     onClose();
   };
 
-  const downloadDocument = async () => {
-    if (!session?.documentId) return;
+  const downloadDocument = async (documentId = session?.documentId) => {
+    if (!documentId) return;
     try {
-      const url = await adminEntriesService.getDocumentDownloadUrl(session.documentId);
+      const url = await adminEntriesService.getDocumentDownloadUrl(documentId);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (downloadError) {
       setError(getApiErrorMessage(downloadError, "Dokument konnte nicht geladen werden."));
@@ -275,6 +294,22 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
           </div>
         ) : requirements ? (
           <div className="mt-5 space-y-4">
+            {requirements.payment.status === "due" || requirements.payment.status === "unknown" ? (
+              <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
+                <div className="font-semibold">Zahlung vor Terminalstart prüfen</div>
+                <div className="mt-1">
+                  {requirements.payment.status === "due"
+                    ? `Diese Nennung ist noch nicht vollständig bezahlt${requirements.payment.amountOpenCents !== null ? ` (offen: ${(requirements.payment.amountOpenCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })})` : ""}.`
+                    : "Für diese Nennung liegt kein bestätigter Zahlungsstatus vor."}
+                </div>
+              </div>
+            ) : null}
+            {requirements.activeSession && !signingInProgress ? (
+              <div className="rounded-lg border-2 border-sky-300 bg-sky-50 p-3 text-sm text-sky-950" role="status">
+                <div className="font-semibold">Für diese Nennung läuft bereits ein Unterschriftenvorgang</div>
+                <div className="mt-1">{requirements.activeSession.deviceName ?? "Signaturterminal"}{requirements.activeSession.operatorDisplay ? ` · ${requirements.activeSession.operatorDisplay}` : ""}</div>
+              </div>
+            ) : null}
             {signerOptions.length > 1 ? (
               <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Wer unterschreibt?</div>
@@ -308,6 +343,22 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
               </div>
             )}
 
+            <div className="rounded-lg border bg-slate-50 p-3 text-xs text-slate-700">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                <span><strong className="text-slate-900">Teilnehmer:</strong> {selectedSigner?.name ?? requirements.driverName}</span>
+                <span className="text-slate-500">{requirements.entryCount} Nennung{requirements.entryCount === 1 ? "" : "en"} · {requirements.vehicleCount} Fahrzeug{requirements.vehicleCount === 1 ? "" : "e"}</span>
+              </div>
+              <div className="grid gap-1.5">
+                {(requirements.entries ?? []).map((entry) => (
+                  <div key={entry.id} className="rounded border bg-white px-2.5 py-2">
+                    <span className="font-semibold text-slate-900">{entry.className} · Startnummer {entry.startNumber ?? "-"}</span>
+                    <span className="text-slate-500"> · Beifahrer: {entry.codriver?.displayName ?? "-"}</span>
+                    <span> · {(entry.vehicles ?? []).map((vehicle) => `${vehicle.role === "backup" ? "Ersatz" : "Fahrzeug"}: ${vehicle.make} ${vehicle.model}`).join(" · ") || "Kein Fahrzeug"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {session?.status === "completed" ? (
               <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-center">
                 <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
@@ -330,6 +381,16 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
                 <p className="mt-1 text-sm">{selectedDevice?.deviceName ?? "Signaturterminal"} · {selectedSigner?.name}</p>
                 <Button type="button" variant="outline" className="mt-4" disabled={busy} onClick={() => void cancelSession()}>Session abbrechen</Button>
               </div>
+            ) : selectedSigner?.signed ? (
+              <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-center">
+                <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-600" />
+                <h3 className="mt-2 font-bold text-emerald-900">Aktueller Haftverzicht bereits unterschrieben</h3>
+                <p className="mt-1 text-sm text-emerald-700">{selectedSigner.name}{selectedSigner.signedAt ? ` · ${formatTimestamp(selectedSigner.signedAt)}` : ""}</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {selectedSigner.documentId ? <Button type="button" variant="outline" onClick={() => void downloadDocument(selectedSigner.documentId)}><Download className="mr-2 h-4 w-4" />Dokument</Button> : null}
+                  <Button type="button" onClick={onClose}>Schließen</Button>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="rounded-lg border bg-white p-3">
@@ -339,7 +400,7 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
                       ["identityCheckedAt", "Identität/Ausweis geprüft"],
                       ["signerPresentAt", selectedSigner?.role === "codriver" ? "Beifahrer ist persönlich anwesend" : "Fahrer ist persönlich anwesend"],
                       ...(needsMedicalCertificate ? [["medicalCertificateCheckedAt", "Ärztliches Attest geprüft"]] : []),
-                      ...(needsGuardian ? [["guardianPresentAt", "Erziehungsberechtigte Person ist anwesend"], ["guardianAuthorityCheckedAt", "Vertretungsberechtigung geprüft"]] : [])
+                      ...(needsGuardian ? [["guardianPresentAt", "Erziehungsberechtigte Person ist anwesend"], ["guardianAuthorityCheckedAt", "Alleinvertretungsberechtigung geprüft"]] : [])
                     ] as Array<[keyof SigningPrecheckTimestamps, string]>).map(([key, label]) => {
                       const checked = Boolean(prechecks[key]);
                       return (
@@ -360,18 +421,24 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
 
                 {connectedDevices.length > 0 ? (
                   <div className="space-y-3">
-                    <Select value={selectedDeviceId || "__none__"} onValueChange={(value) => setDeviceId(value === "__none__" ? "" : value)}>
-                      <SelectTrigger className="h-12"><SelectValue placeholder="Signaturgerät auswählen" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Signaturgerät auswählen</SelectItem>
-                        {connectedDevices.map((device) => <SelectItem key={device.id} value={device.id}>{device.deviceName ?? "Signaturterminal"}{isDeviceOnline(device) ? "" : " (nicht aktiv)"}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" className="h-14 w-full text-base" disabled={busy || !selectedDeviceOnline || !selectedSigner || !prechecksComplete} onClick={() => void startSigning()}>
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <Select value={selectedDeviceId || "__none__"} onValueChange={(value) => setDeviceId(value === "__none__" ? "" : value)}>
+                          <SelectTrigger className="h-12"><SelectValue placeholder="Signaturgerät auswählen" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Signaturgerät auswählen</SelectItem>
+                            {connectedDevices.map((device) => <SelectItem key={device.id} value={device.id}>{device.deviceName ?? "Signaturterminal"}{isDeviceOnline(device) ? "" : " (nicht aktiv)"}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" className="h-12 w-12 shrink-0 p-0" disabled={busy || refreshing} title="Geräte- und Sessionstatus aktualisieren" aria-label="Geräte- und Sessionstatus aktualisieren" onClick={() => void refreshStatus()}>
+                        <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+                      </Button>
+                    </div>
+                    <Button type="button" className="h-14 w-full text-base" disabled={busy || Boolean(requirements.activeSession) || !selectedDeviceOnline || !selectedSigner || !prechecksComplete} onClick={() => void startSigning()}>
                       {busy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}Haftverzicht am Gerät starten
                     </Button>
                     {!selectedDeviceOnline ? <p className="text-sm text-amber-700">Das ausgewählte Terminal ist nicht aktiv. Terminal öffnen und Geräte aktualisieren.</p> : null}
-                    <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void loadDevices().catch(() => setError("Geräte konnten nicht aktualisiert werden."))}>Geräte aktualisieren</Button>
                   </div>
                 ) : (
                   <div className="rounded-lg border bg-slate-50 p-4">
@@ -382,7 +449,12 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
                         <div className="mt-2 text-xs">Gültig bis {new Date(pairingCode.expiresAt).toLocaleTimeString("de-DE")}</div>
                       </div>
                     ) : null}
-                    <Button type="button" className="w-full" disabled={busy} onClick={() => void createPairingCode()}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TabletSmartphone className="mr-2 h-4 w-4" />}Gerät koppeln</Button>
+                    <div className="flex gap-2">
+                      <Button type="button" className="flex-1" disabled={busy} onClick={() => void createPairingCode()}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TabletSmartphone className="mr-2 h-4 w-4" />}Gerät koppeln</Button>
+                      <Button type="button" variant="outline" className="h-10 w-10 shrink-0 p-0" disabled={busy || refreshing} title="Geräte- und Sessionstatus aktualisieren" aria-label="Geräte- und Sessionstatus aktualisieren" onClick={() => void refreshStatus()}>
+                        <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </>

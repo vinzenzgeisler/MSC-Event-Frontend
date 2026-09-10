@@ -19,6 +19,19 @@ export type SigningRequirements = {
   signerType: "driver" | "guardian";
   entryCount: number;
   vehicleCount: number;
+  payment: {
+    status: "due" | "paid" | "not_required" | "unknown";
+    totalCents: number | null;
+    paidAmountCents: number | null;
+    amountOpenCents: number | null;
+  };
+  activeSession: {
+    id: string;
+    operatorDisplay: string | null;
+    deviceName: string | null;
+    createdAt: string;
+    expiresAt: string;
+  } | null;
   contract: {
     locale: string;
     version: string;
