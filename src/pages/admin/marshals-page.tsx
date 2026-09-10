@@ -11,7 +11,7 @@ import { MarshalImportView } from "@/components/features/admin/marshal-import-vi
 import { MarshalPersonDrawer } from "@/components/features/admin/marshal-person-drawer";
 import { MarshalReadinessView } from "@/components/features/admin/marshal-readiness-view";
 import { getPostTarget, type PlanningTargetMode } from "@/components/features/admin/marshal-planning-map";
-import { MarshalSchulungView } from "@/components/features/admin/marshal-schulung-view";
+import { MarshalSchulungView, type BulkTrainingRegistrationResult } from "@/components/features/admin/marshal-schulung-view";
 import { MarshalSidebar, type SidebarView } from "@/components/features/admin/marshal-sidebar";
 import { MarshalStammdatenView } from "@/components/features/admin/marshal-stammdaten-view";
 import { MarshalStatistikView } from "@/components/features/admin/marshal-statistik-view";
@@ -97,7 +97,7 @@ export function AdminMarshalsPage() {
   }, [eventId, loadWorkspace]);
   useEffect(() => { if (eventId) localStorage.setItem(`msc_marshal_view:${eventId}`, view); }, [eventId, view]);
   useEffect(() => {
-    const canRefresh = ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "statistik", "druck"].includes(view) || view.startsWith("area:");
+    const canRefresh = ["readiness", "track_saturday", "track_sunday", "setup_fl1", "setup_fl2", "general_saturday", "general_sunday", "schulung", "statistik", "druck"].includes(view) || view.startsWith("area:");
     if (!eventId || !canRefresh || busy || selectedPersonId) return;
     const refresh = () => { if (document.visibilityState === "visible") void loadWorkspace(eventId); };
     const interval = window.setInterval(refresh, 30_000);
@@ -279,19 +279,53 @@ export function AdminMarshalsPage() {
   function createTraining(draft: { sessionType: "training" | "briefing"; title: string; sessionDate: string; location: string | null }) { return runAction(() => adminMarshalsService.createTraining({ eventId, ...draft }), "Schulungstermin angelegt.", "Schulungstermin konnte nicht angelegt werden."); }
   function saveAttendance(trainingId: string, person: MarshalPerson, status: MarshalTrainingParticipant["attendanceStatus"]) { return runAction(() => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, status), "Anwesenheit gespeichert.", "Anwesenheit konnte nicht gespeichert werden."); }
   function deleteAttendance(trainingId: string, person: MarshalPerson) { return runAction(() => adminMarshalsService.deleteTrainingParticipant(trainingId, person.id), "Person von der Schulung abgemeldet.", "Person konnte nicht von der Schulung abgemeldet werden."); }
-  async function registerAcceptedForTraining(trainingId: string, people: MarshalPerson[]) {
+  async function registerAcceptedForTraining(trainingId: string, people: MarshalPerson[], dayKeys: MarshalDay["dayKey"][]): Promise<BulkTrainingRegistrationResult> {
     const operationEventId = eventId;
+    const result: BulkTrainingRegistrationResult = { succeededPersonIds: [], skipped: [], failed: [] };
     setBusy(true); setError(""); setNotice("");
     try {
-      await Promise.all(people.map((person) => adminMarshalsService.saveTrainingParticipant(trainingId, person.id, "registered")));
+      let freshWorkspace: MarshalWorkspace;
+      try {
+        freshWorkspace = await adminMarshalsService.getWorkspace(operationEventId);
+      } catch (cause) {
+        const message = getApiErrorMessage(cause, "Die Zuordnung konnte vor dem Speichern nicht aktualisiert werden.");
+        result.failed = people.map((person) => ({ personId: person.id, message }));
+        return result;
+      }
+
+      const dayIds = new Set(freshWorkspace.days.filter((day) => dayKeys.includes(day.dayKey)).map((day) => day.id));
+      const trainingById = new Map(freshWorkspace.trainings.map((training) => [training.id, training]));
+      if (!trainingById.has(trainingId)) {
+        result.failed = people.map((person) => ({ personId: person.id, message: "Der gewählte Termin ist nicht mehr vorhanden." }));
+        return result;
+      }
+
+      for (const requestedPerson of people) {
+        const person = freshWorkspace.people.find((item) => item.id === requestedPerson.id);
+        if (!person || !person.isActive || person.noDeployment) {
+          result.skipped.push({ personId: requestedPerson.id, message: "Die Person ist nicht mehr für eine Zuordnung verfügbar." });
+          continue;
+        }
+        const stillAccepted = person.assignments.some((assignment) => dayIds.has(assignment.dayId) && assignment.commitmentStatus === "accepted");
+        if (!stillAccepted) {
+          result.skipped.push({ personId: person.id, message: "Die Zusage für den gewählten Einsatztag besteht nicht mehr." });
+          continue;
+        }
+        const existingParticipant = freshWorkspace.trainingParticipants.find((participant) => participant.personId === person.id);
+        if (existingParticipant) {
+          const existingTraining = trainingById.get(existingParticipant.sessionId);
+          result.skipped.push({ personId: person.id, message: existingParticipant.sessionId === trainingId ? "Beim gewählten Termin ist bereits ein Status gesetzt." : `Bereits zugeordnet: ${existingTraining?.title ?? "anderer Termin"}.` });
+          continue;
+        }
+        try {
+          await adminMarshalsService.saveTrainingParticipant(trainingId, person.id, "registered");
+          result.succeededPersonIds.push(person.id);
+        } catch (cause) {
+          result.failed.push({ personId: person.id, message: getApiErrorMessage(cause, "Anmeldung konnte nicht gespeichert werden.") });
+        }
+      }
       await loadWorkspace(operationEventId);
-      if (activeEventId.current === operationEventId) setNotice(`${people.length} zugesagte Streckenposten wurden angemeldet.`);
-      return true;
-    } catch (cause) {
-      const message = getApiErrorMessage(cause, "Zugesagte Streckenposten konnten nicht vollständig angemeldet werden.");
-      await loadWorkspace(operationEventId);
-      if (activeEventId.current === operationEventId) setError(message);
-      return false;
+      return result;
     } finally {
       setBusy(false);
     }
