@@ -92,6 +92,11 @@ const AdminSimulatorPage = lazy(() =>
     default: module.AdminSimulatorPage,
   })),
 );
+const AdminVotingPage = lazy(() =>
+  import("@/pages/admin/voting-page").then((module) => ({
+    default: module.AdminVotingPage,
+  })),
+);
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -223,6 +228,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin", "simulator_manager"]}>
                 <AdminSimulatorPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "voting",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminVotingPage />
               </ProtectedRoute>
             ),
           },

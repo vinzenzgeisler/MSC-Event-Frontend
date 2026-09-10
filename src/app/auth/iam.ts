@@ -25,7 +25,9 @@ export type AppPermission =
   | "marshals.write"
   | "marshals.export"
   | "sim.read"
-  | "sim.write";
+  | "sim.write"
+  | "voting.read"
+  | "voting.write";
 
 const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager"];
 
@@ -55,7 +57,9 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "marshals.write",
     "marshals.export",
     "sim.read",
-    "sim.write"
+    "sim.write",
+    "voting.read",
+    "voting.write"
   ],
   editor: [
     "dashboard.read",

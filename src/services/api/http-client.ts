@@ -100,7 +100,7 @@ function getAuthenticatedEmailHeader(): string | null {
   return null;
 }
 
-function buildUrl(path: string, query?: RequestOptions["query"]): string {
+export function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(`${baseUrl}${normalizedPath}`, window.location.origin);
 
