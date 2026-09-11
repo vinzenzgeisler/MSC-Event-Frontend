@@ -1,15 +1,18 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   Camera,
   Car,
   CheckCircle2,
   ImageOff,
+  ListChecks,
   Loader2,
   LogOut,
   RotateCcw,
   Search,
   ShieldCheck,
+  Stamp,
   X,
   XCircle
 } from "lucide-react";
@@ -21,14 +24,199 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getVehicleTypeLabel } from "@/lib/vehicle-type";
+import { ApiError } from "@/services/api/http-client";
 import {
   technicalInspectionService,
   type InspectionContext,
   type InspectionEntry,
   type InspectionHistoryItem,
-  type InspectionListItem
+  type InspectionListItem,
+  type InspectionOverview
 } from "@/services/technical-inspection.service";
 import type { TechStatus, VehicleType } from "@/types/common";
+
+const missingRequirementLabels: Record<"payment" | "waiver", string> = {
+  payment: "Nenngeld offen",
+  waiver: "Aktueller Fahrer-Haftverzicht fehlt"
+};
+
+function EligibilityBanner({ entry }: { entry: InspectionEntry }) {
+  if (entry.eligibility.ready) return null;
+  return (
+    <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-950" role="alert">
+      <div className="flex items-center gap-2 font-bold">
+        <AlertTriangle className="h-5 w-5" />
+        Noch nicht vollständig im Org-Büro angemeldet. Bitte zuerst dort melden.
+      </div>
+      {entry.eligibility.missingRequirements.length > 0 && (
+        <ul className="mt-2 list-inside list-disc text-sm">
+          {entry.eligibility.missingRequirements.map((requirement) => (
+            <li key={requirement}>{missingRequirementLabels[requirement]}</li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-sm">Abnahme, Notizen und Statusänderungen sind gesperrt, bis die Anmeldung vollständig ist.</p>
+    </div>
+  );
+}
+
+function StampReadyBanner({ summary }: { summary: InspectionEntry["participantSummary"] }) {
+  if (!summary.stampReady) return null;
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-4 font-bold text-emerald-900" role="status">
+      <Stamp className="h-7 w-7 shrink-0" />
+      Alle Fahrzeuge bestanden – TA-Stempel darf vergeben werden
+    </div>
+  );
+}
+
+function DoppelstarterSection({
+  entry,
+  navigate
+}: {
+  entry: InspectionEntry;
+  navigate: (path: string) => void;
+}) {
+  if (entry.participantSummary.targets.length <= 1) return null;
+  return (
+    <section aria-labelledby="doppelstarter-heading" className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="doppelstarter-heading" className="font-semibold text-slate-950">
+          Alle Starts von {entry.driverDisplayName}
+        </h2>
+        <span className="text-sm font-medium text-slate-600">
+          {entry.participantSummary.passedTargets} von {entry.participantSummary.totalTargets} Fahrzeugen bestanden
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {entry.participantSummary.targets.map((target) => {
+          const isCurrent = target.entryId === entry.id;
+          return (
+            <button
+              key={`${target.entryId}:${target.target}`}
+              type="button"
+              onClick={() => navigate(`/inspection/${target.entryId}`)}
+              className={`flex items-center justify-between gap-2 rounded-lg border-2 px-3 py-2 text-left text-sm ${
+                isCurrent ? "border-primary bg-primary/5" : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              <span className="min-w-0 truncate">
+                <span className="font-semibold">#{target.startNumber ?? "–"}</span> · {target.className}
+                {target.target === "backup" ? " (Ersatz)" : ""}
+                <span className="block truncate text-xs text-slate-500">{target.vehicleMake} {target.vehicleModel}</span>
+              </span>
+              <Badge className={statusClasses[target.status]}>{statusLabels[target.status]}</Badge>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function InspectionOverviewOverlay({
+  open,
+  onClose,
+  navigate
+}: {
+  open: boolean;
+  onClose: () => void;
+  navigate: (path: string) => void;
+}) {
+  const [overview, setOverview] = useState<InspectionOverview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError("");
+    technicalInspectionService
+      .getOverview()
+      .then(setOverview)
+      .catch((loadError) => setError(messageFromError(loadError)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    load();
+  }, [open, load]);
+
+  if (!open) return null;
+
+  const counters = overview?.counters;
+  const summaryTiles: Array<[string, number | undefined, string]> = [
+    ["Noch nicht prüfbar", counters?.notEligibleTargets, "border-slate-300 bg-slate-50 text-slate-800"],
+    ["Prüfbar & offen", counters?.pendingTargets, "border-amber-300 bg-amber-50 text-amber-900"],
+    ["Bestanden", counters?.passedTargets, "border-emerald-300 bg-emerald-50 text-emerald-900"],
+    ["Abgelehnt", counters?.failedTargets, "border-red-300 bg-red-50 text-red-900"],
+    ["TA-Stempel frei", counters?.stampReadyDrivers, "border-sky-300 bg-sky-50 text-sky-900"]
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3" role="dialog" aria-modal="true" aria-labelledby="inspection-overview-title">
+      <div className="max-h-[94dvh] w-full max-w-3xl overflow-y-auto rounded-xl border bg-white p-4 shadow-2xl sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="inspection-overview-title" className="text-xl font-semibold text-slate-900">Prüferübersicht</h2>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={loading} onClick={load}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-9 w-9 p-0" aria-label="Übersicht schließen" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {error && <div className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</div>}
+
+        {loading && !overview ? (
+          <div className="mt-5 flex items-center gap-2 text-slate-600"><Loader2 className="h-4 w-4 animate-spin" />Übersicht wird geladen…</div>
+        ) : overview ? (
+          <div className="mt-5 space-y-6">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {summaryTiles.map(([label, value, className]) => (
+                <div key={label} className={`rounded-lg border-2 p-3 text-center ${className}`}>
+                  <div className="text-2xl font-bold">{value ?? "–"}</div>
+                  <div className="text-xs font-medium">{label}</div>
+                </div>
+              ))}
+            </div>
+            <div>
+              <h3 className="mb-2 font-semibold text-slate-900">Zuletzt von mir geprüft</h3>
+              {overview.recentEntries.length === 0 ? (
+                <div className="text-sm text-slate-500">Noch keine eigenen Entscheidungen.</div>
+              ) : (
+                <div className="space-y-2">
+                  {overview.recentEntries.map((item) => (
+                    <button
+                      key={item.entryId}
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        navigate(`/inspection/${item.entryId}`);
+                      }}
+                      className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3 text-left text-sm hover:border-slate-400 hover:bg-slate-50"
+                    >
+                      <span className="min-w-0 truncate">
+                        <span className="font-semibold">#{item.startNumber ?? "–"}</span> {item.driverDisplayName} · {item.className}
+                        {item.stampReady ? <span className="ml-2 text-emerald-700">· TA-Stempel frei</span> : null}
+                      </span>
+                      <span className="flex items-center gap-2 text-xs text-slate-500">
+                        <Badge className={statusClasses[item.lastAction.status]}>{statusLabels[item.lastAction.status]}{item.lastAction.target === "backup" ? " (Ersatz)" : ""}</Badge>
+                        {formatDateTime(item.lastAction.createdAt)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 const statusLabels: Record<TechStatus, string> = {
   pending: "Offen",
@@ -150,10 +338,23 @@ export function AdminTechnicalInspectionPage() {
     if (window.matchMedia("(display-mode: standalone)").matches) return false;
     return sessionStorage.getItem("install-banner-dismissed") !== "1";
   });
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [openTargetCount, setOpenTargetCount] = useState<number | null>(null);
   const searchRequestRef = useRef(0);
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSavedNotesRef = useRef<Record<InspectionTarget, string>>({ primary: "", backup: "" });
   const noteSaveTimeoutRef = useRef<number | null>(null);
+
+  const refreshOpenCount = useCallback(() => {
+    void technicalInspectionService
+      .getOverview()
+      .then((result) => setOpenTargetCount(result.counters.pendingTargets))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    refreshOpenCount();
+  }, [refreshOpenCount]);
 
   useEffect(() => {
     const handleOffline = () => setIsOffline(true);
@@ -195,6 +396,7 @@ export function AdminTechnicalInspectionPage() {
         setParticipantHeading(`${participant.driver.displayName} · ${participant.entries.length} Starts`);
         setResults(participant.entries.map((item) => ({
           id: item.id,
+          driverPersonId: item.driverPersonId,
           startNumber: item.startNumber,
           driverDisplayName: item.driverDisplayName,
           identityProtected: item.identityProtected,
@@ -206,7 +408,8 @@ export function AdminTechnicalInspectionPage() {
           techStatus: item.techStatus,
           backupVehicleId: item.backupVehicleId,
           backupTechStatus: item.backupTechStatus,
-          techCheckedAt: item.techCheckedAt
+          techCheckedAt: item.techCheckedAt,
+          eligibility: item.eligibility
         })));
         setSearched(true);
       })
@@ -338,6 +541,12 @@ export function AdminTechnicalInspectionPage() {
 
   const updateStatus = async (techStatus: TechStatus) => {
     if (!detail || saving) return;
+    if (techStatus === "pending" && detail.participantSummary.stampReady) {
+      const confirmed = window.confirm(
+        "Für diesen Fahrer wurde möglicherweise bereits ein TA-Stempel vergeben. Beim Zurücksetzen verschwindet die Freigabe. Wirklich zurücksetzen?"
+      );
+      if (!confirmed) return;
+    }
     const note = notes[activeTarget];
     if (techStatus === "failed" && !note.trim()) {
       setNoteRequired(true);
@@ -359,8 +568,22 @@ export function AdminTechnicalInspectionPage() {
       setHistory(updatedHistory);
       lastSavedNotesRef.current[activeTarget] = note;
       setSuccess(`${activeTarget === "backup" ? "Ersatzfahrzeug" : "Fahrzeug"}: ${statusLabels[techStatus]}`);
+      refreshOpenCount();
     } catch (saveError) {
-      setError(messageFromError(saveError));
+      if (saveError instanceof ApiError && saveError.code === "INSPECTION_STATE_CONFLICT") {
+        setError("Die Nennung wurde zwischenzeitlich von einem anderen Prüfer geändert. Ansicht wurde aktualisiert.");
+        const [updated, updatedHistory] = await Promise.all([
+          technicalInspectionService.getEntry(detail.id),
+          technicalInspectionService.getHistory(detail.id)
+        ]);
+        setDetail(updated);
+        setHistory(updatedHistory);
+        const refreshedNotes = { primary: updated.inspectionNote ?? "", backup: updated.backupInspectionNote ?? "" };
+        setNotes(refreshedNotes);
+        lastSavedNotesRef.current = refreshedNotes;
+      } else {
+        setError(messageFromError(saveError));
+      }
     } finally {
       setSaving(null);
     }
@@ -373,7 +596,17 @@ export function AdminTechnicalInspectionPage() {
   const openScannedTarget = useCallback(
     (target: InspectionQrTarget) => {
       setScannerOpen(false);
-      navigate(target.type === "entry" ? `/inspection/${target.entryId}` : `/inspection/participant/${target.eventId}/${target.personId}`);
+      const destination = target.type === "entry" ? `/inspection/${target.entryId}` : `/inspection/participant/${target.eventId}/${target.personId}`;
+      void technicalInspectionService
+        .checkAccess(target, "qr")
+        .then((access) => {
+          if (!access.allowed) {
+            const reasons = access.eligibility.missingRequirements.map((requirement) => missingRequirementLabels[requirement]).join(", ");
+            setError(`Fahrer zuerst im Org-Büro vollständig anmelden lassen (${reasons || "Anmeldung unvollständig"}).`);
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => navigate(destination));
     },
     [navigate]
   );
@@ -394,10 +627,16 @@ export function AdminTechnicalInspectionPage() {
             </div>
             {context?.event.name && <div className="text-xs text-slate-500">{context.event.name}</div>}
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={logout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Abmelden
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => setOverviewOpen(true)}>
+              <ListChecks className="mr-2 h-4 w-4" />
+              Übersicht{openTargetCount !== null ? ` (${openTargetCount})` : ""}
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={logout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Abmelden
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -491,7 +730,12 @@ export function AdminTechnicalInspectionPage() {
                 key={item.id}
                 type="button"
                 className="rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
-                onClick={() => navigate(`/inspection/${item.id}`)}
+                onClick={() => {
+                  if (item.eligibility && !item.eligibility.ready) {
+                    void technicalInspectionService.checkAccess({ type: "entry", entryId: item.id }, "search").catch(() => undefined);
+                  }
+                  navigate(`/inspection/${item.id}`);
+                }}
               >
                 <div className="flex justify-between gap-3">
                   <div className="text-2xl font-bold">#{item.startNumber ?? "–"}</div>
@@ -499,6 +743,11 @@ export function AdminTechnicalInspectionPage() {
                 </div>
                 <div className="mt-2 font-semibold">{item.driverDisplayName}</div>
                 <div className="text-sm text-slate-600">{item.vehicleMake} {item.vehicleModel} · {item.className}</div>
+                {item.eligibility && !item.eligibility.ready && (
+                  <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+                    Org-Büro offen
+                  </div>
+                )}
                 {item.backupVehicleId && (
                   <div className="mt-2 flex items-center justify-between border-t pt-2 text-xs text-slate-600">
                     <span>Ersatzfahrzeug</span>
@@ -516,6 +765,18 @@ export function AdminTechnicalInspectionPage() {
         )}
 
         {!loading && detail && (
+          <div className="space-y-4">
+            <EligibilityBanner entry={detail} />
+            <StampReadyBanner summary={detail.participantSummary} />
+            {detail.participantSummary.targets.length > 1 && (
+              <div className="space-y-2">
+                <Button type="button" variant="ghost" onClick={() => navigate(`/inspection/participant/${detail.eventId}/${detail.driverPersonId}`)}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Zurück zu allen Starts
+                </Button>
+                <DoppelstarterSection entry={detail} navigate={navigate} />
+              </div>
+            )}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
             <Card className="overflow-hidden">
               <CardHeader className="border-b bg-white">
@@ -555,14 +816,14 @@ export function AdminTechnicalInspectionPage() {
                     </div>
                   </dl>
                   {(detail.driverEmail || detail.driverPhone) && (
-                    <div className="mt-3 flex flex-wrap gap-4">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       {detail.driverEmail && (
-                        <a href={`mailto:${detail.driverEmail}`} className="text-sm text-blue-700 underline">
+                        <a href={`mailto:${detail.driverEmail}`} className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 no-underline hover:bg-slate-50">
                           📧 {detail.driverEmail}
                         </a>
                       )}
                       {detail.driverPhone && (
-                        <a href={`tel:${detail.driverPhone}`} className="text-sm text-blue-700 underline">
+                        <a href={`tel:${detail.driverPhone}`} className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 no-underline hover:bg-slate-50">
                           📞 {detail.driverPhone}
                         </a>
                       )}
@@ -638,7 +899,8 @@ export function AdminTechnicalInspectionPage() {
                     }}
                     maxLength={2000}
                     rows={4}
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200"
+                    disabled={!detail.eligibility.ready}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-slate-600 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                     placeholder="Notiz"
                   />
                   {noteRequired && (
@@ -652,15 +914,15 @@ export function AdminTechnicalInspectionPage() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Button type="button" className="h-20 bg-emerald-600 text-lg hover:bg-emerald-700" disabled={Boolean(saving)} onClick={() => void updateStatus("passed")}>
+                  <Button type="button" className="h-20 bg-emerald-600 text-lg hover:bg-emerald-700" disabled={Boolean(saving) || !detail.eligibility.ready} onClick={() => void updateStatus("passed")}>
                     {saving === `${activeTarget}:passed` ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <CheckCircle2 className="mr-2 h-6 w-6" />}Abnahme bestätigen
                   </Button>
-                  <Button type="button" variant="destructive" className="h-20 text-lg" disabled={Boolean(saving)} onClick={() => void updateStatus("failed")}>
+                  <Button type="button" variant="destructive" className="h-20 text-lg" disabled={Boolean(saving) || !detail.eligibility.ready} onClick={() => void updateStatus("failed")}>
                     {saving === `${activeTarget}:failed` ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <XCircle className="mr-2 h-6 w-6" />}Abnahme ablehnen
                   </Button>
                 </div>
                 {(activeTarget === "primary" ? detail.techStatus : detail.backupTechStatus) !== "pending" && (
-                  <Button type="button" variant="outline" className="h-12 w-full" disabled={Boolean(saving)} onClick={() => void updateStatus("pending")}>
+                  <Button type="button" variant="outline" className="h-12 w-full" disabled={Boolean(saving) || !detail.eligibility.ready} onClick={() => void updateStatus("pending")}>
                     <RotateCcw className="mr-2 h-4 w-4" />Auf offen zurücksetzen
                   </Button>
                 )}
@@ -689,12 +951,21 @@ export function AdminTechnicalInspectionPage() {
               </CardContent>
             </Card>
           </div>
+          </div>
         )}
 
         {success && <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white shadow-lg">{success}</div>}
         {error && <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</div>}
       </main>
       <InspectionQrScanner open={scannerOpen} onClose={closeScanner} onTargetDetected={openScannedTarget} />
+      <InspectionOverviewOverlay
+        open={overviewOpen}
+        onClose={() => {
+          setOverviewOpen(false);
+          refreshOpenCount();
+        }}
+        navigate={navigate}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Download, Loader2, RefreshCw, TabletSmartphone, X } from "lucide-react";
+import { CheckCircle2, CreditCard, Download, Loader2, RefreshCw, TabletSmartphone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,12 @@ import {
   type SigningRequirements,
   type SigningSessionStatus
 } from "@/services/admin-signing.service";
-import { getApiErrorMessage } from "@/services/api/http-client";
+import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
+
+function formatCents(cents: number | null | undefined) {
+  if (cents === null || cents === undefined) return null;
+  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+}
 
 const PREFERRED_SIGNING_DEVICE_KEY = "msc-preferred-signing-device-id";
 
@@ -57,6 +62,8 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [payingRemaining, setPayingRemaining] = useState(false);
   const completedSessionRef = useRef<string | null>(null);
 
   const connectedDevices = useMemo(() => devices.filter((device) => device.status === "connected"), [devices]);
@@ -89,6 +96,8 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
       && (!needsGuardian || (prechecks.guardianPresentAt && prechecks.guardianAuthorityCheckedAt && guardianName.trim() && guardianRelationship.trim()))
   );
   const allSigned = signerOptions.length > 0 && signerOptions.every((signer) => signer.signed);
+  const paymentBlocksDriverSigning =
+    selectedSigner?.role === "driver" && requirements?.payment.status !== "paid" && requirements?.payment.status !== "not_required";
 
   const loadDevices = useCallback(async () => {
     const nextDevices = await adminSigningService.listDevices();
@@ -133,6 +142,7 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
     setPrechecks(emptyPrechecks());
     setGuardianName("");
     setGuardianRelationship("");
+    setConfirmingPayment(false);
     completedSessionRef.current = null;
     Promise.all([adminSigningService.getRequirements(entryId), loadDevices()])
       .then(([nextRequirements]) => {
@@ -207,6 +217,29 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
     }
   };
 
+  const payRemainingBalance = async () => {
+    if (!entryId || payingRemaining) return;
+    if (!confirmingPayment) {
+      setConfirmingPayment(true);
+      return;
+    }
+    setConfirmingPayment(false);
+    setPayingRemaining(true);
+    setError("");
+    try {
+      await adminEntriesService.setEntryPaymentStatus(entryId, "paid", "Offenen Restbetrag im Haftverzicht-Dialog verbucht");
+      await loadRequirements(entryId);
+    } catch (paymentError) {
+      setError(
+        paymentError instanceof ApiError && paymentError.code === "PAYMENT_AMOUNT_UNKNOWN"
+          ? "Nenngeldbetrag unbekannt. Bitte Zahlungsdaten in der Nennung prüfen, bevor eine Zahlung verbucht wird."
+          : getApiErrorMessage(paymentError, "Zahlung konnte nicht verbucht werden.")
+      );
+    } finally {
+      setPayingRemaining(false);
+    }
+  };
+
   const startSigning = async () => {
     if (!entryId || !selectedSigner || !selectedDeviceId || !selectedDeviceOnline || !prechecksComplete || busy) return;
     setBusy(true);
@@ -238,7 +271,10 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
         ? "Für diese Nennung läuft bereits ein Unterschriftenvorgang bei einem anderen Operator oder Terminal."
         : apiMessage.includes("SIGNING_DEVICE_BUSY")
           ? "Dieses Terminal wird bereits für einen anderen Unterschriftenvorgang verwendet."
-          : apiMessage);
+          : apiMessage.includes("SIGNING_PAYMENT_REQUIRED")
+            ? "Nenngeld offen. Zahlung muss vor dem Fahrer-Haftverzicht verbucht werden."
+            : apiMessage);
+      if (entryId) await loadRequirements(entryId);
     } finally {
       setBusy(false);
     }
@@ -299,9 +335,26 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
                 <div className="font-semibold">Zahlung vor Terminalstart prüfen</div>
                 <div className="mt-1">
                   {requirements.payment.status === "due"
-                    ? `Diese Nennung ist noch nicht vollständig bezahlt${requirements.payment.amountOpenCents !== null ? ` (offen: ${(requirements.payment.amountOpenCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })})` : ""}.`
-                    : "Für diese Nennung liegt kein bestätigter Zahlungsstatus vor."}
+                    ? `Diese Nennung ist noch nicht vollständig bezahlt${requirements.payment.amountOpenCents !== null ? ` (offen: ${formatCents(requirements.payment.amountOpenCents)})` : ""}.`
+                    : "Für diese Nennung liegt kein bestätigter Zahlungsstatus vor. Bitte Zahlungsdaten in der Nennung prüfen."}
                 </div>
+                {requirements.payment.status === "due" && requirements.payment.amountOpenCents !== null && requirements.payment.amountOpenCents > 0 ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {confirmingPayment ? (
+                      <>
+                        <span className="text-sm font-semibold">{formatCents(requirements.payment.amountOpenCents)} wirklich als bezahlt verbuchen?</span>
+                        <Button type="button" size="sm" disabled={payingRemaining} onClick={() => void payRemainingBalance()}>
+                          {payingRemaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Ja, verbuchen
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" disabled={payingRemaining} onClick={() => setConfirmingPayment(false)}>Abbrechen</Button>
+                      </>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" className="border-amber-400 bg-white" onClick={() => void payRemainingBalance()}>
+                        <CreditCard className="mr-2 h-4 w-4" />Offenen Betrag als bezahlt verbuchen
+                      </Button>
+                    )}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {requirements.activeSession && !signingInProgress ? (
@@ -435,9 +488,10 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
                         <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
                       </Button>
                     </div>
-                    <Button type="button" className="h-14 w-full text-base" disabled={busy || Boolean(requirements.activeSession) || !selectedDeviceOnline || !selectedSigner || !prechecksComplete} onClick={() => void startSigning()}>
+                    <Button type="button" className="h-14 w-full text-base" disabled={busy || Boolean(requirements.activeSession) || !selectedDeviceOnline || !selectedSigner || !prechecksComplete || paymentBlocksDriverSigning} onClick={() => void startSigning()}>
                       {busy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}Haftverzicht am Gerät starten
                     </Button>
+                    {paymentBlocksDriverSigning ? <p className="text-sm text-amber-700">Nenngeld muss zuerst verbucht werden, bevor der Fahrer-Haftverzicht gestartet werden kann.</p> : null}
                     {!selectedDeviceOnline ? <p className="text-sm text-amber-700">Das ausgewählte Terminal ist nicht aktiv. Terminal öffnen und Geräte aktualisieren.</p> : null}
                   </div>
                 ) : (

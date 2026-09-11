@@ -896,21 +896,21 @@ export const adminEntriesService = {
     }
   },
 
-  async setEntryPaymentStatus(entryId: string, paymentStatus: "due" | "paid") {
+  async setEntryPaymentStatus(entryId: string, paymentStatus: "due" | "paid", note = "Als vollständig bezahlt markiert (Admin UI)") {
     if (paymentStatus !== "paid") {
       throw new Error("Manuelles Zurücksetzen auf offen ist im Ledger-Flow nicht möglich.");
     }
 
-    await requestJson<AdminEntryPaymentStatusResponse>(`/admin/entries/${entryId}/payment-status`, {
+    const response = await requestJson<AdminEntryPaymentStatusResponse>(`/admin/entries/${entryId}/payment-status`, {
       method: "PATCH",
       body: {
         paymentStatus: "paid",
         paidAt: new Date().toISOString(),
-        note: "Als vollständig bezahlt markiert (Admin UI)"
+        note
       }
     });
 
-    return { ok: true };
+    return { ok: true, paymentStatus: response.paymentStatus, paidAmountCents: response.paidAmountCents, amountOpenCents: response.amountOpenCents };
   },
 
   async setEntryPaymentAmounts(entryId: string, payload: { totalCents: number; paidAmountCents: number }) {
