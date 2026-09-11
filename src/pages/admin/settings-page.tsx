@@ -1217,6 +1217,11 @@ export function AdminSettingsPage() {
       validFrom: toDatetimeLocal(validFrom.toISOString()),
       validUntil: toDatetimeLocal(validUntil.toISOString())
     }));
+    setIamCreateForm((prev) => ({
+      ...prev,
+      inspectionValidFrom: toDatetimeLocal(validFrom.toISOString()),
+      inspectionValidUntil: toDatetimeLocal(validUntil.toISOString())
+    }));
   }, [eventState?.id]);
 
   const loadSigningDevices = useCallback(async () => {

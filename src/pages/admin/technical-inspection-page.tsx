@@ -369,19 +369,29 @@ export function AdminTechnicalInspectionPage() {
 
   useEffect(() => {
     let active = true;
-    void technicalInspectionService
-      .getContext()
-      .then((result) => {
-        if (active) setContext({ event: result.event });
-      })
-      .catch((loadError) => {
-        if (active) setError(messageFromError(loadError));
-      })
-      .finally(() => {
-        if (active && !entryId) setLoading(false);
-      });
+    let retryTimer: number | null = null;
+    const loadContext = () => {
+      void technicalInspectionService
+        .getContext()
+        .then((result) => {
+          if (!active) return;
+          setContext({ event: result.event });
+          setError("");
+        })
+        .catch((loadError) => {
+          if (!active) return;
+          setContext(null);
+          setError(messageFromError(loadError));
+          retryTimer = window.setTimeout(loadContext, 10_000);
+        })
+        .finally(() => {
+          if (active && !entryId) setLoading(false);
+        });
+    };
+    loadContext();
     return () => {
       active = false;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
   }, [entryId]);
 
