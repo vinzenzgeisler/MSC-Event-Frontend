@@ -923,6 +923,11 @@ export function AdminSettingsPage() {
   const [iamCreatingUser, setIamCreatingUser] = useState(false);
   const [iamRoleDrafts, setIamRoleDrafts] = useState<Record<string, IamRole[]>>({});
   const [iamNameDrafts, setIamNameDrafts] = useState<Record<string, { firstName: string; lastName: string }>>({});
+  const [inspectorAssignmentForm, setInspectorAssignmentForm] = useState({
+    userId: "",
+    validFrom: "",
+    validUntil: ""
+  });
   const [iamCreateForm, setIamCreateForm] = useState({
     email: "",
     firstName: "",
@@ -1197,6 +1202,22 @@ export function AdminSettingsPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (!eventState) {
+      return;
+    }
+    const validFrom = new Date(Date.now() - 5 * 60_000);
+    const eventEnd = new Date(eventState.endsAt);
+    const validUntil = new Date(
+      Math.max(Date.now() + 24 * 60 * 60_000, eventEnd.getTime() + 24 * 60 * 60_000)
+    );
+    setInspectorAssignmentForm((prev) => ({
+      userId: prev.userId,
+      validFrom: toDatetimeLocal(validFrom.toISOString()),
+      validUntil: toDatetimeLocal(validUntil.toISOString())
+    }));
+  }, [eventState?.id]);
 
   const loadSigningDevices = useCallback(async () => {
     setDevicesLoading(true);
@@ -1961,6 +1982,49 @@ export function AdminSettingsPage() {
       showToast(enabled ? "Account aktiviert." : "Account deaktiviert.");
     } catch (error) {
       setIamError(getApiErrorMessage(error, "Account-Status konnte nicht aktualisiert werden."));
+    } finally {
+      setIamBusyUserId(null);
+    }
+  };
+
+  const assignTechnicalInspector = async () => {
+    if (!canManageIam || !iamOverview || !eventState) {
+      return;
+    }
+    const account = iamOverview.accounts.find((item) => item.id === inspectorAssignmentForm.userId);
+    if (!account?.email) {
+      setIamError("Bitte einen Account mit E-Mail-Adresse auswählen.");
+      return;
+    }
+    if (!inspectorAssignmentForm.validFrom || !inspectorAssignmentForm.validUntil) {
+      setIamError("Gültig von und gültig bis sind erforderlich.");
+      return;
+    }
+    const validFrom = new Date(inspectorAssignmentForm.validFrom);
+    const validUntil = new Date(inspectorAssignmentForm.validUntil);
+    if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validUntil.getTime()) || validUntil <= validFrom) {
+      setIamError("Der Gültigkeitszeitraum ist ungültig.");
+      return;
+    }
+
+    setIamBusyUserId(account.id);
+    setIamError("");
+    try {
+      if (!account.roles.includes("technical_inspector")) {
+        const updated = await adminIamService.updateUserRoles(account.id, [
+          ...account.roles,
+          "technical_inspector"
+        ]);
+        patchIamAccount(updated);
+      }
+      await adminIamService.assignTechnicalInspector(account.email, {
+        eventId: eventState.id,
+        validFrom: validFrom.toISOString(),
+        validUntil: validUntil.toISOString()
+      });
+      showToast(`${account.firstName || account.email} wurde der Veranstaltung zugewiesen.`);
+    } catch (error) {
+      setIamError(getApiErrorMessage(error, "Technischer Abnehmer konnte nicht zugewiesen werden."));
     } finally {
       setIamBusyUserId(null);
     }
@@ -2992,6 +3056,82 @@ export function AdminSettingsPage() {
                       {iamCreatingUser ? "Legt an…" : "Account anlegen"}
                     </Button>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">Technischen Abnehmer zuweisen</h3>
+                <div className="grid gap-3 rounded-md border border-blue-200 bg-blue-50/50 p-3 md:grid-cols-3">
+                  <div className="space-y-1 md:col-span-3">
+                    <Label>Veranstaltung</Label>
+                    <div className="rounded-md border bg-white px-3 py-2 text-sm">
+                      {eventState?.name ?? "Keine Veranstaltung gewählt"}
+                    </div>
+                  </div>
+                  <div className="space-y-1 md:col-span-3">
+                    <Label>Person / Account</Label>
+                    <Select
+                      value={inspectorAssignmentForm.userId}
+                      disabled={!canManageIam || !eventState}
+                      onValueChange={(userId) =>
+                        setInspectorAssignmentForm((prev) => ({ ...prev, userId }))
+                      }
+                    >
+                      <SelectTrigger className="bg-white text-base md:text-sm">
+                        <SelectValue placeholder="Person auswählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(iamOverview?.accounts ?? [])
+                          .filter((account) => account.email && account.enabled)
+                          .map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {[account.firstName, account.lastName].filter(Boolean).join(" ") || account.email} ({account.email})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Gültig ab</Label>
+                    <Input
+                      type="datetime-local"
+                      value={inspectorAssignmentForm.validFrom}
+                      disabled={!canManageIam || !eventState}
+                      onChange={(event) =>
+                        setInspectorAssignmentForm((prev) => ({ ...prev, validFrom: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Gültig bis</Label>
+                    <Input
+                      type="datetime-local"
+                      value={inspectorAssignmentForm.validUntil}
+                      disabled={!canManageIam || !eventState}
+                      onChange={(event) =>
+                        setInspectorAssignmentForm((prev) => ({ ...prev, validUntil: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      disabled={
+                        !canManageIam ||
+                        !eventState ||
+                        !inspectorAssignmentForm.userId ||
+                        iamBusyUserId === inspectorAssignmentForm.userId
+                      }
+                      onClick={() => void assignTechnicalInspector()}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {iamBusyUserId === inspectorAssignmentForm.userId ? "Speichert…" : "Zur Veranstaltung hinzufügen"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-600 md:col-span-3">
+                    Die Rolle technical_inspector wird bei Bedarf automatisch ergänzt und die zeitlich begrenzte
+                    Veranstaltungszuordnung in der Datenbank gespeichert.
+                  </p>
                 </div>
               </div>
 
