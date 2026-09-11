@@ -634,6 +634,15 @@ export function AdminEntryDetailPage() {
   const signedWaiverDocumentId = detail.waiverSigned.documentId;
   const hasSignedWaiverDocument = detail.waiverSigned.signed;
   const signedWaiverAt = detail.waiverSigned.signedAt;
+  const participantCreationDisabledReason = participantBusy
+    ? "Beifahrer-Aktion läuft…"
+    : detail.techStatus !== "pending"
+      ? "Beifahrer können nach Beginn der technischen Abnahme nicht mehr ergänzt werden."
+      : status !== "accepted" && !hasSignedWaiverDocument
+        ? "Die Nennung muss zugelassen oder der Fahrer-Haftverzicht unterschrieben sein."
+        : !currentClassAllowsCodriver
+          ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
+          : undefined;
 
   const saveStampCardDownload = (download: { downloadUrl: string; filename: string }) => {
     const anchor = document.createElement("a");
@@ -734,6 +743,14 @@ export function AdminEntryDetailPage() {
 
   const openParticipantFlow = (workflow: ParticipantWorkflowType, operation: ParticipantOperation = "create") => {
     if (!detail) return;
+    if (detail.techStatus !== "pending") {
+      flashMessage("Beifahrer können nach Beginn der technischen Abnahme nicht mehr ergänzt werden.", 3400);
+      return;
+    }
+    if (status !== "accepted" && !detail.waiverSigned.signed) {
+      flashMessage("Die Nennung muss zugelassen oder der Fahrer-Haftverzicht unterschrieben sein.", 3400);
+      return;
+    }
     const classAllowsCodriver = classOptions.find((option) => option.id === detail.classId)?.allowsCodriver ?? false;
     if (!classAllowsCodriver) {
       flashMessage("Diese Fahrzeugklasse erlaubt keine Beifahrer.", 3400);
@@ -767,7 +784,9 @@ export function AdminEntryDetailPage() {
         ? "Für diese Nennung läuft bereits ein Terminalvorgang bei einem anderen Operator."
         : apiMessage.includes("SIGNING_DEVICE_BUSY")
           ? "Dieses Terminal wird bereits für einen anderen Vorgang verwendet."
-          : apiMessage, 3400);
+          : apiMessage.includes("TECHNICAL_INSPECTION_ALREADY_STARTED")
+            ? "Beifahrer können nach Beginn der technischen Abnahme nicht mehr ergänzt werden."
+            : apiMessage, 3400);
     } finally {
       setParticipantBusy(false);
     }
@@ -1022,8 +1041,8 @@ export function AdminEntryDetailPage() {
                       size="sm"
                       variant="outline"
                       className="border-slate-300 bg-white text-slate-700 hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                      disabled={participantBusy || status !== "accepted" || !currentClassAllowsCodriver}
-                      title={status !== "accepted" ? "Beifahrer können erst nach Zulassung bearbeitet werden." : !currentClassAllowsCodriver ? "Diese Fahrzeugklasse erlaubt keine Beifahrer." : undefined}
+                      disabled={Boolean(participantCreationDisabledReason)}
+                      title={participantCreationDisabledReason}
                       onClick={() => openParticipantFlow("regular_codriver_registration", "edit")}
                     >
                       <Pencil className="mr-1.5 h-4 w-4" />Bearbeiten
@@ -1573,15 +1592,7 @@ export function AdminEntryDetailPage() {
                         icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
                         variant="default"
                         className={actionActiveClass}
-                        disabledReason={
-                          participantBusy
-                            ? "Beifahrer-Aktion läuft…"
-                            : status !== "accepted"
-                              ? "Beifahrer können erst nach Zulassung ergänzt werden."
-                              : !currentClassAllowsCodriver
-                                ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
-                                : undefined
-                        }
+                        disabledReason={participantCreationDisabledReason}
                         onClick={() => openParticipantFlow("regular_codriver_registration", detail.codriver.assigned ? "edit" : "create")}
                       />
                       {detail.codriver.assigned ? (
@@ -1616,15 +1627,7 @@ export function AdminEntryDetailPage() {
                       <HintButton
                         label="Charity-Fahrt am Terminal erfassen"
                         icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
-                        disabledReason={
-                          participantBusy
-                            ? "Beifahrer-Aktion läuft…"
-                            : status !== "accepted"
-                              ? "Charity-Fahrten können erst nach Zulassung erfasst werden."
-                              : !currentClassAllowsCodriver
-                                ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
-                                : undefined
-                        }
+                        disabledReason={participantCreationDisabledReason}
                         onClick={() => openParticipantFlow("charity_codriver_registration")}
                       />
                     </>
