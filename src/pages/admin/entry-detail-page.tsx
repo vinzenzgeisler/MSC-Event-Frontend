@@ -643,6 +643,13 @@ export function AdminEntryDetailPage() {
         : !currentClassAllowsCodriver
           ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
           : undefined;
+  const participantEditDisabledReason = participantBusy
+    ? "Beifahrer-Aktion läuft…"
+    : status !== "accepted" && !hasSignedWaiverDocument
+      ? "Die Nennung muss zugelassen oder der Fahrer-Haftverzicht unterschrieben sein."
+      : !currentClassAllowsCodriver
+        ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
+        : undefined;
 
   const saveStampCardDownload = (download: { downloadUrl: string; filename: string }) => {
     const anchor = document.createElement("a");
@@ -743,7 +750,8 @@ export function AdminEntryDetailPage() {
 
   const openParticipantFlow = (workflow: ParticipantWorkflowType, operation: ParticipantOperation = "create") => {
     if (!detail) return;
-    if (detail.techStatus !== "pending") {
+    const createsParticipant = workflow === "charity_codriver_registration" || operation === "create";
+    if (createsParticipant && detail.techStatus !== "pending") {
       flashMessage("Beifahrer können nach Beginn der technischen Abnahme nicht mehr ergänzt werden.", 3400);
       return;
     }
@@ -1041,8 +1049,8 @@ export function AdminEntryDetailPage() {
                       size="sm"
                       variant="outline"
                       className="border-slate-300 bg-white text-slate-700 hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                      disabled={Boolean(participantCreationDisabledReason)}
-                      title={participantCreationDisabledReason}
+                      disabled={Boolean(participantEditDisabledReason)}
+                      title={participantEditDisabledReason}
                       onClick={() => openParticipantFlow("regular_codriver_registration", "edit")}
                     >
                       <Pencil className="mr-1.5 h-4 w-4" />Bearbeiten
@@ -1592,7 +1600,7 @@ export function AdminEntryDetailPage() {
                         icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
                         variant="default"
                         className={actionActiveClass}
-                        disabledReason={participantCreationDisabledReason}
+                        disabledReason={detail.codriver.assigned ? participantEditDisabledReason : participantCreationDisabledReason}
                         onClick={() => openParticipantFlow("regular_codriver_registration", detail.codriver.assigned ? "edit" : "create")}
                       />
                       {detail.codriver.assigned ? (
