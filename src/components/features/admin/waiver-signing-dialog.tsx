@@ -64,6 +64,7 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
   const [error, setError] = useState("");
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [payingRemaining, setPayingRemaining] = useState(false);
+  const [restartConfirmId, setRestartConfirmId] = useState<string | null>(null);
   const completedSessionRef = useRef<string | null>(null);
 
   const connectedDevices = useMemo(() => devices.filter((device) => device.status === "connected"), [devices]);
@@ -280,6 +281,25 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
     }
   };
 
+  const restartWaiver = async (personId: string) => {
+    if (!entryId || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const nextRequirements = await adminSigningService.restartWaiver(entryId, personId);
+      setRequirements(nextRequirements);
+      setRestartConfirmId(null);
+      setSession(null);
+      setPrechecks(emptyPrechecks());
+      setGuardianName("");
+      setGuardianRelationship("");
+    } catch (restartError) {
+      setError(getApiErrorMessage(restartError, "Haftverzicht konnte nicht neu gestartet werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const cancelSession = async () => {
     if (!session || busy) return;
     setBusy(true);
@@ -412,6 +432,22 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
               </div>
             </div>
 
+            {signerOptions.some((signer) => signer.documentId) ? (
+              <div className="rounded-lg border bg-white p-3 text-sm">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Unterschriebene Haftverzichte</div>
+                <div className="grid gap-1.5">
+                  {signerOptions.filter((signer) => signer.documentId).map((signer) => (
+                    <div key={signer.personId} className="flex items-center justify-between gap-2 rounded border bg-slate-50 px-2.5 py-2">
+                      <span className="truncate"><span className="font-semibold text-slate-900">{signer.label}:</span> {signer.name}</span>
+                      <Button type="button" size="sm" variant="outline" onClick={() => void downloadDocument(signer.documentId)}>
+                        <Download className="mr-2 h-3.5 w-3.5" />Drucken
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {session?.status === "completed" ? (
               <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-center">
                 <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
@@ -443,6 +479,21 @@ export function WaiverSigningDialog({ entryId, entryName = "Nennung", open, onCl
                   {selectedSigner.documentId ? <Button type="button" variant="outline" onClick={() => void downloadDocument(selectedSigner.documentId)}><Download className="mr-2 h-4 w-4" />Dokument</Button> : null}
                   <Button type="button" onClick={onClose}>Schließen</Button>
                 </div>
+                {restartConfirmId === selectedSigner.personId ? (
+                  <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                    <p>Der bestehende Haftverzicht wird ungültig und {selectedSigner.name} muss neu unterschreiben. Fortfahren?</p>
+                    <div className="mt-2 flex justify-center gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setRestartConfirmId(null)}>Abbrechen</Button>
+                      <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void restartWaiver(selectedSigner.personId)}>
+                        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Ja, neu unterschreiben
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="mt-3 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700" onClick={() => setRestartConfirmId(selectedSigner.personId)}>
+                    Haftverzicht neu unterschreiben
+                  </button>
+                )}
               </div>
             ) : (
               <>

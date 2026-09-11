@@ -178,6 +178,14 @@ export const adminSigningService = {
     return response.session;
   },
 
+  async restartWaiver(entryId: string, signerPersonId: string) {
+    const response = await requestJson<{ ok: true; requirements: SigningRequirements }>(
+      `/admin/signing/entries/${entryId}/restart`,
+      { method: "POST", includeAdminEmailHeader: true, body: { signerPersonId } }
+    );
+    return response.requirements;
+  },
+
   async resendSignedWaiverMail(documentId: string) {
     return requestJson<{ ok: true; outboxId: string; recipient: string }>(
       `/admin/documents/${documentId}/resend-waiver-mail`,
