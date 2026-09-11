@@ -117,7 +117,8 @@ export function toRoleMatrix() {
       editor: "read",
       viewer: "read",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Nennungen",
@@ -125,7 +126,8 @@ export function toRoleMatrix() {
       editor: "write",
       viewer: "read",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Haftverzicht",
@@ -133,7 +135,8 @@ export function toRoleMatrix() {
       editor: "write",
       viewer: "none",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Kommunikation",
@@ -141,7 +144,8 @@ export function toRoleMatrix() {
       editor: "none",
       viewer: "none",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Exporte",
@@ -149,7 +153,8 @@ export function toRoleMatrix() {
       editor: "read",
       viewer: "read",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Einstellungen",
@@ -157,7 +162,8 @@ export function toRoleMatrix() {
       editor: "none",
       viewer: "none",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "IAM",
@@ -165,7 +171,8 @@ export function toRoleMatrix() {
       editor: "none",
       viewer: "none",
       technical_inspector: "none",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Technische Abnahme",
@@ -173,7 +180,8 @@ export function toRoleMatrix() {
       editor: "none",
       viewer: "none",
       technical_inspector: "write",
-      marshal_manager: "none"
+      marshal_manager: "none",
+      simulator_manager: "none"
     },
     {
       area: "Streckenposten",
@@ -181,7 +189,17 @@ export function toRoleMatrix() {
       editor: "none",
       viewer: "none",
       technical_inspector: "none",
-      marshal_manager: "write"
+      marshal_manager: "write",
+      simulator_manager: "none"
+    },
+    {
+      area: "Simulator",
+      admin: "write",
+      editor: "none",
+      viewer: "none",
+      technical_inspector: "none",
+      marshal_manager: "none",
+      simulator_manager: "write"
     }
   ] as const;
 }

@@ -805,7 +805,7 @@ function validateEventDraft(form: AdminSettingsEventForm): string | null {
 function asRoleList(value: string[]) {
   const unique = new Set<IamRole>();
   value.forEach((item) => {
-    if (item === "admin" || item === "editor" || item === "viewer" || item === "technical_inspector" || item === "marshal_manager") {
+    if (item === "admin" || item === "editor" || item === "viewer" || item === "technical_inspector" || item === "marshal_manager" || item === "simulator_manager") {
       unique.add(item);
     }
   });
@@ -2923,7 +2923,7 @@ export function AdminSettingsPage() {
                   <div className="space-y-1 md:col-span-2">
                     <Label>Rollen</Label>
                     <div className="flex flex-wrap gap-3 pt-1">
-                      {(["admin", "editor", "viewer", "technical_inspector", "marshal_manager"] as IamRole[]).map((role) => (
+                      {(["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager"] as IamRole[]).map((role) => (
                         <label key={role} className="flex items-center gap-2 text-sm text-slate-700">
                           <input
                             type="checkbox"
@@ -3007,6 +3007,7 @@ export function AdminSettingsPage() {
                         <th className="px-3 py-2">viewer</th>
                         <th className="px-3 py-2">technical_inspector</th>
                         <th className="px-3 py-2">marshal_manager</th>
+                        <th className="px-3 py-2">simulator_manager</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3018,6 +3019,7 @@ export function AdminSettingsPage() {
                           <td className="px-3 py-2">{row.viewer}</td>
                           <td className="px-3 py-2">{row.technical_inspector}</td>
                           <td className="px-3 py-2">{row.marshal_manager}</td>
+                          <td className="px-3 py-2">{row.simulator_manager}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -3091,7 +3093,7 @@ export function AdminSettingsPage() {
                               <td className="px-3 py-2">{account.email || "-"}</td>
                               <td className="px-3 py-2">
                                 <div className="flex flex-wrap gap-3">
-                                  {(["admin", "editor", "viewer", "technical_inspector", "marshal_manager"] as IamRole[]).map((role) => (
+                                  {(["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager"] as IamRole[]).map((role) => (
                                     <label key={role} className="flex items-center gap-2">
                                       <input
                                         type="checkbox"

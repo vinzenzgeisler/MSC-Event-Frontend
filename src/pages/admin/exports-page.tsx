@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { acceptanceStatusLabel, exportStatusClasses, exportStatusLabel } from "@/lib/admin-status";
-import { getApiErrorMessage } from "@/services/api/http-client";
+import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { getAdminEventId } from "@/services/api/event-context";
@@ -32,6 +32,8 @@ export function AdminExportsPage() {
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [stampCardStartSlot, setStampCardStartSlot] = useState(1);
   const [stampCardExporting, setStampCardExporting] = useState(false);
+  const [waiverPaperExporting, setWaiverPaperExporting] = useState(false);
+  const [blankWaiverExporting, setBlankWaiverExporting] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   const showToast = (message: string) => {
@@ -69,6 +71,58 @@ export function AdminExportsPage() {
       showToast(getApiErrorMessage(error, "Stempelkarten-Sammeldruck fehlgeschlagen."));
     } finally {
       setStampCardExporting(false);
+    }
+  };
+
+  const downloadWaiverPaperExport = async () => {
+    if (waiverPaperExporting) return;
+    setWaiverPaperExporting(true);
+    try {
+      const eventId = await getAdminEventId();
+      const download = await adminEntriesService.getWaiverPaperExport(eventId);
+      const anchor = document.createElement("a");
+      anchor.href = download.downloadUrl;
+      anchor.download = download.filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      showToast(`${download.driverCount} Haftverzichts-PDFs als ZIP heruntergeladen.`);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "WAIVER_PAPER_EXPORT_NO_ENTRIES") {
+        showToast("Keine zugelassenen Nennungen für dieses Event gefunden.");
+      } else {
+        showToast(getApiErrorMessage(error, "Papier-Fallback-Export fehlgeschlagen."));
+      }
+    } finally {
+      setWaiverPaperExporting(false);
+    }
+  };
+
+  const downloadBlankWaiverExport = async () => {
+    if (blankWaiverExporting) return;
+    setBlankWaiverExporting(true);
+    try {
+      const download = await adminEntriesService.getBlankWaiverExport("de-DE");
+      const byteString = atob(download.dataBase64);
+      const bytes = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i += 1) {
+        bytes[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: download.mimeType });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = download.filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast(getApiErrorMessage(error, "Blanko-Haftverzicht konnte nicht erzeugt werden."));
+    } finally {
+      setBlankWaiverExporting(false);
     }
   };
 
@@ -270,6 +324,45 @@ export function AdminExportsPage() {
                 Sammeldruck herunterladen
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {canCreateExports && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Haftverzicht Papier-Fallback</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Notfalllösung falls das digitale Unterschreiben am Terminal ausfällt: personalisierte
+              Haftverzichtserklärungen aller zugelassenen Fahrer zum Ausdrucken und handschriftlichen
+              Unterschreiben, gebündelt als ZIP-Datei (ein PDF je Fahrer). Bei fremdsprachigen Fahrern ist
+              zusätzlich die verbindliche deutsche Fassung enthalten.
+            </p>
+            <Button type="button" disabled={waiverPaperExporting} onClick={() => void downloadWaiverPaperExport()}>
+              {waiverPaperExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Papier-Fallback (ZIP) herunterladen
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {canCreateExports && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Blanko-Haftverzichtserklärung</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Ein einzelnes, unpersonalisiertes Formular zum handschriftlichen Ausfüllen (Name, Geburtsdatum,
+              Klasse, Startnummer, Fahrzeug) mit Unterschriftenfeld – z. B. als Vorrat vor Ort oder für Fahrer,
+              die noch nicht im System erfasst sind.
+            </p>
+            <Button type="button" disabled={blankWaiverExporting} onClick={() => void downloadBlankWaiverExport()}>
+              {blankWaiverExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Blankoformular herunterladen
+            </Button>
           </CardContent>
         </Card>
       )}

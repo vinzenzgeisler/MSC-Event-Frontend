@@ -1,6 +1,6 @@
 /**
  * TimeDrumPicker – tablet-first drum-scroll time input
- * Columns: minutes | seconds | milliseconds (×10)
+ * Columns: minutes | seconds | hundredths | thousandths (ones digit)
  * Returns time in milliseconds.
  */
 import { useEffect, useRef, useCallback } from "react";
@@ -11,12 +11,14 @@ type ColSpec = {
   max: number;
   step: number;
   pad: number;
+  flex?: number;
 };
 
 const COLS: ColSpec[] = [
-  { label: "Min", min: 0, max: 9,   step: 1,  pad: 1 },
-  { label: "Sek", min: 0, max: 59,  step: 1,  pad: 2 },
-  { label: "ms",  min: 0, max: 990, step: 10, pad: 3 },
+  { label: "Min", min: 0, max: 9, step: 1, pad: 1 },
+  { label: "Sek", min: 0, max: 59, step: 1, pad: 2 },
+  { label: "1/100", min: 0, max: 99, step: 1, pad: 2 },
+  { label: "1/1000", min: 0, max: 9, step: 1, pad: 1, flex: 0.6 },
 ];
 
 const ITEM_H = 72; // px per item
@@ -43,7 +45,8 @@ function DrumColumn({
   const items = values(spec);
   const idx = items.indexOf(value);
 
-  // scroll to selected index
+  // scroll to a given index. `smooth` is only used for external/programmatic jumps;
+  // the drum's own scroll-driven updates never call this, so they never fight momentum.
   const scrollTo = useCallback(
     (i: number, smooth = false) => {
       const el = ref.current;
@@ -53,14 +56,38 @@ function DrumColumn({
     []
   );
 
-  useEffect(() => scrollTo(idx), [idx, scrollTo]);
+  // Tracks the index this column itself last reported via onScroll, so the sync effect
+  // below can tell "the value changed because we scrolled" apart from "the value changed
+  // from outside (preset button, other column, initial load)" and only correct the
+  // scroll position in the latter case. Without this, every onChange during an active
+  // touch-scroll would immediately get an instant corrective scrollTo fired back at it,
+  // fighting the browser's native momentum/snap physics and making the drum feel like it
+  // "hangs" instead of scrolling smoothly.
+  const lastEmittedIndexRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (lastEmittedIndexRef.current === idx) return;
+    scrollTo(idx);
+    lastEmittedIndexRef.current = idx;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx]);
+
+  useEffect(() => () => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+  }, []);
 
   const onScroll = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const i = Math.round(el.scrollTop / ITEM_H);
-    const clamped = Math.max(0, Math.min(items.length - 1, i));
-    if (items[clamped] !== value) onChange(items[clamped]);
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const el = ref.current;
+      if (!el) return;
+      const i = Math.round(el.scrollTop / ITEM_H);
+      const clamped = Math.max(0, Math.min(items.length - 1, i));
+      lastEmittedIndexRef.current = clamped;
+      if (items[clamped] !== value) onChange(items[clamped]);
+    });
   }, [items, onChange, value]);
 
   const accent = dark ? "#3a6dc7" : "#2455a4";
@@ -69,7 +96,7 @@ function DrumColumn({
   const textMut = dark ? "#4a6090" : "#9aabb8";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: spec.flex ?? 1, minWidth: 0 }}>
       {/* label */}
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: "0.1em",
@@ -124,6 +151,8 @@ function DrumColumn({
             height: "100%",
             overflowY: "scroll",
             scrollSnapType: "y mandatory",
+            overscrollBehaviorY: "contain",
+            WebkitOverflowScrolling: "touch",
             background: bg,
             borderRadius: 8,
             border: `1px solid ${accent}33`,
@@ -173,16 +202,17 @@ function msToFields(ms: number) {
   const total = Math.round(ms);
   const min = Math.floor(total / 60000);
   const sec = Math.floor((total % 60000) / 1000);
-  const mil = Math.round(total % 1000 / 10) * 10;
-  return { min, sec, mil };
+  const centi = Math.floor((total % 1000) / 10);
+  const milliOnes = total % 10;
+  return { min, sec, centi, milliOnes };
 }
 
-function fieldsToMs(min: number, sec: number, mil: number) {
-  return min * 60000 + sec * 1000 + mil;
+function fieldsToMs(min: number, sec: number, centi: number, milliOnes: number) {
+  return min * 60000 + sec * 1000 + centi * 10 + milliOnes;
 }
 
 export function TimeDrumPicker({ valueMs, onChange, dark }: Props) {
-  const { min, sec, mil } = msToFields(valueMs);
+  const { min, sec, centi, milliOnes } = msToFields(valueMs);
 
   const bg     = dark ? "#111d31" : "#f8fafc";
   const sepClr = dark ? "#2455a4" : "#94a3b8";
@@ -199,7 +229,7 @@ export function TimeDrumPicker({ valueMs, onChange, dark }: Props) {
     }}>
       <DrumColumn
         spec={COLS[0]} value={min} dark={dark}
-        onChange={(v) => onChange(fieldsToMs(v, sec, mil))}
+        onChange={(v) => onChange(fieldsToMs(v, sec, centi, milliOnes))}
       />
 
       <div style={{
@@ -210,7 +240,7 @@ export function TimeDrumPicker({ valueMs, onChange, dark }: Props) {
 
       <DrumColumn
         spec={COLS[1]} value={sec} dark={dark}
-        onChange={(v) => onChange(fieldsToMs(min, v, mil))}
+        onChange={(v) => onChange(fieldsToMs(min, v, centi, milliOnes))}
       />
 
       <div style={{
@@ -220,8 +250,19 @@ export function TimeDrumPicker({ valueMs, onChange, dark }: Props) {
       }}>.</div>
 
       <DrumColumn
-        spec={COLS[2]} value={mil} dark={dark}
-        onChange={(v) => onChange(fieldsToMs(min, sec, v))}
+        spec={COLS[2]} value={centi} dark={dark}
+        onChange={(v) => onChange(fieldsToMs(min, sec, v, milliOnes))}
+      />
+
+      <div style={{
+        fontSize: 14, fontWeight: 700,
+        color: sepClr, paddingBottom: 6, userSelect: "none",
+        flexShrink: 0,
+      }}>′</div>
+
+      <DrumColumn
+        spec={COLS[3]} value={milliOnes} dark={dark}
+        onChange={(v) => onChange(fieldsToMs(min, sec, centi, v))}
       />
     </div>
   );

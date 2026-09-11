@@ -978,6 +978,20 @@ export const adminEntriesService = {
     );
   },
 
+  async getWaiverPaperExport(eventId: string) {
+    return requestJson<{ ok: true; filename: string; mimeType: string; downloadUrl: string; driverCount: number }>(
+      "/admin/waiver/paper-export",
+      { method: "POST", body: { eventId } }
+    );
+  },
+
+  async getBlankWaiverExport(locale: "de-DE" | "en-GB" | "cs-CZ" | "pl-PL" = "de-DE") {
+    return requestJson<{ ok: true; filename: string; mimeType: string; dataBase64: string }>(
+      "/admin/waiver/blank-export",
+      { query: { locale } }
+    );
+  },
+
   async revokeCharityCodriver(entryId: string, registrationId: string, reason: string) {
     return requestJson<{ ok: true }>(`/admin/entries/${entryId}/charity-codrivers/${registrationId}/revoke`, {
       method: "POST",
