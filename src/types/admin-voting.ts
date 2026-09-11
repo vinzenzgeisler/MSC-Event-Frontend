@@ -44,6 +44,7 @@ export type AdminCandidate = {
   vehicleMake: string | null;
   vehicleModel: string | null;
   overrideState: CandidateOverrideState;
+  featured: boolean;
   eligible: boolean;
   exclusionReason: CandidateExclusionReason;
 };

@@ -27,7 +27,7 @@ const links = [
     permission: "inspection.read" as AppPermission
   },
   { to: "/admin/communication", label: "Kommunikation", icon: Mail, permission: "communication.read" as AppPermission },
-  { to: "/admin/voting", label: "Publikumsvoting", icon: Vote, permission: "voting.read" as AppPermission },
+  { to: "/admin/voting", label: "Event-Interaktion", icon: Vote, permission: "voting.read" as AppPermission },
   { to: "/admin/exports", label: "Exporte", icon: FileDown, permission: "exports.read" as AppPermission },
   { to: "/admin/settings", label: "Einstellungen", icon: Settings, permission: "settings.read" as AppPermission }
 ];

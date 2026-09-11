@@ -24,10 +24,10 @@ export const adminVotingService = {
     return res.config;
   },
 
-  async setCandidateOverride(eventId: string, entryId: string, state: CandidateOverrideState) {
+  async setCandidateOverride(eventId: string, entryId: string, state?: CandidateOverrideState, featured?: boolean) {
     await requestJson(`/admin/events/${eventId}/event-hub/candidates/${entryId}`, {
       method: "PUT",
-      body: { state }
+      body: { ...(state === undefined ? {} : { state }), ...(featured === undefined ? {} : { featured }) }
     });
   },
 

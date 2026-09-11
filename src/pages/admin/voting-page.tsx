@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, EyeOff, Pin, RotateCcw, Trophy } from "lucide-react";
+import { Download, EyeOff, Pin, RotateCcw, Star, Trophy } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { adminVotingService } from "@/services/admin-voting.service";
 import { getAdminEventId } from "@/services/api/event-context";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type { AdminCandidate, CandidateExclusionReason, EventHubConfig, VotingMode, VotingResults } from "@/types/admin-voting";
+import { AuctionAdminPanel } from "@/components/features/admin/auction-admin-panel";
 
 const EXCLUSION_LABEL: Record<Exclude<CandidateExclusionReason, null>, string> = {
   processing_restricted: "Verarbeitung eingeschränkt",
@@ -124,6 +125,14 @@ export function AdminVotingPage() {
     }
   };
 
+  const setFeatured = async (candidate: AdminCandidate) => {
+    if (!eventId || !canWrite) return;
+    try {
+      await adminVotingService.setCandidateOverride(eventId, candidate.entryId, undefined, !candidate.featured);
+      await load(eventId, { silent: true });
+    } catch (e) { setError(getApiErrorMessage(e)); }
+  };
+
   const downloadCsv = async () => {
     if (!eventId) return;
     setExporting(true);
@@ -143,8 +152,8 @@ export function AdminVotingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Publikumsvoting</h1>
-        <p className="text-sm text-slate-500 mt-1">Status, Zeitfenster, Kandidaten und Ergebnisse steuern</p>
+        <h1 className="text-xl font-semibold text-slate-900">Event-Interaktion</h1>
+        <p className="text-sm text-slate-500 mt-1">Voting, Fahrer-Highlights und Helm-Versteigerung steuern</p>
       </div>
 
       {error && (
@@ -269,6 +278,7 @@ export function AdminVotingPage() {
                     </div>
                     {canWrite && (
                       <div className="flex items-center gap-1 shrink-0">
+                        <button type="button" title="Als Fahrer-Highlight zeigen" onClick={() => void setFeatured(candidate)} className={`p-1.5 rounded ${candidate.featured ? "bg-yellow-100 text-yellow-700" : "text-slate-400 hover:bg-slate-100"}`}><Star size={14} fill={candidate.featured ? "currentColor" : "none"}/></button>
                         <button
                           type="button"
                           title="Anpinnen"
@@ -325,6 +335,7 @@ export function AdminVotingPage() {
           </div>
         </div>
       )}
+      {eventId && <AuctionAdminPanel eventId={eventId} canWrite={canWrite} />}
     </div>
   );
 }
