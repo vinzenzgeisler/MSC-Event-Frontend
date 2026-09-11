@@ -26,6 +26,43 @@ export type DashboardWarningBundle = {
   checks: DashboardWarningCheck[];
 };
 
+export type DashboardInspectorStatistic = {
+  inspectorUserId: string;
+  inspectorEmail: string;
+  inspectorDisplay: string;
+  passedTotal: number;
+  failedTotal: number;
+  resetTotal: number;
+  decisionTotal: number;
+  lastDecisionAt: string;
+};
+
+export type DashboardInspectionTimelineItem = {
+  bucket: string;
+  inspectorUserId: string;
+  passedTotal: number;
+  failedTotal: number;
+  count: number;
+};
+
+export type DashboardRecentInspection = {
+  id: string;
+  entryId: string;
+  startNumber: string;
+  target: "primary" | "backup";
+  status: "passed" | "failed";
+  inspectorUserId: string;
+  inspectorEmail: string;
+  inspectorDisplay: string;
+  createdAt: string;
+};
+
+export type DashboardOperations = Record<string, unknown> & {
+  inspectorStatistics: DashboardInspectorStatistic[];
+  inspectionTimeline: DashboardInspectionTimelineItem[];
+  recentInspections: DashboardRecentInspection[];
+};
+
 export type DashboardOverview = {
   generatedAt: string;
   event: {
@@ -56,7 +93,7 @@ export type DashboardOverview = {
   drivers: Record<string, unknown> & { countries?: Array<Record<string, unknown>>; cities?: Array<Record<string, unknown>> };
   vehicles: Record<string, unknown> & { brands?: Array<Record<string, unknown>> };
   classes: Array<Record<string, unknown>>;
-  operations: Record<string, unknown>;
+  operations: DashboardOperations;
   documents: Record<string, unknown> & { byType?: Array<Record<string, unknown>> };
   activity: { last7Days?: Array<Record<string, unknown>>; last30Days?: Array<Record<string, unknown>> };
   distributions: Record<string, unknown>;
@@ -138,6 +175,41 @@ function normalizeRows(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
+function normalizeOperations(value: unknown): DashboardOperations {
+  const record = normalizeRecord(value);
+  return {
+    ...record,
+    inspectorStatistics: normalizeRows(record.inspectorStatistics).map((row) => ({
+      inspectorUserId: toStringValue(row.inspectorUserId),
+      inspectorEmail: toStringValue(row.inspectorEmail),
+      inspectorDisplay: toStringValue(row.inspectorDisplay, "Unbekannter Prüfer"),
+      passedTotal: toNumber(row.passedTotal),
+      failedTotal: toNumber(row.failedTotal),
+      resetTotal: toNumber(row.resetTotal),
+      decisionTotal: toNumber(row.decisionTotal),
+      lastDecisionAt: toStringValue(row.lastDecisionAt)
+    })),
+    inspectionTimeline: normalizeRows(record.inspectionTimeline).map((row) => ({
+      bucket: toStringValue(row.bucket),
+      inspectorUserId: toStringValue(row.inspectorUserId),
+      passedTotal: toNumber(row.passedTotal),
+      failedTotal: toNumber(row.failedTotal),
+      count: toNumber(row.count)
+    })),
+    recentInspections: normalizeRows(record.recentInspections).map((row) => ({
+      id: toStringValue(row.id),
+      entryId: toStringValue(row.entryId),
+      startNumber: toStringValue(row.startNumber),
+      target: row.target === "backup" ? "backup" : "primary",
+      status: row.status === "failed" ? "failed" : "passed",
+      inspectorUserId: toStringValue(row.inspectorUserId),
+      inspectorEmail: toStringValue(row.inspectorEmail),
+      inspectorDisplay: toStringValue(row.inspectorDisplay, "Unbekannter Prüfer"),
+      createdAt: toStringValue(row.createdAt)
+    }))
+  };
+}
+
 export function numberValue(record: Record<string, unknown> | undefined, key: string): number {
   return toNumber(record?.[key]);
 }
@@ -198,7 +270,7 @@ function normalizeOverview(value: unknown): DashboardOverview {
     drivers: normalizeRecord(record.drivers),
     vehicles: normalizeRecord(record.vehicles),
     classes: normalizeRows(record.classes),
-    operations: normalizeRecord(record.operations),
+    operations: normalizeOperations(record.operations),
     documents: normalizeRecord(record.documents),
     activity: normalizeRecord(record.activity) as DashboardOverview["activity"],
     distributions: normalizeRecord(record.distributions),

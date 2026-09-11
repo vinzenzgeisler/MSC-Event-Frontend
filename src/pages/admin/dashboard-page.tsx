@@ -30,6 +30,8 @@ import {
   rowsValue,
   textValue,
   type DashboardOverview,
+  type DashboardInspectionTimelineItem,
+  type DashboardInspectorStatistic,
   type DashboardSeverity,
   type DashboardWarningCheck
 } from "@/services/admin-dashboard.service";
@@ -141,6 +143,87 @@ function ActivityBars({ rows }: { rows: Array<Record<string, unknown>> }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ProgressCard({
+  title,
+  complete,
+  total,
+  open,
+  failed = 0,
+  completeLabel
+}: {
+  title: string;
+  complete: number;
+  total: number;
+  open: number;
+  failed?: number;
+  completeLabel: string;
+}) {
+  const completedPercent = total > 0 ? Math.min(100, Math.round((complete / total) * 100)) : 0;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="text-base">{title}</CardTitle>
+          <span className="text-2xl font-semibold tabular-nums text-slate-900">{complete} / {total}</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="h-3 overflow-hidden rounded-full bg-slate-200" aria-label={`${completedPercent} Prozent erledigt`}>
+          <div className="h-full rounded-full bg-emerald-600 transition-all" style={{ width: `${completedPercent}%` }} />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm">
+          <div><span className="block text-xs text-slate-500">{completeLabel}</span><strong className="text-emerald-700">{complete}</strong></div>
+          <div><span className="block text-xs text-slate-500">Offen</span><strong className={open > 0 ? "text-amber-700" : "text-emerald-700"}>{open}</strong></div>
+          <div><span className="block text-xs text-slate-500">Fortschritt</span><strong>{completedPercent} %</strong></div>
+        </div>
+        {failed > 0 ? <div className="text-xs font-medium text-red-700">Davon {failed} mit Mangel / abgelehnt</div> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+const INSPECTOR_COLORS = ["bg-sky-500", "bg-violet-500", "bg-orange-500", "bg-teal-500"] as const;
+
+function formatTimelineBucket(bucket: string) {
+  const match = bucket.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):00$/);
+  return match ? `${match[3]}.${match[2]}. · ${match[4]} Uhr` : bucket;
+}
+
+function InspectorActivityChart({ timeline, inspectors }: { timeline: DashboardInspectionTimelineItem[]; inspectors: DashboardInspectorStatistic[] }) {
+  const labels = new Map(inspectors.map((item) => [item.inspectorUserId, item.inspectorDisplay]));
+  const ids = Array.from(new Set([...inspectors.map((item) => item.inspectorUserId), ...timeline.map((item) => item.inspectorUserId)])).filter(Boolean);
+  const buckets = Array.from(new Set(timeline.map((item) => item.bucket))).filter(Boolean).slice(-16);
+  const grouped = buckets.map((bucket) => ({
+    bucket,
+    values: ids.map((id) => ({ id, count: timeline.filter((item) => item.bucket === bucket && item.inspectorUserId === id).reduce((sum, item) => sum + item.count, 0) }))
+  }));
+  const max = Math.max(1, ...grouped.map((group) => group.values.reduce((sum, item) => sum + item.count, 0)));
+
+  if (!timeline.length) return <div className="text-sm text-slate-500">Noch keine Abnahmen erfasst.</div>;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
+        {ids.map((id, index) => <span key={id} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-sm ${INSPECTOR_COLORS[index % INSPECTOR_COLORS.length]}`} />{labels.get(id) ?? "Unbekannter Prüfer"}</span>)}
+      </div>
+      <div className="space-y-2">
+        {grouped.map((group) => {
+          const total = group.values.reduce((sum, item) => sum + item.count, 0);
+          return (
+            <div key={group.bucket} className="grid grid-cols-[7.5rem_minmax(0,1fr)_2rem] items-center gap-2 text-xs">
+              <span className="text-slate-500">{formatTimelineBucket(group.bucket)}</span>
+              <div className="flex h-5 overflow-hidden rounded bg-slate-100" title={`${total} Entscheidungen`}>
+                {group.values.map((item, index) => item.count > 0 ? <div key={item.id} className={`${INSPECTOR_COLORS[index % INSPECTOR_COLORS.length]} h-full`} style={{ width: `${(item.count / max) * 100}%` }} title={`${labels.get(item.id) ?? "Prüfer"}: ${item.count}`} /> : null)}
+              </div>
+              <strong className="text-right tabular-nums">{total}</strong>
+            </div>
+          );
+        })}
+      </div>
+      {buckets.length === 16 ? <div className="text-xs text-slate-500">Die letzten 16 Stunden mit Aktivität.</div> : null}
     </div>
   );
 }
@@ -299,8 +382,16 @@ export function AdminDashboardPage() {
   const communication = overview?.communication;
   const drivers = overview?.drivers;
   const vehicles = overview?.vehicles;
-  const operations = overview?.operations;
+  const operations = overview?.operations ?? { inspectorStatistics: [], inspectionTimeline: [], recentInspections: [] };
   const documents = overview?.documents;
+  const signingCompletedTotal = numberValue(operations, "signingCompletedTotal");
+  const signingOpenTotal = numberValue(operations, "signingOpenTotal");
+  const signingRequiredTotal = numberValue(operations, "signingRequiredTotal") || signingCompletedTotal + signingOpenTotal;
+  const techPendingTotal = numberValue(operations, "techPendingTotal");
+  const techPassedTotal = numberValue(operations, "techPassedTotal");
+  const techFailedTotal = numberValue(operations, "techFailedTotal");
+  const techRequiredTotal = numberValue(operations, "techRequiredTotal") || techPendingTotal + techPassedTotal + techFailedTotal;
+  const techCheckedTotal = techPassedTotal + techFailedTotal;
 
   return (
     <div className="flex flex-col gap-5">
@@ -384,14 +475,21 @@ export function AdminDashboardPage() {
             <CardHeader><CardTitle className="text-base">Klassen nach Nennungen</CardTitle></CardHeader>
             <CardContent><BarList rows={overview?.classes ?? []} labelKey="className" /></CardContent>
           </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-base">Betrieb</CardTitle></CardHeader>
-            <CardContent className="grid gap-2 text-sm">
-              <Metric label="Haftverzicht offen" value={numberValue(operations, "signingOpenTotal")} />
-              <Metric label="Technik offen" value={numberValue(operations, "techPendingTotal")} />
-              <Metric label="Exporte aktiv" value={numberValue(operations, "exportsQueuedTotal") + numberValue(operations, "exportsProcessingTotal")} />
-            </CardContent>
-          </Card>
+          <ProgressCard
+            title="Haftverzichte"
+            complete={signingCompletedTotal}
+            total={signingRequiredTotal}
+            open={signingOpenTotal}
+            completeLabel="Unterschrieben"
+          />
+          <ProgressCard
+            title="Technische Abnahmen"
+            complete={techCheckedTotal}
+            total={techRequiredTotal}
+            open={techPendingTotal}
+            failed={techFailedTotal}
+            completeLabel="Geprüft"
+          />
           <Card>
             <CardHeader><CardTitle className="text-base">Dokumente</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -469,11 +567,81 @@ export function AdminDashboardPage() {
       )}
 
       {activeTab === "operations" && (
-        <section className="grid gap-4 xl:grid-cols-3">
-          <Card><CardHeader><CardTitle className="text-base">Haftverzicht</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Unterschrieben" value={numberValue(operations, "signingCompletedTotal")} tone="good" /><Metric label="Offen" value={numberValue(operations, "signingOpenTotal")} tone={numberValue(operations, "signingOpenTotal") > 0 ? "warn" : "good"} /></CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-base">Technische Abnahme</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="Offen" value={numberValue(operations, "techPendingTotal")} /><Metric label="Bestanden" value={numberValue(operations, "techPassedTotal")} tone="good" /><Metric label="Fehler" value={numberValue(operations, "techFailedTotal")} tone={numberValue(operations, "techFailedTotal") > 0 ? "bad" : "good"} /></CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-base">Exporte</CardTitle></CardHeader><CardContent className="grid gap-3"><Metric label="In Warteschlange" value={numberValue(operations, "exportsQueuedTotal")} /><Metric label="Fehlgeschlagen" value={numberValue(operations, "exportsFailedTotal")} tone={numberValue(operations, "exportsFailedTotal") > 0 ? "bad" : "good"} /></CardContent></Card>
-          <Card className="xl:col-span-3"><CardHeader><CardTitle className="text-base">Dokumenttypen</CardTitle></CardHeader><CardContent><BarList rows={rowsValue(documents, "byType")} labelKey="type" /></CardContent></Card>
+        <section className="grid gap-4 xl:grid-cols-2">
+          <ProgressCard
+            title="Haftverzichte · Ist / Soll"
+            complete={signingCompletedTotal}
+            total={signingRequiredTotal}
+            open={signingOpenTotal}
+            completeLabel="Unterschrieben"
+          />
+          <ProgressCard
+            title="Technische Abnahmen · Ist / Soll"
+            complete={techCheckedTotal}
+            total={techRequiredTotal}
+            open={techPendingTotal}
+            failed={techFailedTotal}
+            completeLabel="Geprüft"
+          />
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Abnahmen je Prüfer</CardTitle></CardHeader>
+            <CardContent>
+              {operations.inspectorStatistics.length === 0 ? <div className="text-sm text-slate-500">Noch keine Prüferentscheidungen erfasst.</div> : (
+                <div className="space-y-3">
+                  {operations.inspectorStatistics.map((inspector) => (
+                    <div key={inspector.inspectorUserId} className="rounded-lg border bg-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-slate-900">{inspector.inspectorDisplay}</div>
+                          <div className="mt-1 text-xs text-slate-500">Zuletzt: {formatDateTime(inspector.lastDecisionAt)}</div>
+                        </div>
+                        <div className="text-right"><div className="text-2xl font-semibold tabular-nums">{inspector.decisionTotal}</div><div className="text-xs text-slate-500">Entscheidungen</div></div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                        <span className="text-emerald-700">{inspector.passedTotal} bestanden</span>
+                        <span className="text-red-700">{inspector.failedTotal} abgelehnt</span>
+                        {inspector.resetTotal > 0 ? <span className="text-slate-500">{inspector.resetTotal} zurückgesetzt</span> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Prüferaktivität nach Stunde</CardTitle>
+              <p className="text-xs text-slate-500">Bestätigte und abgelehnte Entscheidungen, nach Prüfer aufgeteilt.</p>
+            </CardHeader>
+            <CardContent><InspectorActivityChart timeline={operations.inspectionTimeline} inspectors={operations.inspectorStatistics} /></CardContent>
+          </Card>
+
+          <Card className="xl:col-span-2">
+            <CardHeader><CardTitle className="text-base">Letzte technische Abnahmen</CardTitle></CardHeader>
+            <CardContent>
+              {operations.recentInspections.length === 0 ? <div className="text-sm text-slate-500">Noch keine Abnahmen erfasst.</div> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="border-b text-xs uppercase text-slate-500"><tr><th className="px-2 py-2">Zeit</th><th className="px-2 py-2">Nennung</th><th className="px-2 py-2">Ergebnis</th><th className="px-2 py-2">Prüfer</th></tr></thead>
+                    <tbody className="divide-y">
+                      {operations.recentInspections.map((item) => (
+                        <tr key={item.id}>
+                          <td className="whitespace-nowrap px-2 py-3 text-slate-600">{formatDateTime(item.createdAt)}</td>
+                          <td className="px-2 py-3"><Link className="font-semibold text-primary hover:underline" to={`/inspection/${item.entryId}`}>#{item.startNumber || "–"}</Link>{item.target === "backup" ? <span className="ml-1 text-xs text-slate-500">Ersatzfahrzeug</span> : null}</td>
+                          <td className="px-2 py-3"><Badge className={item.status === "passed" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-red-300 bg-red-50 text-red-800"}>{item.status === "passed" ? "Bestanden" : "Abgelehnt"}</Badge></td>
+                          <td className="px-2 py-3 text-slate-700">{item.inspectorDisplay}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="xl:col-span-2"><CardHeader><CardTitle className="text-base">Weitere Betriebsdaten</CardTitle></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3"><Metric label="Exporte in Warteschlange" value={numberValue(operations, "exportsQueuedTotal")} /><Metric label="Exporte in Arbeit" value={numberValue(operations, "exportsProcessingTotal")} /><Metric label="Exporte fehlgeschlagen" value={numberValue(operations, "exportsFailedTotal")} tone={numberValue(operations, "exportsFailedTotal") > 0 ? "bad" : "good"} /></CardContent></Card>
         </section>
       )}
     </div>
