@@ -44,6 +44,7 @@ type AdminCurrentEventResponse = {
   event: {
     id: string;
     name: string;
+    startsAt: string;
   };
 };
 
@@ -99,7 +100,8 @@ export async function getAdminCurrentEvent() {
         ok: true,
         event: {
           id: publicEvent.event.id,
-          name: publicEvent.event.name
+          name: publicEvent.event.name,
+          startsAt: publicEvent.event.startsAt
         }
       };
       return adminEventCache;

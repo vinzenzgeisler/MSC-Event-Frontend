@@ -4,6 +4,22 @@ export type ParticipantWorkflowType = "regular_codriver_registration" | "charity
 export type ParticipantOperation = "create" | "edit";
 export type TerminalWorkflowStage = "collecting_data" | "awaiting_operator_approval" | "ready_to_sign" | "completed" | "cancelled" | "failed";
 
+export type CharityParticipantDraft = {
+  locale: "de-DE" | "en-GB" | "cs-CZ" | "pl-PL";
+  firstName: string;
+  lastName: string;
+  birthdate: string;
+  country: string;
+  street: string;
+  zip: string;
+  city: string;
+  email?: string | null;
+  guardianFullName?: string | null;
+  guardianEmail?: string | null;
+  guardianPhone?: string | null;
+  guardianRelationship?: string | null;
+};
+
 export type ParticipantTerminalSession = {
   id: string;
   status: "pending" | "displayed" | "completed" | "cancelled" | "failed";
@@ -24,6 +40,7 @@ export const adminTerminalService = {
     entryIds: string[];
     operation?: ParticipantOperation;
     participantPersonId?: string;
+    participantDraft?: CharityParticipantDraft;
   }) {
     const response = await requestJson<{ ok: true; session: ParticipantTerminalSession }>("/admin/terminal/sessions", {
       method: "POST",

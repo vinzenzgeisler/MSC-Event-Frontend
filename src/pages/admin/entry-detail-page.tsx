@@ -24,11 +24,12 @@ import {
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { adminSigningService, type SigningDevice } from "@/services/admin-signing.service";
-import { adminTerminalService, type ParticipantOperation, type ParticipantTerminalSession, type ParticipantWorkflowType } from "@/services/admin-terminal.service";
+import { adminTerminalService, type CharityParticipantDraft, type ParticipantOperation, type ParticipantTerminalSession, type ParticipantWorkflowType } from "@/services/admin-terminal.service";
 import { adminCodriverInvitationsService, type CodriverInvitation } from "@/services/admin-codriver-invitations.service";
 import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import { communicationService } from "@/services/communication.service";
+import { getAdminCurrentEvent } from "@/services/api/event-context";
 
 function centsFromEuroInput(value: string): number {
   const normalized = value.replace(",", ".").trim();
@@ -48,6 +49,32 @@ function euroDisplayFromCents(value: number): string {
 }
 
 const PREFERRED_SIGNING_DEVICE_KEY = "msc-preferred-signing-device-id";
+
+const emptyCharityDraft = (): CharityParticipantDraft => ({
+  locale: "de-DE",
+  firstName: "",
+  lastName: "",
+  birthdate: "",
+  country: "DE",
+  street: "",
+  zip: "",
+  city: "",
+  email: null,
+  guardianFullName: null,
+  guardianEmail: null,
+  guardianPhone: null,
+  guardianRelationship: null
+});
+
+function ageAtDate(birthdate: string, eventDate: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || !eventDate) return null;
+  const born = new Date(`${birthdate}T12:00:00Z`);
+  const at = new Date(`${eventDate.slice(0, 10)}T12:00:00Z`);
+  if (!Number.isFinite(born.getTime()) || !Number.isFinite(at.getTime())) return null;
+  let age = at.getUTCFullYear() - born.getUTCFullYear();
+  if (at.getUTCMonth() < born.getUTCMonth() || (at.getUTCMonth() === born.getUTCMonth() && at.getUTCDate() < born.getUTCDate())) age -= 1;
+  return age;
+}
 
 function isSigningDeviceOnline(device: SigningDevice | undefined | null): boolean {
   if (!device?.lastSeenAt) {
@@ -244,6 +271,9 @@ export function AdminEntryDetailPage() {
   const [participantEntryIds, setParticipantEntryIds] = useState<string[]>([]);
   const [participantSession, setParticipantSession] = useState<ParticipantTerminalSession | null>(null);
   const [participantBusy, setParticipantBusy] = useState(false);
+  const [charityEntryMode, setCharityEntryMode] = useState<"terminal" | "operator">("terminal");
+  const [charityDraft, setCharityDraft] = useState<CharityParticipantDraft>(emptyCharityDraft);
+  const [eventStartsAt, setEventStartsAt] = useState("");
   const [participantChecks, setParticipantChecks] = useState({ identity: false, present: false, medical: false, guardianPresent: false, guardianAuthority: false });
   const [codriverLinkDialogOpen, setCodriverLinkDialogOpen] = useState(false);
   const [codriverLinkEntryIds, setCodriverLinkEntryIds] = useState<string[]>([]);
@@ -529,6 +559,9 @@ export function AdminEntryDetailPage() {
       .listClassOptions()
       .then(setClassOptions)
       .catch(() => setClassOptions([]));
+    getAdminCurrentEvent()
+      .then((response) => setEventStartsAt(response.event.startsAt))
+      .catch(() => setEventStartsAt(""));
   }, []);
 
   useEffect(() => {
@@ -650,6 +683,11 @@ export function AdminEntryDetailPage() {
       : !currentClassAllowsCodriver
         ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
         : undefined;
+  const charityCreationDisabledReason = participantBusy
+    ? "Charity-Aktion läuft…"
+    : !currentClassAllowsCodriver
+      ? "Diese Fahrzeugklasse erlaubt keine Beifahrer."
+      : undefined;
 
   const saveStampCardDownload = (download: { downloadUrl: string; filename: string }) => {
     const anchor = document.createElement("a");
@@ -750,12 +788,11 @@ export function AdminEntryDetailPage() {
 
   const openParticipantFlow = (workflow: ParticipantWorkflowType, operation: ParticipantOperation = "create") => {
     if (!detail) return;
-    const createsParticipant = workflow === "charity_codriver_registration" || operation === "create";
-    if (createsParticipant && detail.techStatus !== "pending") {
+    if (workflow === "regular_codriver_registration" && operation === "create" && detail.techStatus !== "pending") {
       flashMessage("Beifahrer können nach Beginn der technischen Abnahme nicht mehr ergänzt werden.", 3400);
       return;
     }
-    if (status !== "accepted" && !detail.waiverSigned.signed) {
+    if (workflow === "regular_codriver_registration" && status !== "accepted" && !detail.waiverSigned.signed) {
       flashMessage("Die Nennung muss zugelassen oder der Fahrer-Haftverzicht unterschrieben sein.", 3400);
       return;
     }
@@ -768,6 +805,8 @@ export function AdminEntryDetailPage() {
     setParticipantOperation(operation);
     setParticipantEntryIds(workflow === "charity_codriver_registration" || operation === "edit" ? [detail.id] : Array.from(new Set([detail.id, ...detail.relatedEntryIds])));
     setParticipantSession(null);
+    setCharityEntryMode("terminal");
+    setCharityDraft(emptyCharityDraft());
     setParticipantChecks({ identity: false, present: false, medical: false, guardianPresent: false, guardianAuthority: false });
     setParticipantDialogOpen(true);
     void loadSigningDevices();
@@ -775,6 +814,24 @@ export function AdminEntryDetailPage() {
 
   const startParticipantFlow = async () => {
     if (!selectedSigningDeviceId || !selectedSigningDeviceOnline || participantEntryIds.length === 0) return;
+    const operatorDraft = participantWorkflow === "charity_codriver_registration" && charityEntryMode === "operator" ? charityDraft : undefined;
+    if (operatorDraft) {
+      const age = ageAtDate(operatorDraft.birthdate, eventStartsAt);
+      const missingAddress = !operatorDraft.firstName.trim() || !operatorDraft.lastName.trim() || !operatorDraft.street.trim() || !operatorDraft.zip.trim() || !operatorDraft.city.trim() || !operatorDraft.country.trim();
+      const invalidEmail = Boolean(operatorDraft.email && !/^\S+@\S+\.\S+$/.test(operatorDraft.email));
+      const invalidGuardianEmail = Boolean(operatorDraft.guardianEmail && !/^\S+@\S+\.\S+$/.test(operatorDraft.guardianEmail));
+      const guardianPhoneDigits = operatorDraft.guardianPhone?.replace(/\D/g, "") ?? "";
+      const invalidGuardianPhone = Boolean(guardianPhoneDigits && (guardianPhoneDigits.length < 6 || guardianPhoneDigits.length > 15));
+      const guardianContact = operatorDraft.guardianEmail?.trim() || guardianPhoneDigits;
+      if (missingAddress || age === null || age < 6 || age > 100 || invalidEmail || invalidGuardianEmail || invalidGuardianPhone) {
+        flashMessage("Bitte alle Charity-Pflichtfelder vollständig und korrekt ausfüllen.", 3400);
+        return;
+      }
+      if (age < 18 && (!operatorDraft.guardianFullName?.trim() || !operatorDraft.guardianRelationship?.trim() || !guardianContact)) {
+        flashMessage("Bei U18 bitte Name, Verhältnis und E-Mail oder Telefon der gesetzlichen Vertretung angeben.", 3800);
+        return;
+      }
+    }
     setParticipantBusy(true);
     try {
       const session = await adminTerminalService.createParticipantSession({
@@ -782,7 +839,15 @@ export function AdminEntryDetailPage() {
         deviceSessionId: selectedSigningDeviceId,
         entryIds: participantWorkflow === "charity_codriver_registration" ? [detail!.id] : participantEntryIds,
         operation: participantOperation,
-        participantPersonId: participantOperation === "edit" ? detail!.codriver.id ?? undefined : undefined
+        participantPersonId: participantOperation === "edit" ? detail!.codriver.id ?? undefined : undefined,
+        participantDraft: operatorDraft ? {
+          ...operatorDraft,
+          email: charityDraftIsMinor ? null : operatorDraft.email?.trim() || null,
+          guardianFullName: operatorDraft.guardianFullName?.trim() || null,
+          guardianEmail: operatorDraft.guardianEmail?.trim() || null,
+          guardianPhone: operatorDraft.guardianPhone?.trim() || null,
+          guardianRelationship: operatorDraft.guardianRelationship?.trim() || null
+        } : undefined
       });
       setParticipantSession(session);
       window.localStorage.setItem(PREFERRED_SIGNING_DEVICE_KEY, selectedSigningDeviceId);
@@ -792,7 +857,7 @@ export function AdminEntryDetailPage() {
         ? "Für diese Nennung läuft bereits ein Terminalvorgang bei einem anderen Operator."
         : apiMessage.includes("SIGNING_DEVICE_BUSY")
           ? "Dieses Terminal wird bereits für einen anderen Vorgang verwendet."
-          : apiMessage.includes("TECHNICAL_INSPECTION_ALREADY_STARTED")
+          : participantWorkflow !== "charity_codriver_registration" && apiMessage.includes("TECHNICAL_INSPECTION_ALREADY_STARTED")
             ? "Beifahrer können nach Beginn der technischen Abnahme nicht mehr ergänzt werden."
             : apiMessage, 3400);
     } finally {
@@ -803,6 +868,8 @@ export function AdminEntryDetailPage() {
   const participantContext = participantSession?.sessionPayload as { isMinor?: boolean; requiresMedicalCertificate?: boolean } | null | undefined;
   const participantIsMinor = participantContext?.isMinor === true;
   const participantNeedsMedical = participantContext?.requiresMedicalCertificate === true;
+  const charityDraftAge = ageAtDate(charityDraft.birthdate, eventStartsAt);
+  const charityDraftIsMinor = charityDraftAge !== null && charityDraftAge < 18;
   const participantApprovalComplete = participantChecks.identity && participantChecks.present
     && (!participantNeedsMedical || participantChecks.medical)
     && (!participantIsMinor || (participantChecks.guardianPresent && participantChecks.guardianAuthority));
@@ -1635,7 +1702,7 @@ export function AdminEntryDetailPage() {
                       <HintButton
                         label="Charity-Fahrt am Terminal erfassen"
                         icon={<TabletSmartphone className="mr-2 h-4 w-4" />}
-                        disabledReason={participantCreationDisabledReason}
+                        disabledReason={charityCreationDisabledReason}
                         onClick={() => openParticipantFlow("charity_codriver_registration")}
                       />
                     </>
@@ -2717,7 +2784,9 @@ export function AdminEntryDetailPage() {
                     : participantOperation === "edit" ? "Beifahrer bearbeiten" : "Beifahrer nachmelden"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Die Person trägt ihre Daten selbst am gekoppelten Tablet ein und unterschreibt anschließend.
+                  {participantWorkflow === "charity_codriver_registration"
+                    ? "Die Daten können hier oder am gekoppelten Tablet erfasst werden. Unterschrieben wird anschließend am Tablet."
+                    : "Die Person trägt ihre Daten selbst am gekoppelten Tablet ein und unterschreibt anschließend."}
                   {participantOperation === "edit" ? " Die Stammdaten werden personenweit aktualisiert." : ""}
                 </p>
               </div>
@@ -2739,6 +2808,43 @@ export function AdminEntryDetailPage() {
                     </div>
                   </div>
                 ) : null}
+                {participantWorkflow === "charity_codriver_registration" ? (
+                  <div className="space-y-4 rounded-md border bg-slate-50 p-4">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Dateneingabe</div>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <Button type="button" variant={charityEntryMode === "terminal" ? "default" : "outline"} onClick={() => setCharityEntryMode("terminal")}>Person gibt Daten am Tablet ein</Button>
+                        <Button type="button" variant={charityEntryMode === "operator" ? "default" : "outline"} onClick={() => setCharityEntryMode("operator")}>Daten hier erfassen</Button>
+                      </div>
+                    </div>
+                    {charityEntryMode === "operator" ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="text-sm font-medium sm:col-span-2">Sprache des Haftverzichts
+                          <select className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={charityDraft.locale} onChange={(event) => setCharityDraft((current) => ({ ...current, locale: event.target.value as CharityParticipantDraft["locale"] }))}>
+                            <option value="de-DE">Deutsch</option><option value="en-GB">English</option><option value="cs-CZ">Čeština</option><option value="pl-PL">Polski</option>
+                          </select>
+                        </label>
+                        <label className="text-sm font-medium">Vorname<Input className="mt-1" autoComplete="given-name" value={charityDraft.firstName} onChange={(event) => setCharityDraft((current) => ({ ...current, firstName: event.target.value }))} /></label>
+                        <label className="text-sm font-medium">Nachname<Input className="mt-1" autoComplete="family-name" value={charityDraft.lastName} onChange={(event) => setCharityDraft((current) => ({ ...current, lastName: event.target.value }))} /></label>
+                        <label className="text-sm font-medium">Geburtsdatum<Input className="mt-1" type="date" value={charityDraft.birthdate} onChange={(event) => setCharityDraft((current) => ({ ...current, birthdate: event.target.value }))} /></label>
+                        <label className="text-sm font-medium">Land<Input className="mt-1" autoComplete="country-name" value={charityDraft.country} onChange={(event) => setCharityDraft((current) => ({ ...current, country: event.target.value }))} /></label>
+                        <label className="text-sm font-medium sm:col-span-2">Straße und Hausnummer<Input className="mt-1" autoComplete="street-address" value={charityDraft.street} onChange={(event) => setCharityDraft((current) => ({ ...current, street: event.target.value }))} /></label>
+                        <label className="text-sm font-medium">PLZ<Input className="mt-1" autoComplete="postal-code" value={charityDraft.zip} onChange={(event) => setCharityDraft((current) => ({ ...current, zip: event.target.value }))} /></label>
+                        <label className="text-sm font-medium">Ort<Input className="mt-1" autoComplete="address-level2" value={charityDraft.city} onChange={(event) => setCharityDraft((current) => ({ ...current, city: event.target.value }))} /></label>
+                        {!charityDraftIsMinor ? <label className="text-sm font-medium sm:col-span-2">E-Mail (optional, für PDF-Versand)<Input className="mt-1" type="email" inputMode="email" value={charityDraft.email ?? ""} onChange={(event) => setCharityDraft((current) => ({ ...current, email: event.target.value || null }))} /></label> : null}
+                        {charityDraftIsMinor ? (
+                          <fieldset className="grid gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 sm:col-span-2 sm:grid-cols-2">
+                            <legend className="px-1 text-sm font-semibold text-amber-950">Gesetzliche Vertretung (U18)</legend>
+                            <label className="text-sm font-medium">Vollständiger Name<Input className="mt-1" value={charityDraft.guardianFullName ?? ""} onChange={(event) => setCharityDraft((current) => ({ ...current, guardianFullName: event.target.value || null }))} /></label>
+                            <label className="text-sm font-medium">Verhältnis<Input className="mt-1" value={charityDraft.guardianRelationship ?? ""} onChange={(event) => setCharityDraft((current) => ({ ...current, guardianRelationship: event.target.value || null }))} /></label>
+                            <label className="text-sm font-medium">E-Mail (E-Mail oder Telefon)<Input className="mt-1" type="email" inputMode="email" value={charityDraft.guardianEmail ?? ""} onChange={(event) => setCharityDraft((current) => ({ ...current, guardianEmail: event.target.value || null }))} /></label>
+                            <label className="text-sm font-medium">Telefon (E-Mail oder Telefon)<Input className="mt-1" type="tel" inputMode="tel" value={charityDraft.guardianPhone ?? ""} onChange={(event) => setCharityDraft((current) => ({ ...current, guardianPhone: event.target.value || null }))} /></label>
+                          </fieldset>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div>
                   <div className="mb-2 text-sm font-semibold text-slate-900">Tablet</div>
                   <Select value={signingDeviceId || selectedSigningDeviceId || "__none__"} onValueChange={(value) => setSigningDeviceId(value === "__none__" ? "" : value)}>
@@ -2751,7 +2857,7 @@ export function AdminEntryDetailPage() {
                 </div>
                 <Button type="button" className="h-14 w-full" disabled={participantBusy || !selectedSigningDeviceId || !selectedSigningDeviceOnline || participantEntryIds.length === 0} onClick={() => void startParticipantFlow()}>
                   {participantBusy ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <TabletSmartphone className="mr-2 h-5 w-5" />}
-                  Eingabe am Tablet starten
+                  {participantWorkflow === "charity_codriver_registration" && charityEntryMode === "operator" ? "Daten übernehmen und Unterschrift starten" : "Eingabe am Tablet starten"}
                 </Button>
                 {!selectedSigningDeviceOnline ? <p className="text-sm text-amber-700">Das Tablet muss geöffnet und als aktiv verbunden sein.</p> : null}
               </div>
@@ -2774,6 +2880,13 @@ export function AdminEntryDetailPage() {
                     ) || "-")}</div>
                     <div>Geburtsdatum: {String((participantSession.draftPayload as Record<string, unknown> | null)?.birthdate ?? "-")}</div>
                     <div className="sm:col-span-2">E-Mail: {String((participantSession.draftPayload as Record<string, unknown> | null)?.email ?? "-")}</div>
+                    {participantWorkflow === "charity_codriver_registration" ? <>
+                      <div className="sm:col-span-2">Adresse: {String((participantSession.draftPayload as Record<string, unknown> | null)?.street ?? "-")}, {" "}
+                        {String((participantSession.draftPayload as Record<string, unknown> | null)?.zip ?? "-")} {String((participantSession.draftPayload as Record<string, unknown> | null)?.city ?? "-")}, {" "}
+                        {String((participantSession.draftPayload as Record<string, unknown> | null)?.country ?? "-")}
+                      </div>
+                      {participantIsMinor ? <div className="sm:col-span-2">Vertretung: {String((participantSession.draftPayload as Record<string, unknown> | null)?.guardianFullName ?? "-")} ({String((participantSession.draftPayload as Record<string, unknown> | null)?.guardianRelationship ?? "-")}) · Kontakt: {String((participantSession.draftPayload as Record<string, unknown> | null)?.guardianEmail ?? (participantSession.draftPayload as Record<string, unknown> | null)?.guardianPhone ?? "-")}</div> : null}
+                    </> : null}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -2802,7 +2915,7 @@ export function AdminEntryDetailPage() {
             ) : participantSession.workflowStage === "completed" ? (
               <div className="mt-6 space-y-4 rounded-md border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
                 <div className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="h-6 w-6" /> {participantOperation === "edit" ? "Beifahrer aktualisiert" : "Beifahrer vollständig gespeichert"}</div>
-                <p className="text-sm">Der unterschriebene Haftverzicht wurde automatisch per E-Mail versendet.</p>
+                <p className="text-sm">Der unterschriebene Haftverzicht wurde revisionssicher gespeichert. Bei angegebener E-Mail wurde das PDF automatisch versendet.</p>
                 {canPrintStampCards ? <Button type="button" disabled={participantBusy} onClick={() => {
                   const result = participantSession.resultPayload as { participantId?: string; charityRegistrationId?: string } | null;
                   if (participantWorkflow === "charity_codriver_registration" && result?.charityRegistrationId) void downloadStampCard({ cardType: "charity_codriver", registrationId: result.charityRegistrationId });
