@@ -161,8 +161,8 @@ export function AdminVotingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Event-Interaktion</h1>
-        <p className="text-sm text-slate-500 mt-1">Voting, Fahrer-Highlights und Helm-Versteigerung steuern</p>
+        <h1 className="text-xl font-semibold text-slate-900">Voting &amp; Didier-Grams-Auktion</h1>
+        <p className="text-sm text-slate-500 mt-1">Voting, Fahrer-Highlights und Didier-Grams-Helmauktion steuern</p>
       </div>
 
       {error && (
