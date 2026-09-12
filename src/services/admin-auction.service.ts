@@ -26,6 +26,14 @@ export const adminAuctionService = {
     return (await requestJson<{ bids: AdminAuctionBid[] }>(`/admin/events/${eventId}/auction/bids/${bidId}`, { method: 'PATCH', body: patch })).bids;
   },
   async uploadMedia(eventId: string, kind: 'image' | 'video', file: File) {
+    const allowedTypes = kind === 'image' ? ['image/jpeg', 'image/png', 'image/webp'] : ['video/mp4', 'video/webm'];
+    const maxBytes = (kind === 'image' ? 15 : 250) * 1024 * 1024;
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error(kind === 'image' ? 'Bitte ein Bild als JPG, PNG oder WebP auswählen.' : 'Bitte das Reel als MP4 oder WebM auswählen. MOV-Dateien vorher bitte in MP4 umwandeln.');
+    }
+    if (file.size > maxBytes) {
+      throw new Error(`${kind === 'image' ? 'Das Bild' : 'Das Reel'} ist zu groß. Maximal erlaubt sind ${kind === 'image' ? 15 : 250} MB.`);
+    }
     const init = await requestJson<{ key: string; uploadUrl: string; requiredHeaders: Record<string, string> }>(`/admin/events/${eventId}/auction/media-upload`, {
       method: 'POST', body: { kind, contentType: file.type, fileSizeBytes: file.size }
     });
