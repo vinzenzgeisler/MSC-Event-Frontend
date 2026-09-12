@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, EyeOff, Pin, RotateCcw, Star, Trophy } from "lucide-react";
+import { ChevronDown, Download, EyeOff, Pin, RotateCcw, Star, Trash2, Trophy } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ export function AdminVotingPage() {
   const [error, setError] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [previewEntryId, setPreviewEntryId] = useState<string | null>(null);
   const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
 
@@ -154,6 +155,24 @@ export function AdminVotingPage() {
     }
   };
 
+  const deleteVotes = async (entry: VotingResults["classes"][number]["entries"][number]) => {
+    if (!eventId || !canWrite || deletingEntryId) return;
+    const confirmed = window.confirm(
+      `Wirklich alle ${entry.voteCount} ${entry.voteCount === 1 ? "Stimme" : "Stimmen"} für ${entry.driverName} löschen?\n\nDie Stimmen können nicht wiederhergestellt werden. Die betroffenen Geräte können in dieser Klasse danach erneut abstimmen.`
+    );
+    if (!confirmed) return;
+    setDeletingEntryId(entry.entryId);
+    setError("");
+    try {
+      await adminVotingService.deleteCandidateVotes(eventId, entry.entryId);
+      await load(eventId, { silent: true });
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setDeletingEntryId(null);
+    }
+  };
+
   if (loading && !config) {
     return <div className="p-6 text-sm text-slate-500">Lade Publikumsvoting…</div>;
   }
@@ -232,43 +251,69 @@ export function AdminVotingPage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {results.classes.map((cls) => (
-              <div key={cls.classId} className="px-5 py-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{cls.className || classNamesById.get(cls.classId) || cls.classId}</h3>
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-slate-100">
-                    {cls.entries.map((entry) => (
-                      <tr key={entry.entryId}>
-                        <td className="py-2 pr-3 w-10">
-                          {entry.rank === 1 ? <Trophy size={16} className="text-yellow-500" /> : <span className="text-slate-400">{entry.rank}</span>}
-                        </td>
-                        <td className="py-2 pr-3 font-medium text-slate-900">
-                          {entry.startNumberNorm ? `#${entry.startNumberNorm} · ` : ""}
-                          {entry.driverName}
-                        </td>
-                        <td className="py-2 pr-3 text-right font-mono text-slate-700">{entry.voteCount}</td>
-                        <td className="py-2 text-right text-slate-500">{entry.percent}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <details key={cls.classId} className="group px-5 py-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md text-sm font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <span>{cls.className || classNamesById.get(cls.classId) || cls.classId}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-slate-500">
+                    {cls.entries.reduce((sum, entry) => sum + entry.voteCount, 0)} Stimmen
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                  </span>
+                </summary>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <tbody className="divide-y divide-slate-100">
+                      {cls.entries.map((entry) => (
+                        <tr key={entry.entryId}>
+                          <td className="py-2 pr-3 w-10">
+                            {entry.rank === 1 ? <Trophy size={16} className="text-yellow-500" /> : <span className="text-slate-400">{entry.rank}</span>}
+                          </td>
+                          <td className="py-2 pr-3 font-medium text-slate-900">
+                            {entry.startNumberNorm ? `#${entry.startNumberNorm} · ` : ""}
+                            {entry.driverName}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-mono text-slate-700">{entry.voteCount}</td>
+                          <td className="py-2 pr-3 text-right text-slate-500">{entry.percent}%</td>
+                          {canWrite && (
+                            <td className="py-2 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-700 hover:bg-red-50 hover:text-red-800"
+                                disabled={deletingEntryId !== null}
+                                onClick={() => void deleteVotes(entry)}
+                                title={`Alle Stimmen für ${entry.driverName} löschen`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Alle Stimmen für {entry.driverName} löschen</span>
+                              </Button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
             ))}
           </div>
         )}
       </div>
 
       {/* Kandidatenliste mit Pin/Hide */}
-      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b">
-          <h2 className="text-sm font-medium text-slate-700">Kandidaten · {candidates.length}</h2>
-        </div>
-        <div className="divide-y divide-slate-100">
+      <details className="group rounded-lg border bg-white shadow-sm overflow-hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+          <span>Kandidaten · {candidates.length}</span>
+          <span className="flex items-center gap-2 text-xs font-normal text-slate-500">Verwalten <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></span>
+        </summary>
+        <div className="divide-y divide-slate-100 border-t">
           {Array.from(candidatesByClass.entries()).map(([classId, list]) => (
-            <div key={classId} className="px-5 py-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                {classNamesById.get(classId) ?? classId} · {resultsByClass.get(classId)?.entries.length ?? 0} mit Stimmen
-              </h3>
-              <div className="space-y-2">
+            <details key={classId} className="group/class px-5 py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <span>{classNamesById.get(classId) ?? classId} · {list.length} Fahrer</span>
+                <span className="flex items-center gap-2 font-normal normal-case tracking-normal">{resultsByClass.get(classId)?.entries.length ?? 0} mit Stimmen <ChevronDown className="h-4 w-4 transition-transform group-open/class:rotate-180" /></span>
+              </summary>
+              <div className="mt-3 space-y-2">
                 {list.map((candidate) => (
                   <div
                     key={candidate.entryId}
@@ -309,10 +354,10 @@ export function AdminVotingPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </details>
           ))}
         </div>
-      </div>
+      </details>
 
       {/* Vorschau öffentliche Fahrerkarte */}
       {previewCandidate && (

@@ -36,6 +36,13 @@ export const adminVotingService = {
     return res;
   },
 
+  async deleteCandidateVotes(eventId: string, entryId: string): Promise<number> {
+    const res = await requestJson<{ ok: boolean; deletedVoteCount: number }>(`/admin/events/${eventId}/voting/results/${entryId}`, {
+      method: "DELETE"
+    });
+    return res.deletedVoteCount;
+  },
+
   async downloadResultsCsv(eventId: string): Promise<void> {
     const response = await fetch(buildUrl(`/admin/events/${eventId}/voting/results`, { format: "csv" }), {
       headers: { Authorization: `Bearer ${getAuthToken() ?? ""}` }
