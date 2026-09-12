@@ -11,6 +11,7 @@ import { getAdminEventId } from "@/services/api/event-context";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type { AdminCandidate, CandidateExclusionReason, EventHubConfig, VotingMode, VotingResults } from "@/types/admin-voting";
 import { AuctionAdminPanel } from "@/components/features/admin/auction-admin-panel";
+import { adminMetaService, type AdminClassOption } from "@/services/admin-meta.service";
 
 const EXCLUSION_LABEL: Record<Exclude<CandidateExclusionReason, null>, string> = {
   processing_restricted: "Verarbeitung eingeschränkt",
@@ -50,18 +51,21 @@ export function AdminVotingPage() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [previewEntryId, setPreviewEntryId] = useState<string | null>(null);
+  const [classOptions, setClassOptions] = useState<AdminClassOption[]>([]);
 
   const load = useCallback(async (eid: string, options: { silent?: boolean } = {}) => {
     if (!options.silent) setLoading(true);
     try {
-      const [cfg, cands, res] = await Promise.all([
+      const [cfg, cands, res, classes] = await Promise.all([
         adminVotingService.getConfig(eid),
         adminVotingService.getCandidates(eid),
-        adminVotingService.getResults(eid)
+        adminVotingService.getResults(eid),
+        adminMetaService.listClassOptions()
       ]);
       setConfig(cfg);
       setCandidates(cands);
       setResults(res);
+      setClassOptions(classes);
       setError("");
     } catch (e) {
       if (!options.silent) setError(getApiErrorMessage(e));
@@ -100,9 +104,10 @@ export function AdminVotingPage() {
     return map;
   }, [candidates]);
   const classNamesById = useMemo(() => new Map([
-    ...candidates.map((candidate) => [candidate.classId, candidate.className] as const),
-    ...(results?.classes ?? []).map((eventClass) => [eventClass.classId, eventClass.className] as const)
-  ]), [candidates, results?.classes]);
+    ...classOptions.map((eventClass) => [eventClass.id, eventClass.name] as const),
+    ...candidates.filter((candidate) => candidate.className).map((candidate) => [candidate.classId, candidate.className as string] as const),
+    ...(results?.classes ?? []).filter((eventClass) => eventClass.className).map((eventClass) => [eventClass.classId, eventClass.className as string] as const)
+  ]), [candidates, classOptions, results?.classes]);
 
   const previewCandidate = candidates.find((c) => c.entryId === previewEntryId) ?? null;
 
@@ -228,7 +233,7 @@ export function AdminVotingPage() {
           <div className="divide-y divide-slate-100">
             {results.classes.map((cls) => (
               <div key={cls.classId} className="px-5 py-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{cls.className}</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{cls.className || classNamesById.get(cls.classId) || cls.classId}</h3>
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-slate-100">
                     {cls.entries.map((entry) => (

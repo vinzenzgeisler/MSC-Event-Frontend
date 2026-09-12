@@ -21,7 +21,7 @@ export type VotingResultEntry = {
 
 export type VotingResultsClass = {
   classId: string;
-  className: string;
+  className?: string;
   entries: VotingResultEntry[];
 };
 
@@ -40,7 +40,7 @@ export type CandidateExclusionReason =
 export type AdminCandidate = {
   entryId: string;
   classId: string;
-  className: string;
+  className?: string;
   startNumberNorm: string | null;
   driverName: string;
   vehicleMake: string | null;
