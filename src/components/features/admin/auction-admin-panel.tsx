@@ -48,8 +48,8 @@ export function AuctionAdminPanel({ eventId, canWrite }: { eventId: string; canW
   }, [eventId]);
   if (!auction) return <div className="p-5 text-sm text-slate-500">Lade Didier-Grams-Helmauktion…</div>;
   const checks = [
-    { label: 'Helmbild hinterlegt', done: Boolean(auction.imageUrl) },
-    { label: '11-Sekunden-Reel hinterlegt', done: Boolean(auction.videoUrl) },
+    { label: 'Helmbild hinterlegt', done: Boolean(auction.imageS3Key || auction.imageUrl) },
+    { label: '11-Sekunden-Reel hinterlegt', done: Boolean(auction.videoS3Key || auction.videoUrl) },
     { label: 'Gebotswerte festgelegt', done: auction.startingBidCents >= 0 && auction.minIncrementCents > 0 },
     { label: 'Alle vier Titel gepflegt', done: locales.every(({ id }) => Boolean(auction.titleI18n[id]?.trim())) },
     { label: 'Alle vier Beschreibungen gepflegt', done: locales.every(({ id }) => Boolean(auction.descriptionI18n[id]?.trim())) },
@@ -67,7 +67,14 @@ export function AuctionAdminPanel({ eventId, canWrite }: { eventId: string; canW
     if (auction.status === 'open' && !ready) { setError('Vor dem Öffnen bitte alle Punkte der Veröffentlichungs-Checkliste vervollständigen.'); return; }
     if (auction.status === 'closed' && persistedStatus !== 'closed' && !window.confirm('Versteigerung jetzt manuell schließen und den aktuell höchsten gültigen Bieter als Gewinner festhalten?')) return;
     setSaving(true);
-    try { setAuction(await adminAuctionService.patch(eventId, auction)); await load(); }
+    try {
+      const patch = {
+        ...auction,
+        imageUrl: auction.imageS3Key ? undefined : auction.imageUrl,
+        videoUrl: auction.videoS3Key ? undefined : auction.videoUrl
+      };
+      setAuction(await adminAuctionService.patch(eventId, patch)); await load();
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'Speichern fehlgeschlagen.'); }
     finally { setSaving(false); }
   };
@@ -94,7 +101,7 @@ export function AuctionAdminPanel({ eventId, canWrite }: { eventId: string; canW
         <label className="space-y-1"><Label>Startgebot (€)</Label><Input type="number" value={auction.startingBidCents / 100} onChange={(e) => update('startingBidCents', cents(e.target.value))}/></label>
         <label className="space-y-1"><Label>Mindestschritt (€)</Label><Input type="number" value={auction.minIncrementCents / 100} onChange={(e) => update('minIncrementCents', cents(e.target.value))}/></label>
       </div>
-      <div className="grid gap-4 md:grid-cols-2"><label className="space-y-1"><Label>Helm-Bild URL</Label><Input value={auction.imageUrl ?? ''} onChange={(e) => update('imageUrl', e.target.value || null)}/></label><label className="space-y-1"><Label>11s-Reel URL</Label><Input value={auction.videoUrl ?? ''} onChange={(e) => update('videoUrl', e.target.value || null)}/></label></div>
+      <div className="grid gap-4 md:grid-cols-2"><label className="space-y-1"><Label>Alternative externe Bild-URL (optional)</Label><Input disabled={Boolean(auction.imageS3Key)} value={auction.imageS3Key ? '' : auction.imageUrl ?? ''} onChange={(e) => update('imageUrl', e.target.value || null)}/><span className="block text-xs text-slate-500">{auction.imageS3Key ? 'Bild-Upload hinterlegt – keine URL nötig.' : 'Nur verwenden, wenn du kein Bild hochlädst.'}</span></label><label className="space-y-1"><Label>Alternative externe Reel-URL (optional)</Label><Input disabled={Boolean(auction.videoS3Key)} value={auction.videoS3Key ? '' : auction.videoUrl ?? ''} onChange={(e) => update('videoUrl', e.target.value || null)}/><span className="block text-xs text-slate-500">{auction.videoS3Key ? 'Reel-Upload hinterlegt – keine URL nötig.' : 'Nur verwenden, wenn du kein Reel hochlädst.'}</span></label></div>
       <div className="grid gap-4 rounded-md border border-dashed p-4 md:grid-cols-2"><label className="space-y-2"><span className="flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4"/>Helmbild hochladen</span><Input type="file" accept="image/jpeg,image/png,image/webp" disabled={!canWrite || uploading !== null} className="h-auto py-2" onChange={(event) => void uploadMedia('image', event.target.files?.[0])}/><span className="block text-xs text-slate-500">JPG, PNG oder WebP · maximal 15 MB</span></label><label className="space-y-2"><span className="flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4"/>11-Sekunden-Reel hochladen</span><Input type="file" accept="video/mp4,video/webm" disabled={!canWrite || uploading !== null} className="h-auto py-2" onChange={(event) => void uploadMedia('video', event.target.files?.[0])}/><span className="block text-xs text-slate-500">MP4 oder WebM · maximal 100 MB</span></label>{uploading && <p className="text-sm font-medium text-blue-700 md:col-span-2">{uploading === 'image' ? 'Helmbild' : 'Reel'} wird hochgeladen…</p>}</div>
       {(auction.imageUrl || auction.videoUrl) && <div className="grid max-w-2xl gap-3 sm:grid-cols-2">{auction.imageUrl && <img src={auction.imageUrl} alt="Vorschau des Didier-Grams-Helms" className="aspect-[4/3] w-full rounded-md bg-slate-100 object-cover"/>}{auction.videoUrl && <video src={auction.videoUrl} poster={auction.imageUrl ?? undefined} controls muted playsInline preload="metadata" className="aspect-[9/16] max-h-72 w-full rounded-md bg-black object-cover"/>}</div>}
       <div className="flex flex-wrap gap-2">{locales.map((item) => <Button key={item.id} type="button" size="sm" variant={contentLocale === item.id ? 'default' : 'outline'} onClick={() => setContentLocale(item.id)}>{item.label}{auction.titleI18n[item.id] ? ' ✓' : ''}</Button>)}</div>
