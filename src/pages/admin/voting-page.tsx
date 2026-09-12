@@ -99,6 +99,10 @@ export function AdminVotingPage() {
     }
     return map;
   }, [candidates]);
+  const classNamesById = useMemo(() => new Map([
+    ...candidates.map((candidate) => [candidate.classId, candidate.className] as const),
+    ...(results?.classes ?? []).map((eventClass) => [eventClass.classId, eventClass.className] as const)
+  ]), [candidates, results?.classes]);
 
   const previewCandidate = candidates.find((c) => c.entryId === previewEntryId) ?? null;
 
@@ -224,7 +228,7 @@ export function AdminVotingPage() {
           <div className="divide-y divide-slate-100">
             {results.classes.map((cls) => (
               <div key={cls.classId} className="px-5 py-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Klasse {cls.classId}</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{cls.className}</h3>
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-slate-100">
                     {cls.entries.map((entry) => (
@@ -257,7 +261,7 @@ export function AdminVotingPage() {
           {Array.from(candidatesByClass.entries()).map(([classId, list]) => (
             <div key={classId} className="px-5 py-4">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                Klasse {classId} · {resultsByClass.get(classId)?.entries.length ?? 0} mit Stimmen
+                {classNamesById.get(classId) ?? classId} · {resultsByClass.get(classId)?.entries.length ?? 0} mit Stimmen
               </h3>
               <div className="space-y-2">
                 {list.map((candidate) => (
