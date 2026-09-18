@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarshalPersonPicker } from "@/components/features/admin/marshal-person-picker";
 import type { MarshalCommitmentStatus, MarshalDay, MarshalPerson, MarshalSection, MarshalWorkspace } from "@/types/admin-marshals";
 
 type SaveAction = (person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string, allowOccupied?: boolean) => Promise<boolean>;
@@ -24,7 +25,7 @@ export function MarshalSectionLeaderEditor({ workspace, day, section, canWrite, 
     );
   }
 
-  async function change(index: number, nextId: string) {
+  async function change(index: number, nextId: string | null) {
     const leader = slots[index];
     if (nextId === leader?.id) return;
     setChangingSlot(index);
@@ -42,18 +43,23 @@ export function MarshalSectionLeaderEditor({ workspace, day, section, canWrite, 
 
   return (
     <div className="grid gap-2">
-      {slots.map((leader, index) => (
-        <label key={leader?.id ?? `empty-${index}`} className="grid gap-1 text-xs font-medium text-slate-600">
-          Abschnittsleitung {index + 1}{index >= target ? " (über Soll)" : ""}
-          <select aria-label={`Abschnittsleitung ${index + 1} für ${section.name}`} className="h-10 w-full min-w-0 rounded-md border bg-white px-2 text-sm font-normal text-slate-950" value={leader?.id ?? ""} disabled={busy || changingSlot !== null} onChange={(event) => void change(index, event.target.value)}>
-            <option value="">Nicht besetzt</option>
-            {eligible.map((person) => {
-              const assignedToAnotherSlot = leaders.some((item) => item.id === person.id && item.id !== leader?.id);
-              return <option key={person.id} value={person.id} disabled={assignedToAnotherSlot}>{person.lastName}, {person.firstName} · Nr. {person.helperNumber}</option>;
-            })}
-          </select>
-        </label>
-      ))}
+      {slots.map((leader, index) => {
+        const assignedIds = new Set(leaders.filter((l) => l.id !== leader?.id).map((l) => l.id));
+        const pickerPeople = eligible.filter((person) => !assignedIds.has(person.id));
+        return (
+          <label key={leader?.id ?? `empty-${index}`} className="grid gap-1 text-xs font-medium text-slate-600">
+            Abschnittsleitung {index + 1}{index >= target ? " (über Soll)" : ""}
+            <MarshalPersonPicker
+              people={pickerPeople}
+              value={leader?.id ?? null}
+              disabled={busy || changingSlot !== null}
+              placeholder="Nicht besetzt"
+              aria-label={`Abschnittsleitung ${index + 1} für ${section.name}`}
+              onChange={(nextId) => void change(index, nextId)}
+            />
+          </label>
+        );
+      })}
     </div>
   );
 }
