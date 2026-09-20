@@ -97,6 +97,9 @@ const AdminVotingPage = lazy(() =>
     default: module.AdminVotingPage,
   })),
 );
+const AdminNewsletterPage = lazy(() =>
+  import("@/pages/admin/newsletter-page").then((module) => ({ default: module.AdminNewsletterPage })),
+);
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -133,6 +136,7 @@ function AdminIndexRedirect() {
   if (hasPermission(roles, "marshals.read")) return <Navigate to="marshals" replace />;
   if (hasPermission(roles, "inspection.read")) return <Navigate to="/inspection" replace />;
   if (hasPermission(roles, "sim.read")) return <Navigate to="sim" replace />;
+  if (hasPermission(roles, "newsletter.read")) return <Navigate to="newsletter" replace />;
   return <Navigate to="/admin/forbidden" replace />;
 }
 
@@ -184,6 +188,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminCommunicationPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "newsletter",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "newsletter_manager"]}>
+                <AdminNewsletterPage />
               </ProtectedRoute>
             ),
           },

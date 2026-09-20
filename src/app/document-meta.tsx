@@ -35,6 +35,9 @@ function resolvePageTitle(pathname: string) {
   if (pathname === "/admin/communication") {
     return "Kommunikation";
   }
+  if (pathname === "/admin/newsletter") {
+    return "Newsletter";
+  }
   if (pathname === "/admin/exports") {
     return "Exporte";
   }

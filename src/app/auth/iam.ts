@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector" | "marshal_manager" | "simulator_manager";
+export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector" | "marshal_manager" | "simulator_manager" | "newsletter_manager";
 
 export type AppPermission =
   | "dashboard.read"
@@ -27,9 +27,11 @@ export type AppPermission =
   | "sim.read"
   | "sim.write"
   | "voting.read"
-  | "voting.write";
+  | "voting.write"
+  | "newsletter.read"
+  | "newsletter.write";
 
-const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager"];
+const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager", "newsletter_manager"];
 
 const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   admin: [
@@ -59,7 +61,9 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "sim.read",
     "sim.write",
     "voting.read",
-    "voting.write"
+    "voting.write",
+    "newsletter.read",
+    "newsletter.write"
   ],
   editor: [
     "dashboard.read",
@@ -75,7 +79,8 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   viewer: ["dashboard.read", "entries.read", "exports.read"],
   technical_inspector: ["inspection.read", "inspection.write"],
   marshal_manager: ["marshals.read", "marshals.write", "marshals.export"],
-  simulator_manager: ["sim.read", "sim.write"]
+  simulator_manager: ["sim.read", "sim.write"],
+  newsletter_manager: ["newsletter.read", "newsletter.write"]
 };
 
 function normalizeRole(role: string): AppRole | null {
@@ -146,6 +151,16 @@ export function toRoleMatrix() {
       technical_inspector: "none",
       marshal_manager: "none",
       simulator_manager: "none"
+    },
+    {
+      area: "Newsletter",
+      admin: "write",
+      editor: "none",
+      viewer: "none",
+      technical_inspector: "none",
+      marshal_manager: "none",
+      simulator_manager: "none",
+      newsletter_manager: "write"
     },
     {
       area: "Exporte",
