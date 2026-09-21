@@ -103,6 +103,9 @@ const AdminNewsletterPage = lazy(() =>
 const AdminRacepicPage = lazy(() =>
   import("@/pages/admin/racepic-page").then((module) => ({ default: module.AdminRacepicPage })),
 );
+const AdminRacepicReviewPage = lazy(() =>
+  import("@/pages/admin/racepic-review-page").then((module) => ({ default: module.AdminRacepicReviewPage })),
+);
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -259,6 +262,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin", "racepic_moderator"]}>
                 <AdminRacepicPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "racepic/review/:eventId",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "racepic_moderator"]}>
+                <AdminRacepicReviewPage />
               </ProtectedRoute>
             ),
           },

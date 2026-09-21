@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,13 +103,18 @@ function EventsSection({
                     )}
                   </td>
                   <td className="p-3 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setExpandedEventId(expandedEventId === item.eventId ? null : item.eventId)}
-                    >
-                      {expandedEventId === item.eventId ? "Schließen" : "Konfigurieren"}
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/admin/racepic/review/${item.eventId}`}>Review</Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setExpandedEventId(expandedEventId === item.eventId ? null : item.eventId)}
+                      >
+                        {expandedEventId === item.eventId ? "Schließen" : "Konfigurieren"}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
                 {expandedEventId === item.eventId && (

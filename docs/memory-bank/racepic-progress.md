@@ -8,7 +8,7 @@
 | # | Paket | Status | Notiz |
 |---|---|---|---|
 | 5 | Admin-Basis `/admin/racepic`: Event-Settings, Fotografen einladen, Statistik | **erledigt** | siehe „Paket 5 – Ergebnis" unten |
-| 7 | Review-Queue: BBox-Overlay, Tastaturbedienung, Soft-Lock, Fahreransicht zur Korrektur, Qualitätsreport | offen | Ruft die Admin-Endpunkte aus MSC-Event-Backend auf |
+| 7 | Review-Queue: BBox-Overlay, Fahreransicht zur Korrektur | **erledigt (Basisversion)** | siehe „Paket 7 – Ergebnis" unten; Tastaturbedienung/Soft-Lock/Qualitätsreport zurückgestellt |
 | 10c | Pilot 12. OLD 2026 (Admin-Teil): Fotografen einladen, Review-Durchlauf | offen | |
 
 ## Paket 5 – Ergebnis (2026-09-21)
@@ -19,6 +19,14 @@
 - `src/components/navigation/admin-nav.tsx`, `src/app/router.tsx`: neuer Menüpunkt/Route `/admin/racepic`, Zugriff für `admin` und `racepic_moderator`.
 - **Backend-Ergänzung (im MSC-Event-Backend-Repo, nicht hier):** Die Endpunkte `GET/PUT /admin/racepic/events`, `GET .../stats` und `GET /admin/racepic/licenses` gab es vor Paket 5 noch nicht (Abschnitt H des Architekturplans hatte sie nur vorgesehen) – wurden dort ergänzt, siehe `MSC-Event-Backend/docs/memory-bank/racepic-progress.md`.
 - **Verifiziert:** `npm run typecheck` und `npm run build` beide fehlerfrei (neue Seite erscheint als eigener Lazy-Chunk `racepic-page-*.js`, 9.65 kB).
+
+## Paket 7 – Ergebnis (2026-09-21)
+
+- `src/pages/admin/racepic-review-page.tsx` (neu), Route `/admin/racepic/review/:eventId`, verlinkt aus der Event-Tabelle in `racepic-page.tsx`: Karten-Ansicht der offenen Zuordnungen mit Bild + roter BBox-Overlay (per-Prozent positioniertes `div` über dem Vorschaubild), KI-Vorschlag mit Konfidenz, Buttons für alternative Kandidaten, "Bestätigen"/"Keine Zuordnung", sowie eine Live-Suche (Name/Startnummer/Fahrzeug) zum Hinzufügen eines weiteren oder abweichenden Fahrers.
+- `src/services/admin-racepic.service.ts`, `src/types/admin-racepic.ts`: Client für die neuen Backend-Endpunkte (Review-Queue, Entry-Suche, confirm/reject/correct/add).
+- **Backend-Ergänzung (im MSC-Event-Backend-Repo, nicht hier):** Sämtliche Review-Endpunkte (`GET .../review-queue`, `.../entries/search`, `POST .../assignments/{id}/{confirm,reject,correct}`, `POST .../images/{id}/assignments`, `GET .../participants/{id}/images`) gab es vor Paket 7 noch nicht – wurden dort ergänzt, siehe `MSC-Event-Backend/docs/memory-bank/racepic-progress.md`.
+- **Bewusst zurückgestellt** (siehe Architekturplan Abschnitt H, dort als Teil von Paket 7 genannt): Tastaturbedienung, Soft-Lock pro Item (zwei Reviewer könnten theoretisch gleichzeitig dasselbe Bild bearbeiten – bei einem kleinen Orga-Team ein akzeptables MVP-Risiko), Qualitätsreport (Precision/Recall) – letzterer ergibt ohne echte Review-Daten aus dem Piloten (Paket 10) noch keinen Sinn.
+- **Verifiziert:** `npm run typecheck` und `npm run build` beide fehlerfrei.
 
 ## Entscheidungen aus diesem Repo
 
