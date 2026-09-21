@@ -1,4 +1,12 @@
-export type AppRole = "admin" | "editor" | "viewer" | "technical_inspector" | "marshal_manager" | "simulator_manager" | "newsletter_manager";
+export type AppRole =
+  | "admin"
+  | "editor"
+  | "viewer"
+  | "technical_inspector"
+  | "marshal_manager"
+  | "simulator_manager"
+  | "newsletter_manager"
+  | "racepic_moderator";
 
 export type AppPermission =
   | "dashboard.read"
@@ -29,9 +37,21 @@ export type AppPermission =
   | "voting.read"
   | "voting.write"
   | "newsletter.read"
-  | "newsletter.write";
+  | "newsletter.write"
+  | "racepic.read"
+  | "racepic.review"
+  | "racepic.manage";
 
-const KNOWN_ROLES: AppRole[] = ["admin", "editor", "viewer", "technical_inspector", "marshal_manager", "simulator_manager", "newsletter_manager"];
+const KNOWN_ROLES: AppRole[] = [
+  "admin",
+  "editor",
+  "viewer",
+  "technical_inspector",
+  "marshal_manager",
+  "simulator_manager",
+  "newsletter_manager",
+  "racepic_moderator"
+];
 
 const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   admin: [
@@ -63,7 +83,10 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "voting.read",
     "voting.write",
     "newsletter.read",
-    "newsletter.write"
+    "newsletter.write",
+    "racepic.read",
+    "racepic.review",
+    "racepic.manage"
   ],
   editor: [
     "dashboard.read",
@@ -80,7 +103,10 @@ const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   technical_inspector: ["inspection.read", "inspection.write"],
   marshal_manager: ["marshals.read", "marshals.write", "marshals.export"],
   simulator_manager: ["sim.read", "sim.write"],
-  newsletter_manager: ["newsletter.read", "newsletter.write"]
+  newsletter_manager: ["newsletter.read", "newsletter.write"],
+  // Review-Berechtigung fuer die RacePic-Bildzuordnung (bewusst ohne racepic.manage), siehe
+  // MSC-Event-Backend api/src/http/auth.ts fuer die serverseitige Spiegelung.
+  racepic_moderator: ["racepic.read", "racepic.review"]
 };
 
 function normalizeRole(role: string): AppRole | null {
@@ -215,6 +241,16 @@ export function toRoleMatrix() {
       technical_inspector: "none",
       marshal_manager: "none",
       simulator_manager: "write"
+    },
+    {
+      area: "RacePic",
+      admin: "write",
+      editor: "none",
+      viewer: "none",
+      technical_inspector: "none",
+      marshal_manager: "none",
+      simulator_manager: "none",
+      racepic_moderator: "review"
     }
   ] as const;
 }

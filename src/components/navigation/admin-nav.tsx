@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, ListChecks, Mail, MailCheck, FileDown, Settings, ShieldCheck, PenLine, UsersRound, Gauge, Vote } from "lucide-react";
+import { LayoutGrid, ListChecks, Mail, MailCheck, FileDown, Settings, ShieldCheck, PenLine, UsersRound, Gauge, Vote, Camera } from "lucide-react";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission, type AppPermission } from "@/app/auth/iam";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ const links = [
   { to: "/admin/communication", label: "Kommunikation", icon: Mail, permission: "communication.read" as AppPermission },
   { to: "/admin/newsletter", label: "Newsletter", icon: MailCheck, permission: "newsletter.read" as AppPermission },
   { to: "/admin/voting", label: "Voting & Didier-Grams-Auktion", icon: Vote, permission: "voting.read" as AppPermission },
+  { to: "/admin/racepic", label: "RacePic", icon: Camera, permission: "racepic.read" as AppPermission },
   { to: "/admin/exports", label: "Exporte", icon: FileDown, permission: "exports.read" as AppPermission },
   { to: "/admin/settings", label: "Einstellungen", icon: Settings, permission: "settings.read" as AppPermission }
 ];
