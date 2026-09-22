@@ -1,7 +1,7 @@
 <!-- Nur die Architektur (racepic-architecture.md) wird 1:1 in allen 3 Repos synchron gehalten. Diese Fortschrittsdatei ist repo-spezifisch und listet nur die Arbeitspakete, die in MSC-Event-Frontend passieren. -->
 # RacePic – Fortschritt (MSC-Event-Frontend)
 
-**Stand:** 2026-09-22 · Architektur: [racepic-architecture.md](./racepic-architecture.md) · Offene Punkte (konsolidiert): [racepic-open-items.md](./racepic-open-items.md)
+**Stand:** 2026-09-22 · Architektur: [racepic-architecture.md](./racepic-architecture.md) · Offene Punkte (konsolidiert): [racepic-open-items.md](./racepic-open-items.md) · UI/UX-Redesign-Roadmap: [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.md)
 
 ## Arbeitspakete in diesem Repo
 
@@ -11,6 +11,7 @@
 | 7 | Review-Queue: BBox-Overlay, Fahreransicht zur Korrektur | **erledigt (Basisversion)** | siehe „Paket 7 – Ergebnis" unten; Tastaturbedienung/Soft-Lock/Qualitätsreport zurückgestellt |
 | 10c | Pilot 12. OLD 2026 (Admin-Teil): Fotografen einladen, Review-Durchlauf | offen | |
 | 11 | Fehlende Admin-Bedienelemente für bereits im Backend fertige Funktionen | **erledigt** | siehe „Paket 11 – Ergebnis" unten |
+| 14 | UI/UX-Redesign-Grundlage: Tabs-Komponente portiert | **erledigt** | siehe „Paket 14 – Ergebnis" unten; Roadmap in [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.md) |
 
 ## Paket 5 – Ergebnis (2026-09-21)
 
@@ -62,6 +63,18 @@ Rückfrage vom Verein priorisiert und umgesetzt:
   (`visibility=DRAFT`) Bild ohne bestehende Zuordnung admin-seitig zu erreichen.
 - **Verifiziert:** `npm run typecheck` und `npm run build` beide fehlerfrei (`racepic-page`-Chunk
   auf 16,46 kB gewachsen, `racepic-review-page` auf 5,03 kB).
+
+## Paket 14 – Ergebnis (2026-09-22)
+
+Erste Umsetzung aus der [UI/UX-Redesign-Roadmap](./racepic-ux-redesign-plan.md) (Pakete 14–18).
+
+- `src/components/ui/tabs.tsx` (neu, portiert aus msc-website): identisches shadcn-Tabs-Muster,
+  fehlte in diesem Repo bisher komplett.
+- `@radix-ui/react-tabs` als neue Dependency (`package.json`), analog zur bestehenden
+  `@radix-ui/react-select`-Einbindung.
+- Grundlage für Paket 16 (Admin-Redesign mit Tabs) – hier noch nicht in `racepic-page.tsx`
+  eingebaut.
+- **Verifiziert:** `npm run typecheck` fehlerfrei.
 
 ## Offene Punkte
 
