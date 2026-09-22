@@ -9,6 +9,7 @@ import { adminRacepicService } from "@/services/admin-racepic.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type {
   RacepicAdminImage,
+  RacepicEntrySearchResult,
   RacepicEventConfig,
   RacepicEventListItem,
   RacepicEventStats,
@@ -585,7 +586,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
           {items.length === 0 && <p className="col-span-full p-3 text-center text-sm text-slate-400">Keine Bilder.</p>}
         </div>
       )}
-      {detailImageId && <ImageAssignmentDetail imageId={detailImageId} onClose={() => setDetailImageId(null)} />}
+      {detailImageId && <ImageAssignmentDetail imageId={detailImageId} eventId={eventId} onClose={() => setDetailImageId(null)} />}
       {total > pageSize && (
         <div className="mt-2 flex items-center gap-2">
           <Button size="sm" variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - pageSize))}>
@@ -600,8 +601,17 @@ function ImagesSection({ eventId }: { eventId: string }) {
   );
 }
 
-/** Paket 16: Zuordnungs-Detail zu einem Bild direkt aus dem Bilder-Grid, siehe racepic-ux-redesign-plan.md. */
-function ImageAssignmentDetail({ imageId, onClose }: { imageId: string; onClose: () => void }) {
+/**
+ * Paket 16: Zuordnungs-Detail zu einem Bild direkt aus dem Bilder-Grid, siehe
+ * racepic-ux-redesign-plan.md. Bestandsaufnahme 2026-09-22: ein Bild mit processingStatus=MATCHED
+ * zeigte hier oft "keine Zuordnung" ohne jede Erklärung oder Handlungsoption - MATCHED bedeutet
+ * nur, dass der Match-Schritt durchgelaufen ist (siehe matchWorker.ts), nicht, dass die KI
+ * tatsächlich einen Kandidaten über der Review-Schwelle gefunden hat (kein erkanntes Fahrzeug im
+ * Bild, oder alle Scores zu niedrig). Für genau diesen Fall gibt es jetzt eine manuelle
+ * Zuordnungs-Suche direkt hier, statt nur auf die Review-Queue zu verweisen (die nur Bilder mit
+ * bereits vorhandenem KI-Vorschlag zeigt).
+ */
+function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string; eventId: string; onClose: () => void }) {
   const [assignments, setAssignments] = useState<RacepicImageAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -645,6 +655,18 @@ function ImageAssignmentDetail({ imageId, onClose }: { imageId: string; onClose:
     }
   };
 
+  const handleAdd = async (entryId: string) => {
+    setBusyId("add");
+    try {
+      await adminRacepicService.addAssignment(imageId, entryId, null);
+      reload();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="mt-3 rounded-lg border bg-slate-50 p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -655,7 +677,13 @@ function ImageAssignmentDetail({ imageId, onClose }: { imageId: string; onClose:
       </div>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-xs text-slate-400">Lädt…</p>}
-      {!loading && assignments.length === 0 && <p className="text-xs text-slate-400">Noch keine Zuordnung für dieses Bild.</p>}
+      {!loading && assignments.length === 0 && (
+        <p className="text-xs text-slate-400">
+          Keine Zuordnung gefunden. Die KI hat entweder kein Fahrzeug im Bild erkannt oder keinen Kandidaten mit
+          ausreichender Sicherheit gefunden - das Bild gilt trotzdem als "MATCHED" (der Zuordnungsschritt ist
+          durchgelaufen, hat nur nichts gefunden). Fahrer unten manuell zuordnen.
+        </p>
+      )}
       {!loading && assignments.length > 0 && (
         <ul className="space-y-2">
           {assignments.map((a) => (
@@ -688,9 +716,61 @@ function ImageAssignmentDetail({ imageId, onClose }: { imageId: string; onClose:
           ))}
         </ul>
       )}
-      <p className="mt-2 text-[11px] text-slate-400">
-        Einem anderen Fahrer zuordnen geht über die Review-Queue (Tab "Zuordnung").
-      </p>
+      <div className="mt-3 border-t pt-3">
+        <p className="mb-1 text-[11px] font-medium text-slate-500">
+          Fahrer zuordnen {assignments.length > 0 && "(weiteres Fahrzeug auf diesem Bild)"}
+        </p>
+        <EntryAssignPicker eventId={eventId} disabled={busyId !== null} onPick={handleAdd} />
+      </div>
+    </div>
+  );
+}
+
+/** Fahrersuche + Zuordnen fuer `ImageAssignmentDetail`, analog zu `EntrySearchPicker` in racepic-review-page.tsx. */
+function EntryAssignPicker({ eventId, disabled, onPick }: { eventId: string; disabled: boolean; onPick: (entryId: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<RacepicEntrySearchResult[]>([]);
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      adminRacepicService.searchEntries(eventId, query).then(setResults).catch(() => setResults([]));
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [eventId, query]);
+
+  return (
+    <div>
+      <Input
+        className="h-7 text-xs"
+        placeholder="Name, Startnummer oder Fahrzeug…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        disabled={disabled}
+      />
+      {results.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {results.map((result) => (
+            <Button
+              key={result.entryId}
+              size="sm"
+              variant="outline"
+              className="h-6 px-1.5 text-[10px]"
+              disabled={disabled}
+              onClick={() => {
+                onPick(result.entryId);
+                setQuery("");
+                setResults([]);
+              }}
+            >
+              #{result.startNumber} {result.driverName} ({result.vehicleMake} {result.vehicleModel})
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
