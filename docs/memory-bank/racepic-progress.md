@@ -1,7 +1,7 @@
 <!-- Nur die Architektur (racepic-architecture.md) wird 1:1 in allen 3 Repos synchron gehalten. Diese Fortschrittsdatei ist repo-spezifisch und listet nur die Arbeitspakete, die in MSC-Event-Frontend passieren. -->
 # RacePic – Fortschritt (MSC-Event-Frontend)
 
-**Stand:** 2026-09-21 · Architektur: [racepic-architecture.md](./racepic-architecture.md)
+**Stand:** 2026-09-22 · Architektur: [racepic-architecture.md](./racepic-architecture.md)
 
 ## Arbeitspakete in diesem Repo
 
@@ -10,6 +10,7 @@
 | 5 | Admin-Basis `/admin/racepic`: Event-Settings, Fotografen einladen, Statistik | **erledigt** | siehe „Paket 5 – Ergebnis" unten |
 | 7 | Review-Queue: BBox-Overlay, Fahreransicht zur Korrektur | **erledigt (Basisversion)** | siehe „Paket 7 – Ergebnis" unten; Tastaturbedienung/Soft-Lock/Qualitätsreport zurückgestellt |
 | 10c | Pilot 12. OLD 2026 (Admin-Teil): Fotografen einladen, Review-Durchlauf | offen | |
+| 11 (vorgeschlagen) | Fehlende Admin-Bedienelemente für bereits im Backend fertige Funktionen | offen | siehe „Bestandsaufnahme 2026-09-22" unten |
 
 ## Paket 5 – Ergebnis (2026-09-21)
 
@@ -32,6 +33,28 @@
 
 - 2026-09-21: Admin-Review-Oberfläche bleibt im Nennungstool-Frontend (`/admin/racepic`), nicht in der Website, da sie am bestehenden Admin-Auth/Permission-System (`iam.ts`, `guards.tsx`) andockt.
 
+## Bestandsaufnahme 2026-09-22
+
+Bei einer Prüfung des Gesamtstands über alle drei Repos wurde festgestellt, dass vier bereits
+in MSC-Event-Backend fertige Endpunkte hier **keine UI** haben:
+
+- Bild-Sichtbarkeit ändern (`PATCH /admin/racepic/images/{id}`, `visibility`) – Bilder können
+  aktuell nur über einen rohen API-Aufruf veröffentlicht/verborgen/entfernt werden.
+- Teilnehmer ausblenden (`POST /admin/racepic/participants/{entryId}/hide`, Paket 9).
+- Matching-Config ansehen/anlegen (`GET/POST /admin/racepic/matching-configs`, Paket 6).
+- Re-Match/Re-Analyze auslösen (`POST /admin/racepic/events/{id}/rematch`,
+  `POST /admin/racepic/images/{id}/reanalyze`, Paket 6).
+- Qualitätsreport anzeigen (`GET /admin/racepic/events/{id}/matching-quality-report`, Paket 10).
+
+Der in `docs/racepic/runbook.md` (MSC-Event-Backend) beschriebene Kalibrierungs-Workflow für den
+Piloten setzt die letzten drei Punkte als Admin-Bedienschritte voraus – ohne UI kann ihn nur
+jemand mit direktem API-Zugriff durchführen, kein Vereins-Admin. **Empfehlung:** vor dem echten
+Piloten (Paket 10c) ein Paket 11 einschieben, das diese Bedienelemente in `racepic-page.tsx`
+(Bild-Liste mit Sichtbarkeits-Aktionen, Matching-Config-Formular, Rematch-Button,
+Qualitätsreport-Tabelle) und `racepic-review-page.tsx` (Teilnehmer-ausblenden-Button)
+nachrüstet. Noch nicht umgesetzt, siehe Rückfrage an den Verein im Chat vom 2026-09-22.
+
 ## Offene Punkte
 
-- Keine repo-spezifischen offenen Punkte über die im Architekturplan genannten hinaus.
+- Keine weiteren repo-spezifischen offenen Punkte über die im Architekturplan und der
+  Bestandsaufnahme oben genannten hinaus.
