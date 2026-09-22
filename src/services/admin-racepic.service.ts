@@ -113,6 +113,11 @@ export const adminRacepicService = {
     await requestJson(`/admin/racepic/images/${imageId}`, { method: "PATCH", body: { visibility } });
   },
 
+  /** Nur fuer bereits entfernte (visibility=REMOVED) Bilder - loescht die DB-Zeile endgültig. */
+  async hardDeleteImage(imageId: string): Promise<void> {
+    await requestJson(`/admin/racepic/images/${imageId}/permanent`, { method: "DELETE" });
+  },
+
   async listMatchingConfigs(eventId?: string): Promise<RacepicMatchingConfig[]> {
     const res = await requestJson<{ ok: boolean; configs: RacepicMatchingConfig[] }>("/admin/racepic/matching-configs", {
       query: eventId ? { eventId } : undefined,

@@ -415,21 +415,25 @@ function ImagesSection({ eventId }: { eventId: string }) {
   const [error, setError] = useState("");
   const pageSize = 20;
 
-  const reload = () => {
-    setLoading(true);
+  // `silent` fuer den Hintergrund-Poll unten: kein setLoading(true) (das ersetzte bisher alle 5s
+  // kurz das komplette Grid durch "Lädt…" - Bug gefunden 2026-09-22, Nutzer-Feedback "reloaded
+  // immer ganz komisch und hängt ein wenig") und keine Auswahl-Zuruecksetzung (sonst verschwand
+  // eine laufende Mehrfachauswahl alle 5s von selbst).
+  const reload = (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     adminRacepicService
       .listImages(eventId, { visibility: visibilityFilter || undefined }, offset, pageSize)
       .then((result) => {
         setItems(result.items);
         setTotal(result.total);
-        setSelected(new Set());
+        if (!opts?.silent) setSelected(new Set());
         setError("");
       })
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
-  useEffect(reload, [eventId, visibilityFilter, offset]);
+  useEffect(() => reload(), [eventId, visibilityFilter, offset]);
 
   // Solange noch Bilder auf dieser Seite in der Pipeline stecken (UPLOADED/VALIDATED/DERIVED/
   // ANALYZED), alle 5s neu laden - Feedback 2026-09-22: ein frisch hochgeladenes Bild soll seinen
@@ -437,16 +441,52 @@ function ImagesSection({ eventId }: { eventId: string }) {
   // sichtbaren Bilder einen Endstatus (MATCHED/FAILED/DUPLICATE) erreicht haben.
   useEffect(() => {
     if (!items.some((item) => PROCESSING_NON_TERMINAL_STATUSES.has(item.processingStatus))) return;
-    const timeout = window.setTimeout(reload, 5000);
+    const timeout = window.setTimeout(() => reload({ silent: true }), 5000);
     return () => window.clearTimeout(timeout);
   }, [items, eventId, visibilityFilter, offset]);
 
+  // Aendert Sichtbarkeit/Auswahl direkt im lokalen State statt per volley reload() (Bug gefunden
+  // 2026-09-22, Nutzer-Feedback "entfernen von Bildern läuft sehr unflüssig"): ein voller
+  // Server-Rundtrip + setLoading(true) liess das komplette Grid nach jeder einzelnen Aktion kurz
+  // verschwinden ("Lädt…"). Ist ein Sichtbarkeits-Filter aktiv und das Bild passt danach nicht
+  // mehr dazu, wird es aus der sichtbaren Liste genommen statt eine falsche Sichtbarkeit zu zeigen.
+  const applyVisibilityChange = (imageId: string, next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
+    const stillMatchesFilter = !visibilityFilter || next === visibilityFilter;
+    if (!stillMatchesFilter) {
+      setItems((prev) => prev.filter((item) => item.id !== imageId));
+      setTotal((prev) => Math.max(0, prev - 1));
+    } else {
+      setItems((prev) =>
+        prev.map((item) => (item.id === imageId ? { ...item, visibility: next, previewUrl: next === "REMOVED" ? null : item.previewUrl } : item)),
+      );
+    }
+    setSelected((prev) => {
+      const nextSelected = new Set(prev);
+      nextSelected.delete(imageId);
+      return nextSelected;
+    });
+  };
+
   const runAction = async (imageId: string, next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
-    if (next === "REMOVED" && !window.confirm("Bild wirklich endgültig entfernen? Das löscht die Bilddateien.")) return;
+    if (next === "REMOVED" && !window.confirm("Bild wirklich entfernen? Das löscht die Bilddateien (Datenbank-Eintrag bleibt vorerst erhalten).")) return;
     setBusyImageId(imageId);
     try {
       await adminRacepicService.setImageVisibility(imageId, next);
-      reload();
+      applyVisibilityChange(imageId, next);
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setBusyImageId(null);
+    }
+  };
+
+  const runHardDelete = async (imageId: string) => {
+    if (!window.confirm("Bild wirklich endgültig aus der Datenbank löschen? Das kann nicht rückgängig gemacht werden.")) return;
+    setBusyImageId(imageId);
+    try {
+      await adminRacepicService.hardDeleteImage(imageId);
+      setItems((prev) => prev.filter((item) => item.id !== imageId));
+      setTotal((prev) => Math.max(0, prev - 1));
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -467,10 +507,16 @@ function ImagesSection({ eventId }: { eventId: string }) {
     setBulkRunning(true);
     setError("");
     try {
+      const succeeded: string[] = [];
       for (const imageId of selected) {
-        await adminRacepicService.setImageVisibility(imageId, next).catch(() => undefined);
+        try {
+          await adminRacepicService.setImageVisibility(imageId, next);
+          succeeded.push(imageId);
+        } catch {
+          // einzelne Fehlschläge sollen den Rest der Batch-Aktion nicht abbrechen
+        }
       }
-      reload();
+      succeeded.forEach((imageId) => applyVisibilityChange(imageId, next));
     } finally {
       setBulkRunning(false);
     }
@@ -549,6 +595,17 @@ function ImagesSection({ eventId }: { eventId: string }) {
                       {action.label}
                     </Button>
                   ))}
+                  {image.visibility === "REMOVED" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-1.5 text-[10px] text-destructive"
+                      disabled={busyImageId === image.id}
+                      onClick={() => runHardDelete(image.id)}
+                    >
+                      Endgültig löschen
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -704,11 +761,13 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
                 ({a.source}
                 {a.confidence !== null ? `, ${Math.round(a.confidence * 100)}%` : ""})
               </span>
-              {a.status !== "REJECTED" && a.status !== "MANUALLY_CONFIRMED" && (
+              {a.status !== "REJECTED" && (
                 <div className="flex gap-1">
-                  <Button size="sm" className="h-6 px-2 text-[11px]" disabled={busyId === a.assignmentId} onClick={() => handleConfirm(a.assignmentId)}>
-                    Bestätigen
-                  </Button>
+                  {a.status !== "MANUALLY_CONFIRMED" && (
+                    <Button size="sm" className="h-6 px-2 text-[11px]" disabled={busyId === a.assignmentId} onClick={() => handleConfirm(a.assignmentId)}>
+                      Bestätigen
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -716,6 +775,11 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
                     disabled={busyId === a.assignmentId}
                     onClick={() => handleReject(a.assignmentId)}
                   >
+                    {/* Nimmt eine bereits bestaetigte Zuordnung wieder raus (Bug gefunden 2026-09-22,
+                        Nutzer-Feedback "ich kann Fahrer Zuordnungen nicht wieder rausnehmen"): der
+                        Button verschwand bisher fuer status=MANUALLY_CONFIRMED komplett, obwohl das
+                        Backend (rejectAssignment in reviewQueue.ts) einen Wechsel von jedem Status
+                        nach REJECTED erlaubt. */}
                     Ablehnen
                   </Button>
                 </div>
