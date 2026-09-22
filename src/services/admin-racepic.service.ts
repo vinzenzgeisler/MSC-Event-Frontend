@@ -122,6 +122,10 @@ export const adminRacepicService = {
     return requestJson<{ ok: boolean; queued: number }>(`/admin/racepic/events/${eventId}/rematch`, { method: "POST" });
   },
 
+  async reanalyzeImage(imageId: string): Promise<void> {
+    await requestJson(`/admin/racepic/images/${imageId}/reanalyze`, { method: "POST" });
+  },
+
   async getMatchQualityReport(eventId: string): Promise<RacepicMatchQualityReport> {
     const res = await requestJson<{ ok: boolean; report: RacepicMatchQualityReport }>(`/admin/racepic/events/${eventId}/matching-quality-report`);
     return res.report;

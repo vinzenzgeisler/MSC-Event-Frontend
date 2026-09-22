@@ -616,6 +616,8 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [reanalyzeMessage, setReanalyzeMessage] = useState("");
 
   const reload = () => {
     setLoading(true);
@@ -667,21 +669,42 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
     }
   };
 
+  const handleReanalyze = async () => {
+    setReanalyzing(true);
+    setReanalyzeMessage("");
+    try {
+      await adminRacepicService.reanalyzeImage(imageId);
+      setReanalyzeMessage("Neu eingereiht - Status läuft im Tab „Bilder“ automatisch weiter (kann ein bis zwei Minuten dauern).");
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setReanalyzing(false);
+    }
+  };
+
   return (
     <div className="mt-3 rounded-lg border bg-slate-50 p-4">
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-sm font-semibold">Zuordnungen dieses Bildes</h4>
-        <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={onClose}>
-          Schließen
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={reanalyzing} onClick={handleReanalyze}>
+            {reanalyzing ? "Reiht ein…" : "Neu analysieren"}
+          </Button>
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={onClose}>
+            Schließen
+          </Button>
+        </div>
       </div>
+      {reanalyzeMessage && <p className="mb-2 text-xs text-green-700">{reanalyzeMessage}</p>}
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-xs text-slate-400">Lädt…</p>}
       {!loading && assignments.length === 0 && (
         <p className="text-xs text-slate-400">
           Keine Zuordnung gefunden. Die KI hat entweder kein Fahrzeug im Bild erkannt oder keinen Kandidaten mit
           ausreichender Sicherheit gefunden - das Bild gilt trotzdem als "MATCHED" (der Zuordnungsschritt ist
-          durchgelaufen, hat nur nichts gefunden). Fahrer unten manuell zuordnen.
+          durchgelaufen, hat nur nichts gefunden). War tatsächlich ein Fahrzeug im Bild zu sehen? Mit "Neu
+          analysieren" oben läuft die Bilderkennung erneut (hilfreich nach einer Pipeline-Verbesserung). Sonst
+          Fahrer unten manuell zuordnen.
         </p>
       )}
       {!loading && assignments.length > 0 && (
