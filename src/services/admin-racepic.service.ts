@@ -51,6 +51,10 @@ export const adminRacepicService = {
     });
   },
 
+  async deletePhotographer(photographerId: string): Promise<void> {
+    await requestJson(`/admin/racepic/photographers/${photographerId}`, { method: "DELETE" });
+  },
+
   async listLicenses(): Promise<RacepicLicenseOption[]> {
     const res = await requestJson<{ ok: boolean; licenses: RacepicLicenseOption[] }>("/admin/racepic/licenses");
     return res.licenses;

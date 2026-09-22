@@ -22,7 +22,7 @@ export function AdminRacepicReviewPage() {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [busyAssignmentId, setBusyAssignmentId] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -39,15 +39,15 @@ export function AdminRacepicReviewPage() {
 
   useEffect(reload, [reload]);
 
-  const runAction = async (assignmentId: string, action: () => Promise<void>) => {
-    setBusyAssignmentId(assignmentId);
+  const runAction = async (key: string, action: () => Promise<void>) => {
+    setBusyKey(key);
     try {
       await action();
       reload();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setBusyAssignmentId(null);
+      setBusyKey(null);
     }
   };
 
@@ -70,18 +70,21 @@ export function AdminRacepicReviewPage() {
       {!loading && items.length === 0 && <p className="text-sm text-slate-400">Keine offenen Zuordnungen.</p>}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {items.map((item) => (
-          <ReviewCard
-            key={item.assignmentId}
-            item={item}
-            eventId={eventId}
-            busy={busyAssignmentId === item.assignmentId}
-            onConfirm={() => runAction(item.assignmentId, () => adminRacepicService.confirmAssignment(item.assignmentId))}
-            onReject={() => runAction(item.assignmentId, () => adminRacepicService.rejectAssignment(item.assignmentId))}
-            onCorrect={(entryId) => runAction(item.assignmentId, () => adminRacepicService.correctAssignment(item.assignmentId, entryId))}
-            onAdd={(entryId) => runAction(item.assignmentId, () => adminRacepicService.addAssignment(item.imageId, entryId, item.detection?.id ?? null))}
-          />
-        ))}
+        {items.map((item) => {
+          const itemKey = item.assignmentId ?? `orphan:${item.detection?.id ?? item.imageId}`;
+          return (
+            <ReviewCard
+              key={itemKey}
+              item={item}
+              eventId={eventId}
+              busy={busyKey === itemKey}
+              onConfirm={() => item.assignmentId && runAction(itemKey, () => adminRacepicService.confirmAssignment(item.assignmentId!))}
+              onReject={() => item.assignmentId && runAction(itemKey, () => adminRacepicService.rejectAssignment(item.assignmentId!))}
+              onCorrect={(entryId) => item.assignmentId && runAction(itemKey, () => adminRacepicService.correctAssignment(item.assignmentId!, entryId))}
+              onAdd={(entryId) => runAction(itemKey, () => adminRacepicService.addAssignment(item.imageId, entryId, item.detection?.id ?? null))}
+            />
+          );
+        })}
       </div>
 
       {total > PAGE_SIZE && (
@@ -98,7 +101,7 @@ export function AdminRacepicReviewPage() {
   );
 }
 
-function ReviewCard({
+export function ReviewCard({
   item,
   eventId,
   busy,
@@ -144,16 +147,25 @@ function ReviewCard({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy} onClick={onConfirm}>
-          Bestätigen
-        </Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={onReject}>
-          Keine Zuordnung
-        </Button>
-      </div>
+      {item.assignmentId === null && (
+        <p className="text-xs text-amber-700">
+          Kein Kandidat gefunden - die KI hat entweder kein Fahrzeug erkannt oder keinen Treffer über der
+          Prüfschwelle. Fahrer unten manuell zuordnen.
+        </p>
+      )}
 
-      {item.candidates.length > 1 && (
+      {item.assignmentId !== null && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" disabled={busy} onClick={onConfirm}>
+            Bestätigen
+          </Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={onReject}>
+            Keine Zuordnung
+          </Button>
+        </div>
+      )}
+
+      {item.assignmentId !== null && item.candidates.length > 1 && (
         <div>
           <p className="mb-1 text-xs font-medium text-slate-500">Alternative Kandidaten</p>
           <div className="flex flex-wrap gap-2">
@@ -178,7 +190,7 @@ function ReviewCard({
  * Backend, Paket 11 UI - siehe Bestandsaufnahme 2026-09-22 in racepic-progress.md, bislang nur
  * per rohem API-Aufruf erreichbar).
  */
-function HideParticipantSection({ eventId, onHidden }: { eventId: string; onHidden: () => void }) {
+export function HideParticipantSection({ eventId, onHidden }: { eventId: string; onHidden: () => void }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");

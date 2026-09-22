@@ -55,12 +55,13 @@ export type RacepicCandidate = {
 };
 
 export type RacepicReviewItem = {
-  assignmentId: string;
+  /** null = Fahrzeug erkannt, aber (noch) keine Zuordnung vorhanden - nur manuelles Zuordnen möglich. */
+  assignmentId: string | null;
   imageId: string;
   imagePreviewUrl: string;
   detection: { id: string; label: string; bbox: RacepicBoundingBox } | null;
   confidence: number;
-  suggestedEntryId: string;
+  suggestedEntryId: string | null;
   candidates: RacepicCandidate[];
 };
 

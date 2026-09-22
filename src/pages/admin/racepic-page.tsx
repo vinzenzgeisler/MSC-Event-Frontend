@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminRacepicService } from "@/services/admin-racepic.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
+import { HideParticipantSection, ReviewCard } from "./racepic-review-page";
 import type {
   RacepicAdminImage,
   RacepicImagePipelineStatus,
@@ -196,7 +196,7 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
             { label: 'Zu prüfen', value: stats?.assignmentsByStatus.REVIEW_REQUIRED ?? 0, tab: 'assignment' },
           ].map((card) => <button type="button" key={card.label} onClick={() => setActiveTab(card.tab)} className="rounded-xl border bg-white p-5 text-left shadow-sm transition hover:border-primary hover:shadow"><span className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</span><span className="mt-2 block text-3xl font-bold">{card.value}</span></button>)}
         </div>
-        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => setActiveTab('images')}>Bilder öffnen</Button><Button size="sm" variant="outline" onClick={() => setActiveTab('photographers')}>Fotograf:innen verwalten</Button><Button size="sm" variant="outline" asChild><Link to={`/admin/racepic/review/${event.eventId}`}>Review-Queue öffnen</Link></Button></div>
+        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => setActiveTab('images')}>Bilder öffnen</Button><Button size="sm" variant="outline" onClick={() => setActiveTab('photographers')}>Fotograf:innen verwalten</Button><Button size="sm" variant="outline" onClick={() => setActiveTab('assignment')}>Zuordnung öffnen</Button></div>
       </TabsContent>
 
       <TabsContent value="settings" className="pt-4">
@@ -503,7 +503,8 @@ function ImagesSection({ eventId }: { eventId: string }) {
     });
   };
 
-  const runBulkAction = async (next: "PUBLISHED" | "HIDDEN") => {
+  const runBulkAction = async (next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
+    if (next === "REMOVED" && !window.confirm(`${selected.size} Bild(er) wirklich entfernen? Das löscht die Bilddateien (Datenbank-Eintrag bleibt vorerst erhalten).`)) return;
     setBulkRunning(true);
     setError("");
     try {
@@ -535,6 +536,9 @@ function ImagesSection({ eventId }: { eventId: string }) {
               </Button>
               <Button size="sm" variant="outline" disabled={bulkRunning} onClick={() => runBulkAction("HIDDEN")}>
                 Verbergen
+              </Button>
+              <Button size="sm" variant="outline" className="text-destructive" disabled={bulkRunning} onClick={() => runBulkAction("REMOVED")}>
+                Entfernen
               </Button>
             </>
           )}
@@ -847,28 +851,30 @@ function EntryAssignPicker({ eventId, disabled, onPick }: { eventId: string; dis
   );
 }
 
-const PREVIEW_LIMIT = 4;
+const REVIEW_PAGE_SIZE = 10;
 
 /**
- * "Zuordnung"-Tab (Bestandsaufnahme 2026-09-22: bisher "immer nur ein Button, der zu Review
- * führt" ohne jede Übersicht). Zeigt jetzt, wie viele Bilder in welchem Zuordnungsstatus stecken
- * und eine kleine Vorschau der ersten offenen Fälle direkt hier - Bestätigen/Ablehnen geht schon
- * von hier aus, für alles Weitere (BBox-Overlay, "anderer Fahrer") bleibt der Sprung in die volle
- * Review-Queue nötig.
+ * "Zuordnung"-Tab (Feedback 2026-09-22: "kann der Tab Zuordnung nicht zusammengeführt werden mit
+ * der 'Review Queue öffnen'? Also eine zentrale Stelle zum Zuordnen der Bilder mit den Fahrern.").
+ * War bisher nur eine kleine Statistik + 4er-Vorschau mit Link auf die separate Review-Queue-Seite
+ * (`/admin/racepic/review/:eventId`, racepic-review-page.tsx) - jetzt ist der Tab selbst die volle,
+ * paginierte Queue (gleiche `ReviewCard`/`HideParticipantSection`-Komponenten wie die separate
+ * Seite, die bleibt als eigenstaendige Route zusaetzlich nutzbar, ist aber nicht mehr verlinkt).
  */
 function AssignmentOverviewTab({ eventId }: { eventId: string }) {
   const [stats, setStats] = useState<RacepicEventStats | null>(null);
-  const [preview, setPreview] = useState<RacepicReviewItem[]>([]);
+  const [items, setItems] = useState<RacepicReviewItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const reload = () => {
-    Promise.all([adminRacepicService.getEventStats(eventId), adminRacepicService.listReviewQueue(eventId, 0, PREVIEW_LIMIT)])
+    Promise.all([adminRacepicService.getEventStats(eventId), adminRacepicService.listReviewQueue(eventId, offset, REVIEW_PAGE_SIZE)])
       .then(([statsResult, reviewResult]) => {
         setStats(statsResult);
-        setPreview(reviewResult.items);
+        setItems(reviewResult.items);
         setTotal(reviewResult.total);
         setError("");
       })
@@ -880,18 +886,17 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
     reload();
     const interval = window.setInterval(reload, 8000);
     return () => window.clearInterval(interval);
-  }, [eventId]);
+  }, [eventId, offset]);
 
-  const decide = async (assignmentId: string, action: "confirm" | "reject") => {
-    setBusyId(assignmentId);
+  const runAction = async (key: string, action: () => Promise<void>) => {
+    setBusyKey(key);
     try {
-      if (action === "confirm") await adminRacepicService.confirmAssignment(assignmentId);
-      else await adminRacepicService.rejectAssignment(assignmentId);
+      await action();
       reload();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setBusyId(null);
+      setBusyKey(null);
     }
   };
 
@@ -905,12 +910,11 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-4">
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {loading && <p className="text-sm text-slate-400">Lädt…</p>}
 
       {!loading && (
         <div className="grid gap-2 sm:grid-cols-4">
           <StatusTile label="Werden noch verarbeitet" value={pendingImages + processingImages} tone="slate" />
-          <StatusTile label="Wartet auf Entscheidung" value={reviewRequired} tone="amber" />
+          <StatusTile label="Wartet auf Entscheidung" value={total} tone="amber" />
           <StatusTile label="Automatisch zugeordnet" value={autoMatched} tone="green" />
           <StatusTile label="Bestätigt / korrigiert" value={confirmed} tone="slate" />
         </div>
@@ -923,54 +927,40 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
         </p>
       )}
 
-      {!loading && reviewRequired === 0 && pendingImages + processingImages === 0 && (
+      <HideParticipantSection eventId={eventId} onHidden={reload} />
+
+      {loading && <p className="text-sm text-slate-400">Lädt…</p>}
+      {!loading && total === 0 && reviewRequired === 0 && (
         <p className="text-sm text-slate-400">Keine offenen Zuordnungen - alle Bilder sind entweder automatisch zugeordnet oder entschieden.</p>
       )}
 
-      {preview.length > 0 && (
-        <div>
-          <p className="mb-2 text-sm font-medium">Erste offene Fälle</p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {preview.map((item) => {
-              const suggested = item.candidates.find((c) => c.entryId === item.suggestedEntryId) ?? item.candidates[0];
-              return (
-                <div key={item.assignmentId} className="overflow-hidden rounded-lg border bg-white">
-                  <img src={item.imagePreviewUrl} alt="" className="aspect-[4/3] w-full object-cover" />
-                  <div className="space-y-1 p-2">
-                    {suggested && (
-                      <p className="text-[11px]">
-                        #{suggested.startNumber} {suggested.driverName}
-                        <span className="ml-1 text-slate-400">{Math.round(item.confidence * 100)}%</span>
-                      </p>
-                    )}
-                    <div className="flex gap-1">
-                      <Button size="sm" className="h-6 flex-1 px-1.5 text-[10px]" disabled={busyId === item.assignmentId} onClick={() => decide(item.assignmentId, "confirm")}>
-                        Bestätigen
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 flex-1 px-1.5 text-[10px]"
-                        disabled={busyId === item.assignmentId}
-                        onClick={() => decide(item.assignmentId, "reject")}
-                      >
-                        Ablehnen
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        {items.map((item) => {
+          const itemKey = item.assignmentId ?? `orphan:${item.detection?.id ?? item.imageId}`;
+          return (
+            <ReviewCard
+              key={itemKey}
+              item={item}
+              eventId={eventId}
+              busy={busyKey === itemKey}
+              onConfirm={() => item.assignmentId && runAction(itemKey, () => adminRacepicService.confirmAssignment(item.assignmentId!))}
+              onReject={() => item.assignmentId && runAction(itemKey, () => adminRacepicService.rejectAssignment(item.assignmentId!))}
+              onCorrect={(entryId) => item.assignmentId && runAction(itemKey, () => adminRacepicService.correctAssignment(item.assignmentId!, entryId))}
+              onAdd={(entryId) => runAction(itemKey, () => adminRacepicService.addAssignment(item.imageId, entryId, item.detection?.id ?? null))}
+            />
+          );
+        })}
+      </div>
 
-      {total > 0 && (
-        <Button size="sm" variant="outline" asChild>
-          <Link to={`/admin/racepic/review/${eventId}`}>
-            {total > PREVIEW_LIMIT ? `Alle ${total} offenen Zuordnungen öffnen` : "Review-Queue öffnen"}
-          </Link>
-        </Button>
+      {total > REVIEW_PAGE_SIZE && (
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - REVIEW_PAGE_SIZE))}>
+            Zurück
+          </Button>
+          <Button variant="outline" size="sm" disabled={offset + REVIEW_PAGE_SIZE >= total} onClick={() => setOffset(offset + REVIEW_PAGE_SIZE)}>
+            Weiter
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -1229,6 +1219,14 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
     finally { setReviewingId(null); }
   };
 
+  const handleDeletePhotographer = async (photographerId: string, displayName: string) => {
+    if (!window.confirm(`${displayName} wirklich löschen? Der Zugang wird gesperrt, bereits hochgeladene Bilder bleiben erhalten.`)) return;
+    setReviewingId(photographerId); setError('');
+    try { await adminRacepicService.deletePhotographer(photographerId); reload(); }
+    catch (err) { setError(getApiErrorMessage(err)); }
+    finally { setReviewingId(null); }
+  };
+
   return (
     <div className="space-y-4">
       {pendingRegistrations.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Neue Registrierungen ({pendingRegistrations.length})</h3><p className="mt-1 text-xs text-amber-900">Freigabe gibt Upload-Rechte für dieses Event. Prüfe Identität und Bildrechte vor der Entscheidung.</p><div className="mt-3 space-y-2">{pendingRegistrations.map((photographer) => <div key={photographer.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3 text-sm"><span><strong>{photographer.displayName}</strong> · {photographer.email}</span><div className="flex gap-2"><Button size="sm" disabled={reviewingId === photographer.id} onClick={() => review(photographer.id, 'approve')}>Für Event freigeben</Button><Button size="sm" variant="outline" disabled={reviewingId === photographer.id} onClick={() => review(photographer.id, 'reject')}>Ablehnen</Button></div></div>)}</div></div>}
@@ -1260,6 +1258,7 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
                 <th className="p-3">Name</th>
                 <th className="p-3">E-Mail</th>
                 <th className="p-3">Status</th>
+                <th className="p-3" />
               </tr>
             </thead>
             <tbody>
@@ -1270,11 +1269,22 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
                   <td className="p-3">
                     <Badge variant={photographer.status === "ACTIVE_FREE" ? "default" : "secondary"}>{photographer.status}</Badge>
                   </td>
+                  <td className="p-3 text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-[11px] text-destructive"
+                      disabled={reviewingId === photographer.id}
+                      onClick={() => handleDeletePhotographer(photographer.id, photographer.displayName)}
+                    >
+                      Löschen
+                    </Button>
+                  </td>
                 </tr>
               ))}
               {photographers.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="p-3 text-center text-slate-400">
+                  <td colSpan={4} className="p-3 text-center text-slate-400">
                     Noch keine Fotograf:innen für dieses Event.
                   </td>
                 </tr>
