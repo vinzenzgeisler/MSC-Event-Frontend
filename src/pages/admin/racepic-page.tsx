@@ -17,6 +17,7 @@ import type {
   RacepicMatchingConfig,
   RacepicMatchQualityReport,
   RacepicPhotographer,
+  RacepicReviewItem,
 } from "@/types/admin-racepic";
 
 /**
@@ -159,10 +160,25 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
   const [stats, setStats] = useState<RacepicEventStats | null>(null);
 
   useEffect(() => {
-    adminRacepicService
-      .getEventStats(event.eventId)
-      .then(setStats)
-      .catch(() => setStats(null));
+    let cancelled = false;
+    const load = () => {
+      adminRacepicService
+        .getEventStats(event.eventId)
+        .then((result) => {
+          if (!cancelled) setStats(result);
+        })
+        .catch(() => {
+          if (!cancelled) setStats(null);
+        });
+    };
+    load();
+    // Pollt alle 8s, solange dieses Event aufgeklappt ist, damit der KI-Pipeline-Status live
+    // weiterläuft (Feedback 2026-09-22) statt nur beim manuellen Neuladen der Seite zu aktualisieren.
+    const interval = window.setInterval(load, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [event.eventId]);
 
   const handleSubmit = async (submitEvent: FormEvent) => {
@@ -269,18 +285,46 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
         <h3 className="mb-2 text-sm font-semibold">Statistik</h3>
         {!stats && <p className="text-sm text-slate-400">Lädt…</p>}
         {stats && (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-3 text-sm">
             <p>{stats.photographerCount} Fotograf:innen mit Zugang</p>
             <div>
-              <p className="font-medium">Bilder nach Status</p>
-              <ul className="ml-4 list-disc">
-                {Object.entries(stats.imagesByStatus).map(([status, count]) => (
-                  <li key={status}>
-                    {status}: {count}
-                  </li>
-                ))}
-                {Object.keys(stats.imagesByStatus).length === 0 && <li className="text-slate-400">keine Bilder</li>}
-              </ul>
+              <p className="mb-1 font-medium">KI-Pipeline: Bilder nach Verarbeitungsstatus</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  ...PROCESSING_STATUS_ORDER,
+                  ...Object.keys(stats.imagesByStatus).filter((status) => !PROCESSING_STATUS_ORDER.includes(status)),
+                ]
+                  .filter((status) => stats.imagesByStatus[status] > 0)
+                  .map((status) => (
+                    <span key={status} className="inline-flex items-center gap-1">
+                      <ProcessingStatusBadge status={status} />
+                      <span className="text-xs text-slate-500">×{stats.imagesByStatus[status]}</span>
+                    </span>
+                  ))}
+                {Object.keys(stats.imagesByStatus).length === 0 && <span className="text-slate-400">keine Bilder</span>}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 font-medium">Zuordnungen nach Status</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  ...ASSIGNMENT_STATUS_ORDER,
+                  ...Object.keys(stats.assignmentsByStatus).filter((status) => !ASSIGNMENT_STATUS_ORDER.includes(status)),
+                ]
+                  .filter((status) => stats.assignmentsByStatus[status] > 0)
+                  .map((status) => (
+                    <span key={status} className="inline-flex items-center gap-1">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] ${status === "REVIEW_REQUIRED" ? "border-amber-300 text-amber-700" : "border-slate-300 text-slate-500"}`}
+                      >
+                        {ASSIGNMENT_STATUS_LABELS[status] ?? status}
+                      </Badge>
+                      <span className="text-xs text-slate-500">×{stats.assignmentsByStatus[status]}</span>
+                    </span>
+                  ))}
+                {Object.keys(stats.assignmentsByStatus).length === 0 && <span className="text-slate-400">noch keine Zuordnungen</span>}
+              </div>
             </div>
             <div>
               <p className="font-medium">Bilder nach Sichtbarkeit</p>
@@ -308,14 +352,7 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
       </TabsContent>
 
       <TabsContent value="assignment" className="pt-4">
-        <div className="rounded-lg border p-6 text-sm">
-          <p className="mb-3 text-slate-600">
-            Offene KI-Vorschläge einzeln mit Bild und BBox-Overlay durchgehen und bestätigen/korrigieren.
-          </p>
-          <Button size="sm" variant="outline" asChild>
-            <Link to={`/admin/racepic/review/${event.eventId}`}>Review-Queue öffnen</Link>
-          </Button>
-        </div>
+        <AssignmentOverviewTab eventId={event.eventId} />
       </TabsContent>
 
       <TabsContent value="matching" className="pt-4">
@@ -324,6 +361,52 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
     </Tabs>
   );
 }
+
+/**
+ * KI-Pipeline-Status pro Bild (Feedback 2026-09-22: "einen besseren Status der KI-Analyse" - ein
+ * frisch hochgeladenes Bild durchläuft Ingest → Analyze → Match asynchron über SQS und taucht
+ * deshalb nicht sofort in der Review-Queue auf; die rohen Enum-Werte allein erklären das nicht).
+ */
+const PROCESSING_STATUS_ORDER = ["UPLOADED", "VALIDATED", "DERIVED", "ANALYZED", "MATCHED", "FAILED", "DUPLICATE"];
+const PROCESSING_STATUS_LABELS: Record<string, string> = {
+  UPLOADED: "Hochgeladen",
+  VALIDATED: "Geprüft",
+  DERIVED: "Varianten werden erzeugt",
+  ANALYZED: "KI-Analyse fertig",
+  MATCHED: "Zuordnung berechnet",
+  FAILED: "Fehlgeschlagen",
+  DUPLICATE: "Duplikat",
+};
+// Bilder in diesen Stati werden noch von der Pipeline verarbeitet - solange mindestens eins davon
+// existiert, lohnt sich Polling, damit der Status ohne manuelles Neuladen weiterläuft.
+const PROCESSING_NON_TERMINAL_STATUSES = new Set(["UPLOADED", "VALIDATED", "DERIVED", "ANALYZED"]);
+const PROCESSING_STATUS_BADGE_CLASS: Record<string, string> = {
+  UPLOADED: "border-slate-300 text-slate-500",
+  VALIDATED: "border-slate-300 text-slate-500",
+  DERIVED: "border-blue-300 text-blue-600",
+  ANALYZED: "border-blue-300 text-blue-600",
+  MATCHED: "border-green-300 text-green-700",
+  FAILED: "border-red-300 text-red-700",
+  DUPLICATE: "border-amber-300 text-amber-700",
+};
+
+function ProcessingStatusBadge({ status }: { status: string }) {
+  return (
+    <Badge variant="outline" className={`text-[10px] ${PROCESSING_STATUS_BADGE_CLASS[status] ?? "border-slate-300 text-slate-500"}`}>
+      {PROCESSING_NON_TERMINAL_STATUSES.has(status) && <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />}
+      {PROCESSING_STATUS_LABELS[status] ?? status}
+    </Badge>
+  );
+}
+
+const ASSIGNMENT_STATUS_ORDER = ["REVIEW_REQUIRED", "AUTO_MATCHED", "MANUALLY_CONFIRMED", "MANUALLY_CORRECTED", "REJECTED"];
+const ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
+  REVIEW_REQUIRED: "Wartet auf Entscheidung",
+  AUTO_MATCHED: "Automatisch zugeordnet",
+  MANUALLY_CONFIRMED: "Bestätigt",
+  MANUALLY_CORRECTED: "Manuell korrigiert",
+  REJECTED: "Abgelehnt",
+};
 
 const VISIBILITY_ACTIONS: Record<string, { label: string; next: "PUBLISHED" | "HIDDEN" | "REMOVED"; permission?: "manage" }[]> = {
   DRAFT: [{ label: "Veröffentlichen", next: "PUBLISHED" }],
@@ -370,6 +453,16 @@ function ImagesSection({ eventId }: { eventId: string }) {
   };
 
   useEffect(reload, [eventId, visibilityFilter, offset]);
+
+  // Solange noch Bilder auf dieser Seite in der Pipeline stecken (UPLOADED/VALIDATED/DERIVED/
+  // ANALYZED), alle 5s neu laden - Feedback 2026-09-22: ein frisch hochgeladenes Bild soll seinen
+  // Fortschritt zeigen, ohne dass man die Seite manuell neu lädt. Stoppt automatisch, sobald alle
+  // sichtbaren Bilder einen Endstatus (MATCHED/FAILED/DUPLICATE) erreicht haben.
+  useEffect(() => {
+    if (!items.some((item) => PROCESSING_NON_TERMINAL_STATUSES.has(item.processingStatus))) return;
+    const timeout = window.setTimeout(reload, 5000);
+    return () => window.clearTimeout(timeout);
+  }, [items, eventId, visibilityFilter, offset]);
 
   const runAction = async (imageId: string, next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
     if (next === "REMOVED" && !window.confirm("Bild wirklich endgültig entfernen? Das löscht die Bilddateien.")) return;
@@ -462,7 +555,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
                   <Badge variant={image.visibility === "PUBLISHED" ? "default" : "secondary"} className="text-[10px]">
                     {image.visibility}
                   </Badge>
-                  <span className="text-[10px] text-slate-400">{image.processingStatus}</span>
+                  <ProcessingStatusBadge status={image.processingStatus} />
                 </div>
                 <div className="flex flex-wrap gap-1 pt-1">
                   {(VISIBILITY_ACTIONS[image.visibility] ?? []).map((action) => (
@@ -598,6 +691,145 @@ function ImageAssignmentDetail({ imageId, onClose }: { imageId: string; onClose:
       <p className="mt-2 text-[11px] text-slate-400">
         Einem anderen Fahrer zuordnen geht über die Review-Queue (Tab "Zuordnung").
       </p>
+    </div>
+  );
+}
+
+const PREVIEW_LIMIT = 4;
+
+/**
+ * "Zuordnung"-Tab (Bestandsaufnahme 2026-09-22: bisher "immer nur ein Button, der zu Review
+ * führt" ohne jede Übersicht). Zeigt jetzt, wie viele Bilder in welchem Zuordnungsstatus stecken
+ * und eine kleine Vorschau der ersten offenen Fälle direkt hier - Bestätigen/Ablehnen geht schon
+ * von hier aus, für alles Weitere (BBox-Overlay, "anderer Fahrer") bleibt der Sprung in die volle
+ * Review-Queue nötig.
+ */
+function AssignmentOverviewTab({ eventId }: { eventId: string }) {
+  const [stats, setStats] = useState<RacepicEventStats | null>(null);
+  const [preview, setPreview] = useState<RacepicReviewItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const reload = () => {
+    Promise.all([adminRacepicService.getEventStats(eventId), adminRacepicService.listReviewQueue(eventId, 0, PREVIEW_LIMIT)])
+      .then(([statsResult, reviewResult]) => {
+        setStats(statsResult);
+        setPreview(reviewResult.items);
+        setTotal(reviewResult.total);
+        setError("");
+      })
+      .catch((err) => setError(getApiErrorMessage(err)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    reload();
+    const interval = window.setInterval(reload, 8000);
+    return () => window.clearInterval(interval);
+  }, [eventId]);
+
+  const decide = async (assignmentId: string, action: "confirm" | "reject") => {
+    setBusyId(assignmentId);
+    try {
+      if (action === "confirm") await adminRacepicService.confirmAssignment(assignmentId);
+      else await adminRacepicService.rejectAssignment(assignmentId);
+      reload();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const pendingImages = stats?.imagesByStatus.UPLOADED ?? 0;
+  const processingImages =
+    (stats?.imagesByStatus.VALIDATED ?? 0) + (stats?.imagesByStatus.DERIVED ?? 0) + (stats?.imagesByStatus.ANALYZED ?? 0);
+  const reviewRequired = stats?.assignmentsByStatus.REVIEW_REQUIRED ?? 0;
+  const autoMatched = stats?.assignmentsByStatus.AUTO_MATCHED ?? 0;
+  const confirmed = (stats?.assignmentsByStatus.MANUALLY_CONFIRMED ?? 0) + (stats?.assignmentsByStatus.MANUALLY_CORRECTED ?? 0);
+
+  return (
+    <div className="space-y-4">
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {loading && <p className="text-sm text-slate-400">Lädt…</p>}
+
+      {!loading && (
+        <div className="grid gap-2 sm:grid-cols-4">
+          <StatusTile label="Werden noch verarbeitet" value={pendingImages + processingImages} tone="slate" />
+          <StatusTile label="Wartet auf Entscheidung" value={reviewRequired} tone="amber" />
+          <StatusTile label="Automatisch zugeordnet" value={autoMatched} tone="green" />
+          <StatusTile label="Bestätigt / korrigiert" value={confirmed} tone="slate" />
+        </div>
+      )}
+
+      {!loading && pendingImages + processingImages > 0 && (
+        <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+          {pendingImages + processingImages} Bild(er) laufen gerade durch die KI-Pipeline (Ingest → Analyse → Zuordnung) - sie tauchen erst hier
+          auf, sobald die Zuordnung berechnet wurde. Fortschritt siehe Tab "Bilder" bzw. Statistik im Tab "Einstellungen".
+        </p>
+      )}
+
+      {!loading && reviewRequired === 0 && pendingImages + processingImages === 0 && (
+        <p className="text-sm text-slate-400">Keine offenen Zuordnungen - alle Bilder sind entweder automatisch zugeordnet oder entschieden.</p>
+      )}
+
+      {preview.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-medium">Erste offene Fälle</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {preview.map((item) => {
+              const suggested = item.candidates.find((c) => c.entryId === item.suggestedEntryId) ?? item.candidates[0];
+              return (
+                <div key={item.assignmentId} className="overflow-hidden rounded-lg border bg-white">
+                  <img src={item.imagePreviewUrl} alt="" className="aspect-[4/3] w-full object-cover" />
+                  <div className="space-y-1 p-2">
+                    {suggested && (
+                      <p className="text-[11px]">
+                        #{suggested.startNumber} {suggested.driverName}
+                        <span className="ml-1 text-slate-400">{Math.round(item.confidence * 100)}%</span>
+                      </p>
+                    )}
+                    <div className="flex gap-1">
+                      <Button size="sm" className="h-6 flex-1 px-1.5 text-[10px]" disabled={busyId === item.assignmentId} onClick={() => decide(item.assignmentId, "confirm")}>
+                        Bestätigen
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 flex-1 px-1.5 text-[10px]"
+                        disabled={busyId === item.assignmentId}
+                        onClick={() => decide(item.assignmentId, "reject")}
+                      >
+                        Ablehnen
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {total > 0 && (
+        <Button size="sm" variant="outline" asChild>
+          <Link to={`/admin/racepic/review/${eventId}`}>
+            {total > PREVIEW_LIMIT ? `Alle ${total} offenen Zuordnungen öffnen` : "Review-Queue öffnen"}
+          </Link>
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function StatusTile({ label, value, tone }: { label: string; value: number; tone: "slate" | "amber" | "green" }) {
+  const toneClass = tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-800" : tone === "green" ? "border-green-200 bg-green-50 text-green-800" : "border-slate-200 bg-slate-50 text-slate-700";
+  return (
+    <div className={`rounded-lg border p-3 ${toneClass}`}>
+      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-xs">{label}</p>
     </div>
   );
 }

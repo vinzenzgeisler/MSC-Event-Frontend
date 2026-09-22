@@ -22,6 +22,7 @@ export type RacepicEventStats = {
   photographerCount: number;
   imagesByStatus: Record<string, number>;
   imagesByVisibility: Record<string, number>;
+  assignmentsByStatus: Record<string, number>;
 };
 
 export type RacepicPhotographer = {
