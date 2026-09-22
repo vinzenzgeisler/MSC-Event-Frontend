@@ -1,7 +1,7 @@
 <!-- Nur die Architektur (racepic-architecture.md) wird 1:1 in allen 3 Repos synchron gehalten. Diese Fortschrittsdatei ist repo-spezifisch und listet nur die Arbeitspakete, die in MSC-Event-Frontend passieren. -->
 # RacePic – Fortschritt (MSC-Event-Frontend)
 
-**Stand:** 2026-09-22 · Architektur: [racepic-architecture.md](./racepic-architecture.md)
+**Stand:** 2026-09-22 · Architektur: [racepic-architecture.md](./racepic-architecture.md) · Offene Punkte (konsolidiert): [racepic-open-items.md](./racepic-open-items.md)
 
 ## Arbeitspakete in diesem Repo
 
