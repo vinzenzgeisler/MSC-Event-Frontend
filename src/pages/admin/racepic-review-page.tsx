@@ -57,6 +57,8 @@ export function AdminRacepicReviewPage() {
         <p className="text-sm text-slate-500">{total} Zuordnung(en) benötigen eine Entscheidung.</p>
       </div>
 
+      <HideParticipantSection eventId={eventId} onHidden={reload} />
+
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {loading && <p className="text-sm text-slate-500">Lädt…</p>}
 
@@ -162,6 +164,42 @@ function ReviewCard({
       )}
 
       <EntrySearchPicker eventId={eventId} disabled={busy} onPick={onAdd} label="Weitere Zuordnung / anderer Fahrer" />
+    </div>
+  );
+}
+
+/**
+ * Datenschutz-Widerspruch/Wunsch: alle Bilder einer Nennung auf einen Schlag ausblenden (Paket 9
+ * Backend, Paket 11 UI - siehe Bestandsaufnahme 2026-09-22 in racepic-progress.md, bislang nur
+ * per rohem API-Aufruf erreichbar).
+ */
+function HideParticipantSection({ eventId, onHidden }: { eventId: string; onHidden: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const handlePick = async (entryId: string) => {
+    if (!window.confirm("Alle Bilder dieser Nennung ausblenden (bestehende Zuordnungen werden abgelehnt)?")) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await adminRacepicService.hideParticipant(entryId);
+      setMessage(`${result.rejectedCount} Zuordnung(en) abgelehnt.`);
+      onHidden();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border p-4">
+      <p className="mb-1 text-sm font-medium">Teilnehmer ausblenden (Datenschutz-Widerspruch)</p>
+      <EntrySearchPicker eventId={eventId} disabled={busy} onPick={handlePick} label="Nennung suchen" />
+      {message && <p className="mt-1 text-sm text-green-700">{message}</p>}
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

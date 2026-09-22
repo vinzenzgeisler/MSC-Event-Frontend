@@ -1,10 +1,14 @@
 import { requestJson } from "@/services/api/http-client";
 import type {
+  RacepicAdminImage,
   RacepicEntrySearchResult,
   RacepicEventConfig,
   RacepicEventListItem,
   RacepicEventStats,
   RacepicLicenseOption,
+  RacepicMatchingConfig,
+  RacepicMatchingConfigInput,
+  RacepicMatchQualityReport,
   RacepicPhotographer,
   RacepicReviewItem,
 } from "@/types/admin-racepic";
@@ -75,5 +79,50 @@ export const adminRacepicService = {
 
   async addAssignment(imageId: string, entryId: string, detectionId: string | null): Promise<void> {
     await requestJson(`/admin/racepic/images/${imageId}/assignments`, { method: "POST", body: { entryId, detectionId } });
+  },
+
+  async hideParticipant(entryId: string): Promise<{ rejectedCount: number }> {
+    return requestJson<{ ok: boolean; rejectedCount: number }>(`/admin/racepic/participants/${entryId}/hide`, { method: "POST" });
+  },
+
+  // --- Paket 11: Bildliste, Matching-Config, Rematch/Reanalyze, Qualitätsreport ---
+
+  async listImages(
+    eventId: string,
+    filter: { visibility?: string; processingStatus?: string },
+    offset: number,
+    limit: number,
+  ): Promise<{ items: RacepicAdminImage[]; total: number }> {
+    return requestJson<{ ok: boolean; items: RacepicAdminImage[]; total: number }>(`/admin/racepic/events/${eventId}/images`, {
+      query: { ...filter, offset, limit },
+    });
+  },
+
+  async setImageVisibility(imageId: string, visibility: "PUBLISHED" | "HIDDEN" | "REMOVED"): Promise<void> {
+    await requestJson(`/admin/racepic/images/${imageId}`, { method: "PATCH", body: { visibility } });
+  },
+
+  async listMatchingConfigs(eventId?: string): Promise<RacepicMatchingConfig[]> {
+    const res = await requestJson<{ ok: boolean; configs: RacepicMatchingConfig[] }>("/admin/racepic/matching-configs", {
+      query: eventId ? { eventId } : undefined,
+    });
+    return res.configs;
+  },
+
+  async createMatchingConfig(input: RacepicMatchingConfigInput): Promise<RacepicMatchingConfig> {
+    const res = await requestJson<{ ok: boolean; config: RacepicMatchingConfig }>("/admin/racepic/matching-configs", {
+      method: "POST",
+      body: input,
+    });
+    return res.config;
+  },
+
+  async triggerRematch(eventId: string): Promise<{ queued: number }> {
+    return requestJson<{ ok: boolean; queued: number }>(`/admin/racepic/events/${eventId}/rematch`, { method: "POST" });
+  },
+
+  async getMatchQualityReport(eventId: string): Promise<RacepicMatchQualityReport> {
+    const res = await requestJson<{ ok: boolean; report: RacepicMatchQualityReport }>(`/admin/racepic/events/${eventId}/matching-quality-report`);
+    return res.report;
   },
 };

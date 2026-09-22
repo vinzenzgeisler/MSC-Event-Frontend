@@ -70,3 +70,65 @@ export type RacepicEntrySearchResult = {
   vehicleMake: string | null;
   vehicleModel: string | null;
 };
+
+// --- Paket 11: Bildliste, Matching-Config, Qualitätsreport ----------------------------------------
+
+export type RacepicAdminImage = {
+  id: string;
+  previewUrl: string | null;
+  visibility: "DRAFT" | "PUBLISHED" | "HIDDEN" | "REMOVED";
+  processingStatus: string;
+  photographerDisplayName: string;
+  capturedAt: string | null;
+  createdAt: string;
+};
+
+export type RacepicMatchingWeights = {
+  ocrExact: number;
+  ocrConfidence: number;
+  vehicleTypeMatch: number;
+  embeddingSimilarity: number;
+  colorSimilarity: number;
+  ambiguityPenalty: number;
+};
+
+/**
+ * Spiegelt die rohe DB-Zeile aus `GET /admin/racepic/matching-configs` (`listMatchingConfigs` in
+ * MSC-Event-Backend gibt die Drizzle-Zeile unveraendert zurueck) - die `numeric`-Spalten kommen
+ * dabei als String, nicht als Zahl (Standardverhalten von drizzle-orm ohne `mode: 'number'`).
+ * Beim Anlegen (`POST`) erwartet das Backend dagegen echte Zahlen, siehe `RacepicMatchingConfigInput`.
+ */
+export type RacepicMatchingConfig = {
+  id: string;
+  eventId: string | null;
+  version: number;
+  weights: RacepicMatchingWeights;
+  autoThreshold: string;
+  reviewThreshold: string;
+  minMargin: string;
+  active: boolean;
+};
+
+export type RacepicMatchingConfigInput = {
+  eventId: string | null;
+  weights: RacepicMatchingWeights;
+  autoThreshold: number;
+  reviewThreshold: number;
+  minMargin: number;
+};
+
+export type RacepicQualityThresholdRow = {
+  threshold: number;
+  candidateCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  precision: number | null;
+  recall: number | null;
+};
+
+export type RacepicMatchQualityReport = {
+  eventId: string;
+  reviewedDetectionCount: number;
+  detectionsWithConfirmedMatchCount: number;
+  thresholds: RacepicQualityThresholdRow[];
+};
