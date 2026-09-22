@@ -25,17 +25,15 @@ import type {
  */
 export function AdminRacepicPage() {
   const [events, setEvents] = useState<RacepicEventListItem[]>([]);
-  const [photographers, setPhotographers] = useState<RacepicPhotographer[]>([]);
   const [licenses, setLicenses] = useState<RacepicLicenseOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const reload = () => {
     setLoading(true);
-    Promise.all([adminRacepicService.listEvents(), adminRacepicService.listPhotographers(), adminRacepicService.listLicenses()])
-      .then(([eventsRes, photographersRes, licensesRes]) => {
+    Promise.all([adminRacepicService.listEvents(), adminRacepicService.listLicenses()])
+      .then(([eventsRes, licensesRes]) => {
         setEvents(eventsRes);
-        setPhotographers(photographersRes);
         setLicenses(licensesRes);
         setError("");
       })
@@ -49,18 +47,15 @@ export function AdminRacepicPage() {
     <div className="space-y-8 p-6">
       <div>
         <h1 className="text-2xl font-bold">RacePic</h1>
-        <p className="text-sm text-slate-500">Events aktivieren, Fotograf:innen einladen und den Status verfolgen.</p>
+        <p className="text-sm text-slate-500">
+          Event aufklappen, um Einstellungen, Fotograf:innen, Bilder, Zuordnung und KI-Konfiguration zu verwalten.
+        </p>
       </div>
 
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {loading && <p className="text-sm text-slate-500">Lädt…</p>}
 
-      {!loading && (
-        <>
-          <EventsSection events={events} licenses={licenses} onChanged={reload} />
-          <PhotographersSection photographers={photographers} events={events} onChanged={reload} />
-        </>
-      )}
+      {!loading && <EventsSection events={events} licenses={licenses} onChanged={reload} />}
     </div>
   );
 }
@@ -192,14 +187,27 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
     }
   };
 
+  const tabTriggerClass =
+    "rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-slate-500 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none";
+
   return (
     <Tabs defaultValue="settings" className="w-full">
-      <TabsList>
-        <TabsTrigger value="settings">Einstellungen</TabsTrigger>
-        <TabsTrigger value="photographers">Fotograf:innen</TabsTrigger>
-        <TabsTrigger value="images">Bilder</TabsTrigger>
-        <TabsTrigger value="assignment">Zuordnung</TabsTrigger>
-        <TabsTrigger value="matching">KI-Konfiguration</TabsTrigger>
+      <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+        <TabsTrigger value="settings" className={tabTriggerClass}>
+          Einstellungen
+        </TabsTrigger>
+        <TabsTrigger value="photographers" className={tabTriggerClass}>
+          Fotograf:innen
+        </TabsTrigger>
+        <TabsTrigger value="images" className={tabTriggerClass}>
+          Bilder
+        </TabsTrigger>
+        <TabsTrigger value="assignment" className={tabTriggerClass}>
+          Zuordnung
+        </TabsTrigger>
+        <TabsTrigger value="matching" className={tabTriggerClass}>
+          KI-Konfiguration
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="settings" className="pt-4">
@@ -436,8 +444,14 @@ function ImagesSection({ eventId }: { eventId: string }) {
         <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {items.map((image) => (
             <div key={image.id} className="overflow-hidden rounded-lg border bg-white">
-              <div className="relative aspect-[4/3] bg-slate-100">
-                {image.previewUrl && <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />}
+              <div className="relative flex aspect-[4/3] items-center justify-center bg-slate-100">
+                {image.previewUrl ? (
+                  <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-[10px] text-slate-400">
+                    {image.visibility === "REMOVED" ? "Entfernt" : "Wird verarbeitet…"}
+                  </span>
+                )}
                 <label className="absolute left-1.5 top-1.5 rounded bg-white/90 p-1">
                   <input type="checkbox" checked={selected.has(image.id)} onChange={() => toggleSelected(image.id)} />
                 </label>

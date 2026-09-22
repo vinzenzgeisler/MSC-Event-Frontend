@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { adminRacepicService } from "@/services/admin-racepic.service";
@@ -53,7 +54,11 @@ export function AdminRacepicReviewPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold">RacePic – Review</h1>
+        <Link to="/admin/racepic" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
+          <ArrowLeft className="h-4 w-4" />
+          Zurück zu RacePic
+        </Link>
+        <h1 className="mt-2 text-2xl font-bold">RacePic – Review</h1>
         <p className="text-sm text-slate-500">{total} Zuordnung(en) benötigen eine Entscheidung.</p>
       </div>
 
