@@ -12,6 +12,7 @@
 | 10c | Pilot 12. OLD 2026 (Admin-Teil): Fotografen einladen, Review-Durchlauf | offen | |
 | 11 | Fehlende Admin-Bedienelemente für bereits im Backend fertige Funktionen | **erledigt** | siehe „Paket 11 – Ergebnis" unten |
 | 14 | UI/UX-Redesign-Grundlage: Tabs-Komponente portiert | **erledigt** | siehe „Paket 14 – Ergebnis" unten; Roadmap in [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.md) |
+| 16 | Admin-Redesign mit Tabs | **erledigt (ungedeployed)** | siehe „Paket 16 – Ergebnis" unten; Backend-Teil siehe MSC-Event-Backend |
 
 ## Paket 5 – Ergebnis (2026-09-21)
 
@@ -75,6 +76,31 @@ Erste Umsetzung aus der [UI/UX-Redesign-Roadmap](./racepic-ux-redesign-plan.md) 
 - Grundlage für Paket 16 (Admin-Redesign mit Tabs) – hier noch nicht in `racepic-page.tsx`
   eingebaut.
 - **Verifiziert:** `npm run typecheck` fehlerfrei.
+
+## Paket 16 – Ergebnis (2026-09-22)
+
+Admin-Redesign, siehe [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.md). Auf
+`feature/racepic-ux-redesign`.
+
+- `src/pages/admin/racepic-page.tsx`: `EventConfigForm` (der bisherige lineare Konfigurations-
+  block je Event) läuft jetzt in fünf Tabs statt gestapelt: **Einstellungen** (bisheriges
+  Formular + Statistik unverändert), **Fotograf:innen** (neue `EventPhotographersTab` –
+  event-gescopte Sicht statt der globalen Liste unten auf der Seite, mit direktem
+  "Für dieses Event einladen"-Formular), **Bilder** (`ImagesSection` von einer Tabelle auf ein
+  Kontaktabzug-Grid umgebaut: Checkbox pro Kachel, Mehrfachauswahl für Bulk-Veröffentlichen/
+  -Verbergen, größere Thumbnails), **Zuordnung** (Link zur bestehenden Review-Queue-Seite, bleibt
+  eine eigene Route wegen BBox-Overlay), **KI-Konfiguration** (bisherige `MatchingSection`,
+  unverändert).
+- `src/pages/admin/racepic-page.tsx`: neue `ImageAssignmentDetail`-Komponente – Klick auf
+  "Zuordnung" bei einem Bild im Grid zeigt dessen aktuelle Zuordnung(en) mit Bestätigen/Ablehnen
+  direkt dort, ohne erst über die Fahrersuche zu gehen. Schließt die vom Verein genannte Lücke
+  "wie ich die Zuordnung zum Fahrer sehen/ändern kann". Eine Korrektur auf einen *anderen* Fahrer
+  bleibt bewusst der vollen Review-Queue vorbehalten (BBox-Overlay + Kandidatenliste + Fahrersuche
+  wären hier eine Doppelimplementierung).
+- `src/services/admin-racepic.service.ts`, `src/types/admin-racepic.ts`: `getImageAssignments`
+  gegen den neuen Backend-Endpunkt `GET /admin/racepic/images/{id}/assignments`.
+- **Verifiziert:** `npm run typecheck` und `npm run build` fehlerfrei (`racepic-page`-Chunk auf
+  52,38 kB gewachsen). Kein Browser-Test in dieser Sandbox möglich.
 
 ## Offene Punkte
 

@@ -5,6 +5,7 @@ import type {
   RacepicEventConfig,
   RacepicEventListItem,
   RacepicEventStats,
+  RacepicImageAssignment,
   RacepicLicenseOption,
   RacepicMatchingConfig,
   RacepicMatchingConfigInput,
@@ -124,5 +125,12 @@ export const adminRacepicService = {
   async getMatchQualityReport(eventId: string): Promise<RacepicMatchQualityReport> {
     const res = await requestJson<{ ok: boolean; report: RacepicMatchQualityReport }>(`/admin/racepic/events/${eventId}/matching-quality-report`);
     return res.report;
+  },
+
+  // --- Paket 16: Zuordnungen je Bild (Admin-Redesign) ---
+
+  async getImageAssignments(imageId: string): Promise<RacepicImageAssignment[]> {
+    const res = await requestJson<{ ok: boolean; assignments: RacepicImageAssignment[] }>(`/admin/racepic/images/${imageId}/assignments`);
+    return res.assignments;
   },
 };

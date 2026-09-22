@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminRacepicService } from "@/services/admin-racepic.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type {
@@ -11,6 +12,7 @@ import type {
   RacepicEventConfig,
   RacepicEventListItem,
   RacepicEventStats,
+  RacepicImageAssignment,
   RacepicLicenseOption,
   RacepicMatchingConfig,
   RacepicMatchQualityReport,
@@ -191,7 +193,16 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
   };
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="settings" className="w-full">
+      <TabsList>
+        <TabsTrigger value="settings">Einstellungen</TabsTrigger>
+        <TabsTrigger value="photographers">Fotograf:innen</TabsTrigger>
+        <TabsTrigger value="images">Bilder</TabsTrigger>
+        <TabsTrigger value="assignment">Zuordnung</TabsTrigger>
+        <TabsTrigger value="matching">KI-Konfiguration</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="settings" className="pt-4">
     <div className="grid gap-6 md:grid-cols-2">
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
@@ -278,10 +289,31 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
         )}
       </div>
     </div>
+      </TabsContent>
 
-      <ImagesSection eventId={event.eventId} />
-      <MatchingSection eventId={event.eventId} />
-    </div>
+      <TabsContent value="photographers" className="pt-4">
+        <EventPhotographersTab eventId={event.eventId} />
+      </TabsContent>
+
+      <TabsContent value="images" className="pt-4">
+        <ImagesSection eventId={event.eventId} />
+      </TabsContent>
+
+      <TabsContent value="assignment" className="pt-4">
+        <div className="rounded-lg border p-6 text-sm">
+          <p className="mb-3 text-slate-600">
+            Offene KI-Vorschläge einzeln mit Bild und BBox-Overlay durchgehen und bestätigen/korrigieren.
+          </p>
+          <Button size="sm" variant="outline" asChild>
+            <Link to={`/admin/racepic/review/${event.eventId}`}>Review-Queue öffnen</Link>
+          </Button>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="matching" className="pt-4">
+        <MatchingSection eventId={event.eventId} />
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -297,7 +329,11 @@ const VISIBILITY_ACTIONS: Record<string, { label: string; next: "PUBLISHED" | "H
   ],
 };
 
-/** Paket 11: allgemeine Bildliste je Event mit Sichtbarkeits-Aktionen, siehe Bestandsaufnahme 2026-09-22. */
+/**
+ * Paket 11: allgemeine Bildliste je Event, Paket 16: von der Tabelle auf ein Kontaktabzug-Grid mit
+ * Mehrfachauswahl (Bulk-Veröffentlichen/-Verbergen) und einem Klick-Detail zur Zuordnung
+ * umgebaut, siehe racepic-ux-redesign-plan.md.
+ */
 function ImagesSection({ eventId }: { eventId: string }) {
   const [items, setItems] = useState<RacepicAdminImage[]>([]);
   const [total, setTotal] = useState(0);
@@ -305,8 +341,11 @@ function ImagesSection({ eventId }: { eventId: string }) {
   const [visibilityFilter, setVisibilityFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyImageId, setBusyImageId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [detailImageId, setDetailImageId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const pageSize = 10;
+  const pageSize = 20;
 
   const reload = () => {
     setLoading(true);
@@ -315,6 +354,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
       .then((result) => {
         setItems(result.items);
         setTotal(result.total);
+        setSelected(new Set());
         setError("");
       })
       .catch((err) => setError(getApiErrorMessage(err)))
@@ -336,78 +376,109 @@ function ImagesSection({ eventId }: { eventId: string }) {
     }
   };
 
+  const toggleSelected = (imageId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(imageId)) next.delete(imageId);
+      else next.add(imageId);
+      return next;
+    });
+  };
+
+  const runBulkAction = async (next: "PUBLISHED" | "HIDDEN") => {
+    setBulkRunning(true);
+    setError("");
+    try {
+      for (const imageId of selected) {
+        await adminRacepicService.setImageVisibility(imageId, next).catch(() => undefined);
+      }
+      reload();
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Bilder ({total})</h3>
-        <select
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-          value={visibilityFilter}
-          onChange={(e) => {
-            setOffset(0);
-            setVisibilityFilter(e.target.value);
-          }}
-        >
-          <option value="">Alle Sichtbarkeiten</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="PUBLISHED">PUBLISHED</option>
-          <option value="HIDDEN">HIDDEN</option>
-          <option value="REMOVED">REMOVED</option>
-        </select>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <>
+              <span className="text-xs text-slate-500">{selected.size} ausgewählt</span>
+              <Button size="sm" variant="outline" disabled={bulkRunning} onClick={() => runBulkAction("PUBLISHED")}>
+                Veröffentlichen
+              </Button>
+              <Button size="sm" variant="outline" disabled={bulkRunning} onClick={() => runBulkAction("HIDDEN")}>
+                Verbergen
+              </Button>
+            </>
+          )}
+          <select
+            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            value={visibilityFilter}
+            onChange={(e) => {
+              setOffset(0);
+              setVisibilityFilter(e.target.value);
+            }}
+          >
+            <option value="">Alle Sichtbarkeiten</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="PUBLISHED">PUBLISHED</option>
+            <option value="HIDDEN">HIDDEN</option>
+            <option value="REMOVED">REMOVED</option>
+          </select>
+        </div>
       </div>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-sm text-slate-400">Lädt…</p>}
       {!loading && (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-left">
-              <tr>
-                <th className="p-2">Vorschau</th>
-                <th className="p-2">Fotograf:in</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Sichtbarkeit</th>
-                <th className="p-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((image) => (
-                <tr key={image.id} className="border-t">
-                  <td className="p-2">
-                    {image.previewUrl ? <img src={image.previewUrl} alt="" className="h-12 w-16 rounded object-cover" /> : "–"}
-                  </td>
-                  <td className="p-2">{image.photographerDisplayName}</td>
-                  <td className="p-2">{image.processingStatus}</td>
-                  <td className="p-2">
-                    <Badge variant={image.visibility === "PUBLISHED" ? "default" : "secondary"}>{image.visibility}</Badge>
-                  </td>
-                  <td className="p-2 text-right">
-                    <div className="flex justify-end gap-1">
-                      {(VISIBILITY_ACTIONS[image.visibility] ?? []).map((action) => (
-                        <Button
-                          key={action.next}
-                          size="sm"
-                          variant="outline"
-                          disabled={busyImageId === image.id}
-                          onClick={() => runAction(image.id, action.next)}
-                        >
-                          {action.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-3 text-center text-slate-400">
-                    Keine Bilder.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {items.map((image) => (
+            <div key={image.id} className="overflow-hidden rounded-lg border bg-white">
+              <div className="relative aspect-[4/3] bg-slate-100">
+                {image.previewUrl && <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />}
+                <label className="absolute left-1.5 top-1.5 rounded bg-white/90 p-1">
+                  <input type="checkbox" checked={selected.has(image.id)} onChange={() => toggleSelected(image.id)} />
+                </label>
+              </div>
+              <div className="space-y-1 p-2">
+                <p className="truncate text-[11px] text-slate-500">{image.photographerDisplayName}</p>
+                <div className="flex items-center justify-between">
+                  <Badge variant={image.visibility === "PUBLISHED" ? "default" : "secondary"} className="text-[10px]">
+                    {image.visibility}
+                  </Badge>
+                  <span className="text-[10px] text-slate-400">{image.processingStatus}</span>
+                </div>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {(VISIBILITY_ACTIONS[image.visibility] ?? []).map((action) => (
+                    <Button
+                      key={action.next}
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-1.5 text-[10px]"
+                      disabled={busyImageId === image.id}
+                      onClick={() => runAction(image.id, action.next)}
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-1.5 text-[10px]"
+                    onClick={() => setDetailImageId(detailImageId === image.id ? null : image.id)}
+                  >
+                    Zuordnung
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {items.length === 0 && <p className="col-span-full p-3 text-center text-sm text-slate-400">Keine Bilder.</p>}
         </div>
       )}
+      {detailImageId && <ImageAssignmentDetail imageId={detailImageId} onClose={() => setDetailImageId(null)} />}
       {total > pageSize && (
         <div className="mt-2 flex items-center gap-2">
           <Button size="sm" variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - pageSize))}>
@@ -418,6 +489,101 @@ function ImagesSection({ eventId }: { eventId: string }) {
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Paket 16: Zuordnungs-Detail zu einem Bild direkt aus dem Bilder-Grid, siehe racepic-ux-redesign-plan.md. */
+function ImageAssignmentDetail({ imageId, onClose }: { imageId: string; onClose: () => void }) {
+  const [assignments, setAssignments] = useState<RacepicImageAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const reload = () => {
+    setLoading(true);
+    adminRacepicService
+      .getImageAssignments(imageId)
+      .then((result) => {
+        setAssignments(result);
+        setError("");
+      })
+      .catch((err) => setError(getApiErrorMessage(err)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(reload, [imageId]);
+
+  const handleConfirm = async (assignmentId: string) => {
+    setBusyId(assignmentId);
+    try {
+      await adminRacepicService.confirmAssignment(assignmentId);
+      reload();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReject = async (assignmentId: string) => {
+    setBusyId(assignmentId);
+    try {
+      await adminRacepicService.rejectAssignment(assignmentId);
+      reload();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border bg-slate-50 p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Zuordnungen dieses Bildes</h4>
+        <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={onClose}>
+          Schließen
+        </Button>
+      </div>
+      {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+      {loading && <p className="text-xs text-slate-400">Lädt…</p>}
+      {!loading && assignments.length === 0 && <p className="text-xs text-slate-400">Noch keine Zuordnung für dieses Bild.</p>}
+      {!loading && assignments.length > 0 && (
+        <ul className="space-y-2">
+          {assignments.map((a) => (
+            <li key={a.assignmentId} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-white p-2 text-xs">
+              <span>
+                #{a.startNumber} {a.driverName} – {a.vehicleMake} {a.vehicleModel} ·{" "}
+                <Badge variant={a.status === "REJECTED" ? "secondary" : "default"} className="text-[10px]">
+                  {a.status}
+                </Badge>{" "}
+                ({a.source}
+                {a.confidence !== null ? `, ${Math.round(a.confidence * 100)}%` : ""})
+              </span>
+              {a.status !== "REJECTED" && a.status !== "MANUALLY_CONFIRMED" && (
+                <div className="flex gap-1">
+                  <Button size="sm" className="h-6 px-2 text-[11px]" disabled={busyId === a.assignmentId} onClick={() => handleConfirm(a.assignmentId)}>
+                    Bestätigen
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={busyId === a.assignmentId}
+                    onClick={() => handleReject(a.assignmentId)}
+                  >
+                    Ablehnen
+                  </Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-[11px] text-slate-400">
+        Einem anderen Fahrer zuordnen geht über die Review-Queue (Tab "Zuordnung").
+      </p>
     </div>
   );
 }
@@ -608,6 +774,99 @@ function MatchingConfigForm({ eventId, onCreated }: { eventId: string; onCreated
       </Button>
       {error && <p className="w-full text-sm text-red-600">{error}</p>}
     </form>
+  );
+}
+
+/** Paket 16: event-gescopte Fotograf:innen-Ansicht innerhalb der Event-Tabs (statt der globalen Liste unten auf der Seite). */
+function EventPhotographersTab({ eventId }: { eventId: string }) {
+  const [photographers, setPhotographers] = useState<RacepicPhotographer[]>([]);
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const reload = () => {
+    setLoading(true);
+    adminRacepicService
+      .listPhotographers()
+      .then((all) => setPhotographers(all.filter((p) => p.events.some((e) => e.eventId === eventId))))
+      .catch((err) => setError(getApiErrorMessage(err)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(reload, [eventId]);
+
+  const handleInvite = async (submitEvent: FormEvent) => {
+    submitEvent.preventDefault();
+    setInviting(true);
+    setError("");
+    try {
+      await adminRacepicService.invitePhotographer({ email, displayName, eventIds: [eventId] });
+      setEmail("");
+      setDisplayName("");
+      reload();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
+        <div>
+          <Label htmlFor={`event-invite-email-${eventId}`} className="text-xs">
+            E-Mail
+          </Label>
+          <Input id={`event-invite-email-${eventId}`} type="email" className="h-8 w-56" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
+        <div>
+          <Label htmlFor={`event-invite-name-${eventId}`} className="text-xs">
+            Anzeigename
+          </Label>
+          <Input id={`event-invite-name-${eventId}`} className="h-8 w-48" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+        </div>
+        <Button type="submit" size="sm" disabled={inviting}>
+          {inviting ? "Sendet…" : "Für dieses Event einladen"}
+        </Button>
+        {error && <p className="w-full text-sm text-red-600">{error}</p>}
+      </form>
+
+      {loading && <p className="text-sm text-slate-400">Lädt…</p>}
+      {!loading && (
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left">
+              <tr>
+                <th className="p-3">Name</th>
+                <th className="p-3">E-Mail</th>
+                <th className="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {photographers.map((photographer) => (
+                <tr key={photographer.id} className="border-t">
+                  <td className="p-3">{photographer.displayName}</td>
+                  <td className="p-3">{photographer.email}</td>
+                  <td className="p-3">
+                    <Badge variant={photographer.status === "ACTIVE_FREE" ? "default" : "secondary"}>{photographer.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+              {photographers.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="p-3 text-center text-slate-400">
+                    Noch keine Fotograf:innen für dieses Event.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

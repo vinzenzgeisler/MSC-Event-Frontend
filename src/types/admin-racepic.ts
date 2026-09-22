@@ -126,6 +126,20 @@ export type RacepicQualityThresholdRow = {
   recall: number | null;
 };
 
+// --- Paket 16: Zuordnungen je Bild (Admin-Redesign) -----------------------------------------------
+
+export type RacepicImageAssignment = {
+  assignmentId: string;
+  entryId: string;
+  status: string;
+  source: string;
+  confidence: number | null;
+  driverName: string;
+  startNumber: string | null;
+  vehicleMake: string | null;
+  vehicleModel: string | null;
+};
+
 export type RacepicMatchQualityReport = {
   eventId: string;
   reviewedDetectionCount: number;
