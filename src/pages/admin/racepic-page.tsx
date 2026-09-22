@@ -9,6 +9,7 @@ import { adminRacepicService } from "@/services/admin-racepic.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import type {
   RacepicAdminImage,
+  RacepicImagePipelineStatus,
   RacepicEntrySearchResult,
   RacepicEventConfig,
   RacepicEventListItem,
@@ -49,9 +50,7 @@ export function AdminRacepicPage() {
     <div className="space-y-8 p-6">
       <div>
         <h1 className="text-2xl font-bold">RacePic</h1>
-        <p className="text-sm text-slate-500">
-          Event aufklappen, um Einstellungen, Fotograf:innen, Bilder, Zuordnung und KI-Konfiguration zu verwalten.
-        </p>
+        <p className="text-sm text-slate-500">Bilder, Zuordnungen und Fotograf:innen direkt verwalten.</p>
       </div>
 
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -71,66 +70,24 @@ function EventsSection({
   licenses: RacepicLicenseOption[];
   onChanged: () => void;
 }) {
-  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState(() => {
+    const remembered = window.sessionStorage.getItem('racepic_admin_event');
+    return events.find((item) => item.eventId === remembered)?.eventId ?? events.find((item) => item.racepic?.enabled)?.eventId ?? events[0]?.eventId ?? '';
+  });
+  const selectedEvent = events.find((item) => item.eventId === selectedEventId) ?? events[0];
 
   return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold">Events</h2>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left">
-            <tr>
-              <th className="p-3">Event</th>
-              <th className="p-3">RacePic-Status</th>
-              <th className="p-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((item) => (
-              <>
-                <tr key={item.eventId} className="border-t">
-                  <td className="p-3">{item.eventName}</td>
-                  <td className="p-3">
-                    {item.racepic ? (
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant={item.racepic.enabled ? "default" : "secondary"}>
-                          {item.racepic.enabled ? "aktiviert" : "deaktiviert"}
-                        </Badge>
-                        <Badge variant={item.racepic.published ? "default" : "outline"}>
-                          {item.racepic.published ? "veröffentlicht" : "nicht veröffentlicht"}
-                        </Badge>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400">nicht konfiguriert</span>
-                    )}
-                  </td>
-                  <td className="p-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" asChild>
-                        <Link to={`/admin/racepic/review/${item.eventId}`}>Review</Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setExpandedEventId(expandedEventId === item.eventId ? null : item.eventId)}
-                      >
-                        {expandedEventId === item.eventId ? "Schließen" : "Konfigurieren"}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-                {expandedEventId === item.eventId && (
-                  <tr className="border-t bg-slate-50/50" key={`${item.eventId}-detail`}>
-                    <td colSpan={3} className="p-4">
-                      <EventConfigForm event={item} licenses={licenses} onSaved={onChanged} />
-                    </td>
-                  </tr>
-                )}
-              </>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <section className="space-y-5">
+      {selectedEvent ? <>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4">
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktives Event</p><h2 className="text-lg font-semibold">{selectedEvent.eventName}</h2></div>
+          <div className="flex items-center gap-3">
+            <Badge variant={selectedEvent.racepic?.published ? 'default' : 'secondary'}>{selectedEvent.racepic?.published ? 'Öffentlich' : 'Nicht öffentlich'}</Badge>
+            {events.length > 1 && <select aria-label="RacePic-Event wählen" className="h-9 rounded-md border px-3 text-sm" value={selectedEvent.eventId} onChange={(event) => { setSelectedEventId(event.target.value); window.sessionStorage.setItem('racepic_admin_event', event.target.value); }}>{events.map((item) => <option key={item.eventId} value={item.eventId}>{item.eventName}</option>)}</select>}
+          </div>
+        </div>
+        <EventConfigForm key={selectedEvent.eventId} event={selectedEvent} licenses={licenses} onSaved={onChanged} />
+      </> : <p className="text-sm text-slate-500">Keine Events verfügbar.</p>}
     </section>
   );
 }
@@ -159,6 +116,7 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [stats, setStats] = useState<RacepicEventStats | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     let cancelled = false;
@@ -208,8 +166,9 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
     "rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-slate-500 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none";
 
   return (
-    <Tabs defaultValue="settings" className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+        <TabsTrigger value="overview" className={tabTriggerClass}>Übersicht</TabsTrigger>
         <TabsTrigger value="settings" className={tabTriggerClass}>
           Einstellungen
         </TabsTrigger>
@@ -226,6 +185,19 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
           KI-Konfiguration
         </TabsTrigger>
       </TabsList>
+
+      <TabsContent value="overview" className="space-y-5 pt-5">
+        <p className="text-sm text-slate-600">Verarbeitung und Zuordnung sind getrennte Schritte: „Zuordnung berechnet“ bedeutet nicht automatisch, dass ein Fahrer gefunden wurde.</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Bilder gesamt', value: Object.values(stats?.imagesByStatus ?? {}).reduce((sum, count) => sum + count, 0), tab: 'images' },
+            { label: 'In Verarbeitung', value: Object.entries(stats?.imagesByStatus ?? {}).filter(([status]) => PROCESSING_NON_TERMINAL_STATUSES.has(status)).reduce((sum, [, count]) => sum + count, 0), tab: 'images' },
+            { label: 'Fehlgeschlagen', value: stats?.imagesByStatus.FAILED ?? 0, tab: 'images' },
+            { label: 'Zu prüfen', value: stats?.assignmentsByStatus.REVIEW_REQUIRED ?? 0, tab: 'assignment' },
+          ].map((card) => <button type="button" key={card.label} onClick={() => setActiveTab(card.tab)} className="rounded-xl border bg-white p-5 text-left shadow-sm transition hover:border-primary hover:shadow"><span className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</span><span className="mt-2 block text-3xl font-bold">{card.value}</span></button>)}
+        </div>
+        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => setActiveTab('images')}>Bilder öffnen</Button><Button size="sm" variant="outline" onClick={() => setActiveTab('photographers')}>Fotograf:innen verwalten</Button><Button size="sm" variant="outline" asChild><Link to={`/admin/racepic/review/${event.eventId}`}>Review-Queue öffnen</Link></Button></div>
+      </TabsContent>
 
       <TabsContent value="settings" className="pt-4">
     <div className="grid gap-6 md:grid-cols-2">
@@ -389,6 +361,10 @@ const PROCESSING_STATUS_BADGE_CLASS: Record<string, string> = {
   MATCHED: "border-green-300 text-green-700",
   FAILED: "border-red-300 text-red-700",
   DUPLICATE: "border-amber-300 text-amber-700",
+};
+
+const ASSIGNMENT_STATE_LABEL: Record<string, string> = {
+  CONFIRMED: 'Bestätigt', AUTO_MATCHED: 'Automatisch zugeordnet', REVIEW_REQUIRED: 'Prüfung nötig', UNASSIGNED: 'Kein Fahrer zugeordnet'
 };
 
 function ProcessingStatusBadge({ status }: { status: string }) {
@@ -558,6 +534,8 @@ function ImagesSection({ eventId }: { eventId: string }) {
                   </Badge>
                   <ProcessingStatusBadge status={image.processingStatus} />
                 </div>
+                <p className={`text-[11px] font-medium ${image.assignmentState === 'UNASSIGNED' ? 'text-amber-700' : 'text-slate-600'}`}>{ASSIGNMENT_STATE_LABEL[image.assignmentState] ?? image.assignmentState}</p>
+                {image.processingError && <p className="line-clamp-2 text-[10px] text-red-700" title={image.processingError}>{image.processingError}</p>}
                 <div className="flex flex-wrap gap-1 pt-1">
                   {(VISIBILITY_ACTIONS[image.visibility] ?? []).map((action) => (
                     <Button
@@ -618,13 +596,14 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
   const [error, setError] = useState("");
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeMessage, setReanalyzeMessage] = useState("");
+  const [pipeline, setPipeline] = useState<RacepicImagePipelineStatus | null>(null);
 
   const reload = () => {
     setLoading(true);
-    adminRacepicService
-      .getImageAssignments(imageId)
-      .then((result) => {
+    Promise.all([adminRacepicService.getImageAssignments(imageId), adminRacepicService.getImagePipelineStatus(imageId)])
+      .then(([result, status]) => {
         setAssignments(result);
+        setPipeline(status);
         setError("");
       })
       .catch((err) => setError(getApiErrorMessage(err)))
@@ -675,6 +654,7 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
     try {
       await adminRacepicService.reanalyzeImage(imageId);
       setReanalyzeMessage("Neu eingereiht - Status läuft im Tab „Bilder“ automatisch weiter (kann ein bis zwei Minuten dauern).");
+      reload();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -696,6 +676,11 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
         </div>
       </div>
       {reanalyzeMessage && <p className="mb-2 text-xs text-green-700">{reanalyzeMessage}</p>}
+      {pipeline && <div className="mb-4 grid gap-3 rounded-lg border bg-white p-3 text-xs sm:grid-cols-2">
+        <div><p className="font-semibold">Verarbeitung</p><ProcessingStatusBadge status={pipeline.processingStatus} />{pipeline.processingError && <p className="mt-2 text-red-700">{pipeline.processingError}</p>}<p className="mt-2">{pipeline.detectionCount} Fahrzeugerkennung(en) · {pipeline.candidateCount} Kandidat(en)</p></div>
+        <div><p className="font-semibold">Zuordnung</p><p className="mt-1">{ASSIGNMENT_STATE_LABEL[pipeline.assignmentState] ?? pipeline.assignmentState}</p><p className="mt-2 text-slate-500">{pipeline.offerMode === 'PAID' ? 'Interner Bezahlentwurf' : 'Kostenlos'} · {pipeline.visibility}</p></div>
+        <div className="sm:col-span-2"><p className="font-semibold">Letzte Pipeline-Schritte</p><div className="mt-1 flex flex-wrap gap-2">{pipeline.steps.slice(0, 8).map((step, index) => <span key={`${step.step}-${step.pipelineVersion}-${index}`} title={step.error ?? step.pipelineVersion} className="rounded border px-2 py-1">{step.step}: {step.status}</span>)}</div></div>
+      </div>}
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-xs text-slate-400">Lädt…</p>}
       {!loading && assignments.length === 0 && (
@@ -1045,6 +1030,7 @@ function MatchingConfigForm({ eventId, onCreated }: { eventId: string; onCreated
   const [autoThreshold, setAutoThreshold] = useState("0.85");
   const [reviewThreshold, setReviewThreshold] = useState("0.55");
   const [minMargin, setMinMargin] = useState("0.08");
+  const [weights, setWeights] = useState({ ocrExact: 0.5, ocrConfidence: 0.1, vehicleTypeMatch: 0.1, embeddingSimilarity: 0.2, colorSimilarity: 0.1, ambiguityPenalty: 0.15 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1055,10 +1041,7 @@ function MatchingConfigForm({ eventId, onCreated }: { eventId: string; onCreated
     try {
       await adminRacepicService.createMatchingConfig({
         eventId,
-        // Gewichte im MVP nicht per UI anpassbar - nur die Schwellen, die laut Runbook
-        // ("Schwellen kalibrieren", Paket 10) primaer kalibriert werden. Vollstaendige
-        // Gewichts-Bearbeitung kann bei Bedarf nachgezogen werden.
-        weights: { ocrExact: 0.5, ocrConfidence: 0.1, vehicleTypeMatch: 0.1, embeddingSimilarity: 0.2, colorSimilarity: 0.1, ambiguityPenalty: 0.15 },
+        weights,
         autoThreshold: Number(autoThreshold),
         reviewThreshold: Number(reviewThreshold),
         minMargin: Number(minMargin),
@@ -1073,6 +1056,13 @@ function MatchingConfigForm({ eventId, onCreated }: { eventId: string; onCreated
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
+      <div className="w-full text-xs font-medium">Gewichte für die nächste Matching-Version</div>
+      <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {([
+          ['ocrExact', 'Startnummer'], ['ocrConfidence', 'OCR-Sicherheit'], ['vehicleTypeMatch', 'Fahrzeugtyp'],
+          ['embeddingSimilarity', 'Bildähnlichkeit'], ['colorSimilarity', 'Farbe'], ['ambiguityPenalty', 'Mehrdeutigkeit'],
+        ] as const).map(([key, label]) => <div key={key}><Label htmlFor={`${key}-${eventId}`} className="text-xs">{label}</Label><Input id={`${key}-${eventId}`} type="number" min="0" max="1" step="0.01" required className="h-8" value={weights[key]} onChange={(e) => setWeights((previous) => ({ ...previous, [key]: Number(e.target.value) }))} /></div>)}
+      </div>
       <div>
         <Label htmlFor={`auto-${eventId}`} className="text-xs">
           autoThreshold
@@ -1129,6 +1119,8 @@ function MatchingConfigForm({ eventId, onCreated }: { eventId: string; onCreated
 /** Paket 16: event-gescopte Fotograf:innen-Ansicht innerhalb der Event-Tabs (statt der globalen Liste unten auf der Seite). */
 function EventPhotographersTab({ eventId }: { eventId: string }) {
   const [photographers, setPhotographers] = useState<RacepicPhotographer[]>([]);
+  const [pendingRegistrations, setPendingRegistrations] = useState<RacepicPhotographer[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -1139,7 +1131,10 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
     setLoading(true);
     adminRacepicService
       .listPhotographers()
-      .then((all) => setPhotographers(all.filter((p) => p.events.some((e) => e.eventId === eventId))))
+      .then((all) => {
+        setPhotographers(all.filter((p) => p.events.some((e) => e.eventId === eventId)));
+        setPendingRegistrations(all.filter((p) => p.status === 'PENDING_APPROVAL'));
+      })
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   };
@@ -1162,8 +1157,17 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
     }
   };
 
+  const review = async (photographerId: string, decision: 'approve' | 'reject') => {
+    if (decision === 'reject' && !window.confirm('Registrierung wirklich ablehnen?')) return;
+    setReviewingId(photographerId); setError('');
+    try { await adminRacepicService.reviewPhotographerRegistration(photographerId, decision, decision === 'approve' ? [eventId] : []); reload(); }
+    catch (err) { setError(getApiErrorMessage(err)); }
+    finally { setReviewingId(null); }
+  };
+
   return (
     <div className="space-y-4">
+      {pendingRegistrations.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Neue Registrierungen ({pendingRegistrations.length})</h3><p className="mt-1 text-xs text-amber-900">Freigabe gibt Upload-Rechte für dieses Event. Prüfe Identität und Bildrechte vor der Entscheidung.</p><div className="mt-3 space-y-2">{pendingRegistrations.map((photographer) => <div key={photographer.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3 text-sm"><span><strong>{photographer.displayName}</strong> · {photographer.email}</span><div className="flex gap-2"><Button size="sm" disabled={reviewingId === photographer.id} onClick={() => review(photographer.id, 'approve')}>Für Event freigeben</Button><Button size="sm" variant="outline" disabled={reviewingId === photographer.id} onClick={() => review(photographer.id, 'reject')}>Ablehnen</Button></div></div>)}</div></div>}
       <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
         <div>
           <Label htmlFor={`event-invite-email-${eventId}`} className="text-xs">

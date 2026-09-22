@@ -1,6 +1,7 @@
 import { requestJson } from "@/services/api/http-client";
 import type {
   RacepicAdminImage,
+  RacepicImagePipelineStatus,
   RacepicEntrySearchResult,
   RacepicEventConfig,
   RacepicEventListItem,
@@ -37,6 +38,10 @@ export const adminRacepicService = {
   async listPhotographers(): Promise<RacepicPhotographer[]> {
     const res = await requestJson<{ ok: boolean; photographers: RacepicPhotographer[] }>("/admin/racepic/photographers");
     return res.photographers;
+  },
+
+  async reviewPhotographerRegistration(photographerId: string, decision: 'approve' | 'reject', eventIds: string[]): Promise<void> {
+    await requestJson(`/admin/racepic/photographers/${photographerId}/review`, { method: 'POST', body: { decision, eventIds } });
   },
 
   async invitePhotographer(input: { email: string; displayName: string; eventIds: string[] }): Promise<{ photographerId: string }> {
@@ -97,6 +102,11 @@ export const adminRacepicService = {
     return requestJson<{ ok: boolean; items: RacepicAdminImage[]; total: number }>(`/admin/racepic/events/${eventId}/images`, {
       query: { ...filter, offset, limit },
     });
+  },
+
+  async getImagePipelineStatus(imageId: string): Promise<RacepicImagePipelineStatus> {
+    const res = await requestJson<{ ok: boolean; status: RacepicImagePipelineStatus }>(`/admin/racepic/images/${imageId}/status`);
+    return res.status;
   },
 
   async setImageVisibility(imageId: string, visibility: "PUBLISHED" | "HIDDEN" | "REMOVED"): Promise<void> {

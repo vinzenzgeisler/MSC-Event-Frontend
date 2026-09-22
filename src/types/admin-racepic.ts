@@ -79,9 +79,24 @@ export type RacepicAdminImage = {
   previewUrl: string | null;
   visibility: "DRAFT" | "PUBLISHED" | "HIDDEN" | "REMOVED";
   processingStatus: string;
+  processingError: string | null;
+  assignmentState: string;
   photographerDisplayName: string;
   capturedAt: string | null;
   createdAt: string;
+};
+
+export type RacepicImagePipelineStatus = {
+  id: string;
+  processingStatus: string;
+  processingError: string | null;
+  visibility: string;
+  offerMode: string;
+  priceCents: number | null;
+  assignmentState: string;
+  detectionCount: number;
+  candidateCount: number;
+  steps: { step: string; pipelineVersion: string; status: string; startedAt: string; finishedAt: string | null; error: string | null }[];
 };
 
 export type RacepicMatchingWeights = {

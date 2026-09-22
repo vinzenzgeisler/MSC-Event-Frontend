@@ -108,3 +108,8 @@ Admin-Redesign, siehe [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.m
   das neue Formular (nur die drei Schwellen) – für die Paket-10-Kalibrierung ausreichend, bei
   Bedarf später ergänzen.
 - Keine weiteren repo-spezifischen offenen Punkte über die im Architekturplan genannten hinaus.
+## Pakete 19–24 – Implementierungsstand 2026-09-22
+
+Nennungstool-Admin: direkter Event-Einstieg, Zustandsübersicht, Pipeline-Schritte, manuelle Fahrerzuordnung, Reanalyse, Fotografenfreigabe und editierbare Matching-Gewichte.
+
+Dies ist Feature-Branch-Arbeit. Lokal erfolgreich: TypeScript-Typechecks der Website, Backend-API, Backend-Infrastruktur und des Nennungstool-Admins. Ein echter Browser-/Cognito-/AWS-Durchlauf, eine KI-Qualitätsmessung mit bestätigten Bildern und eine rechtliche Freigabe stehen aus. Keine Merges, Deployments oder öffentliche Freischaltung erfolgten in diesem Paket. Das genaue Paket- und Abnahme-Raster steht in racepic-open-items.md, Abschnitt E.
