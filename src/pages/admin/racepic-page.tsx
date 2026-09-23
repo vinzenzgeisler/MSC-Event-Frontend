@@ -783,8 +783,14 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
                         Nutzer-Feedback "ich kann Fahrer Zuordnungen nicht wieder rausnehmen"): der
                         Button verschwand bisher fuer status=MANUALLY_CONFIRMED komplett, obwohl das
                         Backend (rejectAssignment in reviewQueue.ts) einen Wechsel von jedem Status
-                        nach REJECTED erlaubt. */}
-                    Ablehnen
+                        nach REJECTED erlaubt.
+                        Beschriftung 2026-09-23 (Nutzer-Feedback: "Ablehnen passt ja nicht, was wenn
+                        ich aus Versehen einen reingenommen habe") - fachlich macht der Klick exakt
+                        dasselbe (status -> REJECTED), aber "Ablehnen" liest sich wie "der
+                        KI-Vorschlag ist falsch", nicht wie "ich nehme meine eigene Zuordnung
+                        zurueck". Bei MANUAL/MANUALLY_CONFIRMED/MANUALLY_CORRECTED (der Mensch hat
+                        selbst gehandelt) daher "Entfernen" statt "Ablehnen". */}
+                    {a.source === "MANUAL" ? "Entfernen" : "Ablehnen"}
                   </Button>
                 </div>
               )}
