@@ -144,13 +144,15 @@ export function ReviewCard({
           </span>{" "}
           – {suggested.vehicleMake} {suggested.vehicleModel}
           <span className="ml-2 text-slate-500">{Math.round(item.confidence * 100)}% Konfidenz</span>
+          {item.assignmentId === null && <span className="ml-2 text-amber-700">(unterhalb der Prüfschwelle - nur Vorschlag)</span>}
         </p>
       )}
 
       {item.assignmentId === null && (
         <p className="text-xs text-amber-700">
-          Kein Kandidat gefunden - die KI hat entweder kein Fahrzeug erkannt oder keinen Treffer über der
-          Prüfschwelle. Fahrer unten manuell zuordnen.
+          {suggested
+            ? "Kein Kandidat hat die Prüfschwelle erreicht - der oben gezeigte war der beste, aber unsichere Treffer. Erst nach manueller Bestätigung unten gilt er als zugeordnet."
+            : "Kein Kandidat gefunden - die KI hat entweder kein Fahrzeug erkannt oder gar keinen möglichen Treffer. Fahrer unten manuell zuordnen."}
         </p>
       )}
 
