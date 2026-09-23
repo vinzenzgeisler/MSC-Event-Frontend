@@ -503,6 +503,19 @@ function ImagesSection({ eventId }: { eventId: string }) {
     });
   };
 
+  // Nutzerwunsch 2026-09-23: "im Admin will ich schneller auswählen können oder ein Button für alle
+  // auswählen auf der Seite" - bisher musste jedes Bild einzeln angeklickt werden, was bei
+  // Bulk-Aktionen (Veröffentlichen/Verbergen/Entfernen) über 20 Bilder pro Seite mühsam war.
+  const allOnPageSelected = items.length > 0 && items.every((item) => selected.has(item.id));
+  const toggleSelectAllOnPage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) items.forEach((item) => next.delete(item.id));
+      else items.forEach((item) => next.add(item.id));
+      return next;
+    });
+  };
+
   const runBulkAction = async (next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
     if (next === "REMOVED" && !window.confirm(`${selected.size} Bild(er) wirklich entfernen? Das löscht die Bilddateien (Datenbank-Eintrag bleibt vorerst erhalten).`)) return;
     setBulkRunning(true);
@@ -528,6 +541,12 @@ function ImagesSection({ eventId }: { eventId: string }) {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Bilder ({total})</h3>
         <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <label className="flex items-center gap-1 text-xs text-slate-500">
+              <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAllOnPage} />
+              Alle auf dieser Seite
+            </label>
+          )}
           {selected.size > 0 && (
             <>
               <span className="text-xs text-slate-500">{selected.size} ausgewählt</span>
