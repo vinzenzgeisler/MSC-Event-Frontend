@@ -146,6 +146,11 @@ export const adminRacepicService = {
     return requestJson<{ ok: boolean; queued: number }>(`/admin/racepic/events/${eventId}/rematch`, { method: "POST" });
   },
 
+  /** Ein Aufruf verarbeitet nur, was in ~22s passt - wiederholt aufrufen, bis `done` true ist. */
+  async warmVehicleReferences(eventId: string): Promise<{ processed: number; skipped: number; total: number; done: boolean }> {
+    return requestJson(`/admin/racepic/events/${eventId}/warm-vehicle-references`, { method: "POST" });
+  },
+
   async reanalyzeImage(imageId: string): Promise<void> {
     await requestJson(`/admin/racepic/images/${imageId}/reanalyze`, { method: "POST" });
   },

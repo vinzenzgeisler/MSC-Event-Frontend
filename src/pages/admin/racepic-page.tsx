@@ -984,6 +984,8 @@ function MatchingSection({ eventId }: { eventId: string }) {
   const [rematching, setRematching] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState("");
+  const [warming, setWarming] = useState(false);
+  const [warmProgress, setWarmProgress] = useState<{ processed: number; skipped: number; total: number } | null>(null);
 
   const reloadConfigs = () => {
     adminRacepicService
@@ -1005,6 +1007,33 @@ function MatchingSection({ eventId }: { eventId: string }) {
       setError(getApiErrorMessage(err));
     } finally {
       setRematching(false);
+    }
+  };
+
+  // Nutzerwunsch 2026-09-23: alle Fahrzeugreferenzen kontrolliert vorab in den Cache bringen,
+  // statt sie nur beilaeufig waehrend eines Match-Laufs zu berechnen ("das kann ruhig eine Weile
+  // dauern und nacheinander jedes Referenzbild durchlaufen lassen"). Ein Serveraufruf verarbeitet
+  // nur, was in dessen Zeitbudget passt (siehe warmEventVehicleReferences im Backend) - hier
+  // einfach wiederholt aufrufen, bis `done` true ist, und den Fortschritt dabei anzeigen.
+  const handleWarmReferences = async () => {
+    setWarming(true);
+    setError("");
+    setWarmProgress(null);
+    let totalProcessed = 0;
+    let totalSkipped = 0;
+    try {
+      let done = false;
+      while (!done) {
+        const result = await adminRacepicService.warmVehicleReferences(eventId);
+        totalProcessed += result.processed;
+        totalSkipped += result.skipped;
+        setWarmProgress({ processed: totalProcessed, skipped: totalSkipped, total: result.total });
+        done = result.done;
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setWarming(false);
     }
   };
 
@@ -1046,7 +1075,16 @@ function MatchingSection({ eventId }: { eventId: string }) {
         <Button size="sm" variant="outline" disabled={loadingReport} onClick={handleLoadReport}>
           {loadingReport ? "Lädt…" : "Qualitätsreport laden"}
         </Button>
+        <Button size="sm" variant="outline" disabled={warming} onClick={handleWarmReferences}>
+          {warming ? "Läuft…" : "Referenzfotos vorbereiten"}
+        </Button>
       </div>
+      {warmProgress && (
+        <p className="text-xs text-slate-500">
+          {warmProgress.processed} neu berechnet, {warmProgress.skipped} bereits gecacht, von {warmProgress.total} Fahrzeugen insgesamt
+          {warming && " · läuft weiter…"}
+        </p>
+      )}
 
       {report && (
         <div className="overflow-x-auto rounded-lg border">
