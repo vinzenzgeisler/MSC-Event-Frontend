@@ -91,6 +91,11 @@ export const adminRacepicService = {
     await requestJson(`/admin/racepic/images/${imageId}/assignments`, { method: "POST", body: { entryId, detectionId } });
   },
 
+  /** "Wegklicken" einer Detection ohne Fahrer - das Bild bleibt regulär verfügbar, verschwindet nur aus der Queue. */
+  async dismissDetection(detectionId: string): Promise<void> {
+    await requestJson(`/admin/racepic/detections/${detectionId}/dismiss`, { method: "POST" });
+  },
+
   async hideParticipant(entryId: string): Promise<{ rejectedCount: number }> {
     return requestJson<{ ok: boolean; rejectedCount: number }>(`/admin/racepic/participants/${entryId}/hide`, { method: "POST" });
   },

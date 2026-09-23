@@ -82,6 +82,7 @@ export function AdminRacepicReviewPage() {
               onReject={() => item.assignmentId && runAction(itemKey, () => adminRacepicService.rejectAssignment(item.assignmentId!))}
               onCorrect={(entryId) => item.assignmentId && runAction(itemKey, () => adminRacepicService.correctAssignment(item.assignmentId!, entryId))}
               onAdd={(entryId) => runAction(itemKey, () => adminRacepicService.addAssignment(item.imageId, entryId, item.detection?.id ?? null))}
+              onDismiss={item.detection ? () => runAction(itemKey, () => adminRacepicService.dismissDetection(item.detection!.id)) : undefined}
             />
           );
         })}
@@ -109,6 +110,7 @@ export function ReviewCard({
   onReject,
   onCorrect,
   onAdd,
+  onDismiss,
 }: {
   item: RacepicReviewItem;
   eventId: string;
@@ -117,6 +119,7 @@ export function ReviewCard({
   onReject: () => void;
   onCorrect: (entryId: string) => void;
   onAdd: (entryId: string) => void;
+  onDismiss?: () => void;
 }) {
   const suggested = item.candidates.find((c) => c.entryId === item.suggestedEntryId) ?? item.candidates[0];
 
@@ -154,6 +157,12 @@ export function ReviewCard({
             ? "Kein Kandidat hat die Prüfschwelle erreicht - der oben gezeigte war der beste, aber unsichere Treffer. Erst nach manueller Bestätigung unten gilt er als zugeordnet."
             : "Kein Kandidat gefunden - die KI hat entweder kein Fahrzeug erkannt oder gar keinen möglichen Treffer. Fahrer unten manuell zuordnen."}
         </p>
+      )}
+
+      {item.assignmentId === null && item.detection && onDismiss && (
+        <Button size="sm" variant="outline" disabled={busy} onClick={onDismiss}>
+          Fahrer nicht erkennbar - ignorieren
+        </Button>
       )}
 
       {item.assignmentId !== null && (

@@ -947,6 +947,7 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
               onReject={() => item.assignmentId && runAction(itemKey, () => adminRacepicService.rejectAssignment(item.assignmentId!))}
               onCorrect={(entryId) => item.assignmentId && runAction(itemKey, () => adminRacepicService.correctAssignment(item.assignmentId!, entryId))}
               onAdd={(entryId) => runAction(itemKey, () => adminRacepicService.addAssignment(item.imageId, entryId, item.detection?.id ?? null))}
+              onDismiss={item.detection ? () => runAction(itemKey, () => adminRacepicService.dismissDetection(item.detection!.id)) : undefined}
             />
           );
         })}
