@@ -121,3 +121,7 @@ Admin-Redesign, siehe [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.m
 Nennungstool-Admin: direkter Event-Einstieg, Zustandsübersicht, Pipeline-Schritte, manuelle Fahrerzuordnung, Reanalyse, Fotografenfreigabe und editierbare Matching-Gewichte.
 
 Dies ist Feature-Branch-Arbeit. Lokal erfolgreich: TypeScript-Typechecks der Website, Backend-API, Backend-Infrastruktur und des Nennungstool-Admins. Ein echter Browser-/Cognito-/AWS-Durchlauf, eine KI-Qualitätsmessung mit bestätigten Bildern und eine rechtliche Freigabe stehen aus. Keine Merges, Deployments oder öffentliche Freischaltung erfolgten in diesem Paket. Das genaue Paket- und Abnahme-Raster steht in racepic-open-items.md, Abschnitt E.
+
+## Marketplace-/Checkout-Plan (2026-09-25)
+
+Der vollständige Plan ist in [racepic-marketplace-checkout-plan.md](./racepic-marketplace-checkout-plan.md) dokumentiert. Dieses Repo übernimmt FREE→PAID-Freigaben, Bestell- und Zahlungsübersichten, vollständige Positions-/Order-Refunds, Takedowns, Disputes, Transfers, Reversals und die Reconciliation-Ausnahmewarteschlange. Diese Adminfunktionen sind noch nicht implementiert oder freigeschaltet.
