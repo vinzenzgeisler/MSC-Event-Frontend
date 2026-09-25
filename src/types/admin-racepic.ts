@@ -1,5 +1,10 @@
 // RacePic Admin-Basis (Paket 5), spiegelt api/src/racepic/handler.ts (MSC-Event-Backend-Repo).
 
+export type RacepicImageVisibility = "DRAFT" | "PUBLISHED" | "HIDDEN" | "REMOVED";
+export type RacepicProcessingStatus = "UPLOADED" | "VALIDATED" | "DERIVED" | "ANALYZED" | "MATCHED" | "FAILED" | "DUPLICATE";
+export type RacepicAssignmentStatus = "AUTO_MATCHED" | "REVIEW_REQUIRED" | "MANUALLY_CONFIRMED" | "MANUALLY_CORRECTED" | "REJECTED";
+export type RacepicPhotographerStatus = "INVITED" | "PENDING_APPROVAL" | "ACTIVE_FREE" | "PAYMENT_ONBOARDING_REQUIRED" | "PAYMENT_ONBOARDING_PENDING" | "PAYMENT_ENABLED" | "PAYMENT_RESTRICTED" | "PAYMENT_DISABLED" | "DISABLED";
+
 export type RacepicEventConfig = {
   slug: string;
   title: string;
@@ -29,7 +34,7 @@ export type RacepicPhotographer = {
   id: string;
   email: string;
   displayName: string;
-  status: string;
+  status: RacepicPhotographerStatus;
   events: { eventId: string; eventName: string }[];
 };
 
@@ -78,8 +83,8 @@ export type RacepicEntrySearchResult = {
 export type RacepicAdminImage = {
   id: string;
   previewUrl: string | null;
-  visibility: "DRAFT" | "PUBLISHED" | "HIDDEN" | "REMOVED";
-  processingStatus: string;
+  visibility: RacepicImageVisibility;
+  processingStatus: RacepicProcessingStatus;
   processingError: string | null;
   assignmentState: string;
   photographerDisplayName: string;
@@ -89,9 +94,9 @@ export type RacepicAdminImage = {
 
 export type RacepicImagePipelineStatus = {
   id: string;
-  processingStatus: string;
+  processingStatus: RacepicProcessingStatus;
   processingError: string | null;
-  visibility: string;
+  visibility: RacepicImageVisibility;
   offerMode: string;
   priceCents: number | null;
   assignmentState: string;
@@ -148,7 +153,7 @@ export type RacepicQualityThresholdRow = {
 export type RacepicImageAssignment = {
   assignmentId: string;
   entryId: string;
-  status: string;
+  status: RacepicAssignmentStatus;
   source: string;
   confidence: number | null;
   driverName: string;

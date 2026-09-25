@@ -1,7 +1,15 @@
 <!-- Nur die Architektur (racepic-architecture.md) wird 1:1 in allen 3 Repos synchron gehalten. Diese Fortschrittsdatei ist repo-spezifisch und listet nur die Arbeitspakete, die in MSC-Event-Frontend passieren. -->
 # RacePic – Fortschritt (MSC-Event-Frontend)
 
-**Stand:** 2026-09-22 · Architektur: [racepic-architecture.md](./racepic-architecture.md) · Offene Punkte (konsolidiert): [racepic-open-items.md](./racepic-open-items.md) · UI/UX-Redesign-Roadmap: [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.md)
+**Stand:** 2026-09-25 · Architektur: [racepic-architecture.md](./racepic-architecture.md) · Offene Punkte (konsolidiert): [racepic-open-items.md](./racepic-open-items.md) · UI/UX-Redesign-Roadmap: [racepic-ux-redesign-plan.md](./racepic-ux-redesign-plan.md)
+
+## Gesamt-Review 2026-09-25
+
+- RacePic-Navigation und Route sind per Build-/Runtime-Flag standardmäßig deaktiviert.
+- Die alte Review-Route leitet kompatibel in den Assignment-Tab weiter; Event und Tab bleiben in der URL adressierbar.
+- `racepic.manage` trennt schreibende Einstellungen, Fotografen-, Bilder- und Matching-Funktionen von der lesenden/prüfenden Ansicht.
+- API-Typen verwenden begrenzte Status-Unions; der Widerspruchs-Contract meldet nur die Anzahl abgelehnter Zuordnungen und behauptet keine Bildlöschung.
+- Lokal verifiziert: Typecheck, drei Tests (zwei bestehende Node-Tests und ein RacePic-Vertragstest) sowie Produktions-Build erfolgreich. Der strikte repositoryweite Lint zeigt weiterhin vorbestehende Warnungen/Fehler außerhalb RacePic; die Qualitätsregeln wurden nicht gelockert.
 
 ## Arbeitspakete in diesem Repo
 

@@ -306,7 +306,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return {
         token,
         provider: session?.provider ?? null,
-        roles: resolvedRoles,
+        roles: effectiveRoles,
         isPreviewMode: false,
         displayName,
         email,
@@ -326,7 +326,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
       };
     },
-    [authMe?.email, clearSession, resolvedRoles, session]
+    [authMe?.email, clearSession, effectiveRoles, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

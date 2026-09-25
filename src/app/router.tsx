@@ -1,11 +1,12 @@
 import { lazy } from "react";
-import { createBrowserRouter, isRouteErrorResponse, Navigate, useRouteError } from "react-router-dom";
+import { createBrowserRouter, isRouteErrorResponse, Navigate, useParams, useRouteError } from "react-router-dom";
 import { ProtectedRoute } from "@/app/auth/guards";
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission } from "@/app/auth/iam";
 import { AdminLayout } from "@/app/layouts/admin-layout";
 import { PublicLayout } from "@/app/layouts/public-layout";
 import { HomePage } from "@/pages/home-page";
+import { isRacePicEnabled } from "@/config/runtime";
 
 const AnmeldungPage = lazy(() =>
   import("@/pages/public/anmeldung-page").then((module) => ({
@@ -103,9 +104,10 @@ const AdminNewsletterPage = lazy(() =>
 const AdminRacepicPage = lazy(() =>
   import("@/pages/admin/racepic-page").then((module) => ({ default: module.AdminRacepicPage })),
 );
-const AdminRacepicReviewPage = lazy(() =>
-  import("@/pages/admin/racepic-review-page").then((module) => ({ default: module.AdminRacepicReviewPage })),
-);
+function LegacyRacePicReviewRedirect() {
+  const { eventId = '' } = useParams();
+  return <Navigate to={`/admin/racepic?event=${encodeURIComponent(eventId)}&tab=assignments`} replace />;
+}
 
 function RouteErrorPage() {
   const error = useRouteError();
@@ -261,7 +263,7 @@ export const router = createBrowserRouter([
             path: "racepic",
             element: (
               <ProtectedRoute allowedRoles={["admin", "racepic_moderator"]}>
-                <AdminRacepicPage />
+                {isRacePicEnabled() ? <AdminRacepicPage /> : <Navigate to="/admin" replace />}
               </ProtectedRoute>
             ),
           },
@@ -269,7 +271,7 @@ export const router = createBrowserRouter([
             path: "racepic/review/:eventId",
             element: (
               <ProtectedRoute allowedRoles={["admin", "racepic_moderator"]}>
-                <AdminRacepicReviewPage />
+                {isRacePicEnabled() ? <LegacyRacePicReviewRedirect /> : <Navigate to="/admin" replace />}
               </ProtectedRoute>
             ),
           },

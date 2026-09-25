@@ -196,18 +196,14 @@ export function ReviewCard({
   );
 }
 
-/**
- * Datenschutz-Widerspruch/Wunsch: alle Bilder einer Nennung auf einen Schlag ausblenden (Paket 9
- * Backend, Paket 11 UI - siehe Bestandsaufnahme 2026-09-22 in racepic-progress.md, bislang nur
- * per rohem API-Aufruf erreichbar).
- */
+/** Remove an entry's RacePic assignments after a privacy objection without hiding shared images. */
 export function HideParticipantSection({ eventId, onHidden }: { eventId: string; onHidden: () => void }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const handlePick = async (entryId: string) => {
-    if (!window.confirm("Alle Bilder dieser Nennung ausblenden (bestehende Zuordnungen werden abgelehnt)?")) return;
+    if (!window.confirm("Diese Nennung aus RacePic entfernen? Bestehende Zuordnungen werden abgelehnt; die Bilder selbst bleiben erhalten.")) return;
     setBusy(true);
     setError("");
     setMessage("");
@@ -224,7 +220,7 @@ export function HideParticipantSection({ eventId, onHidden }: { eventId: string;
 
   return (
     <div className="rounded-lg border p-4">
-      <p className="mb-1 text-sm font-medium">Teilnehmer ausblenden (Datenschutz-Widerspruch)</p>
+      <p className="mb-1 text-sm font-medium">RacePic-Zuordnungen entfernen (Datenschutz-Widerspruch)</p>
       <EntrySearchPicker eventId={eventId} disabled={busy} onPick={handlePick} label="Nennung suchen" />
       {message && <p className="mt-1 text-sm text-green-700">{message}</p>}
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}

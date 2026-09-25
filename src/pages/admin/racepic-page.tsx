@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,6 @@ import type {
   RacepicAdminImage,
   RacepicImagePipelineStatus,
   RacepicEntrySearchResult,
-  RacepicEventConfig,
   RacepicEventListItem,
   RacepicEventStats,
   RacepicImageAssignment,
@@ -21,12 +21,17 @@ import type {
   RacepicPhotographer,
   RacepicReviewItem,
 } from "@/types/admin-racepic";
+import { useAuth } from "@/app/auth/auth-context";
+import { hasPermission } from "@/app/auth/iam";
 
 /**
  * RacePic Admin-Basis (Paket 5), siehe docs/memory-bank/racepic-architecture.md Abschnitt H.
  * Review-Queue (Paket 7) und KI-Konfiguration (Paket 6) folgen als eigene Bereiche.
  */
 export function AdminRacepicPage() {
+  const { roles } = useAuth();
+  const canManage = hasPermission(roles, 'racepic.manage');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<RacepicEventListItem[]>([]);
   const [licenses, setLicenses] = useState<RacepicLicenseOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +61,15 @@ export function AdminRacepicPage() {
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {loading && <p className="text-sm text-slate-500">Lädt…</p>}
 
-      {!loading && <EventsSection events={events} licenses={licenses} onChanged={reload} />}
+      {!loading && <EventsSection
+        events={events}
+        licenses={licenses}
+        onChanged={reload}
+        canManage={canManage}
+        requestedEventId={searchParams.get('event')}
+        requestedTab={searchParams.get('tab')}
+        onSelectionChange={(eventId, tab) => setSearchParams({ event: eventId, tab }, { replace: true })}
+      />}
     </div>
   );
 }
@@ -65,14 +78,22 @@ function EventsSection({
   events,
   licenses,
   onChanged,
+  canManage,
+  requestedEventId,
+  requestedTab,
+  onSelectionChange,
 }: {
   events: RacepicEventListItem[];
   licenses: RacepicLicenseOption[];
   onChanged: () => void;
+  canManage: boolean;
+  requestedEventId: string | null;
+  requestedTab: string | null;
+  onSelectionChange: (eventId: string, tab: string) => void;
 }) {
   const [selectedEventId, setSelectedEventId] = useState(() => {
     const remembered = window.sessionStorage.getItem('racepic_admin_event');
-    return events.find((item) => item.eventId === remembered)?.eventId ?? events.find((item) => item.racepic?.enabled)?.eventId ?? events[0]?.eventId ?? '';
+    return events.find((item) => item.eventId === requestedEventId)?.eventId ?? events.find((item) => item.eventId === remembered)?.eventId ?? events.find((item) => item.racepic?.enabled)?.eventId ?? events[0]?.eventId ?? '';
   });
   const selectedEvent = events.find((item) => item.eventId === selectedEventId) ?? events[0];
 
@@ -83,10 +104,10 @@ function EventsSection({
           <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktives Event</p><h2 className="text-lg font-semibold">{selectedEvent.eventName}</h2></div>
           <div className="flex items-center gap-3">
             <Badge variant={selectedEvent.racepic?.published ? 'default' : 'secondary'}>{selectedEvent.racepic?.published ? 'Öffentlich' : 'Nicht öffentlich'}</Badge>
-            {events.length > 1 && <select aria-label="RacePic-Event wählen" className="h-9 rounded-md border px-3 text-sm" value={selectedEvent.eventId} onChange={(event) => { setSelectedEventId(event.target.value); window.sessionStorage.setItem('racepic_admin_event', event.target.value); }}>{events.map((item) => <option key={item.eventId} value={item.eventId}>{item.eventName}</option>)}</select>}
+            {events.length > 1 && <select aria-label="RacePic-Event wählen" className="h-9 rounded-md border px-3 text-sm" value={selectedEvent.eventId} onChange={(event) => { setSelectedEventId(event.target.value); window.sessionStorage.setItem('racepic_admin_event', event.target.value); onSelectionChange(event.target.value, 'overview'); }}>{events.map((item) => <option key={item.eventId} value={item.eventId}>{item.eventName}</option>)}</select>}
           </div>
         </div>
-        <EventConfigForm key={selectedEvent.eventId} event={selectedEvent} licenses={licenses} onSaved={onChanged} />
+        <EventConfigForm key={selectedEvent.eventId} event={selectedEvent} licenses={licenses} onSaved={onChanged} canManage={canManage} initialTab={requestedTab} onTabChange={(tab) => onSelectionChange(selectedEvent.eventId, tab)} />
       </> : <p className="text-sm text-slate-500">Keine Events verfügbar.</p>}
     </section>
   );
@@ -104,7 +125,7 @@ function fromDatetimeLocal(value: string): string | null {
   return new Date(value).toISOString();
 }
 
-function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventListItem; licenses: RacepicLicenseOption[]; onSaved: () => void }) {
+function EventConfigForm({ event, licenses, onSaved, canManage, initialTab, onTabChange }: { event: RacepicEventListItem; licenses: RacepicLicenseOption[]; onSaved: () => void; canManage: boolean; initialTab: string | null; onTabChange: (tab: string) => void }) {
   const existing = event.racepic;
   const [slug, setSlug] = useState(existing?.slug ?? "");
   const [title, setTitle] = useState(existing?.title ?? event.eventName);
@@ -116,7 +137,8 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [stats, setStats] = useState<RacepicEventStats | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const allowedInitialTab = initialTab === 'assignments' ? 'assignment' : initialTab;
+  const [activeTab, setActiveTab] = useState(allowedInitialTab && ['overview', 'assignment', ...(canManage ? ['settings', 'photographers', 'images', 'matching'] : [])].includes(allowedInitialTab) ? allowedInitialTab : 'overview');
 
   useEffect(() => {
     let cancelled = false;
@@ -166,24 +188,24 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
     "rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-slate-500 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none";
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+    <Tabs value={activeTab} onValueChange={(tab) => { setActiveTab(tab); onTabChange(tab === 'assignment' ? 'assignments' : tab); }} className="w-full">
       <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
         <TabsTrigger value="overview" className={tabTriggerClass}>Übersicht</TabsTrigger>
-        <TabsTrigger value="settings" className={tabTriggerClass}>
+        {canManage && <TabsTrigger value="settings" className={tabTriggerClass}>
           Einstellungen
-        </TabsTrigger>
-        <TabsTrigger value="photographers" className={tabTriggerClass}>
+        </TabsTrigger>}
+        {canManage && <TabsTrigger value="photographers" className={tabTriggerClass}>
           Fotograf:innen
-        </TabsTrigger>
-        <TabsTrigger value="images" className={tabTriggerClass}>
+        </TabsTrigger>}
+        {canManage && <TabsTrigger value="images" className={tabTriggerClass}>
           Bilder
-        </TabsTrigger>
+        </TabsTrigger>}
         <TabsTrigger value="assignment" className={tabTriggerClass}>
           Zuordnung
         </TabsTrigger>
-        <TabsTrigger value="matching" className={tabTriggerClass}>
+        {canManage && <TabsTrigger value="matching" className={tabTriggerClass}>
           KI-Konfiguration
-        </TabsTrigger>
+        </TabsTrigger>}
       </TabsList>
 
       <TabsContent value="overview" className="space-y-5 pt-5">
@@ -196,10 +218,10 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
             { label: 'Zu prüfen', value: stats?.assignmentsByStatus.REVIEW_REQUIRED ?? 0, tab: 'assignment' },
           ].map((card) => <button type="button" key={card.label} onClick={() => setActiveTab(card.tab)} className="rounded-xl border bg-white p-5 text-left shadow-sm transition hover:border-primary hover:shadow"><span className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</span><span className="mt-2 block text-3xl font-bold">{card.value}</span></button>)}
         </div>
-        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => setActiveTab('images')}>Bilder öffnen</Button><Button size="sm" variant="outline" onClick={() => setActiveTab('photographers')}>Fotograf:innen verwalten</Button><Button size="sm" variant="outline" onClick={() => setActiveTab('assignment')}>Zuordnung öffnen</Button></div>
+        <div className="flex flex-wrap gap-2">{canManage && <Button size="sm" onClick={() => setActiveTab('images')}>Bilder öffnen</Button>}{canManage && <Button size="sm" variant="outline" onClick={() => setActiveTab('photographers')}>Fotograf:innen verwalten</Button>}<Button size="sm" variant="outline" onClick={() => setActiveTab('assignment')}>Zuordnung öffnen</Button></div>
       </TabsContent>
 
-      <TabsContent value="settings" className="pt-4">
+      {canManage && <TabsContent value="settings" className="pt-4">
     <div className="grid gap-6 md:grid-cols-2">
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
@@ -314,23 +336,23 @@ function EventConfigForm({ event, licenses, onSaved }: { event: RacepicEventList
         )}
       </div>
     </div>
-      </TabsContent>
+      </TabsContent>}
 
-      <TabsContent value="photographers" className="pt-4">
+      {canManage && <TabsContent value="photographers" className="pt-4">
         <EventPhotographersTab eventId={event.eventId} />
-      </TabsContent>
+      </TabsContent>}
 
-      <TabsContent value="images" className="pt-4">
+      {canManage && <TabsContent value="images" className="pt-4">
         <ImagesSection eventId={event.eventId} />
-      </TabsContent>
+      </TabsContent>}
 
       <TabsContent value="assignment" className="pt-4">
         <AssignmentOverviewTab eventId={event.eventId} />
       </TabsContent>
 
-      <TabsContent value="matching" className="pt-4">
+      {canManage && <TabsContent value="matching" className="pt-4">
         <MatchingSection eventId={event.eventId} />
-      </TabsContent>
+      </TabsContent>}
     </Tabs>
   );
 }
@@ -419,7 +441,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
   // kurz das komplette Grid durch "Lädt…" - Bug gefunden 2026-09-22, Nutzer-Feedback "reloaded
   // immer ganz komisch und hängt ein wenig") und keine Auswahl-Zuruecksetzung (sonst verschwand
   // eine laufende Mehrfachauswahl alle 5s von selbst).
-  const reload = (opts?: { silent?: boolean }) => {
+  const reload = useCallback((opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     adminRacepicService
       .listImages(eventId, { visibility: visibilityFilter || undefined }, offset, pageSize)
@@ -431,9 +453,9 @@ function ImagesSection({ eventId }: { eventId: string }) {
       })
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  };
+  }, [eventId, offset, pageSize, visibilityFilter]);
 
-  useEffect(() => reload(), [eventId, visibilityFilter, offset]);
+  useEffect(() => reload(), [reload]);
 
   // Solange noch Bilder auf dieser Seite in der Pipeline stecken (UPLOADED/VALIDATED/DERIVED/
   // ANALYZED), alle 5s neu laden - Feedback 2026-09-22: ein frisch hochgeladenes Bild soll seinen
@@ -443,7 +465,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
     if (!items.some((item) => PROCESSING_NON_TERMINAL_STATUSES.has(item.processingStatus))) return;
     const timeout = window.setTimeout(() => reload({ silent: true }), 5000);
     return () => window.clearTimeout(timeout);
-  }, [items, eventId, visibilityFilter, offset]);
+  }, [items, reload]);
 
   // Aendert Sichtbarkeit/Auswahl direkt im lokalen State statt per volley reload() (Bug gefunden
   // 2026-09-22, Nutzer-Feedback "entfernen von Bildern läuft sehr unflüssig"): ein voller
@@ -678,7 +700,7 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
   const [reanalyzeMessage, setReanalyzeMessage] = useState("");
   const [pipeline, setPipeline] = useState<RacepicImagePipelineStatus | null>(null);
 
-  const reload = () => {
+  const reload = useCallback(() => {
     setLoading(true);
     Promise.all([adminRacepicService.getImageAssignments(imageId), adminRacepicService.getImagePipelineStatus(imageId)])
       .then(([result, status]) => {
@@ -688,9 +710,9 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
       })
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  };
+  }, [imageId]);
 
-  useEffect(reload, [imageId]);
+  useEffect(reload, [reload]);
 
   const handleConfirm = async (assignmentId: string) => {
     setBusyId(assignmentId);
@@ -895,7 +917,7 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const reload = () => {
+  const reload = useCallback(() => {
     Promise.all([adminRacepicService.getEventStats(eventId), adminRacepicService.listReviewQueue(eventId, offset, REVIEW_PAGE_SIZE)])
       .then(([statsResult, reviewResult]) => {
         setStats(statsResult);
@@ -905,13 +927,13 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
       })
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  };
+  }, [eventId, offset]);
 
   useEffect(() => {
     reload();
     const interval = window.setInterval(reload, 8000);
     return () => window.clearInterval(interval);
-  }, [eventId, offset]);
+  }, [reload]);
 
   const runAction = async (key: string, action: () => Promise<void>) => {
     setBusyKey(key);
@@ -1361,7 +1383,7 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
   );
 }
 
-function PhotographersSection({
+export function PhotographersSection({
   photographers,
   events,
   onChanged,

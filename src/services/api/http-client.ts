@@ -49,19 +49,6 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
-function readConfigValue(envKey: string, runtimeKey: string, fallback = ""): string {
-  const runtimeConfig = window.__MSC_RUNTIME_CONFIG__;
-  const runtimeValue = runtimeConfig?.[runtimeKey] ?? runtimeConfig?.[envKey];
-  if (runtimeValue !== undefined && runtimeValue !== null) {
-    return String(runtimeValue).trim();
-  }
-  const envValue = (import.meta.env as Record<string, unknown>)[envKey];
-  if (envValue !== undefined && envValue !== null) {
-    return String(envValue).trim();
-  }
-  return fallback;
-}
-
 function resolveBaseUrl(): string {
   const runtimeConfig = window.__MSC_RUNTIME_CONFIG__;
   const runtimeValue = runtimeConfig?.apiBaseUrl ?? runtimeConfig?.VITE_API_BASE_URL;

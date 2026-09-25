@@ -55,6 +55,7 @@ jobs:
       MSC_COGNITO_LOGOUT_URI: ${{ vars.VITE_COGNITO_LOGOUT_URI_DEV }}
       MSC_COGNITO_SCOPES: ${{ vars.VITE_COGNITO_SCOPES_DEV }}
       MSC_COGNITO_STORAGE_BRIDGE: "true"
+      MSC_ENABLE_RACEPIC: ${{ vars.VITE_ENABLE_RACEPIC_DEV }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,6 +93,7 @@ jobs:
           VITE_COGNITO_LOGOUT_URI: ${{ env.MSC_COGNITO_LOGOUT_URI }}
           VITE_COGNITO_SCOPES: ${{ env.MSC_COGNITO_SCOPES }}
           VITE_COGNITO_STORAGE_BRIDGE: ${{ env.MSC_COGNITO_STORAGE_BRIDGE }}
+          VITE_ENABLE_RACEPIC: ${{ env.MSC_ENABLE_RACEPIC }}
 
       - name: Write runtime config
         run: |
@@ -103,7 +105,8 @@ jobs:
             cognitoRedirectUri: "${MSC_COGNITO_REDIRECT_URI}",
             cognitoLogoutUri: "${MSC_COGNITO_LOGOUT_URI}",
             cognitoScopes: "${MSC_COGNITO_SCOPES}",
-            cognitoStorageBridgeEnabled: "${MSC_COGNITO_STORAGE_BRIDGE}"
+            cognitoStorageBridgeEnabled: "${MSC_COGNITO_STORAGE_BRIDGE}",
+            racepicEnabled: "${MSC_ENABLE_RACEPIC}"
           };
           EOF
 
@@ -171,6 +174,7 @@ jobs:
       MSC_ENABLE_PWA: "true"
       MSC_AUTH_IDLE_TIMEOUT_MINUTES: "129600"
       MSC_AUTH_MAX_SESSION_HOURS: "2160"
+      MSC_ENABLE_RACEPIC: ${{ vars.VITE_ENABLE_RACEPIC_PROD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -211,6 +215,7 @@ jobs:
           VITE_ENABLE_PWA: ${{ env.MSC_ENABLE_PWA }}
           VITE_AUTH_IDLE_TIMEOUT_MINUTES: ${{ env.MSC_AUTH_IDLE_TIMEOUT_MINUTES }}
           VITE_AUTH_MAX_SESSION_HOURS: ${{ env.MSC_AUTH_MAX_SESSION_HOURS }}
+          VITE_ENABLE_RACEPIC: ${{ env.MSC_ENABLE_RACEPIC }}
 
       - name: Write runtime config
         run: |
@@ -224,7 +229,8 @@ jobs:
             cognitoScopes: "${MSC_COGNITO_SCOPES}",
             cognitoStorageBridgeEnabled: "${MSC_COGNITO_STORAGE_BRIDGE}",
             authIdleTimeoutMinutes: "${MSC_AUTH_IDLE_TIMEOUT_MINUTES}",
-            authMaxSessionHours: "${MSC_AUTH_MAX_SESSION_HOURS}"
+            authMaxSessionHours: "${MSC_AUTH_MAX_SESSION_HOURS}",
+            racepicEnabled: "${MSC_ENABLE_RACEPIC}"
           };
           EOF
 

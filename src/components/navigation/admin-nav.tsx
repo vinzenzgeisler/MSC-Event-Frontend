@@ -3,6 +3,7 @@ import { LayoutGrid, ListChecks, Mail, MailCheck, FileDown, Settings, ShieldChec
 import { useAuth } from "@/app/auth/auth-context";
 import { hasPermission, type AppPermission } from "@/app/auth/iam";
 import { cn } from "@/lib/utils";
+import { isRacePicEnabled } from "@/config/runtime";
 
 const links = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutGrid, permission: "dashboard.read" as AppPermission },
@@ -39,7 +40,7 @@ export function AdminNav() {
 
   return (
     <nav className="grid gap-1">
-      {links.filter((link) => hasPermission(roles, link.permission)).map((link) => {
+      {links.filter((link) => hasPermission(roles, link.permission) && (link.to !== '/admin/racepic' || isRacePicEnabled())).map((link) => {
         const Icon = link.icon;
         return (
           <NavLink
