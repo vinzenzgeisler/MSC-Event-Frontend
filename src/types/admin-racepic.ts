@@ -168,3 +168,47 @@ export type RacepicMatchQualityReport = {
   detectionsWithConfirmedMatchCount: number;
   thresholds: RacepicQualityThresholdRow[];
 };
+
+// --- Commerce: FREE->PAID-Antraege (MSC-Event-Backend api/src/commerce/conversion.ts) ---------------
+
+export type RacepicConversionStatus = "REQUESTED" | "PREPARING_ASSETS" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "FAILED";
+export type RacepicConversionArtifactStatus = "PENDING" | "RUNNING" | "READY" | "FAILED";
+
+export type RacepicConversionSummary = {
+  id: string;
+  status: RacepicConversionStatus;
+  priceCents: number;
+  createdAt: string;
+  decidedAt: string | null;
+  finalized: boolean;
+  failureReason: string | null;
+  photographer: { id: string; displayName: string };
+  imageCount: number;
+};
+
+export type RacepicConversionDetail = {
+  id: string;
+  status: RacepicConversionStatus;
+  priceCents: number;
+  createdAt: string;
+  decidedAt: string | null;
+  finalized: boolean;
+  failureReason: string | null;
+  reviewNote: string | null;
+  reviewer: string | null;
+  rightsConfirmedAt: string;
+  rightsConfirmationVersion: string;
+  photographer: { id: string; displayName: string; email: string };
+  license: { id: string; code: string; version: number };
+  items: {
+    imageId: string;
+    title: string | null;
+    eventId: string;
+    ownedByRequester: boolean;
+    visibility: RacepicImageVisibility;
+    offerMode: "FREE" | "PAID";
+    artifactStatus: RacepicConversionArtifactStatus;
+    artifactError: string | null;
+    previewUrl: string | null;
+  }[];
+};

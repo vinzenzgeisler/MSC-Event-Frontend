@@ -125,3 +125,13 @@ Dies ist Feature-Branch-Arbeit. Lokal erfolgreich: TypeScript-Typechecks der Web
 ## Marketplace-/Checkout-Plan (2026-09-25)
 
 Der vollständige Plan ist in [racepic-marketplace-checkout-plan.md](./racepic-marketplace-checkout-plan.md) dokumentiert. Dieses Repo übernimmt FREE→PAID-Freigaben, Bestell- und Zahlungsübersichten, vollständige Positions-/Order-Refunds, Takedowns, Disputes, Transfers, Reversals und die Reconciliation-Ausnahmewarteschlange. Diese Adminfunktionen sind noch nicht implementiert oder freigeschaltet.
+
+## Commerce: Prüfung der FREE→PAID-Anträge (Branch `feature/racepic/commerce-conversion-ui`)
+
+Stand 2026-09-28, nichts deployt, nicht gegen ein echtes Backend geklickt:
+
+- Neue Seite `src/pages/admin/racepic-conversions-page.tsx` unter `/admin/racepic/conversions` (nur Rolle `admin`, Berechtigung `racepic.manage`, hinter `isRacePicEnabled()`; Navigationseintrag „RacePic Preisumstellung“). Liste mit Statusfilter, Detail mit Fotograf:in, Preis, Lizenz, Rechtebestätigung, wasserzeichenbehafteten Vorschauen und Artefaktstatus; Freigeben/Ablehnen mit Pflicht-Bearbeitungsvermerk und Bestätigungsdialog; „Umstellung abschließen“, falls eine Freigabe die öffentliche Umstellung noch nicht beendet hat.
+- `adminRacepicService` (`listConversions`, `getConversion`, `decideConversion`, `finalizeConversion`) sendet `Idempotency-Key`; die Seite erzeugt den Key einmal pro Entscheidungsversuch und verwendet ihn nach einem Fehler erneut.
+- Es gibt bewusst kein eigenes Frontend-Flag: Solange das Backend-Flag `commerceFreeToPaidConversion` aus ist, antworten die Routen mit 404/`COMMERCE_DISABLED`, und die Seite zeigt einen Hinweis. Abweichung vom Plan, der `runtime.ts`/CI-Variablen vorsah.
+- `vitest.config.ts` kennt jetzt den `@`-Alias (`vite.config.ts`), damit Services testbar sind. Tests: `src/services/admin-racepic-conversions.test.ts`.
+- `npm run lint` schlägt im Bestand bereits fehl (31 Warnungen mit `--max-warnings=0`, u. a. `router.tsx`, `entry-detail-page.tsx`); die geänderten und neuen Dateien bringen keine neuen Warnungen. `typecheck`, `test` und `build` laufen durch.

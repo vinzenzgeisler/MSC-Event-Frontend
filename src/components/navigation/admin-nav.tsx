@@ -31,6 +31,7 @@ const links = [
   { to: "/admin/newsletter", label: "Newsletter", icon: MailCheck, permission: "newsletter.read" as AppPermission },
   { to: "/admin/voting", label: "Voting & Didier-Grams-Auktion", icon: Vote, permission: "voting.read" as AppPermission },
   { to: "/admin/racepic", label: "RacePic", icon: Camera, permission: "racepic.read" as AppPermission },
+  { to: "/admin/racepic/conversions", label: "RacePic Preisumstellung", icon: Camera, permission: "racepic.manage" as AppPermission },
   { to: "/admin/exports", label: "Exporte", icon: FileDown, permission: "exports.read" as AppPermission },
   { to: "/admin/settings", label: "Einstellungen", icon: Settings, permission: "settings.read" as AppPermission }
 ];
@@ -40,12 +41,13 @@ export function AdminNav() {
 
   return (
     <nav className="grid gap-1">
-      {links.filter((link) => hasPermission(roles, link.permission) && (link.to !== '/admin/racepic' || isRacePicEnabled())).map((link) => {
+      {links.filter((link) => hasPermission(roles, link.permission) && (!link.to.startsWith('/admin/racepic') || isRacePicEnabled())).map((link) => {
         const Icon = link.icon;
         return (
           <NavLink
             key={link.to}
             to={link.to}
+            end={link.to === "/admin/racepic"}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition",

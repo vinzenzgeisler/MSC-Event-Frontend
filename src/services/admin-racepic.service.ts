@@ -1,6 +1,9 @@
 import { requestJson } from "@/services/api/http-client";
 import type {
   RacepicAdminImage,
+  RacepicConversionDetail,
+  RacepicConversionStatus,
+  RacepicConversionSummary,
   RacepicImagePipelineStatus,
   RacepicEntrySearchResult,
   RacepicEventConfig,
@@ -58,6 +61,37 @@ export const adminRacepicService = {
   async listLicenses(): Promise<RacepicLicenseOption[]> {
     const res = await requestJson<{ ok: boolean; licenses: RacepicLicenseOption[] }>("/admin/racepic/licenses");
     return res.licenses;
+  },
+
+  // --- Commerce: FREE->PAID-Antraege (Pruefung durch racepic.manage) ---
+  // Schreibende Aufrufe senden einen Idempotency-Key, den der Aufrufer pro Entscheidungsversuch einmal erzeugt
+  // und bei Wiederholung nach einem Fehler wiederverwendet.
+
+  async listConversions(status?: RacepicConversionStatus): Promise<RacepicConversionSummary[]> {
+    const res = await requestJson<{ ok: boolean; conversions: RacepicConversionSummary[] }>("/admin/racepic/offer-conversions", {
+      query: status ? { status } : undefined,
+    });
+    return res.conversions;
+  },
+
+  async getConversion(conversionId: string): Promise<RacepicConversionDetail> {
+    const res = await requestJson<{ ok: boolean; conversion: RacepicConversionDetail }>(`/admin/racepic/offer-conversions/${conversionId}`);
+    return res.conversion;
+  },
+
+  async decideConversion(conversionId: string, decision: "approve" | "reject", note: string, idempotencyKey: string): Promise<void> {
+    await requestJson(`/admin/racepic/offer-conversions/${conversionId}/${decision}`, {
+      method: "POST",
+      body: { note },
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
+  },
+
+  async finalizeConversion(conversionId: string, idempotencyKey: string): Promise<void> {
+    await requestJson(`/admin/racepic/offer-conversions/${conversionId}/finalize`, {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
   },
 
   // --- Paket 7: Review-Queue ---
