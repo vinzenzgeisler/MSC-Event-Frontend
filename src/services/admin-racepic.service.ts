@@ -17,6 +17,7 @@ import type {
   RacepicPhotographer,
   RacepicReviewItem,
 } from "@/types/admin-racepic";
+import type { CommerceSettingsValues, CommerceSettingsVersion } from "@/lib/commerce-settings";
 
 /** RacePic Admin-Basis (Paket 5), spiegelt api/src/racepic/handler.ts (MSC-Event-Backend-Repo). */
 export const adminRacepicService = {
@@ -92,6 +93,22 @@ export const adminRacepicService = {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
     });
+  },
+
+  // --- Commerce: Steuer-/Provisionseinstellungen (unveraenderliche Versionen, optimistische Sperre) ---
+
+  async getCommerceSettings(): Promise<{ current: CommerceSettingsVersion; history: CommerceSettingsVersion[] }> {
+    const res = await requestJson<{ ok: boolean; current: CommerceSettingsVersion; history: CommerceSettingsVersion[] }>("/admin/racepic/commerce-settings");
+    return { current: res.current, history: res.history };
+  },
+
+  /** `expectedVersion` ist die Version, die der Nutzer gesehen hat; bei Abweichung antwortet der Server mit 409. */
+  async saveCommerceSettings(values: CommerceSettingsValues, expectedVersion: number, note: string): Promise<CommerceSettingsVersion> {
+    const res = await requestJson<{ ok: boolean; current: CommerceSettingsVersion }>("/admin/racepic/commerce-settings", {
+      method: "POST",
+      body: { ...values, expectedVersion, note },
+    });
+    return res.current;
   },
 
   // --- Paket 7: Review-Queue ---

@@ -135,3 +135,11 @@ Stand 2026-09-28, nichts deployt, nicht gegen ein echtes Backend geklickt:
 - Es gibt bewusst kein eigenes Frontend-Flag: Solange das Backend-Flag `commerceFreeToPaidConversion` aus ist, antworten die Routen mit 404/`COMMERCE_DISABLED`, und die Seite zeigt einen Hinweis. Abweichung vom Plan, der `runtime.ts`/CI-Variablen vorsah.
 - `vitest.config.ts` kennt jetzt den `@`-Alias (`vite.config.ts`), damit Services testbar sind. Tests: `src/services/admin-racepic-conversions.test.ts`.
 - `npm run lint` schlägt im Bestand bereits fehl (31 Warnungen mit `--max-warnings=0`, u. a. `router.tsx`, `entry-detail-page.tsx`); die geänderten und neuen Dateien bringen keine neuen Warnungen. `typecheck`, `test` und `build` laufen durch.
+
+## Commerce: Steuer-/Provisionseinstellungen (Branch `feature/racepic/commerce-settings-ui`)
+
+Stand 2026-09-28, nichts deployt, nicht gegen ein echtes Backend geklickt:
+
+- Neue Seite `src/pages/admin/racepic-commerce-settings-page.tsx` unter `/admin/racepic/commerce-settings` (nur Rolle `admin`, Berechtigung `racepic.manage`, hinter `isRacePicEnabled()`; Navigationseintrag „RacePic Steuer & Provision“). Bearbeitet werden Verkaufssteuersatz (leer = noch nicht entschieden), Provision, Bezugsgröße Netto/Brutto, Steuersatz der Fotograf:innen (leer = wie beim Verkauf) und Künstlersozialabgabe. Speichern erzeugt eine neue, unveränderliche Version mit Pflichtvermerk und `expectedVersion`; bei Konflikt (409) lädt die Seite neu.
+- Eine Vorschau (`src/lib/commerce-settings.ts`, spiegelt die Server-Formeln nur zur Anzeige) zeigt für 5/10/20 € Netto, USt, Auszahlung an regelbesteuerte Fotograf:innen und Kleinunternehmer sowie den MSC-Anteil. Der Verlauf listet alle Versionen. Ein Hinweis erscheint, solange kein Steuersatz gesetzt ist.
+- Tests: `src/lib/commerce-settings.test.ts`, `src/services/admin-racepic-settings.test.ts`. `npm test`, `typecheck` und `build` laufen durch; die geänderten Dateien sind lint-sauber (der Bestand-Lint mit `--max-warnings=0` schlägt weiterhin an).

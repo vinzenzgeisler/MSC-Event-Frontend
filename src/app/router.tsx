@@ -107,6 +107,9 @@ const AdminRacepicPage = lazy(() =>
 const AdminRacepicConversionsPage = lazy(() =>
   import("@/pages/admin/racepic-conversions-page").then((module) => ({ default: module.AdminRacepicConversionsPage })),
 );
+const AdminRacepicCommerceSettingsPage = lazy(() =>
+  import("@/pages/admin/racepic-commerce-settings-page").then((module) => ({ default: module.AdminRacepicCommerceSettingsPage })),
+);
 function LegacyRacePicReviewRedirect() {
   const { eventId = '' } = useParams();
   return <Navigate to={`/admin/racepic?event=${encodeURIComponent(eventId)}&tab=assignments`} replace />;
@@ -275,6 +278,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute allowedRoles={["admin"]}>
                 {isRacePicEnabled() ? <AdminRacepicConversionsPage /> : <Navigate to="/admin" replace />}
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "racepic/commerce-settings",
+            element: (
+              <ProtectedRoute allowedRoles={["admin"]}>
+                {isRacePicEnabled() ? <AdminRacepicCommerceSettingsPage /> : <Navigate to="/admin" replace />}
               </ProtectedRoute>
             ),
           },

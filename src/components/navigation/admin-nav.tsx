@@ -32,6 +32,7 @@ const links = [
   { to: "/admin/voting", label: "Voting & Didier-Grams-Auktion", icon: Vote, permission: "voting.read" as AppPermission },
   { to: "/admin/racepic", label: "RacePic", icon: Camera, permission: "racepic.read" as AppPermission },
   { to: "/admin/racepic/conversions", label: "RacePic Preisumstellung", icon: Camera, permission: "racepic.manage" as AppPermission },
+  { to: "/admin/racepic/commerce-settings", label: "RacePic Steuer & Provision", icon: Camera, permission: "racepic.manage" as AppPermission },
   { to: "/admin/exports", label: "Exporte", icon: FileDown, permission: "exports.read" as AppPermission },
   { to: "/admin/settings", label: "Einstellungen", icon: Settings, permission: "settings.read" as AppPermission }
 ];
