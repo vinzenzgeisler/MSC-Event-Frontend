@@ -1,10 +1,22 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+  Calendar, Tag, Receipt, Gauge, Settings as SettingsIcon, UsersRound, Image as ImageIcon,
+  UserCheck, Sparkles, Eye, EyeOff, Trash2, Link2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useConfirm } from "@/hooks/use-confirm";
+import {
+  PROCESSING_STATUS_ORDER, PROCESSING_STATUS_LABELS, PROCESSING_NON_TERMINAL_STATUSES, PROCESSING_STATUS_BADGE_CLASS,
+  VISIBILITY_LABELS, ASSIGNMENT_STATE_LABEL, ASSIGNMENT_STATUS_ORDER, ASSIGNMENT_STATUS_LABELS, PHOTOGRAPHER_STATUS_LABELS,
+} from "@/lib/racepic-labels";
 import { adminRacepicService } from "@/services/admin-racepic.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { HideParticipantSection, ReviewCard } from "./racepic-review-page";
@@ -62,10 +74,12 @@ export function AdminRacepicPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">RacePic</h1>
-        <p className="text-sm text-slate-500">Bilder, Zuordnungen, Fotograf:innen sowie Preisumstellung und Steuer/Provision an einem Ort verwalten.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>RacePic</CardTitle>
+          <CardDescription>Bilder, Zuordnungen, Fotograf:innen sowie Preisumstellung und Steuer/Provision an einem Ort verwalten.</CardDescription>
+        </CardHeader>
+      </Card>
 
       <Tabs
         value={section}
@@ -77,9 +91,9 @@ export function AdminRacepicPage() {
         className="w-full"
       >
         <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
-          <TabsTrigger value="events" className={topTabTriggerClass}>Events</TabsTrigger>
-          {canManage && <TabsTrigger value="conversions" className={topTabTriggerClass}>Preisumstellung</TabsTrigger>}
-          {canManage && <TabsTrigger value="commerce-settings" className={topTabTriggerClass}>Steuer & Provision</TabsTrigger>}
+          <TabsTrigger value="events" className={topTabTriggerClass}><Calendar className="mr-1.5 h-3.5 w-3.5" />Events</TabsTrigger>
+          {canManage && <TabsTrigger value="conversions" className={topTabTriggerClass}><Tag className="mr-1.5 h-3.5 w-3.5" />Preisumstellung</TabsTrigger>}
+          {canManage && <TabsTrigger value="commerce-settings" className={topTabTriggerClass}><Receipt className="mr-1.5 h-3.5 w-3.5" />Steuer & Provision</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="events" className="space-y-5 pt-5">
@@ -135,13 +149,15 @@ function EventsSection({
   return (
     <section className="space-y-5">
       {selectedEvent ? <>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4">
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktives Event</p><h2 className="text-lg font-semibold">{selectedEvent.eventName}</h2></div>
-          <div className="flex items-center gap-3">
-            <Badge variant={selectedEvent.racepic?.published ? 'default' : 'secondary'}>{selectedEvent.racepic?.published ? 'Öffentlich' : 'Nicht öffentlich'}</Badge>
-            {events.length > 1 && <select aria-label="RacePic-Event wählen" className="h-9 rounded-md border px-3 text-sm" value={selectedEvent.eventId} onChange={(event) => { setSelectedEventId(event.target.value); window.sessionStorage.setItem('racepic_admin_event', event.target.value); onSelectionChange(event.target.value, 'overview'); }}>{events.map((item) => <option key={item.eventId} value={item.eventId}>{item.eventName}</option>)}</select>}
-          </div>
-        </div>
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktives Event</p><h2 className="text-lg font-semibold">{selectedEvent.eventName}</h2></div>
+            <div className="flex items-center gap-3">
+              <Badge variant={selectedEvent.racepic?.published ? 'default' : 'secondary'}>{selectedEvent.racepic?.published ? 'Öffentlich' : 'Nicht öffentlich'}</Badge>
+              {events.length > 1 && <select aria-label="RacePic-Event wählen" className="h-9 rounded-md border px-3 text-sm" value={selectedEvent.eventId} onChange={(event) => { setSelectedEventId(event.target.value); window.sessionStorage.setItem('racepic_admin_event', event.target.value); onSelectionChange(event.target.value, 'overview'); }}>{events.map((item) => <option key={item.eventId} value={item.eventId}>{item.eventName}</option>)}</select>}
+            </div>
+          </CardContent>
+        </Card>
         <EventConfigForm key={selectedEvent.eventId} event={selectedEvent} licenses={licenses} onSaved={onChanged} canManage={canManage} initialTab={requestedTab} onTabChange={(tab) => onSelectionChange(selectedEvent.eventId, tab)} />
       </> : <p className="text-sm text-slate-500">Keine Events verfügbar.</p>}
     </section>
@@ -225,21 +241,21 @@ function EventConfigForm({ event, licenses, onSaved, canManage, initialTab, onTa
   return (
     <Tabs value={activeTab} onValueChange={(tab) => { setActiveTab(tab); onTabChange(tab === 'assignment' ? 'assignments' : tab); }} className="w-full">
       <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
-        <TabsTrigger value="overview" className={tabTriggerClass}>Übersicht</TabsTrigger>
+        <TabsTrigger value="overview" className={tabTriggerClass}><Gauge className="mr-1.5 h-3.5 w-3.5" />Übersicht</TabsTrigger>
         {canManage && <TabsTrigger value="settings" className={tabTriggerClass}>
-          Einstellungen
+          <SettingsIcon className="mr-1.5 h-3.5 w-3.5" />Einstellungen
         </TabsTrigger>}
         {canManage && <TabsTrigger value="photographers" className={tabTriggerClass}>
-          Fotograf:innen
+          <UsersRound className="mr-1.5 h-3.5 w-3.5" />Fotograf:innen
         </TabsTrigger>}
         {canManage && <TabsTrigger value="images" className={tabTriggerClass}>
-          Bilder
+          <ImageIcon className="mr-1.5 h-3.5 w-3.5" />Bilder
         </TabsTrigger>}
         <TabsTrigger value="assignment" className={tabTriggerClass}>
-          Zuordnung
+          <UserCheck className="mr-1.5 h-3.5 w-3.5" />Zuordnung
         </TabsTrigger>
         {canManage && <TabsTrigger value="matching" className={tabTriggerClass}>
-          KI-Konfiguration
+          <Sparkles className="mr-1.5 h-3.5 w-3.5" />KI-Konfiguration
         </TabsTrigger>}
       </TabsList>
 
@@ -361,7 +377,7 @@ function EventConfigForm({ event, licenses, onSaved, canManage, initialTab, onTa
               <ul className="ml-4 list-disc">
                 {Object.entries(stats.imagesByVisibility).map(([visibility, count]) => (
                   <li key={visibility}>
-                    {visibility}: {count}
+                    {VISIBILITY_LABELS[visibility] ?? visibility}: {count}
                   </li>
                 ))}
                 {Object.keys(stats.imagesByVisibility).length === 0 && <li className="text-slate-400">keine Bilder</li>}
@@ -392,37 +408,9 @@ function EventConfigForm({ event, licenses, onSaved, canManage, initialTab, onTa
   );
 }
 
-/**
- * KI-Pipeline-Status pro Bild (Feedback 2026-09-22: "einen besseren Status der KI-Analyse" - ein
- * frisch hochgeladenes Bild durchläuft Ingest → Analyze → Match asynchron über SQS und taucht
- * deshalb nicht sofort in der Review-Queue auf; die rohen Enum-Werte allein erklären das nicht).
- */
-const PROCESSING_STATUS_ORDER = ["UPLOADED", "VALIDATED", "DERIVED", "ANALYZED", "MATCHED", "FAILED", "DUPLICATE"];
-const PROCESSING_STATUS_LABELS: Record<string, string> = {
-  UPLOADED: "Hochgeladen",
-  VALIDATED: "Geprüft",
-  DERIVED: "Varianten werden erzeugt",
-  ANALYZED: "KI-Analyse fertig",
-  MATCHED: "Zuordnung berechnet",
-  FAILED: "Fehlgeschlagen",
-  DUPLICATE: "Duplikat",
-};
-// Bilder in diesen Stati werden noch von der Pipeline verarbeitet - solange mindestens eins davon
-// existiert, lohnt sich Polling, damit der Status ohne manuelles Neuladen weiterläuft.
-const PROCESSING_NON_TERMINAL_STATUSES = new Set(["UPLOADED", "VALIDATED", "DERIVED", "ANALYZED"]);
-const PROCESSING_STATUS_BADGE_CLASS: Record<string, string> = {
-  UPLOADED: "border-slate-300 text-slate-500",
-  VALIDATED: "border-slate-300 text-slate-500",
-  DERIVED: "border-blue-300 text-blue-600",
-  ANALYZED: "border-blue-300 text-blue-600",
-  MATCHED: "border-green-300 text-green-700",
-  FAILED: "border-red-300 text-red-700",
-  DUPLICATE: "border-amber-300 text-amber-700",
-};
-
-const ASSIGNMENT_STATE_LABEL: Record<string, string> = {
-  CONFIRMED: 'Bestätigt', AUTO_MATCHED: 'Automatisch zugeordnet', REVIEW_REQUIRED: 'Prüfung nötig', UNASSIGNED: 'Kein Fahrer zugeordnet'
-};
+// Status-/Sichtbarkeits-Vokabulare (PROCESSING_STATUS_*, VISIBILITY_LABELS, ASSIGNMENT_*,
+// PHOTOGRAPHER_STATUS_LABELS) kommen aus src/lib/racepic-labels.ts (Bug/Verwirrung gefunden
+// 2026-09-29: sechs sich überlappende, lokal definierte Vokabulare an sechs Stellen im Code).
 
 function ProcessingStatusBadge({ status }: { status: string }) {
   return (
@@ -432,15 +420,6 @@ function ProcessingStatusBadge({ status }: { status: string }) {
     </Badge>
   );
 }
-
-const ASSIGNMENT_STATUS_ORDER = ["REVIEW_REQUIRED", "AUTO_MATCHED", "MANUALLY_CONFIRMED", "MANUALLY_CORRECTED", "REJECTED"];
-const ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
-  REVIEW_REQUIRED: "Wartet auf Entscheidung",
-  AUTO_MATCHED: "Automatisch zugeordnet",
-  MANUALLY_CONFIRMED: "Bestätigt",
-  MANUALLY_CORRECTED: "Manuell korrigiert",
-  REJECTED: "Abgelehnt",
-};
 
 const VISIBILITY_ACTIONS: Record<string, { label: string; next: "PUBLISHED" | "HIDDEN" | "REMOVED"; permission?: "manage" }[]> = {
   DRAFT: [{ label: "Veröffentlichen", next: "PUBLISHED" }],
@@ -470,6 +449,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [detailImageId, setDetailImageId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const { confirm, node: confirmDialog } = useConfirm();
   const pageSize = 20;
 
   // `silent` fuer den Hintergrund-Poll unten: kein setLoading(true) (das ersetzte bisher alle 5s
@@ -525,7 +505,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
   };
 
   const runAction = async (imageId: string, next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
-    if (next === "REMOVED" && !window.confirm("Bild wirklich entfernen? Das löscht die Bilddateien (Datenbank-Eintrag bleibt vorerst erhalten).")) return;
+    if (next === "REMOVED" && !(await confirm("Das löscht die Bilddateien (Datenbank-Eintrag bleibt vorerst erhalten).", { title: "Bild wirklich entfernen?", confirmLabel: "Entfernen" }))) return;
     setBusyImageId(imageId);
     try {
       await adminRacepicService.setImageVisibility(imageId, next);
@@ -538,7 +518,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
   };
 
   const runHardDelete = async (imageId: string) => {
-    if (!window.confirm("Bild wirklich endgültig aus der Datenbank löschen? Das kann nicht rückgängig gemacht werden.")) return;
+    if (!(await confirm("Das kann nicht rückgängig gemacht werden.", { title: "Bild wirklich endgültig löschen?", confirmLabel: "Endgültig löschen" }))) return;
     setBusyImageId(imageId);
     try {
       await adminRacepicService.hardDeleteImage(imageId);
@@ -574,7 +554,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
   };
 
   const runBulkAction = async (next: "PUBLISHED" | "HIDDEN" | "REMOVED") => {
-    if (next === "REMOVED" && !window.confirm(`${selected.size} Bild(er) wirklich entfernen? Das löscht die Bilddateien (Datenbank-Eintrag bleibt vorerst erhalten).`)) return;
+    if (next === "REMOVED" && !(await confirm(`Das löscht die Bilddateien von ${selected.size} Bild(ern) (Datenbank-Eintrag bleibt vorerst erhalten).`, { title: "Bilder wirklich entfernen?", confirmLabel: "Entfernen" }))) return;
     setBulkRunning(true);
     setError("");
     try {
@@ -593,14 +573,50 @@ function ImagesSection({ eventId }: { eventId: string }) {
     }
   };
 
+  // Nutzerwunsch 2026-09-29: "endlich ordentlich die Bilder in der Testphase beliebig gesammelt
+  // löschen können". Das Backend lehnt einen Hard-Delete weiterhin ab (409), solange visibility !=
+  // REMOVED (Sicherheitsschranke gegen versehentliches endgültiges Löschen veröffentlichter Fotos,
+  // handler.ts) - hier wirkt die Aktion deshalb nur auf bereits entfernte Bilder der Auswahl; der
+  // Rest bleibt unangetastet (kein Fehler-Abbruch fuer die ganze Batch-Aktion).
+  const runBulkHardDelete = async () => {
+    const removedSelected = items.filter((item) => selected.has(item.id) && item.visibility === "REMOVED").map((item) => item.id);
+    if (removedSelected.length === 0) return;
+    if (!(await confirm(`${removedSelected.length} bereits entfernte(s) Bild(er) endgültig löschen. Das kann nicht rückgängig gemacht werden.`, { title: "Bilder wirklich endgültig löschen?", confirmLabel: "Endgültig löschen" }))) return;
+    setBulkRunning(true);
+    setError("");
+    try {
+      const succeeded: string[] = [];
+      for (const imageId of removedSelected) {
+        try {
+          await adminRacepicService.hardDeleteImage(imageId);
+          succeeded.push(imageId);
+        } catch {
+          // einzelne Fehlschläge sollen den Rest der Batch-Aktion nicht abbrechen
+        }
+      }
+      setItems((prev) => prev.filter((item) => !succeeded.includes(item.id)));
+      setTotal((prev) => Math.max(0, prev - succeeded.length));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        succeeded.forEach((id) => next.delete(id));
+        return next;
+      });
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
+  const selectedRemovedCount = items.filter((item) => selected.has(item.id) && item.visibility === "REMOVED").length;
+
   return (
     <div>
+      {confirmDialog}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Bilder ({total})</h3>
         <div className="flex items-center gap-2">
           {items.length > 0 && (
-            <label className="flex items-center gap-1 text-xs text-slate-500">
-              <input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAllOnPage} />
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Checkbox checked={allOnPageSelected} onCheckedChange={toggleSelectAllOnPage} />
               Alle auf dieser Seite
             </label>
           )}
@@ -608,14 +624,19 @@ function ImagesSection({ eventId }: { eventId: string }) {
             <>
               <span className="text-xs text-slate-500">{selected.size} ausgewählt</span>
               <Button size="sm" variant="outline" disabled={bulkRunning} onClick={() => runBulkAction("PUBLISHED")}>
-                Veröffentlichen
+                <Eye className="mr-1 h-3.5 w-3.5" />Veröffentlichen
               </Button>
               <Button size="sm" variant="outline" disabled={bulkRunning} onClick={() => runBulkAction("HIDDEN")}>
-                Verbergen
+                <EyeOff className="mr-1 h-3.5 w-3.5" />Verbergen
               </Button>
               <Button size="sm" variant="outline" className="text-destructive" disabled={bulkRunning} onClick={() => runBulkAction("REMOVED")}>
-                Entfernen
+                <Trash2 className="mr-1 h-3.5 w-3.5" />Entfernen
               </Button>
+              {selectedRemovedCount > 0 && (
+                <Button size="sm" variant="outline" className="text-destructive" disabled={bulkRunning} onClick={runBulkHardDelete}>
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />Endgültig löschen ({selectedRemovedCount})
+                </Button>
+              )}
             </>
           )}
           <select
@@ -627,10 +648,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
             }}
           >
             <option value="">Alle Sichtbarkeiten</option>
-            <option value="DRAFT">DRAFT</option>
-            <option value="PUBLISHED">PUBLISHED</option>
-            <option value="HIDDEN">HIDDEN</option>
-            <option value="REMOVED">REMOVED</option>
+            {Object.entries(VISIBILITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>
       </div>
@@ -639,7 +657,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
       {!loading && (
         <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {items.map((image) => (
-            <div key={image.id} className="overflow-hidden rounded-lg border bg-white">
+            <Card key={image.id} className="overflow-hidden">
               <div className="relative flex aspect-[4/3] items-center justify-center bg-slate-100">
                 {image.previewUrl ? (
                   <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />
@@ -652,15 +670,15 @@ function ImagesSection({ eventId }: { eventId: string }) {
                         : "Keine Vorschau"}
                   </span>
                 )}
-                <label className="absolute left-1.5 top-1.5 rounded bg-white/90 p-1">
-                  <input type="checkbox" checked={selected.has(image.id)} onChange={() => toggleSelected(image.id)} />
-                </label>
+                <div className="absolute left-1.5 top-1.5 rounded bg-white/90 p-1">
+                  <Checkbox checked={selected.has(image.id)} onCheckedChange={() => toggleSelected(image.id)} aria-label="Bild auswählen" />
+                </div>
               </div>
-              <div className="space-y-1 p-2">
+              <CardContent className="space-y-1 p-2">
                 <p className="truncate text-[11px] text-slate-500">{image.photographerDisplayName}</p>
                 <div className="flex items-center justify-between">
                   <Badge variant={image.visibility === "PUBLISHED" ? "default" : "secondary"} className="text-[10px]">
-                    {image.visibility}
+                    {VISIBILITY_LABELS[image.visibility] ?? image.visibility}
                   </Badge>
                   <ProcessingStatusBadge status={image.processingStatus} />
                 </div>
@@ -676,6 +694,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
                       disabled={busyImageId === image.id}
                       onClick={() => runAction(image.id, action.next)}
                     >
+                      {action.next === "PUBLISHED" ? <Eye className="mr-1 h-3 w-3" /> : action.next === "HIDDEN" ? <EyeOff className="mr-1 h-3 w-3" /> : <Trash2 className="mr-1 h-3 w-3" />}
                       {action.label}
                     </Button>
                   ))}
@@ -687,7 +706,7 @@ function ImagesSection({ eventId }: { eventId: string }) {
                       disabled={busyImageId === image.id}
                       onClick={() => runHardDelete(image.id)}
                     >
-                      Endgültig löschen
+                      <Trash2 className="mr-1 h-3 w-3" />Endgültig löschen
                     </Button>
                   )}
                   <Button
@@ -696,11 +715,11 @@ function ImagesSection({ eventId }: { eventId: string }) {
                     className="h-6 px-1.5 text-[10px]"
                     onClick={() => setDetailImageId(detailImageId === image.id ? null : image.id)}
                   >
-                    Zuordnung
+                    <Link2 className="mr-1 h-3 w-3" />Zuordnung
                   </Button>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
           {items.length === 0 && <p className="col-span-full p-3 text-center text-sm text-slate-400">Keine Bilder.</p>}
         </div>
@@ -840,7 +859,7 @@ function ImageAssignmentDetail({ imageId, eventId, onClose }: { imageId: string;
               <span>
                 #{a.startNumber} {a.driverName} – {a.vehicleMake} {a.vehicleModel} ·{" "}
                 <Badge variant={a.status === "REJECTED" ? "secondary" : "default"} className="text-[10px]">
-                  {a.status}
+                  {ASSIGNMENT_STATUS_LABELS[a.status] ?? a.status}
                 </Badge>{" "}
                 ({a.source}
                 {a.confidence !== null ? `, ${Math.round(a.confidence * 100)}%` : ""})
@@ -1056,10 +1075,12 @@ function AssignmentOverviewTab({ eventId }: { eventId: string }) {
 function StatusTile({ label, value, tone }: { label: string; value: number; tone: "slate" | "amber" | "green" }) {
   const toneClass = tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-800" : tone === "green" ? "border-green-200 bg-green-50 text-green-800" : "border-slate-200 bg-slate-50 text-slate-700";
   return (
-    <div className={`rounded-lg border p-3 ${toneClass}`}>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs">{label}</p>
-    </div>
+    <Card className={toneClass}>
+      <CardContent className="p-3">
+        <p className="text-2xl font-bold">{value}</p>
+        <p className="text-xs">{label}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1173,32 +1194,32 @@ function MatchingSection({ eventId }: { eventId: string }) {
       )}
 
       {report && (
-        <div className="overflow-x-auto rounded-lg border">
-          <p className="p-2 text-xs text-slate-500">
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500">
             {report.reviewedDetectionCount} geprüfte Erkennungen, {report.detectionsWithConfirmedMatchCount} mit bestätigtem Treffer.
           </p>
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-left">
-              <tr>
-                <th className="p-2">Schwelle</th>
-                <th className="p-2">Kandidaten</th>
-                <th className="p-2">Precision</th>
-                <th className="p-2">Recall</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Schwelle</TableHead>
+                <TableHead className="text-xs">Kandidaten</TableHead>
+                <TableHead className="text-xs">Precision</TableHead>
+                <TableHead className="text-xs">Recall</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {report.thresholds.map((row) => (
-                <tr key={row.threshold} className="border-t">
-                  <td className="p-2">{row.threshold}</td>
-                  <td className="p-2">
+                <TableRow key={row.threshold}>
+                  <TableCell className="text-xs">{row.threshold}</TableCell>
+                  <TableCell className="text-xs">
                     {row.correctCount}/{row.candidateCount}
-                  </td>
-                  <td className="p-2">{row.precision === null ? "–" : `${Math.round(row.precision * 100)}%`}</td>
-                  <td className="p-2">{row.recall === null ? "–" : `${Math.round(row.recall * 100)}%`}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="text-xs">{row.precision === null ? "–" : `${Math.round(row.precision * 100)}%`}</TableCell>
+                  <TableCell className="text-xs">{row.recall === null ? "–" : `${Math.round(row.recall * 100)}%`}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
@@ -1305,6 +1326,7 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const { confirm, node: confirmDialog } = useConfirm();
 
   const reload = () => {
     setLoading(true);
@@ -1337,7 +1359,7 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
   };
 
   const review = async (photographerId: string, decision: 'approve' | 'reject') => {
-    if (decision === 'reject' && !window.confirm('Registrierung wirklich ablehnen?')) return;
+    if (decision === 'reject' && !(await confirm('Registrierung wirklich ablehnen?'))) return;
     setReviewingId(photographerId); setError('');
     try { await adminRacepicService.reviewPhotographerRegistration(photographerId, decision, decision === 'approve' ? [eventId] : []); reload(); }
     catch (err) { setError(getApiErrorMessage(err)); }
@@ -1345,7 +1367,7 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
   };
 
   const handleDeletePhotographer = async (photographerId: string, displayName: string) => {
-    if (!window.confirm(`${displayName} wirklich löschen? Der Zugang wird gesperrt, bereits hochgeladene Bilder bleiben erhalten.`)) return;
+    if (!(await confirm(`${displayName} wirklich löschen? Der Zugang wird gesperrt, bereits hochgeladene Bilder bleiben erhalten.`))) return;
     setReviewingId(photographerId); setError('');
     try { await adminRacepicService.deletePhotographer(photographerId); reload(); }
     catch (err) { setError(getApiErrorMessage(err)); }
@@ -1354,6 +1376,7 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
 
   return (
     <div className="space-y-4">
+      {confirmDialog}
       {pendingRegistrations.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Neue Registrierungen ({pendingRegistrations.length})</h3><p className="mt-1 text-xs text-amber-900">Freigabe gibt Upload-Rechte für dieses Event. Prüfe Identität und Bildrechte vor der Entscheidung.</p><div className="mt-3 space-y-2">{pendingRegistrations.map((photographer) => <div key={photographer.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-3 text-sm"><span><strong>{photographer.displayName}</strong> · {photographer.email}</span><div className="flex gap-2"><Button size="sm" disabled={reviewingId === photographer.id} onClick={() => review(photographer.id, 'approve')}>Für Event freigeben</Button><Button size="sm" variant="outline" disabled={reviewingId === photographer.id} onClick={() => review(photographer.id, 'reject')}>Ablehnen</Button></div></div>)}</div></div>}
       <form onSubmit={handleInvite} className="flex flex-wrap items-end gap-3 rounded-lg border p-4">
         <div>
@@ -1376,47 +1399,45 @@ function EventPhotographersTab({ eventId }: { eventId: string }) {
 
       {loading && <p className="text-sm text-slate-400">Lädt…</p>}
       {!loading && (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left">
-              <tr>
-                <th className="p-3">Name</th>
-                <th className="p-3">E-Mail</th>
-                <th className="p-3">Status</th>
-                <th className="p-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {photographers.map((photographer) => (
-                <tr key={photographer.id} className="border-t">
-                  <td className="p-3">{photographer.displayName}</td>
-                  <td className="p-3">{photographer.email}</td>
-                  <td className="p-3">
-                    <Badge variant={photographer.status === "ACTIVE_FREE" ? "default" : "secondary"}>{photographer.status}</Badge>
-                  </td>
-                  <td className="p-3 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2 text-[11px] text-destructive"
-                      disabled={reviewingId === photographer.id}
-                      onClick={() => handleDeletePhotographer(photographer.id, photographer.displayName)}
-                    >
-                      Löschen
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {photographers.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-3 text-center text-slate-400">
-                    Noch keine Fotograf:innen für dieses Event.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>E-Mail</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {photographers.map((photographer) => (
+              <TableRow key={photographer.id}>
+                <TableCell>{photographer.displayName}</TableCell>
+                <TableCell>{photographer.email}</TableCell>
+                <TableCell>
+                  <Badge variant={photographer.status === "ACTIVE_FREE" ? "default" : "secondary"}>{PHOTOGRAPHER_STATUS_LABELS[photographer.status] ?? photographer.status}</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[11px] text-destructive"
+                    disabled={reviewingId === photographer.id}
+                    onClick={() => handleDeletePhotographer(photographer.id, photographer.displayName)}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />Löschen
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {photographers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-slate-400">
+                  Noch keine Fotograf:innen für dieses Event.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       )}
     </div>
   );
@@ -1483,7 +1504,7 @@ export function PhotographersSection({
           <div className="flex flex-wrap gap-3">
             {events.map((item) => (
               <label key={item.eventId} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={selectedEventIds.includes(item.eventId)} onChange={() => toggleEvent(item.eventId)} />
+                <Checkbox checked={selectedEventIds.includes(item.eventId)} onCheckedChange={() => toggleEvent(item.eventId)} />
                 {item.eventName}
               </label>
             ))}
@@ -1495,37 +1516,35 @@ export function PhotographersSection({
         </Button>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left">
-            <tr>
-              <th className="p-3">Name</th>
-              <th className="p-3">E-Mail</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Events</th>
-            </tr>
-          </thead>
-          <tbody>
-            {photographers.map((photographer) => (
-              <tr key={photographer.id} className="border-t">
-                <td className="p-3">{photographer.displayName}</td>
-                <td className="p-3">{photographer.email}</td>
-                <td className="p-3">
-                  <Badge variant={photographer.status === "ACTIVE_FREE" ? "default" : "secondary"}>{photographer.status}</Badge>
-                </td>
-                <td className="p-3">{photographer.events.map((e) => e.eventName).join(", ") || "–"}</td>
-              </tr>
-            ))}
-            {photographers.length === 0 && (
-              <tr>
-                <td colSpan={4} className="p-3 text-center text-slate-400">
-                  Noch keine Fotograf:innen eingeladen.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>E-Mail</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Events</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {photographers.map((photographer) => (
+            <TableRow key={photographer.id}>
+              <TableCell>{photographer.displayName}</TableCell>
+              <TableCell>{photographer.email}</TableCell>
+              <TableCell>
+                <Badge variant={photographer.status === "ACTIVE_FREE" ? "default" : "secondary"}>{PHOTOGRAPHER_STATUS_LABELS[photographer.status] ?? photographer.status}</Badge>
+              </TableCell>
+              <TableCell>{photographer.events.map((e) => e.eventName).join(", ") || "–"}</TableCell>
+            </TableRow>
+          ))}
+          {photographers.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-slate-400">
+                Noch keine Fotograf:innen eingeladen.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </section>
   );
 }

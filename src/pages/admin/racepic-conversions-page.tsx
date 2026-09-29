@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useConfirm } from "@/hooks/use-confirm";
+import { CONVERSION_STATUS_LABELS as STATUS_LABEL, VISIBILITY_LABELS } from "@/lib/racepic-labels";
 import { adminRacepicService } from "@/services/admin-racepic.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
 import type { RacepicConversionDetail, RacepicConversionStatus, RacepicConversionSummary } from "@/types/admin-racepic";
@@ -11,15 +14,6 @@ import type { RacepicConversionDetail, RacepicConversionStatus, RacepicConversio
  * Die Freigabe wirkt nur auf kuenftige Zugriffe: bereits heruntergeladene FREE-Dateien sind nicht rueckrufbar.
  * Die Routen antworten mit 404/COMMERCE_DISABLED, solange das Backend-Flag commerceFreeToPaidConversion aus ist.
  */
-
-const STATUS_LABEL: Record<RacepicConversionStatus, string> = {
-  REQUESTED: "Beantragt",
-  PREPARING_ASSETS: "Bereitet Dateien vor",
-  READY_FOR_REVIEW: "Zur Prüfung",
-  APPROVED: "Freigegeben",
-  REJECTED: "Abgelehnt",
-  FAILED: "Fehlgeschlagen",
-};
 
 const FILTERS: { value: RacepicConversionStatus | ""; label: string }[] = [
   { value: "READY_FOR_REVIEW", label: "Zur Prüfung" },
@@ -45,6 +39,7 @@ export function AdminRacepicConversionsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [disabled, setDisabled] = useState(false);
+  const { confirm, node: confirmDialog } = useConfirm();
   // Ein Idempotency-Key pro Entscheidungsversuch: bei Wiederholung nach einem Fehler derselbe Key, nach Erfolg neu.
   const attemptKey = useRef<{ scope: string; key: string } | null>(null);
 
@@ -84,7 +79,7 @@ export function AdminRacepicConversionsPage() {
       decision === "approve"
         ? `Umstellung für ${detail.items.length} Bild(er) auf ${formatPrice(detail.priceCents)} wirklich freigeben? Die kostenlose Ausgabe endet für künftige Zugriffe.`
         : "Antrag wirklich ablehnen? Die Veröffentlichung bleibt unverändert.";
-    if (!window.confirm(question)) return;
+    if (!(await confirm(question, { title: decision === "approve" ? "Umstellung freigeben?" : "Antrag ablehnen?", confirmLabel: decision === "approve" ? "Freigeben" : "Ablehnen" }))) return;
     setBusy(true);
     setError("");
     try {
@@ -117,12 +112,9 @@ export function AdminRacepicConversionsPage() {
 
   if (disabled) {
     return (
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold">RacePic: Preisumstellungen</h1>
-        <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-600">
-          Die Umstellung von kostenlosen auf kostenpflichtige Bilder ist noch nicht aktiviert (Backend-Flag <code>commerceFreeToPaidConversion</code>).
-        </p>
-      </div>
+      <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-600">
+        Die Umstellung von kostenlosen auf kostenpflichtige Bilder ist noch nicht aktiviert (Backend-Flag <code>commerceFreeToPaidConversion</code>).
+      </p>
     );
   }
 
@@ -131,13 +123,11 @@ export function AdminRacepicConversionsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">RacePic: Preisumstellungen</h1>
-        <p className="text-sm text-slate-600">
-          Anträge von Fotograf:innen, veröffentlichte kostenlose Bilder kostenpflichtig anzubieten. Geprüft werden Eigentum, Rechtebestätigung, Preis, Lizenz und
-          wasserzeichenbehaftete Vorschau.
-        </p>
-      </div>
+      {confirmDialog}
+      <p className="text-sm text-slate-600">
+        Anträge von Fotograf:innen, veröffentlichte kostenlose Bilder kostenpflichtig anzubieten. Geprüft werden Eigentum, Rechtebestätigung, Preis, Lizenz und
+        wasserzeichenbehaftete Vorschau.
+      </p>
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((option) => (
@@ -247,7 +237,7 @@ export function AdminRacepicConversionsPage() {
                     <figcaption className="space-y-0.5">
                       <div className="truncate font-medium">{item.title || item.imageId}</div>
                       <div className="text-slate-500">
-                        {item.visibility} · {item.offerMode} · Dateien: {item.artifactStatus}
+                        {VISIBILITY_LABELS[item.visibility] ?? item.visibility} · {item.offerMode} · Dateien: {item.artifactStatus}
                       </div>
                       {!item.ownedByRequester && <div className="font-medium text-red-700">Gehört nicht der antragstellenden Person!</div>}
                       {item.artifactError && <div className="text-red-700">{item.artifactError}</div>}
@@ -261,9 +251,9 @@ export function AdminRacepicConversionsPage() {
                   <Label htmlFor="conversion-note" className="text-xs">
                     Bearbeitungsvermerk (Pflicht)
                   </Label>
-                  <textarea
+                  <Textarea
                     id="conversion-note"
-                    className="min-h-20 w-full rounded-md border bg-white p-2 text-sm"
+                    className="min-h-20"
                     maxLength={1000}
                     value={note}
                     onChange={(event) => setNote(event.target.value)}

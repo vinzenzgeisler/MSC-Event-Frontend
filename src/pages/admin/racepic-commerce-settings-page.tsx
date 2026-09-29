@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { bpToPercent, formatEuro, percentToBp, previewSale, type CommerceSettingsValues, type CommerceSettingsVersion, type ShareBasis } from "@/lib/commerce-settings";
 import { adminRacepicService } from "@/services/admin-racepic.service";
 import { ApiError, getApiErrorMessage } from "@/services/api/http-client";
@@ -105,13 +107,10 @@ export function AdminRacepicCommerceSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">RacePic: Steuer &amp; Provision</h1>
-        <p className="text-sm text-slate-600">
-          Diese Werte bestimmen, wie ein Verkaufspreis aufgeteilt wird. Sie sind bewusst einstellbar, weil das Steuermodell noch mit der Steuerberatung geklärt wird.
-          Jede Änderung erzeugt eine neue Version, bestehende Bestellungen behalten ihre.
-        </p>
-      </div>
+      <p className="text-sm text-slate-600">
+        Diese Werte bestimmen, wie ein Verkaufspreis aufgeteilt wird. Sie sind bewusst einstellbar, weil das Steuermodell noch mit der Steuerberatung geklärt wird.
+        Jede Änderung erzeugt eine neue Version, bestehende Bestellungen behalten ihre.
+      </p>
 
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {message && <p className="rounded-md bg-green-50 p-3 text-sm text-green-800">{message}</p>}
@@ -152,7 +151,7 @@ export function AdminRacepicCommerceSettingsPage() {
         </div>
         <div className="md:col-span-2">
           <Label htmlFor="settings-note" className="text-xs">Vermerk zur Änderung (Pflicht)</Label>
-          <textarea id="settings-note" className="min-h-16 w-full rounded-md border bg-white p-2 text-sm" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Grund, z. B. Auskunft der Steuerberatung vom …" />
+          <Textarea id="settings-note" className="min-h-16" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Grund, z. B. Auskunft der Steuerberatung vom …" />
         </div>
         {parsed === null && <p className="text-sm text-red-700 md:col-span-2">Bitte gültige Prozentwerte eingeben (Steuersätze bis 30 %, Provision bis 100 %, Künstlersozialabgabe bis 10 %).</p>}
         <div className="md:col-span-2">
@@ -164,74 +163,70 @@ export function AdminRacepicCommerceSettingsPage() {
         <h2 className="text-lg font-semibold">Vorschau (mit den Werten im Formular)</h2>
         {parsed && parsed.saleTaxRateBp === null && <p className="text-sm text-slate-500">Ohne Umsatzsteuersatz keine Vorschau.</p>}
         {parsed && parsed.saleTaxRateBp !== null && (
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="p-3">Preis brutto</th>
-                  <th className="p-3">Netto / USt</th>
-                  <th className="p-3">Auszahlung regelbesteuert</th>
-                  <th className="p-3">Auszahlung Kleinunternehmer</th>
-                  <th className="p-3">MSC (regelbesteuert / Kleinunternehmer)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {PREVIEW_PRICES.map((price) => {
-                  const preview = previewSale(price, parsed);
-                  if (!preview) return null;
-                  return (
-                    <tr key={price}>
-                      <td className="p-3 font-medium">{formatEuro(price)}</td>
-                      <td className="p-3">{formatEuro(preview.netCents)} / {formatEuro(preview.taxCents)}</td>
-                      <td className="p-3">{formatEuro(preview.regularPayoutCents)}</td>
-                      <td className="p-3">{formatEuro(preview.smallBusinessPayoutCents)}</td>
-                      <td className="p-3">{formatEuro(preview.regularMscCents)} / {formatEuro(preview.smallBusinessMscCents)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs uppercase">Preis brutto</TableHead>
+                <TableHead className="text-xs uppercase">Netto / USt</TableHead>
+                <TableHead className="text-xs uppercase">Auszahlung regelbesteuert</TableHead>
+                <TableHead className="text-xs uppercase">Auszahlung Kleinunternehmer</TableHead>
+                <TableHead className="text-xs uppercase">MSC (regelbesteuert / Kleinunternehmer)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {PREVIEW_PRICES.map((price) => {
+                const preview = previewSale(price, parsed);
+                if (!preview) return null;
+                return (
+                  <TableRow key={price}>
+                    <TableCell className="font-medium">{formatEuro(price)}</TableCell>
+                    <TableCell>{formatEuro(preview.netCents)} / {formatEuro(preview.taxCents)}</TableCell>
+                    <TableCell>{formatEuro(preview.regularPayoutCents)}</TableCell>
+                    <TableCell>{formatEuro(preview.smallBusinessPayoutCents)}</TableCell>
+                    <TableCell>{formatEuro(preview.regularMscCents)} / {formatEuro(preview.smallBusinessMscCents)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
         <p className="text-xs text-slate-500">Ohne Zahlungsgebühren und Künstlersozialabgabe. Der Server rechnet verbindlich.</p>
       </div>
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Verlauf</h2>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="p-3">Version</th>
-                <th className="p-3">Steuersatz</th>
-                <th className="p-3">Provision</th>
-                <th className="p-3">Bezug</th>
-                <th className="p-3">Fotograf USt</th>
-                <th className="p-3">KSA</th>
-                <th className="p-3">Vermerk</th>
-                <th className="p-3">Von / am</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {history.map((version) => (
-                <tr key={version.id}>
-                  <td className="p-3">
-                    v{version.version} {version.version === current?.version && <Badge variant="default">aktuell</Badge>}
-                  </td>
-                  <td className="p-3">{version.saleTaxRateBp === null ? "offen" : `${bpToPercent(version.saleTaxRateBp)} %`}</td>
-                  <td className="p-3">{bpToPercent(version.commissionBp)} %</td>
-                  <td className="p-3">{version.sellerShareBasis === "NET" ? "Netto" : "Brutto"}</td>
-                  <td className="p-3">{version.sellerVatRateBp === null ? "wie Verkauf" : `${bpToPercent(version.sellerVatRateBp)} %`}</td>
-                  <td className="p-3">{bpToPercent(version.artistSocialLevyBp)} %</td>
-                  <td className="p-3">{version.note ?? ""}</td>
-                  <td className="p-3 whitespace-nowrap">
-                    {version.createdBy.slice(0, 12)} · {new Date(version.createdAt).toLocaleString("de-DE")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs uppercase">Version</TableHead>
+              <TableHead className="text-xs uppercase">Steuersatz</TableHead>
+              <TableHead className="text-xs uppercase">Provision</TableHead>
+              <TableHead className="text-xs uppercase">Bezug</TableHead>
+              <TableHead className="text-xs uppercase">Fotograf USt</TableHead>
+              <TableHead className="text-xs uppercase">KSA</TableHead>
+              <TableHead className="text-xs uppercase">Vermerk</TableHead>
+              <TableHead className="text-xs uppercase">Von / am</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {history.map((version) => (
+              <TableRow key={version.id}>
+                <TableCell>
+                  v{version.version} {version.version === current?.version && <Badge variant="default">aktuell</Badge>}
+                </TableCell>
+                <TableCell>{version.saleTaxRateBp === null ? "offen" : `${bpToPercent(version.saleTaxRateBp)} %`}</TableCell>
+                <TableCell>{bpToPercent(version.commissionBp)} %</TableCell>
+                <TableCell>{version.sellerShareBasis === "NET" ? "Netto" : "Brutto"}</TableCell>
+                <TableCell>{version.sellerVatRateBp === null ? "wie Verkauf" : `${bpToPercent(version.sellerVatRateBp)} %`}</TableCell>
+                <TableCell>{bpToPercent(version.artistSocialLevyBp)} %</TableCell>
+                <TableCell>{version.note ?? ""}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {version.createdBy.slice(0, 12)} · {new Date(version.createdAt).toLocaleString("de-DE")}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
