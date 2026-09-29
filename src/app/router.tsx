@@ -104,15 +104,18 @@ const AdminNewsletterPage = lazy(() =>
 const AdminRacepicPage = lazy(() =>
   import("@/pages/admin/racepic-page").then((module) => ({ default: module.AdminRacepicPage })),
 );
-const AdminRacepicConversionsPage = lazy(() =>
-  import("@/pages/admin/racepic-conversions-page").then((module) => ({ default: module.AdminRacepicConversionsPage })),
-);
-const AdminRacepicCommerceSettingsPage = lazy(() =>
-  import("@/pages/admin/racepic-commerce-settings-page").then((module) => ({ default: module.AdminRacepicCommerceSettingsPage })),
-);
 function LegacyRacePicReviewRedirect() {
   const { eventId = '' } = useParams();
   return <Navigate to={`/admin/racepic?event=${encodeURIComponent(eventId)}&tab=assignments`} replace />;
+}
+/** Die Preisumstellungs- und Steuer/Provisions-Seiten sind seit der Menü-Konsolidierung Tabs
+ * innerhalb von AdminRacepicPage (`?section=...`) statt eigener Routen; diese Pfade bleiben nur
+ * als Redirect fuer bestehende Links/Bookmarks erhalten. */
+function LegacyRacePicConversionsRedirect() {
+  return <Navigate to="/admin/racepic?section=conversions" replace />;
+}
+function LegacyRacePicCommerceSettingsRedirect() {
+  return <Navigate to="/admin/racepic?section=commerce-settings" replace />;
 }
 
 function RouteErrorPage() {
@@ -277,7 +280,7 @@ export const router = createBrowserRouter([
             path: "racepic/conversions",
             element: (
               <ProtectedRoute allowedRoles={["admin"]}>
-                {isRacePicEnabled() ? <AdminRacepicConversionsPage /> : <Navigate to="/admin" replace />}
+                {isRacePicEnabled() ? <LegacyRacePicConversionsRedirect /> : <Navigate to="/admin" replace />}
               </ProtectedRoute>
             ),
           },
@@ -285,7 +288,7 @@ export const router = createBrowserRouter([
             path: "racepic/commerce-settings",
             element: (
               <ProtectedRoute allowedRoles={["admin"]}>
-                {isRacePicEnabled() ? <AdminRacepicCommerceSettingsPage /> : <Navigate to="/admin" replace />}
+                {isRacePicEnabled() ? <LegacyRacePicCommerceSettingsRedirect /> : <Navigate to="/admin" replace />}
               </ProtectedRoute>
             ),
           },

@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { adminRacepicService } from "@/services/admin-racepic.service";
 import { getApiErrorMessage } from "@/services/api/http-client";
 import { HideParticipantSection, ReviewCard } from "./racepic-review-page";
+import { AdminRacepicConversionsPage } from "./racepic-conversions-page";
+import { AdminRacepicCommerceSettingsPage } from "./racepic-commerce-settings-page";
 import type {
   RacepicAdminImage,
   RacepicImagePipelineStatus,
@@ -51,25 +53,58 @@ export function AdminRacepicPage() {
 
   useEffect(reload, []);
 
+  // Eigener Query-Parameter `section` fuer die oberste Tab-Ebene (getrennt vom `tab`-Parameter der
+  // Event-internen Tabs in EventConfigForm), damit beide unabhaengig voneinander verlinkbar bleiben.
+  const requestedSection = searchParams.get('section');
+  const section = canManage && (requestedSection === 'conversions' || requestedSection === 'commerce-settings') ? requestedSection : 'events';
+  const topTabTriggerClass =
+    "rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium text-slate-500 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none";
+
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-bold">RacePic</h1>
-        <p className="text-sm text-slate-500">Bilder, Zuordnungen und Fotograf:innen direkt verwalten.</p>
+        <p className="text-sm text-slate-500">Bilder, Zuordnungen, Fotograf:innen sowie Preisumstellung und Steuer/Provision an einem Ort verwalten.</p>
       </div>
 
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {loading && <p className="text-sm text-slate-500">Lädt…</p>}
+      <Tabs
+        value={section}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          if (value === 'events') next.delete('section'); else next.set('section', value);
+          setSearchParams(next, { replace: true });
+        }}
+        className="w-full"
+      >
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+          <TabsTrigger value="events" className={topTabTriggerClass}>Events</TabsTrigger>
+          {canManage && <TabsTrigger value="conversions" className={topTabTriggerClass}>Preisumstellung</TabsTrigger>}
+          {canManage && <TabsTrigger value="commerce-settings" className={topTabTriggerClass}>Steuer & Provision</TabsTrigger>}
+        </TabsList>
 
-      {!loading && <EventsSection
-        events={events}
-        licenses={licenses}
-        onChanged={reload}
-        canManage={canManage}
-        requestedEventId={searchParams.get('event')}
-        requestedTab={searchParams.get('tab')}
-        onSelectionChange={(eventId, tab) => setSearchParams({ event: eventId, tab }, { replace: true })}
-      />}
+        <TabsContent value="events" className="space-y-5 pt-5">
+          {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+          {loading && <p className="text-sm text-slate-500">Lädt…</p>}
+
+          {!loading && <EventsSection
+            events={events}
+            licenses={licenses}
+            onChanged={reload}
+            canManage={canManage}
+            requestedEventId={searchParams.get('event')}
+            requestedTab={searchParams.get('tab')}
+            onSelectionChange={(eventId, tab) => setSearchParams({ event: eventId, tab }, { replace: true })}
+          />}
+        </TabsContent>
+
+        {canManage && <TabsContent value="conversions" className="pt-5">
+          <AdminRacepicConversionsPage />
+        </TabsContent>}
+
+        {canManage && <TabsContent value="commerce-settings" className="pt-5">
+          <AdminRacepicCommerceSettingsPage />
+        </TabsContent>}
+      </Tabs>
     </div>
   );
 }
