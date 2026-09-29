@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Calendar, Tag, Receipt, Gauge, Settings as SettingsIcon, UsersRound, Image as ImageIcon,
-  UserCheck, Sparkles, Eye, EyeOff, Trash2, Link2,
+  UserCheck, Sparkles, Eye, EyeOff, Trash2, Link2, LayoutGrid, List as ListIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -450,6 +450,11 @@ function ImagesSection({ eventId }: { eventId: string }) {
   const [detailImageId, setDetailImageId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const { confirm, node: confirmDialog } = useConfirm();
+  // Nutzerwunsch 2026-09-29: "mehr Listen-Optik im Panel wie so bei SharePoint, wo ich den Status
+  // eines Bildes besser nachvollziehen kann" - die Kachelansicht bleibt Standard (Vorschaubilder
+  // sind fuer die Foto-Auswahl wichtig), die Listenansicht daneben zeigt denselben Bestand
+  // tabellarisch und dichter, damit viele Stati auf einen Blick vergleichbar sind.
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const pageSize = 20;
 
   // `silent` fuer den Hintergrund-Poll unten: kein setLoading(true) (das ersetzte bisher alle 5s
@@ -608,6 +613,45 @@ function ImagesSection({ eventId }: { eventId: string }) {
 
   const selectedRemovedCount = items.filter((item) => selected.has(item.id) && item.visibility === "REMOVED").length;
 
+  // Gemeinsame Aktionsleiste fuer Kachel- und Listenansicht (Nutzerwunsch 2026-09-29: Listenansicht
+  // dazu) - eine Implementierung statt einer zweiten Kopie derselben Buttons.
+  const renderActions = (image: RacepicAdminImage) => (
+    <>
+      {(VISIBILITY_ACTIONS[image.visibility] ?? []).map((action) => (
+        <Button
+          key={action.next}
+          size="sm"
+          variant="outline"
+          className="h-6 px-1.5 text-[10px]"
+          disabled={busyImageId === image.id}
+          onClick={() => runAction(image.id, action.next)}
+        >
+          {action.next === "PUBLISHED" ? <Eye className="mr-1 h-3 w-3" /> : action.next === "HIDDEN" ? <EyeOff className="mr-1 h-3 w-3" /> : <Trash2 className="mr-1 h-3 w-3" />}
+          {action.label}
+        </Button>
+      ))}
+      {image.visibility === "REMOVED" && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 px-1.5 text-[10px] text-destructive"
+          disabled={busyImageId === image.id}
+          onClick={() => runHardDelete(image.id)}
+        >
+          <Trash2 className="mr-1 h-3 w-3" />Endgültig löschen
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-1.5 text-[10px]"
+        onClick={() => setDetailImageId(detailImageId === image.id ? null : image.id)}
+      >
+        <Link2 className="mr-1 h-3 w-3" />Zuordnung
+      </Button>
+    </>
+  );
+
   return (
     <div>
       {confirmDialog}
@@ -650,11 +694,29 @@ function ImagesSection({ eventId }: { eventId: string }) {
             <option value="">Alle Sichtbarkeiten</option>
             {Object.entries(VISIBILITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
+          <div className="flex overflow-hidden rounded-md border">
+            <button
+              type="button"
+              title="Kachelansicht"
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "bg-background text-slate-500 hover:bg-slate-100"}`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              title="Listenansicht"
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 ${viewMode === "list" ? "bg-primary text-primary-foreground" : "bg-background text-slate-500 hover:bg-slate-100"}`}
+            >
+              <ListIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       {loading && <p className="text-sm text-slate-400">Lädt…</p>}
-      {!loading && (
+      {!loading && viewMode === "grid" && (
         <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {items.map((image) => (
             <Card key={image.id} className="overflow-hidden">
@@ -684,45 +746,68 @@ function ImagesSection({ eventId }: { eventId: string }) {
                 </div>
                 <p className={`text-[11px] font-medium ${image.assignmentState === 'UNASSIGNED' ? 'text-amber-700' : 'text-slate-600'}`}>{ASSIGNMENT_STATE_LABEL[image.assignmentState] ?? image.assignmentState}</p>
                 {image.processingError && <p className="line-clamp-2 text-[10px] text-red-700" title={image.processingError}>{image.processingError}</p>}
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {(VISIBILITY_ACTIONS[image.visibility] ?? []).map((action) => (
-                    <Button
-                      key={action.next}
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-1.5 text-[10px]"
-                      disabled={busyImageId === image.id}
-                      onClick={() => runAction(image.id, action.next)}
-                    >
-                      {action.next === "PUBLISHED" ? <Eye className="mr-1 h-3 w-3" /> : action.next === "HIDDEN" ? <EyeOff className="mr-1 h-3 w-3" /> : <Trash2 className="mr-1 h-3 w-3" />}
-                      {action.label}
-                    </Button>
-                  ))}
-                  {image.visibility === "REMOVED" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-1.5 text-[10px] text-destructive"
-                      disabled={busyImageId === image.id}
-                      onClick={() => runHardDelete(image.id)}
-                    >
-                      <Trash2 className="mr-1 h-3 w-3" />Endgültig löschen
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-6 px-1.5 text-[10px]"
-                    onClick={() => setDetailImageId(detailImageId === image.id ? null : image.id)}
-                  >
-                    <Link2 className="mr-1 h-3 w-3" />Zuordnung
-                  </Button>
-                </div>
+                <div className="flex flex-wrap gap-1 pt-1">{renderActions(image)}</div>
               </CardContent>
             </Card>
           ))}
           {items.length === 0 && <p className="col-span-full p-3 text-center text-sm text-slate-400">Keine Bilder.</p>}
         </div>
+      )}
+      {!loading && viewMode === "list" && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-8" />
+              <TableHead className="w-16">Vorschau</TableHead>
+              <TableHead>Fotograf:in</TableHead>
+              <TableHead>Sichtbarkeit</TableHead>
+              <TableHead>Verarbeitung</TableHead>
+              <TableHead>Zuordnung</TableHead>
+              <TableHead className="text-right">Aktionen</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((image) => (
+              <TableRow key={image.id}>
+                <TableCell>
+                  <Checkbox checked={selected.has(image.id)} onCheckedChange={() => toggleSelected(image.id)} aria-label="Bild auswählen" />
+                </TableCell>
+                <TableCell>
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded bg-slate-100">
+                    {image.previewUrl ? (
+                      <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-[8px] text-slate-400">
+                        {image.visibility === "REMOVED" ? "Entfernt" : PROCESSING_NON_TERMINAL_STATUSES.has(image.processingStatus) ? "…" : "–"}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm">{image.photographerDisplayName}</TableCell>
+                <TableCell>
+                  <Badge variant={image.visibility === "PUBLISHED" ? "default" : "secondary"} className="text-[10px]">
+                    {VISIBILITY_LABELS[image.visibility] ?? image.visibility}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <ProcessingStatusBadge status={image.processingStatus} />
+                  {image.processingError && <p className="mt-1 line-clamp-2 max-w-[16rem] text-[10px] text-red-700" title={image.processingError}>{image.processingError}</p>}
+                </TableCell>
+                <TableCell className={`text-xs font-medium ${image.assignmentState === 'UNASSIGNED' ? 'text-amber-700' : 'text-slate-600'}`}>
+                  {ASSIGNMENT_STATE_LABEL[image.assignmentState] ?? image.assignmentState}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap justify-end gap-1">{renderActions(image)}</div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {items.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-slate-400">Keine Bilder.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       )}
       {detailImageId && <ImageAssignmentDetail imageId={detailImageId} eventId={eventId} onClose={() => setDetailImageId(null)} />}
       {total > pageSize && (
