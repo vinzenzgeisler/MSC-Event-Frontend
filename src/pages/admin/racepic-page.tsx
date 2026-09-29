@@ -645,7 +645,11 @@ function ImagesSection({ eventId }: { eventId: string }) {
                   <img src={image.previewUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-[10px] text-slate-400">
-                    {image.visibility === "REMOVED" ? "Entfernt" : "Wird verarbeitet…"}
+                    {image.visibility === "REMOVED"
+                      ? "Entfernt"
+                      : PROCESSING_NON_TERMINAL_STATUSES.has(image.processingStatus)
+                        ? "Wird verarbeitet…"
+                        : "Keine Vorschau"}
                   </span>
                 )}
                 <label className="absolute left-1.5 top-1.5 rounded bg-white/90 p-1">
