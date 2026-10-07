@@ -14,7 +14,9 @@ import {
   paymentStatusClasses,
   paymentStatusLabel,
   techStatusClasses,
-  techStatusLabel
+  techStatusLabel,
+  waiverSignedClasses,
+  waiverSignedLabel
 } from "@/lib/admin-status";
 import { adminEntriesService } from "@/services/admin-entries.service";
 import { adminSigningService, type SigningDevice, type SigningPrecheckTimestamps, type SigningRequirements, type SigningSessionStatus } from "@/services/admin-signing.service";
@@ -553,9 +555,9 @@ export function AdminEntryDetailPage() {
   const selectedSigningDeviceId = signingDeviceId || connectedSigningDevices[0]?.id || "";
   const selectedSigningDevice = connectedSigningDevices.find((device) => device.id === selectedSigningDeviceId) ?? null;
   const selectedSigningDeviceOnline = isSigningDeviceOnline(selectedSigningDevice);
-  const signedWaiverDocument = detail.documents.find((doc) => doc.type === "waiver_signed" && doc.status === "generated" && doc.driverPersonId === detail.driverPersonId);
-  const hasSignedWaiverDocument = detail.consent.waiverAccepted && Boolean(signedWaiverDocument);
-  const signedWaiverAt = detail.consent.waiverAccepted ? detail.consent.consentCapturedAt : null;
+  const signedWaiverDocumentId = detail.waiverSigned.documentId;
+  const hasSignedWaiverDocument = detail.waiverSigned.signed;
+  const signedWaiverAt = detail.waiverSigned.signedAt;
   const signingRequirementEntries = signingRequirements?.entries ?? [];
   const signingSignerOptions =
     signingRequirements?.signers && signingRequirements.signers.length > 0
@@ -732,6 +734,9 @@ export function AdminEntryDetailPage() {
                   Prüfung: Noch nicht relevant
                 </Badge>
               )}
+              <Badge className={`${waiverSignedClasses(detail.waiverSigned.signed)} h-6 px-2.5 text-xs`} variant="outline">
+                Haftverzicht: {waiverSignedLabel(detail.waiverSigned.signed)}
+              </Badge>
               {statusActionInFlight && (
                 <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -785,6 +790,9 @@ export function AdminEntryDetailPage() {
                 Prüfung: Noch nicht relevant
               </Badge>
             )}
+            <Badge className={`${waiverSignedClasses(detail.waiverSigned.signed)} h-6 px-2.5 text-xs`} variant="outline">
+              Haftverzicht: {waiverSignedLabel(detail.waiverSigned.signed)}
+            </Badge>
             {statusActionInFlight && (
               <Badge className="h-6 border-blue-300 bg-blue-50 px-2.5 text-xs text-blue-800" variant="outline">
                 <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -1071,8 +1079,8 @@ export function AdminEntryDetailPage() {
                       className="mt-3 h-9 bg-white"
                       disabled={anyActionInFlight}
                       onClick={() => {
-                        if (signedWaiverDocument) {
-                          void handleDocumentDownloadById(signedWaiverDocument.id, "Unterschriebener Haftverzicht", "download-waiver");
+                        if (signedWaiverDocumentId) {
+                          void handleDocumentDownloadById(signedWaiverDocumentId, "Unterschriebener Haftverzicht", "download-waiver");
                         }
                       }}
                     >
@@ -1384,8 +1392,8 @@ export function AdminEntryDetailPage() {
                   disabled={anyActionInFlight}
                   className={cn("h-auto w-full whitespace-normal break-words py-2 text-left leading-tight", actionOutlineClass)}
                   onClick={() => {
-                    if (hasSignedWaiverDocument && signedWaiverDocument) {
-                      void handleDocumentDownloadById(signedWaiverDocument.id, "Haftverzicht", "download-waiver");
+                    if (hasSignedWaiverDocument && signedWaiverDocumentId) {
+                      void handleDocumentDownloadById(signedWaiverDocumentId, "Haftverzicht", "download-waiver");
                       return;
                     }
                     void handleDocumentDownload("waiver", "Haftverzicht", "download-waiver");
