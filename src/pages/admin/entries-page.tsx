@@ -693,12 +693,11 @@ export function AdminEntriesPage() {
           showToast(getApiErrorMessage(error, "Nennungen konnten nicht geladen werden."));
         }
       } finally {
-        if (!isRequestActive(requestId)) {
-          return;
-        }
+        if (isRequestActive(requestId)) {
         setLoadingInitial(false);
         setRefreshing(false);
         setLoadingMore(false);
+        }
       }
     },
     [fetchActiveSnapshot]
@@ -733,12 +732,11 @@ export function AdminEntriesPage() {
           showToast(getApiErrorMessage(error, "Gelöschte Nennungen konnten nicht geladen werden."));
         }
       } finally {
-        if (!isRequestActive(requestId)) {
-          return;
-        }
+        if (isRequestActive(requestId)) {
         setLoadingInitial(false);
         setRefreshing(false);
         setLoadingMore(false);
+        }
       }
     },
     [fetchDeletedSnapshot]
@@ -774,10 +772,9 @@ export function AdminEntriesPage() {
       }
       showToast(getApiErrorMessage(error, "Weitere Nennungen konnten nicht geladen werden."));
     } finally {
-      if (!isRequestActive(requestId)) {
-        return;
+      if (isRequestActive(requestId)) {
+        setLoadingMore(false);
       }
-      setLoadingMore(false);
     }
   }, [appliedFilter, loadingInitial, loadingMore, meta.hasMore, meta.nextCursor, refreshing]);
 
@@ -807,10 +804,9 @@ export function AdminEntriesPage() {
       }
       showToast(getApiErrorMessage(error, "Weitere gelöschte Nennungen konnten nicht geladen werden."));
     } finally {
-      if (!isRequestActive(requestId)) {
-        return;
+      if (isRequestActive(requestId)) {
+        setLoadingMore(false);
       }
-      setLoadingMore(false);
     }
   }, [appliedFilter, deletedMeta.hasMore, deletedMeta.nextCursor, loadingInitial, loadingMore, refreshing]);
 

@@ -1,5 +1,4 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useAnmeldungI18n } from "@/app/i18n/anmeldung-i18n";
 import { usePublicLegal } from "@/app/legal/public-legal-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

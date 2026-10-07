@@ -211,6 +211,7 @@ export function resolveCountryToCanonical(value: string): string | null {
   return getCatalog().canonicalNameByCode.get(code) ?? null;
 }
 
-export function isCountryOption(value: string, _locale: string): boolean {
+export function isCountryOption(value: string, locale: string): boolean {
+  void locale;
   return Boolean(resolveCountryCode(value));
 }

@@ -22,8 +22,8 @@ import type {
 } from "@/types/registration";
 
 const START_NUMBER_PATTERN = /^[A-Z0-9]{1,6}$/;
-const PHONE_ALLOWED_PATTERN = /^\+?[0-9()\/\-\s.]+$/;
-const ZIP_PATTERN = /^[A-Za-z0-9][A-Za-z0-9\- ]{1,11}$/;
+const PHONE_ALLOWED_PATTERN = /^\+?[0-9()/\s.-]+$/;
+const ZIP_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 -]{1,11}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HUBRAUM_PATTERN = /^\d{2,5}$/;
 const CYLINDERS_PATTERN = /^(?:\d{1,2}|V\d{1,2})$/i;
@@ -198,7 +198,7 @@ const initialDriver: DriverForm = {
 };
 
 function sanitizePhoneInput(value: string) {
-  let next = value.replace(/[^\d+\s()/.\-]/g, "");
+  let next = value.replace(/[^\d+\s()/.-]/g, "");
   const firstPlusIndex = next.indexOf("+");
   if (firstPlusIndex > 0) {
     next = next.replace(/\+/g, "");
@@ -720,23 +720,6 @@ function getDriverBirthdateRealtimeError(
   }
   if (!isBirthdateInRange(trimmed, 6, 100)) {
     return m.errors.invalidBirthdateRange;
-  }
-  return undefined;
-}
-
-function getCodriverBirthdateRealtimeError(
-  value: string,
-  m: ReturnType<typeof useAnmeldungI18n>["m"]
-) {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length < 10) {
-    return undefined;
-  }
-  if (!parseBirthdate(trimmed)) {
-    return m.errors.invalidCodriverBirthdate;
-  }
-  if (!isBirthdateInRange(trimmed, 6, 100)) {
-    return m.errors.invalidCodriverBirthdateRange;
   }
   return undefined;
 }

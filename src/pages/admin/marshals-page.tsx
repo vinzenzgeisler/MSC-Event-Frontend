@@ -10,7 +10,7 @@ import { MarshalGeneralView } from "@/components/features/admin/marshal-general-
 import { MarshalImportView } from "@/components/features/admin/marshal-import-view";
 import { MarshalPersonDrawer } from "@/components/features/admin/marshal-person-drawer";
 import { MarshalReadinessView } from "@/components/features/admin/marshal-readiness-view";
-import { getPostTarget, type PlanningTargetMode } from "@/components/features/admin/marshal-planning-map";
+import { type PlanningTargetMode } from "@/components/features/admin/marshal-planning-map";
 import { MarshalSchulungView, type BulkTrainingRegistrationResult } from "@/components/features/admin/marshal-schulung-view";
 import { MarshalSidebar, type SidebarView } from "@/components/features/admin/marshal-sidebar";
 import { MarshalStammdatenView } from "@/components/features/admin/marshal-stammdaten-view";
@@ -127,7 +127,8 @@ export function AdminMarshalsPage() {
     finally { setBusy(false); }
   }
 
-  function resolveDaySave(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string, _allowOverfill = false) {
+  function resolveDaySave(person: MarshalPerson, status: MarshalCommitmentStatus, assignmentValue: string, allowOverfill = false) {
+    void allowOverfill;
     if (!workspace) return false;
     const scopedPerson = workspace.people.find((item) => item.id === person.id);
     if (!scopedPerson) return false;
@@ -187,8 +188,8 @@ export function AdminMarshalsPage() {
     const replacementAssignment = replacement?.assignments.find((assignment) => assignment.dayId === day?.id);
     if (!day || !current || !replacement || !currentAssignment || !replacementAssignment || replacement.noDeployment) return false;
     const operationEventId = eventId;
-    const assignReplacement = resolveDaySave(replacement, replacementAssignment.commitmentStatus, `post:${postId}`, true);
-    const removeCurrent = resolveDaySave(current, currentAssignment.commitmentStatus, "", true);
+    const assignReplacement = resolveDaySave(replacement, replacementAssignment.commitmentStatus, `post:${postId}`);
+    const removeCurrent = resolveDaySave(current, currentAssignment.commitmentStatus, "");
     if (!assignReplacement || !removeCurrent) return false;
     const rollbackReplacement = { ...assignReplacement.payload, days: [{
       dayId: replacementAssignment.dayId,
