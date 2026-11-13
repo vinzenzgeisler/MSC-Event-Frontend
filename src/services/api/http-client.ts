@@ -71,6 +71,11 @@ function resolveBaseUrl(): string {
 }
 
 const baseUrl = resolveBaseUrl();
+const newsletterBaseUrl = String(
+  window.__MSC_RUNTIME_CONFIG__?.newsletterApiBaseUrl ??
+  (import.meta.env as Record<string, unknown>).VITE_NEWSLETTER_API_BASE_URL ??
+  ""
+).trim().replace(/\/$/, "") || baseUrl;
 
 function getAuthenticatedEmailHeader(): string | null {
   const session = getAuthSession();
@@ -89,7 +94,8 @@ function getAuthenticatedEmailHeader(): string | null {
 
 export function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  const url = new URL(`${baseUrl}${normalizedPath}`, window.location.origin);
+  const selectedBaseUrl = normalizedPath.startsWith("/admin/newsletter/") ? newsletterBaseUrl : baseUrl;
+  const url = new URL(`${selectedBaseUrl}${normalizedPath}`, window.location.origin);
 
   if (query) {
     Object.entries(query).forEach(([key, value]) => {
@@ -100,7 +106,7 @@ export function buildUrl(path: string, query?: RequestOptions["query"]): string 
     });
   }
 
-  return baseUrl ? url.toString() : `${normalizedPath}${url.search}`;
+  return selectedBaseUrl ? url.toString() : `${normalizedPath}${url.search}`;
 }
 
 async function parseResponseBody(response: Response): Promise<{ payload: unknown; invalidJson: boolean }> {
