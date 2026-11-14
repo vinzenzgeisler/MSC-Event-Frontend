@@ -2,6 +2,7 @@ window.__MSC_RUNTIME_CONFIG__ = window.__MSC_RUNTIME_CONFIG__ || {};
 // Example:
 // window.__MSC_RUNTIME_CONFIG__ = {
 //   apiBaseUrl: "https://api.example.org",
+//   newsletterApiBaseUrl: "https://newsletter-api.example.org",
 //   cognitoEnabled: true,
 //   cognitoDomain: "https://<cognito-hosted-ui-domain>",
 //   cognitoClientId: "client-id",
